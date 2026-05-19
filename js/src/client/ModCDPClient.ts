@@ -69,6 +69,7 @@ export const DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000;
 export const DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100;
 export const DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20;
 export const DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
+export const DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250;
 export const DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = ["/modcdp/service_worker.js"];
 export const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
 export const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
@@ -126,6 +127,7 @@ export type ClientConfigOptions = {
   client_mirror_upstream_events?: boolean;
   client_cdp_send_timeout_ms?: number;
   client_event_wait_timeout_ms?: number;
+  client_heartbeat_interval_ms?: number;
 };
 export type ClientOptions = {
   launcher?: LauncherOptions;
@@ -143,6 +145,7 @@ type ClientConfig = {
   client_mirror_upstream_events: boolean;
   client_cdp_send_timeout_ms: number;
   client_event_wait_timeout_ms: number;
+  client_heartbeat_interval_ms: number;
 };
 type NormalizedClientOptions = {
   launcher: Required<LauncherOptions>;
@@ -293,6 +296,7 @@ function normalizeClientOptions({
       client_mirror_upstream_events: client.client_mirror_upstream_events ?? true,
       client_cdp_send_timeout_ms: client.client_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS,
       client_event_wait_timeout_ms: client.client_event_wait_timeout_ms ?? DEFAULT_EVENT_WAIT_TIMEOUT_MS,
+      client_heartbeat_interval_ms: client.client_heartbeat_interval_ms ?? DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS,
     },
     server:
       server === null
@@ -399,6 +403,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   cdp_aliases_hydrated: boolean;
   event_wait_cleanups: Set<() => void>;
   auto_sessions: AutoSessionRouter;
+  heartbeat_timer: ReturnType<typeof setInterval> | null;
   _injectors: ExtensionInjector[];
   _cdp: {
     send: (method: string, params?: ProtocolParams, sessionId?: string | null) => Promise<ProtocolResult>;
@@ -453,6 +458,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.command_result_unwrap_keys = new Map();
     this.cdp_aliases_hydrated = false;
     this.event_wait_cleanups = new Set();
+    this.heartbeat_timer = null;
     this.auto_sessions = new AutoSessionRouter(
       (method, params = {}, session_id = null) =>
         this._sendMessage(method, params, session_id) as Promise<ProtocolResult>,
@@ -483,6 +489,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     const transport_connected_at = Date.now();
     this.transport?.onRecv((message) => this._onRecv(message));
     this.transport?.onClose((error) => {
+      this._stopHeartbeat();
       if (this.pending.size > 0) this._rejectAll(error);
     });
 
@@ -492,6 +499,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       if (this.server !== null) {
         await this._sendMessage("Mod.configure", this._serverConfigureParams(), null);
       }
+      this._startHeartbeat();
       void this._measurePingLatency().catch(() => {});
       const connected_at = Date.now();
       this.connect_timing = {
@@ -542,6 +550,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       );
     }
 
+    this._startHeartbeat();
     void this._measurePingLatency().catch(() => {});
     const connected_at = Date.now();
     this.connect_timing = {
@@ -772,6 +781,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       server_cdp_send_timeout_ms: this.client.client_cdp_send_timeout_ms,
       server_loopback_execution_context_timeout_ms: this.injector.injector_execution_context_timeout_ms,
       server_ws_connect_error_settle_timeout_ms: this.upstream.upstream_ws_connect_error_settle_timeout_ms,
+      server_downstream_client_timeout_ms: Math.max(this.client.client_heartbeat_interval_ms * 4, 1_000),
     };
   }
 
@@ -1016,6 +1026,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   }
 
   async close() {
+    this._stopHeartbeat();
     for (const cleanup of this.event_wait_cleanups) cleanup();
     this.event_wait_cleanups.clear();
     if (this._launched) await this._launched.close();
@@ -1024,6 +1035,34 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.transport = null;
     for (const injector of this._injectors) await injector.close();
     this._injectors = [];
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    if (this.server?.server_close_browser_on_downstream_disconnect !== true) return;
+    const interval_ms = this.client.client_heartbeat_interval_ms;
+    this.heartbeat_timer = setInterval(() => {
+      if (this.ext_session_id) {
+        void this._sendRaw(
+          wrapCommandIfNeeded(
+            "Mod.ping",
+            { sent_at: Date.now() },
+            {
+              routes: this.client.client_routes,
+              cdpSessionId: this.ext_session_id,
+            },
+          ),
+        ).catch(() => {});
+        return;
+      }
+      void this.send("Mod.ping", { sent_at: Date.now() }).catch(() => {});
+    }, interval_ms);
+  }
+
+  _stopHeartbeat() {
+    if (this.heartbeat_timer == null) return;
+    clearInterval(this.heartbeat_timer);
+    this.heartbeat_timer = null;
   }
 
   on<TEvent extends z.ZodType & ModCDPNamedValue>(

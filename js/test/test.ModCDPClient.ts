@@ -57,6 +57,7 @@ test("ModCDPClient normalizes nested config owners", () => {
       client_mirror_upstream_events: false,
       client_cdp_send_timeout_ms: 1234,
       client_event_wait_timeout_ms: 2345,
+      client_heartbeat_interval_ms: 3456,
     },
     server: {
       server_routes: { "*.*": "loopback_cdp" },
@@ -64,6 +65,7 @@ test("ModCDPClient normalizes nested config owners", () => {
       server_cdp_send_timeout_ms: 9876,
       server_loopback_execution_context_timeout_ms: 8765,
       server_ws_connect_error_settle_timeout_ms: 7654,
+      server_downstream_client_timeout_ms: 4567,
     },
   });
 
@@ -87,6 +89,7 @@ test("ModCDPClient normalizes nested config owners", () => {
   assert.equal(cdp.client.client_mirror_upstream_events, false);
   assert.equal(cdp.client.client_cdp_send_timeout_ms, 1234);
   assert.equal(cdp.client.client_event_wait_timeout_ms, 2345);
+  assert.equal(cdp.client.client_heartbeat_interval_ms, 3456);
   assert.equal("routes" in cdp, false);
   assert.equal("cdp_send_timeout_ms" in cdp, false);
   assert.equal("service_worker_probe_timeout_ms" in cdp, false);
@@ -97,6 +100,7 @@ test("ModCDPClient normalizes nested config owners", () => {
   assert.equal(params.server.server_cdp_send_timeout_ms, 9876);
   assert.equal(params.server.server_loopback_execution_context_timeout_ms, 8765);
   assert.equal(params.server.server_ws_connect_error_settle_timeout_ms, 7654);
+  assert.equal(params.server.server_downstream_client_timeout_ms, 4567);
 });
 
 test("ModCDPClient dispatches root events before extension session is attached", () => {

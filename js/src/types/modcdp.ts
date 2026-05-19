@@ -169,6 +169,7 @@ export const ModCDPClientOptionsSchema = z
     client_mirror_upstream_events: z.boolean().optional(),
     client_cdp_send_timeout_ms: z.number().positive().optional(),
     client_event_wait_timeout_ms: z.number().positive().optional(),
+    client_heartbeat_interval_ms: z.number().positive().optional(),
   })
   .passthrough();
 export type ModCDPClientOptions = z.infer<typeof ModCDPClientOptionsSchema>;
@@ -181,6 +182,8 @@ export const ModCDPServerOptionsSchema = z
     server_cdp_send_timeout_ms: z.number().positive().optional(),
     server_loopback_execution_context_timeout_ms: z.number().positive().optional(),
     server_ws_connect_error_settle_timeout_ms: z.number().positive().optional(),
+    server_downstream_client_timeout_ms: z.number().positive().optional(),
+    server_close_browser_on_downstream_disconnect: z.boolean().optional(),
   })
   .passthrough();
 export type ModCDPServerOptions = z.infer<typeof ModCDPServerOptionsSchema>;

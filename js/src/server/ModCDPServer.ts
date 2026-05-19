@@ -32,6 +32,7 @@ export const DEFAULT_NATIVE_BRIDGE_HOST_NAME = "com.modcdp.bridge";
 export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 export const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
+export const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
 
 type MiddlewarePhase = "request" | "response" | "event";
 type ProtocolCommandSchema = {
@@ -89,6 +90,54 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   };
   const attachedDebuggees = new Set<string>();
   let runtime_types_promise: Promise<unknown> | null = null;
+  const DOWNSTREAM_CLIENT_KEY = "downstream_client";
+  const registered_downstream_client_keys = new Set<string>();
+  const downstream_client_leases = new Map<
+    string,
+    {
+      cdpSessionId: string | null;
+      last_seen_at: number;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
+
+  function downstreamClientKey(_cdpSessionId: string | null) {
+    return DOWNSTREAM_CLIENT_KEY;
+  }
+
+  function registerDownstreamClient(cdpSessionId: string | null) {
+    const client_key = downstreamClientKey(cdpSessionId);
+    registered_downstream_client_keys.add(client_key);
+    return client_key;
+  }
+
+  function clearDownstreamClientLease(client_key: string) {
+    const lease = downstream_client_leases.get(client_key);
+    if (!lease) return null;
+    clearTimeout(lease.timer);
+    downstream_client_leases.delete(client_key);
+    return lease;
+  }
+
+  function touchDownstreamClientLease(cdpSessionId: string | null) {
+    const timeout_ms = ModCDPServer.downstream_client_timeout_ms;
+    if (!(timeout_ms > 0)) return;
+    const client_key = downstreamClientKey(cdpSessionId);
+    if (!registered_downstream_client_keys.has(client_key)) return;
+    const last_seen_at = Date.now();
+    clearDownstreamClientLease(client_key);
+    const timer = setTimeout(() => {
+      const expired = clearDownstreamClientLease(client_key);
+      if (!expired) return;
+      if (ModCDPServer.close_browser_on_downstream_disconnect !== true) return;
+      void ModCDPServer.sendLoopback("Browser.close", {}, null).catch(() => {});
+    }, timeout_ms);
+    downstream_client_leases.set(client_key, {
+      cdpSessionId,
+      last_seen_at,
+      timer,
+    });
+  }
 
   function nativeCommandSchema(method: string) {
     return (nativeCommandSchemas as Record<string, ProtocolCommandSchema>)[method];
@@ -1002,6 +1051,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     cdp_send_timeout_ms: DEFAULT_CDP_SEND_TIMEOUT_MS,
     loopback_execution_context_timeout_ms: DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS,
     ws_connect_error_settle_timeout_ms: DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
+    downstream_client_timeout_ms: DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
+    close_browser_on_downstream_disconnect: false,
     types: null as (typeof import("../types/generated/zod.js"))["types"] | null,
     commands: null as (typeof import("../types/generated/zod.js"))["commands"] | null,
     events: null as (typeof import("../types/generated/zod.js"))["events"] | null,
@@ -1088,6 +1139,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         server_cdp_send_timeout_ms = this.cdp_send_timeout_ms,
         server_loopback_execution_context_timeout_ms = this.loopback_execution_context_timeout_ms,
         server_ws_connect_error_settle_timeout_ms = this.ws_connect_error_settle_timeout_ms,
+        server_downstream_client_timeout_ms = this.downstream_client_timeout_ms,
+        server_close_browser_on_downstream_disconnect = this.close_browser_on_downstream_disconnect,
       } = server;
       const { custom_commands = [], custom_events = [], custom_middlewares = [] } = params;
       this.loopback_cdp_url = await resolveCDPEndpoint(server_loopback_cdp_url);
@@ -1095,6 +1148,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       this.cdp_send_timeout_ms = server_cdp_send_timeout_ms;
       this.loopback_execution_context_timeout_ms = server_loopback_execution_context_timeout_ms;
       this.ws_connect_error_settle_timeout_ms = server_ws_connect_error_settle_timeout_ms;
+      this.downstream_client_timeout_ms = server_downstream_client_timeout_ms;
+      this.close_browser_on_downstream_disconnect = server_close_browser_on_downstream_disconnect;
       if (upstream.upstream_mode === "nats" && upstream.upstream_nats_url) {
         this.startNatsBridge(upstream.upstream_nats_url, {
           upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix ?? DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
@@ -1217,6 +1272,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     },
 
     async handleCommand(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
+      if (method === "Mod.configure") registerDownstreamClient(cdpSessionId);
+      touchDownstreamClientLease(cdpSessionId);
       const request = { method, params, cdpSessionId };
       const middlewareParams = await this.runMiddleware("request", method, params, { cdpSessionId, request });
       if (middlewareParams == null) throw new Error(`Request middleware for ${method} returned no params.`);
