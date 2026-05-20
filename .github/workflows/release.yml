@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-npm:
+    if: github.repository == 'browserbase/ModCDP'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build
+
+      - name: Prepare alpha version
+        if: github.event_name == 'push'
+        run: |
+          ALPHA_VERSION=$(node -p "(() => {
+            const version = require('./package.json').version;
+            const [core] = version.split('-');
+            return `${core}-alpha.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`;
+          })()")
+          npm version "$ALPHA_VERSION" --no-git-tag-version
+
+      - name: Publish alpha
+        if: github.event_name == 'push'
+        run: npm publish --tag alpha
+
+      - name: Publish stable
+        if: github.event_name != 'push'
+        run: npm publish

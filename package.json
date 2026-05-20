@@ -3,7 +3,7 @@
   "version": "0.0.19",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pirate/modcdp.git"
+    "url": "git+https://github.com/browserbase/ModCDP.git"
   },
   "files": [
     "js/scripts/**/*.mjs",
