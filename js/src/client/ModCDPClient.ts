@@ -1042,19 +1042,6 @@ export class ModCDPClient extends ModCDPEventEmitter {
     if (this.server?.server_close_browser_on_downstream_disconnect !== true) return;
     const interval_ms = this.client.client_heartbeat_interval_ms;
     this.heartbeat_timer = setInterval(() => {
-      if (this.ext_session_id) {
-        void this._sendRaw(
-          wrapCommandIfNeeded(
-            "Mod.ping",
-            { sent_at: Date.now() },
-            {
-              routes: this.client.client_routes,
-              cdpSessionId: this.ext_session_id,
-            },
-          ),
-        ).catch(() => {});
-        return;
-      }
       void this.send("Mod.ping", { sent_at: Date.now() }).catch(() => {});
     }, interval_ms);
   }

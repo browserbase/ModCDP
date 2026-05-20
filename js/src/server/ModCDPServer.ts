@@ -90,53 +90,42 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   };
   const attachedDebuggees = new Set<string>();
   let runtime_types_promise: Promise<unknown> | null = null;
-  const DOWNSTREAM_CLIENT_KEY = "downstream_client";
-  const registered_downstream_client_keys = new Set<string>();
-  const downstream_client_leases = new Map<
-    string,
-    {
-      cdpSessionId: string | null;
-      last_seen_at: number;
-      timer: ReturnType<typeof setTimeout>;
-    }
-  >();
+  let downstream_client_registered = false;
+  let downstream_client_lease: {
+    cdpSessionId: string | null;
+    last_seen_at: number;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
 
-  function downstreamClientKey(_cdpSessionId: string | null) {
-    return DOWNSTREAM_CLIENT_KEY;
+  function registerDownstreamClient() {
+    downstream_client_registered = true;
   }
 
-  function registerDownstreamClient(cdpSessionId: string | null) {
-    const client_key = downstreamClientKey(cdpSessionId);
-    registered_downstream_client_keys.add(client_key);
-    return client_key;
-  }
-
-  function clearDownstreamClientLease(client_key: string) {
-    const lease = downstream_client_leases.get(client_key);
+  function clearDownstreamClientLease() {
+    const lease = downstream_client_lease;
     if (!lease) return null;
     clearTimeout(lease.timer);
-    downstream_client_leases.delete(client_key);
+    downstream_client_lease = null;
     return lease;
   }
 
   function touchDownstreamClientLease(cdpSessionId: string | null) {
     const timeout_ms = ModCDPServer.downstream_client_timeout_ms;
     if (!(timeout_ms > 0)) return;
-    const client_key = downstreamClientKey(cdpSessionId);
-    if (!registered_downstream_client_keys.has(client_key)) return;
+    if (!downstream_client_registered) return;
     const last_seen_at = Date.now();
-    clearDownstreamClientLease(client_key);
+    clearDownstreamClientLease();
     const timer = setTimeout(() => {
-      const expired = clearDownstreamClientLease(client_key);
+      const expired = clearDownstreamClientLease();
       if (!expired) return;
       if (ModCDPServer.close_browser_on_downstream_disconnect !== true) return;
       void ModCDPServer.sendLoopback("Browser.close", {}, null).catch(() => {});
     }, timeout_ms);
-    downstream_client_leases.set(client_key, {
+    downstream_client_lease = {
       cdpSessionId,
       last_seen_at,
       timer,
-    });
+    };
   }
 
   function nativeCommandSchema(method: string) {
@@ -1272,7 +1261,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     },
 
     async handleCommand(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
-      if (method === "Mod.configure") registerDownstreamClient(cdpSessionId);
+      if (method === "Mod.configure") registerDownstreamClient();
       touchDownstreamClientLease(cdpSessionId);
       const request = { method, params, cdpSessionId };
       const middlewareParams = await this.runMiddleware("request", method, params, { cdpSessionId, request });
