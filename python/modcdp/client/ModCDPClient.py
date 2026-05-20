@@ -187,6 +187,7 @@ DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000
 DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100
 DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20
 DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250
+DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250
 
 
 class _RawCDP:
@@ -313,6 +314,9 @@ class ModCDPClient(CDPSurfaceMixin):
             "client_mirror_upstream_events": bool(client_input.get("client_mirror_upstream_events", True)),
             "client_cdp_send_timeout_ms": int(_defaulted(client_input.get("client_cdp_send_timeout_ms"), DEFAULT_CDP_SEND_TIMEOUT_MS)),
             "client_event_wait_timeout_ms": int(_defaulted(client_input.get("client_event_wait_timeout_ms"), DEFAULT_EVENT_WAIT_TIMEOUT_MS)),
+            "client_heartbeat_interval_ms": int(
+                _defaulted(client_input.get("client_heartbeat_interval_ms"), DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS)
+            ),
         }
         self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_cdp_url"))
         if server is DEFAULT_SERVER:
@@ -362,6 +366,8 @@ class ModCDPClient(CDPSurfaceMixin):
         self._closed = False
         self._launched_browser: Any | None = None
         self._extension_injectors: list[ExtensionInjector] = []
+        self._heartbeat_stop: threading.Event | None = None
+        self._heartbeat_thread: threading.Thread | None = None
         self._cdp = _RawCDP(self)
         self._hydrate_native_protocol_schemas()
         self._hydrate_custom_surface()
@@ -374,13 +380,14 @@ class ModCDPClient(CDPSurfaceMixin):
         if self.transport is None:
             raise RuntimeError("upstream transport did not connect.")
         self.transport.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
-        self.transport.onClose(lambda error: self._reject_all(error))
+        self.transport.onClose(lambda error: self._handle_transport_close(error))
 
         if self.upstream_endpoint_kind == "modcdp_server":
             self.transport.waitForPeer()
             if self.server is not None:
                 self._send_message("Mod.configure", cast(ProtocolParams, self._server_configure_params()))
             threading.Thread(target=self._measure_ping_latency, daemon=True).start()
+            self._start_heartbeat()
             connected_at = int(time.time() * 1000)
             self.connect_timing = cast(ModCDPConnectTiming, {
                 "started_at": connect_started_at,
@@ -420,6 +427,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 routes=cast(ModCDPRoutes, self.client["client_routes"]),
                 cdp_session_id=self.ext_session_id,
             ))
+        self._start_heartbeat()
         threading.Thread(target=self._measure_ping_latency, daemon=True).start()
         connected_at = int(time.time() * 1000)
         self.connect_timing = cast(ModCDPConnectTiming, {
@@ -617,6 +625,10 @@ class ModCDPClient(CDPSurfaceMixin):
             "server_ws_connect_error_settle_timeout_ms",
             self.upstream["upstream_ws_connect_error_settle_timeout_ms"],
         )
+        server_downstream_client_timeout_ms = server.pop(
+            "server_downstream_client_timeout_ms",
+            max(int(self.client["client_heartbeat_interval_ms"]) * 4, 1_000),
+        )
         custom_events: list[ModCDPAddCustomEventObjectParams] = []
         for event in self.custom_events:
             custom_events.append(
@@ -645,6 +657,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 "server_cdp_send_timeout_ms": server_cdp_send_timeout_ms,
                 "server_loopback_execution_context_timeout_ms": server_loopback_execution_context_timeout_ms,
                 "server_ws_connect_error_settle_timeout_ms": server_ws_connect_error_settle_timeout_ms,
+                "server_downstream_client_timeout_ms": server_downstream_client_timeout_ms,
                 **({"server_routes": server_routes} if server_routes is not None else {}),
                 **({"server_loopback_cdp_url": server_loopback_cdp_url} if server_loopback_cdp_url is not None else {}),
                 **({"server_browser_token": server_browser_token} if server_browser_token is not None else {}),
@@ -659,6 +672,7 @@ class ModCDPClient(CDPSurfaceMixin):
         if self._closed:
             return
         self._closed = True
+        self._stop_heartbeat()
         if self._launched_browser is not None:
             self._launched_browser["close"]()
             self._launched_browser = None
@@ -674,6 +688,35 @@ class ModCDPClient(CDPSurfaceMixin):
             except Exception:
                 pass
         self._extension_injectors = []
+
+    def _handle_transport_close(self, error: Exception) -> None:
+        self._stop_heartbeat()
+        self._reject_all(error)
+
+    def _start_heartbeat(self) -> None:
+        self._stop_heartbeat()
+        if not self.server or self.server.get("server_close_browser_on_downstream_disconnect") is not True:
+            return
+        interval_ms = int(self.client["client_heartbeat_interval_ms"])
+        stop = threading.Event()
+        self._heartbeat_stop = stop
+
+        def run() -> None:
+            while not stop.wait(interval_ms / 1000):
+                try:
+                    self.send("Mod.ping", {"sent_at": int(time.time() * 1000)})
+                except Exception:
+                    return
+
+        self._heartbeat_thread = threading.Thread(target=run, daemon=True)
+        self._heartbeat_thread.start()
+
+    def _stop_heartbeat(self) -> None:
+        stop = self._heartbeat_stop
+        self._heartbeat_stop = None
+        if stop is not None:
+            stop.set()
+        self._heartbeat_thread = None
 
     def _session_id_for_target(self, target_id: str, timeout: float = 0) -> str | None:
         if timeout <= 0:

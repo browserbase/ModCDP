@@ -92,6 +92,8 @@ class ModCDPServerConfig(TypedDict, total=False):
     server_cdp_send_timeout_ms: int
     server_loopback_execution_context_timeout_ms: int
     server_ws_connect_error_settle_timeout_ms: int
+    server_downstream_client_timeout_ms: int
+    server_close_browser_on_downstream_disconnect: bool
     server_browser_token: str | None
     custom_commands: list[ModCDPAddCustomCommandParams]
     custom_events: list[ModCDPAddCustomEventObjectParams]

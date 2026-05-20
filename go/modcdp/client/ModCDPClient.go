@@ -54,6 +54,7 @@ const DefaultServiceWorkerReadyTimeoutMS = 60_000
 const DefaultServiceWorkerPollIntervalMS = 100
 const DefaultTargetSessionPollIntervalMS = 20
 const DefaultWSConnectErrorSettleTimeoutMS = 250
+const DefaultClientHeartbeatIntervalMS = 250
 
 func boolPointer(value bool) *bool {
 	return &value
@@ -180,14 +181,16 @@ func freePort() (int, error) {
 // --- public types --------------------------------------------------------
 
 type ServerConfig struct {
-	ServerLoopbackCDPURL                    string            `json:"server_loopback_cdp_url,omitempty"`
-	ServerRoutes                            map[string]string `json:"server_routes,omitempty"`
-	ServerBrowserToken                      string            `json:"server_browser_token,omitempty"`
-	ServerCDPSendTimeoutMS                  int               `json:"server_cdp_send_timeout_ms,omitempty"`
-	ServerLoopbackExecutionContextTimeoutMS int               `json:"server_loopback_execution_context_timeout_ms,omitempty"`
-	ServerWSConnectErrorSettleTimeoutMS     int               `json:"server_ws_connect_error_settle_timeout_ms,omitempty"`
-	Options                                 map[string]any    `json:"-"`
-	disabled                                bool
+	ServerLoopbackCDPURL                     string            `json:"server_loopback_cdp_url,omitempty"`
+	ServerRoutes                             map[string]string `json:"server_routes,omitempty"`
+	ServerBrowserToken                       string            `json:"server_browser_token,omitempty"`
+	ServerCDPSendTimeoutMS                   int               `json:"server_cdp_send_timeout_ms,omitempty"`
+	ServerLoopbackExecutionContextTimeoutMS  int               `json:"server_loopback_execution_context_timeout_ms,omitempty"`
+	ServerWSConnectErrorSettleTimeoutMS      int               `json:"server_ws_connect_error_settle_timeout_ms,omitempty"`
+	ServerDownstreamClientTimeoutMS          int               `json:"server_downstream_client_timeout_ms,omitempty"`
+	ServerCloseBrowserOnDownstreamDisconnect *bool             `json:"server_close_browser_on_downstream_disconnect,omitempty"`
+	Options                                  map[string]any    `json:"-"`
+	disabled                                 bool
 }
 
 var ServerNone = &ServerConfig{disabled: true}
@@ -254,6 +257,7 @@ type ClientConfig struct {
 	ClientMirrorUpstreamEvents *bool             `json:"client_mirror_upstream_events,omitempty"`
 	ClientCDPSendTimeoutMS     int               `json:"client_cdp_send_timeout_ms,omitempty"`
 	ClientEventWaitTimeoutMS   int               `json:"client_event_wait_timeout_ms,omitempty"`
+	ClientHeartbeatIntervalMS  int               `json:"client_heartbeat_interval_ms,omitempty"`
 }
 
 type Options struct {
@@ -406,6 +410,7 @@ type ModCDPClient struct {
 	launchedBrowser          *LaunchedBrowser
 	extensionInjectors       []extensionInjector
 	configuredPeerGeneration int64
+	heartbeatStop            chan struct{}
 }
 
 type extensionInjector interface {
@@ -501,6 +506,9 @@ func New(opts Options) *ModCDPClient {
 	if opts.Client.ClientEventWaitTimeoutMS == 0 {
 		opts.Client.ClientEventWaitTimeoutMS = DefaultEventWaitTimeoutMS
 	}
+	if opts.Client.ClientHeartbeatIntervalMS == 0 {
+		opts.Client.ClientHeartbeatIntervalMS = DefaultClientHeartbeatIntervalMS
+	}
 	if opts.Injector.InjectorExecutionContextTimeoutMS == 0 {
 		opts.Injector.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
 	}
@@ -575,7 +583,10 @@ func (c *ModCDPClient) Connect() error {
 		return fmt.Errorf("upstream transport did not connect")
 	}
 	c.transport.OnRecv(func(message map[string]any) { c.handleMessage(message) })
-	c.transport.OnClose(func(err error) { c.rejectAll(err) })
+	c.transport.OnClose(func(err error) {
+		c.stopHeartbeat()
+		c.rejectAll(err)
+	})
 	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer {
 		if err := c.transport.WaitForPeer(); err != nil {
 			c.Close()
@@ -588,6 +599,7 @@ func (c *ModCDPClient) Connect() error {
 			}
 			c.configuredPeerGeneration = c.transport.PeerGeneration()
 		}
+		c.startHeartbeat()
 		c.startPingLatencyMeasurement()
 		connectedAt := time.Now().UnixMilli()
 		c.ConnectTiming = map[string]any{
@@ -683,6 +695,7 @@ func (c *ModCDPClient) Connect() error {
 			return fmt.Errorf("Mod.configure: %w", err)
 		}
 	}
+	c.startHeartbeat()
 	c.startPingLatencyMeasurement()
 	connectedAt := time.Now().UnixMilli()
 	c.ConnectTiming = map[string]any{
@@ -899,6 +912,7 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		"server_cdp_send_timeout_ms":                   c.Client.ClientCDPSendTimeoutMS,
 		"server_loopback_execution_context_timeout_ms": c.Injector.InjectorExecutionContextTimeoutMS,
 		"server_ws_connect_error_settle_timeout_ms":    c.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
+		"server_downstream_client_timeout_ms":          maxInt(c.Client.ClientHeartbeatIntervalMS*4, 1_000),
 	}
 	if c.Server != nil {
 		server["server_loopback_cdp_url"] = c.Server.ServerLoopbackCDPURL
@@ -914,6 +928,12 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		}
 		if c.Server.ServerWSConnectErrorSettleTimeoutMS != 0 {
 			server["server_ws_connect_error_settle_timeout_ms"] = c.Server.ServerWSConnectErrorSettleTimeoutMS
+		}
+		if c.Server.ServerDownstreamClientTimeoutMS != 0 {
+			server["server_downstream_client_timeout_ms"] = c.Server.ServerDownstreamClientTimeoutMS
+		}
+		if c.Server.ServerCloseBrowserOnDownstreamDisconnect != nil {
+			server["server_close_browser_on_downstream_disconnect"] = *c.Server.ServerCloseBrowserOnDownstreamDisconnect
 		}
 		for key, value := range c.Server.Options {
 			server[key] = value
@@ -1410,6 +1430,7 @@ func handlerPointer(handler Handler) uintptr {
 }
 
 func (c *ModCDPClient) Close() {
+	c.stopHeartbeat()
 	if c.launchedBrowser != nil {
 		c.launchedBrowser.Close()
 		c.launchedBrowser = nil
@@ -1662,6 +1683,48 @@ func (c *ModCDPClient) startPingLatencyMeasurement() {
 	go func() {
 		_ = c.measurePingLatency()
 	}()
+}
+
+func (c *ModCDPClient) startHeartbeat() {
+	c.stopHeartbeat()
+	if c.Server == nil || c.Server.ServerCloseBrowserOnDownstreamDisconnect == nil || !*c.Server.ServerCloseBrowserOnDownstreamDisconnect {
+		return
+	}
+	interval := c.Client.ClientHeartbeatIntervalMS
+	if interval <= 0 {
+		return
+	}
+	stop := make(chan struct{})
+	c.heartbeatStop = stop
+	go func() {
+		ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if _, err := c.Send("Mod.ping", map[string]any{"sent_at": time.Now().UnixMilli()}); err != nil {
+					return
+				}
+			case <-stop:
+				return
+			}
+		}
+	}()
+}
+
+func (c *ModCDPClient) stopHeartbeat() {
+	if c.heartbeatStop == nil {
+		return
+	}
+	close(c.heartbeatStop)
+	c.heartbeatStop = nil
+}
+
+func maxInt(left int, right int) int {
+	if left > right {
+		return left
+	}
+	return right
 }
 
 func numberAsInt64(value any) (int64, bool) {
