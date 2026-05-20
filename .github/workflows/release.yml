@@ -40,11 +40,7 @@ jobs:
       - name: Prepare alpha version
         if: github.event_name == 'push'
         run: |
-          ALPHA_VERSION=$(node -p "(() => {
-            const version = require('./package.json').version;
-            const [core] = version.split('-');
-            return `${core}-alpha.${process.env.GITHUB_RUN_NUMBER}.${process.env.GITHUB_RUN_ATTEMPT}`;
-          })()")
+          ALPHA_VERSION=$(node -e 'const version = require("./package.json").version; const [core] = version.split("-"); const commit = (process.env.GITHUB_SHA || "").slice(0, 7); process.stdout.write(`${core}-alpha.${commit}`)')
           npm version "$ALPHA_VERSION" --no-git-tag-version
 
       - name: Publish alpha
