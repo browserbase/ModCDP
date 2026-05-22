@@ -455,41 +455,75 @@ func main() {
 	})
 
 	if mode == "debugger" {
-		marker := fmt.Sprintf("modcdp-debugger-event-%d", time.Now().UnixMilli())
-		if _, err := cdp.Runtime.Enable(); err != nil {
-			log.Fatalf("Runtime.enable: %v", err)
-		}
-		if _, err := cdp.Runtime.Evaluate(modcdp.RuntimeEvaluateParams{
-			Expression:    fmt.Sprintf("console.log(%q)", marker),
-			ReturnByValue: modcdp.Bool(true),
-		}); err != nil {
-			log.Fatalf("Runtime.evaluate console event: %v", err)
-		}
-		deadline := time.Now().Add(3 * time.Second)
-		matchedConsoleEvent := false
-		for time.Now().Before(deadline) {
-			eventsMu.Lock()
-			for _, event := range runtimeConsoleEvents {
-				for _, arg := range event.Args {
-					if arg.Value == marker {
-						matchedConsoleEvent = true
+		normalEventMarker := ""
+		if upstreamMode == "pipe" {
+			if _, err := cdp.SendRaw("Target.setDiscoverTargets", map[string]any{"discover": true}); err != nil {
+				log.Fatalf("Target.setDiscoverTargets: %v", err)
+			}
+			createdTarget, err := cdp.SendRaw("Target.createTarget", map[string]any{
+				"url":        "https://example.com",
+				"background": true,
+			})
+			if err != nil {
+				log.Fatalf("Target.createTarget: %v", err)
+			}
+			normalEventMarker, _ = createdTarget["targetId"].(string)
+			deadline := time.Now().Add(3 * time.Second)
+			matchedTargetEvent := false
+			for time.Now().Before(deadline) {
+				eventsMu.Lock()
+				for _, event := range targetCreatedEvents {
+					if event.TargetID() == normalEventMarker {
+						matchedTargetEvent = true
 						break
 					}
 				}
+				eventsMu.Unlock()
+				if matchedTargetEvent {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			if !matchedTargetEvent {
+				log.Fatalf("expected Target.targetCreated for %s", normalEventMarker)
+			}
+		} else {
+			normalEventMarker = fmt.Sprintf("modcdp-debugger-event-%d", time.Now().UnixMilli())
+			if _, err := cdp.Runtime.Enable(); err != nil {
+				log.Fatalf("Runtime.enable: %v", err)
+			}
+			if _, err := cdp.Runtime.Evaluate(modcdp.RuntimeEvaluateParams{
+				Expression:    fmt.Sprintf("console.log(%q)", normalEventMarker),
+				ReturnByValue: modcdp.Bool(true),
+			}); err != nil {
+				log.Fatalf("Runtime.evaluate console event: %v", err)
+			}
+			deadline := time.Now().Add(3 * time.Second)
+			matchedConsoleEvent := false
+			for time.Now().Before(deadline) {
+				eventsMu.Lock()
+				for _, event := range runtimeConsoleEvents {
+					for _, arg := range event.Args {
+						if arg.Value == normalEventMarker {
+							matchedConsoleEvent = true
+							break
+						}
+					}
+					if matchedConsoleEvent {
+						break
+					}
+				}
+				eventsMu.Unlock()
 				if matchedConsoleEvent {
 					break
 				}
+				time.Sleep(20 * time.Millisecond)
 			}
-			eventsMu.Unlock()
-			if matchedConsoleEvent {
-				break
+			if !matchedConsoleEvent {
+				log.Fatalf("expected Runtime.consoleAPICalled for %s", normalEventMarker)
 			}
-			time.Sleep(20 * time.Millisecond)
 		}
-		if !matchedConsoleEvent {
-			log.Fatalf("expected Runtime.consoleAPICalled for %s", marker)
-		}
-		fmt.Println("normal event matched ->", marker)
+		fmt.Println("normal event matched ->", normalEventMarker)
 
 		debuggerTargetRaw, err := cdp.Mod.Evaluate(map[string]any{
 			"expression": `async () => {
@@ -530,7 +564,7 @@ func main() {
 		if pageTargetEmit["emitted"] != true || pageTargetEmit["targetId"] != debuggerTargetID {
 			log.Fatalf("unexpected Custom.pageTargetUpdated emit result: %v", pageTargetEmit)
 		}
-		deadline = time.Now().Add(3 * time.Second)
+		deadline := time.Now().Add(3 * time.Second)
 		var pageTarget map[string]any
 		for time.Now().Before(deadline) {
 			eventsMu.Lock()

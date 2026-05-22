@@ -1244,8 +1244,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
 
   function validateSingleServerUpstream(routes: ModCDPRoutes) {
     const upstreams = new Set(
-      Object.values(routes).filter((route): route is ServerUpstreamTransportName =>
-        route === "loopback_cdp" || route === "chrome_debugger",
+      Object.values(routes).filter(
+        (route): route is ServerUpstreamTransportName => route === "loopback_cdp" || route === "chrome_debugger",
       ),
     );
     if (upstreams.size > 1) {

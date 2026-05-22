@@ -496,23 +496,46 @@ async function main() {
     });
 
     if (mode === "debugger") {
-      const marker = `modcdp-debugger-event-${Date.now()}`;
-      await cdp.Runtime.enable();
-      await cdp.Runtime.evaluate({
-        expression: `console.log(${JSON.stringify(marker)})`,
-        returnByValue: true,
-      });
-      const runtimeEventDeadline = Date.now() + DEFAULT_TARGET_EVENT_TIMEOUT_MS;
-      while (
-        !runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === marker)) &&
-        Date.now() < runtimeEventDeadline
-      ) {
-        await sleep(DEFAULT_DEMO_EVENT_POLL_INTERVAL_MS);
+      let normalEventMarker: string;
+      if (upstream_mode === "pipe") {
+        await cdp.sendRaw("Target.setDiscoverTargets", { discover: true });
+        const createdTarget = assertObject(
+          await cdp.sendRaw("Target.createTarget", {
+            url: "https://example.com",
+            background: true,
+          }),
+          "Target.createTarget",
+        );
+        normalEventMarker = String(createdTarget.targetId);
+        const targetDeadline = Date.now() + DEFAULT_TARGET_EVENT_TIMEOUT_MS;
+        while (
+          !targetCreatedEvents.some((event) => event?.targetInfo?.targetId === normalEventMarker) &&
+          Date.now() < targetDeadline
+        ) {
+          await sleep(DEFAULT_DEMO_EVENT_POLL_INTERVAL_MS);
+        }
+        if (!targetCreatedEvents.some((event) => event?.targetInfo?.targetId === normalEventMarker)) {
+          throw new Error(`expected Target.targetCreated for ${normalEventMarker}`);
+        }
+      } else {
+        normalEventMarker = `modcdp-debugger-event-${Date.now()}`;
+        await cdp.Runtime.enable();
+        await cdp.Runtime.evaluate({
+          expression: `console.log(${JSON.stringify(normalEventMarker)})`,
+          returnByValue: true,
+        });
+        const runtimeEventDeadline = Date.now() + DEFAULT_TARGET_EVENT_TIMEOUT_MS;
+        while (
+          !runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === normalEventMarker)) &&
+          Date.now() < runtimeEventDeadline
+        ) {
+          await sleep(DEFAULT_DEMO_EVENT_POLL_INTERVAL_MS);
+        }
+        if (!runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === normalEventMarker))) {
+          throw new Error(`expected Runtime.consoleAPICalled for ${normalEventMarker}`);
+        }
       }
-      if (!runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === marker))) {
-        throw new Error(`expected Runtime.consoleAPICalled for ${marker}`);
-      }
-      console.log("normal event matched ->", marker);
+      console.log("normal event matched ->", normalEventMarker);
 
       const debuggerTarget = assertObject(
         await cdp.Mod.evaluate({

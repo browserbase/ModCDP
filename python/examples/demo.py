@@ -339,26 +339,40 @@ def main():
         cdp.on("Custom.pageTargetUpdated", on_page_target_updated)
 
         if mode == "debugger":
-            marker = f"modcdp-debugger-event-{int(time.time() * 1000)}"
-            cdp.send("Runtime.enable", {})
-            cdp.send("Runtime.evaluate", {"expression": f"console.log({json.dumps(marker)})", "returnByValue": True})
-            deadline = time.monotonic() + 3.0
-            while True:
-                with events_lock:
-                    matched_console_event = next(
-                        (
-                            event
-                            for event in runtime_console_events
-                            if any(isinstance(arg, dict) and arg.get("value") == marker for arg in event.get("args", []))
-                        ),
-                        None,
-                    )
-                if matched_console_event or time.monotonic() >= deadline:
-                    break
-                time.sleep(0.02)
-            if not matched_console_event:
-                raise RuntimeError(f"expected Runtime.consoleAPICalled for {marker}")
-            print(f"normal event matched -> {marker}")
+            if upstream_mode == "pipe":
+                cdp.sendRaw("Target.setDiscoverTargets", {"discover": True})
+                created_target = expect_object(cdp.sendRaw("Target.createTarget", {"url": "https://example.com", "background": True}), "Target.createTarget")
+                normal_event_marker = str(created_target.get("targetId"))
+                deadline = time.monotonic() + 3.0
+                while True:
+                    with events_lock:
+                        matched_target_event = next((event for event in target_created_events if event.get("targetInfo", {}).get("targetId") == normal_event_marker), None)
+                    if matched_target_event or time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.02)
+                if not matched_target_event:
+                    raise RuntimeError(f"expected Target.targetCreated for {normal_event_marker}")
+            else:
+                normal_event_marker = f"modcdp-debugger-event-{int(time.time() * 1000)}"
+                cdp.send("Runtime.enable", {})
+                cdp.send("Runtime.evaluate", {"expression": f"console.log({json.dumps(normal_event_marker)})", "returnByValue": True})
+                deadline = time.monotonic() + 3.0
+                while True:
+                    with events_lock:
+                        matched_console_event = next(
+                            (
+                                event
+                                for event in runtime_console_events
+                                if any(isinstance(arg, dict) and arg.get("value") == normal_event_marker for arg in event.get("args", []))
+                            ),
+                            None,
+                        )
+                    if matched_console_event or time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.02)
+                if not matched_console_event:
+                    raise RuntimeError(f"expected Runtime.consoleAPICalled for {normal_event_marker}")
+            print(f"normal event matched -> {normal_event_marker}")
 
             debugger_target = expect_object(cdp.send("Mod.evaluate", {
                 "expression": '''async () => {
