@@ -367,7 +367,7 @@ def main():
                   const target = targets.find(target => target.type === "page" && tab?.id != null && target.tabId === tab.id)
                     ?? targets.find(target => target.type === "page");
                   if (!target?.id) throw new Error("no page target found");
-                  return { targetId: target.id };
+                  return { targetId: target.id, tabId: target.tabId };
                 }''',
             }), "debugger target lookup")
             if not isinstance(debugger_target.get("targetId"), str) or not isinstance(debugger_target.get("tabId"), int | float):

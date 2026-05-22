@@ -498,7 +498,7 @@ func main() {
               const target = targets.find(target => target.type === "page" && tab?.id != null && target.tabId === tab.id)
                 ?? targets.find(target => target.type === "page");
               if (!target?.id) throw new Error("no page target found");
-              return { targetId: target.id };
+              return { targetId: target.id, tabId: target.tabId };
             }`,
 		})
 		if err != nil {
