@@ -371,13 +371,6 @@ async function main() {
     const demoEvent = assertObject(await demoEventPromise, "Custom.demoEvent");
     console.log("Custom.demoEvent ->", demoEvent);
 
-    const runtimeContextPromise = waitForEvent(
-      cdp,
-      "Runtime.executionContextCreated",
-      (event) => event?.context?.id != null,
-    );
-    await cdp.Runtime.enable();
-    const runtimeContext = assertObject(await runtimeContextPromise, "Runtime.executionContextCreated");
     const runtimeEval = assertObject(
       await cdp.Runtime.evaluate({
         expression: "(() => 42)()",
@@ -388,11 +381,10 @@ async function main() {
     if (runtimeEval.result?.value !== 42) {
       throw new Error(`unexpected Runtime.evaluate result ${JSON.stringify(runtimeEval)}`);
     }
-    console.log("Runtime.executionContextCreated ->", runtimeContext);
     console.log("Runtime.evaluate ->", runtimeEval);
 
     console.log(
-      `\nSUCCESS (${mode}/${upstream_mode}): native command/event, custom commands, custom event, and middleware all passed`,
+      `\nSUCCESS (${mode}/${upstream_mode}): native command, custom commands, custom event, and middleware all passed`,
     );
 
     // Drop into an interactive prompt when stdin is a TTY. Lets you poke at

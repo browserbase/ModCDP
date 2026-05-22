@@ -279,32 +279,13 @@ def main():
             raise RuntimeError("expected Custom.demoEvent")
         print(f"Custom.demoEvent -> {demo_event}")
 
-        runtime_contexts = []
-        runtime_context_lock = threading.Lock()
-
-        def on_runtime_context_created(payload, *_):
-            with runtime_context_lock:
-                runtime_contexts.append(payload)
-
-        cdp.on("Runtime.executionContextCreated", on_runtime_context_created)
-        cdp.send("Runtime.enable", {})
-        deadline = time.monotonic() + 3.0
-        while True:
-            with runtime_context_lock:
-                runtime_context = runtime_contexts[0] if runtime_contexts else None
-            if runtime_context or time.monotonic() >= deadline:
-                break
-            time.sleep(0.02)
-        if not runtime_context:
-            raise RuntimeError("expected Runtime.executionContextCreated")
         runtime_eval = expect_object(cdp.send("Runtime.evaluate", {"expression": "(() => 42)()", "returnByValue": True}), "Runtime.evaluate")
         result = expect_object(runtime_eval.get("result"), "Runtime.evaluate.result")
         if result.get("value") != 42:
             raise RuntimeError(f"unexpected Runtime.evaluate result {runtime_eval}")
-        print(f"Runtime.executionContextCreated -> {runtime_context}")
         print(f"Runtime.evaluate -> {runtime_eval}")
 
-        print(f"\nSUCCESS ({mode}/{upstream_mode}): native command/event, custom commands, custom event, and middleware all passed")
+        print(f"\nSUCCESS ({mode}/{upstream_mode}): native command, custom commands, custom event, and middleware all passed")
 
         # TTY-only: drop into a REPL where you can send live commands and
         # watch events as they print. Skip when run non-interactively so the

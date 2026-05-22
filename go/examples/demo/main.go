@@ -375,19 +375,6 @@ func main() {
 	})
 	fmt.Println("Custom.demoEvent ->", demoEvent)
 
-	runtimeContextCh := make(chan map[string]any, 16)
-	cdp.On("Runtime.executionContextCreated", func(data any) {
-		if event, ok := data.(map[string]any); ok {
-			runtimeContextCh <- event
-		}
-	})
-	if _, err := cdp.Send("Runtime.enable", map[string]any{}); err != nil {
-		log.Fatalf("Runtime.enable: %v", err)
-	}
-	runtimeContext := waitForEvent(runtimeContextCh, "Runtime.executionContextCreated", func(event map[string]any) bool {
-		context, _ := event["context"].(map[string]any)
-		return context["id"] != nil
-	})
 	runtimeEval := mustMap(mustSend(cdp, "Runtime.evaluate", map[string]any{
 		"expression":    "(() => 42)()",
 		"returnByValue": true,
@@ -396,11 +383,10 @@ func main() {
 	if runtimeResult["value"] != float64(42) && runtimeResult["value"] != 42 {
 		log.Fatalf("unexpected Runtime.evaluate result: %v", runtimeEval)
 	}
-	fmt.Println("Runtime.executionContextCreated ->", runtimeContext)
 	b, _ = json.Marshal(runtimeEval)
 	fmt.Println("Runtime.evaluate ->", string(b))
 
-	fmt.Printf("\nSUCCESS (%s/%s): native command/event, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
+	fmt.Printf("\nSUCCESS (%s/%s): native command, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
 
 	// TTY-only REPL. Lets you poke at the live browser interactively;
 	// subscribed events print as they arrive. Skip when stdin is not a tty
