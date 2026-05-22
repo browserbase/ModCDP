@@ -1242,6 +1242,17 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     throw new Error(`No ModCDP server upstream transport registered for route ${route}.`);
   }
 
+  function validateSingleServerUpstream(routes: ModCDPRoutes) {
+    const upstreams = new Set(
+      Object.values(routes).filter((route): route is ServerUpstreamTransportName =>
+        route === "loopback_cdp" || route === "chrome_debugger",
+      ),
+    );
+    if (upstreams.size > 1) {
+      throw new Error("server_routes cannot mix loopback_cdp and chrome_debugger routes.");
+    }
+  }
+
   function useServerUpstreamTransport(name: ServerUpstreamTransportName) {
     const transport = serverUpstreamTransport(name);
     if (activeServerUpstreamTransport === transport) return transport;
@@ -1422,6 +1433,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         this.routes = { ...defaultRoutes };
         await this.discoverLoopbackCDP();
       }
+      validateSingleServerUpstream(this.routes);
       for (const command of custom_commands) this.addCustomCommand(command as ModCDPCustomCommandRegistration);
       for (const event of custom_events) this.addCustomEvent(event as ModCDPCustomEventRegistration);
       for (const middleware of custom_middlewares) this.addMiddleware(middleware as ModCDPMiddlewareRegistration);

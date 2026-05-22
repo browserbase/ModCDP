@@ -35,6 +35,10 @@ import { ModCDPClient } from "../src/client/ModCDPClient.js";
 type TargetCreatedPayload = {
   targetInfo?: { targetId?: string } & Record<string, unknown>;
 };
+type RuntimeConsoleAPICalledPayload = {
+  type?: string;
+  args?: { value?: unknown }[];
+};
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH =
@@ -91,30 +95,19 @@ function parseArgs(argv) {
 }
 
 function serverRoutesFor(mode, upstream_mode) {
-  const routes = {
+  void upstream_mode;
+  return {
     "Mod.*": "service_worker",
     "Custom.*": "service_worker",
     "*.*": mode === "loopback" ? "loopback_cdp" : mode === "debugger" ? "chrome_debugger" : "auto",
   };
-  if (mode === "loopback" || ["reversews", "nativemessaging", "nats"].includes(upstream_mode)) {
-    routes["Target.setDiscoverTargets"] = "loopback_cdp";
-    routes["Target.createTarget"] = "loopback_cdp";
-    routes["Target.activateTarget"] = "loopback_cdp";
-  }
-  return routes;
 }
 
 function clientRoutesFor(mode) {
-  const directNormalEventRoutes = {
-    "Target.setDiscoverTargets": "direct_cdp",
-    "Target.createTarget": "direct_cdp",
-    "Target.activateTarget": "direct_cdp",
-  };
   return {
     "Mod.*": "service_worker",
     "Custom.*": "service_worker",
     "*.*": mode === "direct" ? "direct_cdp" : "service_worker",
-    ...directNormalEventRoutes,
   };
 }
 
@@ -259,6 +252,7 @@ async function main() {
   const cdp = new ModCDPClient(clientOptionsFor(mode, upstream_mode, cdp_url, launch_options));
   const pageTargetEvents = [];
   const targetCreatedEvents: TargetCreatedPayload[] = [];
+  const runtimeConsoleEvents: RuntimeConsoleAPICalledPayload[] = [];
 
   try {
     await cdp.connect();
@@ -267,6 +261,14 @@ async function main() {
       const event = isTargetCreatedPayload(payload) ? payload : {};
       console.log("Target.targetCreated ->", event.targetInfo?.targetId);
       targetCreatedEvents.push(event);
+    });
+    cdp.on(cdp.Runtime.consoleAPICalled, (payload) => {
+      const event =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as RuntimeConsoleAPICalledPayload)
+          : {};
+      console.log("Runtime.consoleAPICalled ->", event.args?.map((arg) => arg.value).join(" "));
+      runtimeConsoleEvents.push(event);
     });
     console.log("connected; ext", cdp.extension_id, "session", cdp.ext_session_id);
     console.log("connect timing    ->", cdp.connect_timing);
@@ -492,6 +494,86 @@ async function main() {
       console.log("Custom.pageTargetUpdated ->", event);
       pageTargetEvents.push(event);
     });
+
+    if (mode === "debugger") {
+      const marker = `modcdp-debugger-event-${Date.now()}`;
+      await cdp.Runtime.enable();
+      await cdp.Runtime.evaluate({
+        expression: `console.log(${JSON.stringify(marker)})`,
+        returnByValue: true,
+      });
+      const runtimeEventDeadline = Date.now() + DEFAULT_TARGET_EVENT_TIMEOUT_MS;
+      while (
+        !runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === marker)) &&
+        Date.now() < runtimeEventDeadline
+      ) {
+        await sleep(DEFAULT_DEMO_EVENT_POLL_INTERVAL_MS);
+      }
+      if (!runtimeConsoleEvents.some((event) => event.args?.some((arg) => arg.value === marker))) {
+        throw new Error(`expected Runtime.consoleAPICalled for ${marker}`);
+      }
+      console.log("normal event matched ->", marker);
+
+      const debuggerTarget = assertObject(
+        await cdp.Mod.evaluate({
+          expression: `async () => {
+            const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+            const targets = await chrome.debugger.getTargets();
+            const target = targets.find(target => target.type === "page" && tab?.id != null && target.tabId === tab.id)
+              ?? targets.find(target => target.type === "page");
+            if (!target?.id) throw new Error("no page target found");
+            return { targetId: target.id };
+          }`,
+        }),
+        "debugger target lookup",
+      );
+      if (typeof debuggerTarget.targetId !== "string" || typeof debuggerTarget.tabId !== "number") {
+        throw new Error(`unexpected debugger target lookup result ${JSON.stringify(debuggerTarget)}`);
+      }
+      console.log("Custom.TabIdFromTargetId ->", debuggerTarget);
+
+      const pageTargetEmitResult = assertObject(
+        await cdp.Mod.evaluate({
+          params: { targetId: debuggerTarget.targetId },
+          expression: `async ({ targetId }) => {
+            const targets = await chrome.debugger.getTargets();
+            const target = targets.find(target => target.id === targetId);
+            if (!target?.id) throw new Error(\`target \${targetId} not found\`);
+            await cdp.emit("Custom.pageTargetUpdated", { targetId: target.id, url: target.url ?? null });
+            return { emitted: true, targetId: target.id };
+          }`,
+        }),
+        "Custom.pageTargetUpdated emit",
+      );
+      if (pageTargetEmitResult.emitted !== true || pageTargetEmitResult.targetId !== debuggerTarget.targetId) {
+        throw new Error(`unexpected Custom.pageTargetUpdated emit result ${JSON.stringify(pageTargetEmitResult)}`);
+      }
+      const pageTargetDeadline = Date.now() + DEFAULT_PAGE_TARGET_EVENT_TIMEOUT_MS;
+      while (
+        !pageTargetEvents.some((event) => event.targetId === debuggerTarget.targetId) &&
+        Date.now() < pageTargetDeadline
+      ) {
+        await sleep(DEFAULT_DEMO_EVENT_POLL_INTERVAL_MS);
+      }
+      const pageTarget = pageTargetEvents.find((event) => event.targetId === debuggerTarget.targetId);
+      if (!pageTarget) throw new Error(`expected Custom.pageTargetUpdated for ${debuggerTarget.targetId}`);
+      if (pageTarget.tabId !== debuggerTarget.tabId)
+        throw new Error(`unexpected Custom.pageTargetUpdated result ${JSON.stringify(pageTarget)}`);
+
+      const targetFromTab = await cdp.send("Custom.targetIdFromTabId", {
+        tabId: pageTarget.tabId,
+      });
+      const targetFromTabObj = assertObject(targetFromTab, "Custom.targetIdFromTabId");
+      if (targetFromTabObj.targetId !== debuggerTarget.targetId || targetFromTabObj.tabId !== pageTarget.tabId) {
+        throw new Error(`unexpected Custom.targetIdFromTabId/middleware result ${JSON.stringify(targetFromTabObj)}`);
+      }
+      console.log("Custom.targetIdFromTabId ->", targetFromTabObj);
+
+      console.log(
+        `\nSUCCESS (${mode}/${upstream_mode}): normal command, normal event, custom commands, custom event, and middleware all passed`,
+      );
+      return;
+    }
 
     await cdp.Target.setDiscoverTargets({ discover: true });
     const createdTarget = await cdp.Target.createTarget({
