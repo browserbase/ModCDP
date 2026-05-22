@@ -302,6 +302,43 @@ func main() {
 		fmt.Println("Mod.evaluate     ->", string(b))
 	}
 
+	topologyRaw, err := cdp.Mod.GetTopology(nil)
+	if err != nil {
+		log.Fatalf("Mod.getTopology: %v", err)
+	}
+	topology := mustMap(topologyRaw, "Mod.getTopology")
+	rootFrameID := mustString(topology["rootFrameId"], "Mod.getTopology.rootFrameId")
+	frames := mustMap(topology["frames"], "Mod.getTopology.frames")
+	roots := mustMap(topology["roots"], "Mod.getTopology.roots")
+	contexts := mustMap(topology["contexts"], "Mod.getTopology.contexts")
+	if _, ok := frames[rootFrameID]; !ok {
+		log.Fatalf("Mod.getTopology frames missing root frame %s: %v", rootFrameID, frames)
+	}
+	hasDocumentRoot := false
+	for _, root := range roots {
+		rootMap, ok := root.(map[string]any)
+		if ok && rootMap["kind"] == "document" {
+			hasDocumentRoot = true
+		}
+	}
+	hasPiercerContext := false
+	for _, context := range contexts {
+		contextMap, ok := context.(map[string]any)
+		if ok && contextMap["world"] == "piercer" {
+			hasPiercerContext = true
+		}
+	}
+	if !hasDocumentRoot || !hasPiercerContext {
+		log.Fatalf("unexpected Mod.getTopology result: %v", topology)
+	}
+	b, _ := json.Marshal(map[string]any{
+		"rootFrameId": rootFrameID,
+		"frames":      len(frames),
+		"roots":       len(roots),
+		"contexts":    len(contexts),
+	})
+	fmt.Println("Mod.getTopology ->", string(b))
+
 	responseMiddlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
 		Name:       "Custom.echo",
 		Phase:      "response",
@@ -343,7 +380,7 @@ func main() {
 	if echoResult["echoed"] != "custom-command-ok" || echoResult["method"] != "Custom.echo" || echoResult["responseMiddleware"] != "ok" {
 		log.Fatalf("unexpected Custom.echo result: %v", echoResult)
 	}
-	b, _ := json.Marshal(echoResult)
+	b, _ = json.Marshal(echoResult)
 	fmt.Println("Custom.echo      ->", string(b))
 
 	demoEventCh := make(chan map[string]any, 16)
@@ -386,7 +423,7 @@ func main() {
 	b, _ = json.Marshal(runtimeEval)
 	fmt.Println("Runtime.evaluate ->", string(b))
 
-	fmt.Printf("\nSUCCESS (%s/%s): native command, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
+	fmt.Printf("\nSUCCESS (%s/%s): native command, topology, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
 
 	// TTY-only REPL. Lets you poke at the live browser interactively;
 	// subscribed events print as they arrive. Skip when stdin is not a tty

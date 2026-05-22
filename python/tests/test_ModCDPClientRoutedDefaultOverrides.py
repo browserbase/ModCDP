@@ -139,6 +139,16 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
                 )
             )
 
+            topology = cast(dict[str, Any], cdp.Mod.getTopology())
+            root_frame_id = topology.get("rootFrameId")
+            frames = cast(dict[str, Any], topology.get("frames"))
+            roots = cast(dict[str, dict[str, Any]], topology.get("roots"))
+            contexts = cast(dict[str, dict[str, Any]], topology.get("contexts"))
+            self.assertIsInstance(root_frame_id, str)
+            self.assertIn(root_frame_id, frames)
+            self.assertTrue(any(root.get("kind") == "document" for root in roots.values()))
+            self.assertTrue(any(context.get("world") == "piercer" for context in contexts.values()))
+
             cdp.Mod.addCustomEvent("Target.targetCreated")
             transformed_events: Queue[dict] = Queue()
 

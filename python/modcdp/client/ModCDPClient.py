@@ -174,6 +174,9 @@ class _ModDomain:
     def ping(self, **params: Any) -> AwaitableDict | AwaitableValue:
         return self._client._send_command("Mod.ping", params)
 
+    def getTopology(self, **params: Any) -> AwaitableDict | AwaitableValue:
+        return self._client._send_command("Mod.getTopology", params)
+
 MODCDP_READY_EXPRESSION = (
     "Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && "
     "globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)"
