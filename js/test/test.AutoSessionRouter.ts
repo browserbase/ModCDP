@@ -1,115 +1,104 @@
-import { once } from "node:events";
-import WebSocket from "ws";
-import { expect, test } from "vitest";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { test } from "vitest";
 
-import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
-import { AutoSessionRouter } from "../src/router/AutoSessionRouter.js";
-import { CdpEventMessageSchema } from "../src/types/modcdp.js";
+import { ModCDPClient } from "../src/client/ModCDPClient.js";
 
-test("AutoSessionRouter tracks real target sessions and execution contexts", async () => {
-  const chrome = await new LocalBrowserLauncher({
-    headless: true,
-  }).launch();
-  const ws = new WebSocket(chrome.cdp_url!);
-  await once(ws, "open");
-  let next_id = 1;
-  const pending = new Map<number, (message: Record<string, unknown>) => void>();
-  const router = new AutoSessionRouter(
-    (method, params = {}, session_id = null) =>
-      send(method, params as Record<string, unknown>, session_id) as Promise<Record<string, unknown>>,
-    () => 30_000,
-  );
-  const router_event_listeners = new Set<
-    (method: string, payload: Record<string, unknown>, cdpSessionId: string | null) => void
-  >();
-  const router_subscription = router.listenTo({
-    on(listener) {
-      router_event_listeners.add(listener);
-      return { remove: () => router_event_listeners.delete(listener) };
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
+
+test("AutoSessionRouter tracks real target sessions and execution contexts from live CDP events", async () => {
+  const cdp = new ModCDPClient({
+    launcher: {
+      launcher_mode: "local",
+      launcher_options: { headless: true },
+    },
+    upstream: { upstream_mode: "ws" },
+    injector: {
+      injector_mode: "auto",
+      injector_extension_path: EXTENSION_PATH,
+      injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
+      injector_trust_service_worker_target: true,
+    },
+    client: {
+      client_routes: {
+        "Mod.*": "service_worker",
+        "Custom.*": "service_worker",
+        "*.*": "direct_cdp",
+      },
     },
   });
 
-  function send(method: string, params: Record<string, unknown> = {}, session_id: string | null = null) {
-    const id = next_id++;
-    ws.send(
-      JSON.stringify({
-        id,
-        method,
-        params,
-        ...(session_id ? { sessionId: session_id } : {}),
-      }),
-    );
-    return new Promise<Record<string, unknown>>((resolve, reject) => {
-      pending.set(id, (message) => {
-        if (message.error) reject(new Error(JSON.stringify(message.error)));
-        else resolve((message.result ?? {}) as Record<string, unknown>);
-      });
-    });
-  }
-
-  ws.on("message", (data) => {
-    const message = JSON.parse(data.toString()) as Record<string, unknown>;
-    if (typeof message.id === "number") {
-      pending.get(message.id)?.(message);
-      pending.delete(message.id);
-      return;
-    }
-    const cdpEvent = CdpEventMessageSchema.parse(message);
-    for (const listener of router_event_listeners) {
-      listener(cdpEvent.method, (cdpEvent.params ?? {}) as Record<string, unknown>, cdpEvent.sessionId ?? null);
-    }
-  });
-
+  let targetId: string | null = null;
+  let pendingTargetId: string | null = null;
   try {
-    await send("Target.setAutoAttach", {
-      autoAttach: true,
-      waitForDebuggerOnStart: false,
-      flatten: true,
+    await cdp.connect();
+    const created = await cdp.Target.createTarget({ url: "about:blank#modcdp-auto-session-router" });
+    targetId = created.targetId;
+    await expectEventually(() => {
+      assert.equal(typeof cdp.auto_target_sessions.get(targetId!), "string");
     });
-    await send("Target.setDiscoverTargets", { discover: true });
-    const created = await send("Target.createTarget", {
-      url: "about:blank#modcdp-auto-session-router",
-    });
-    const target_id = created.targetId as string;
-    await expect
-      .poll(() => router.sessionIdFromTargetId.get(target_id), { timeout: 5_000 })
-      .toEqual(expect.any(String));
-    const session_id = router.sessionIdFromTargetId.get(target_id)!;
+    const sessionId = cdp.auto_target_sessions.get(targetId);
+    assert.equal(typeof sessionId, "string");
 
-    const context_promise = router.waitForExecutionContext(session_id, {
+    const contextPromise = cdp.auto_sessions.waitForExecutionContext(sessionId, {
       timeout_ms: 30_000,
     });
-    await send("Runtime.enable", {}, session_id);
-    await expect(context_promise).resolves.toEqual(expect.any(Number));
-    expect(router.execution_contexts.get(session_id)).toEqual(expect.any(Number));
+    await cdp.send("Runtime.enable", {}, sessionId);
+    const contextId = await contextPromise;
+    assert.equal(typeof contextId, "number");
+    assert.equal(cdp.runtime_execution_contexts.get(sessionId), contextId);
 
-    await send("Target.detachFromTarget", { sessionId: session_id });
-    await expect.poll(() => router.sessionIdFromTargetId.get(target_id), { timeout: 5_000 }).toBeUndefined();
-    expect(router.execution_contexts.get(session_id)).toBeUndefined();
-    await send("Target.closeTarget", { targetId: target_id }).catch(() => ({}));
+    await cdp.Target.detachFromTarget({ sessionId });
+    await expectEventually(() => {
+      assert.equal(cdp.auto_target_sessions.get(targetId!), undefined);
+    });
+    assert.equal(cdp.runtime_execution_contexts.get(sessionId), undefined);
+    await cdp.Target.closeTarget({ targetId }).catch(() => ({}));
+    targetId = null;
 
-    const pending_created = await send("Target.createTarget", {
+    const pendingCreated = await cdp.Target.createTarget({
       url: "about:blank#modcdp-auto-session-router-pending-context",
     });
-    const pending_target_id = pending_created.targetId as string;
-    await expect
-      .poll(() => router.sessionIdFromTargetId.get(pending_target_id), { timeout: 5_000 })
-      .toEqual(expect.any(String));
-    const pending_session_id = router.sessionIdFromTargetId.get(pending_target_id)!;
-    const cancelled_context_promise = router.waitForExecutionContext(pending_session_id, {
+    pendingTargetId = pendingCreated.targetId;
+    await expectEventually(() => {
+      assert.equal(typeof cdp.auto_target_sessions.get(pendingTargetId!), "string");
+    });
+    const pendingSessionId = cdp.auto_target_sessions.get(pendingTargetId);
+    assert.equal(typeof pendingSessionId, "string");
+    const cancelledContextPromise = cdp.auto_sessions.waitForExecutionContext(pendingSessionId, {
       timeout_ms: 30_000,
     });
-    const cancelled_context_assertion = expect(cancelled_context_promise).rejects.toThrow(
-      `Runtime execution context wait cancelled because session ${pending_session_id} detached.`,
+    const cancelledContextAssertion = assert.rejects(
+      cancelledContextPromise,
+      new RegExp(`Runtime execution context wait cancelled because session ${pendingSessionId} detached\\.`),
     );
-    await send("Target.detachFromTarget", { sessionId: pending_session_id });
-    await cancelled_context_assertion;
-    await expect.poll(() => router.sessionIdFromTargetId.get(pending_target_id), { timeout: 5_000 }).toBeUndefined();
-    await send("Target.closeTarget", { targetId: pending_target_id }).catch(() => ({}));
+    await cdp.Target.detachFromTarget({ sessionId: pendingSessionId });
+    await cancelledContextAssertion;
+    await expectEventually(() => {
+      assert.equal(cdp.auto_target_sessions.get(pendingTargetId!), undefined);
+    });
+    await cdp.Target.closeTarget({ targetId: pendingTargetId }).catch(() => ({}));
+    pendingTargetId = null;
   } finally {
-    router_subscription.remove();
-    ws.close();
-    await once(ws, "close").catch(() => {});
-    await chrome.close();
+    if (targetId) await cdp.Target.closeTarget({ targetId }).catch(() => ({}));
+    if (pendingTargetId) await cdp.Target.closeTarget({ targetId: pendingTargetId }).catch(() => ({}));
+    await cdp.close();
   }
 }, 60_000);
+
+async function expectEventually(assertion: () => void, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}

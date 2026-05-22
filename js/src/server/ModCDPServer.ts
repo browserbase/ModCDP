@@ -11,7 +11,7 @@ import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
 import { CdpEventMessageSchema, CdpResponseMessageSchema, normalizeModCDPPayloadSchema } from "../types/modcdp.js";
-import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
+import { AutoSessionRouter, type ServerUpstreamTransport } from "../router/AutoSessionRouter.js";
 import type {
   CdpCommandMessage,
   CdpEventMessage,
@@ -123,7 +123,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       if (ModCDPServer.close_browser_on_downstream_disconnect !== true) return;
       if (!activeServerUpstreamTransport)
         registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
-      void activeServerUpstreamTransport?.send("Browser.close", {}, null).catch(() => {});
+      void activeServerUpstreamTransport?.sendBrowserCommand("Browser.close", {}).catch(() => {});
     }, timeout_ms);
     downstream_client_lease = {
       cdpSessionId,
@@ -254,13 +254,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   } satisfies ModCDPRoutes;
   const serverUpstreamRouteNames = new Set(["auto", "loopback_cdp", "chrome_debugger"]);
 
-  const browserLevelDomains = new Set(["Browser", "Target", "SystemInfo"]);
-
   let nextLoopbackId = 1;
   const loopbackSockets = new Map<string, WebSocket>();
   const loopbackSocketPromises = new Map<string, Promise<WebSocket>>();
-  const loopbackTargetSessions = new Map<string, string>();
-  const loopbackSessionTargets = new Map<string, string>();
   const loopbackSessionContexts = new Map<string, number>();
   const loopbackContextWaiters = new Map<string, Set<(contextId: number) => void>>();
   const initializedLoopbackSockets = new WeakSet<WebSocket>();
@@ -268,7 +264,12 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     number,
     { resolve: (value: ProtocolResult) => void; reject: (error: Error) => void }
   >();
-  type ServerUpstreamEventListener = (method: string, payload: ProtocolPayload, cdpSessionId: string | null) => void;
+  type ServerUpstreamEventListener = (
+    method: string,
+    payload: ProtocolPayload,
+    targetId: cdp.types.ts.Target.TargetID | null,
+    sessionId: cdp.types.ts.Target.SessionID | null,
+  ) => void;
   const loopbackUpstreamEventListeners = new Set<ServerUpstreamEventListener>();
   let reverseBridgeSocket: WebSocket | null = null;
   let reverseBridgeUrl: string | null = null;
@@ -291,8 +292,12 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   let offscreenKeepAlivePort: chrome.runtime.Port | null = null;
   let serverAutoRouter: AutoSessionRouter | null = null;
 
-  function emitLoopbackUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
-    for (const listener of loopbackUpstreamEventListeners) listener(method, payload, cdpSessionId);
+  function emitLoopbackUpstreamEvent(
+    method: string,
+    payload: ProtocolPayload,
+    sessionId: cdp.types.ts.Target.SessionID | null,
+  ) {
+    for (const listener of loopbackUpstreamEventListeners) listener(method, payload, null, sessionId);
   }
 
   function registryMatch<T>(registry: Map<string, T>, name: string): T | null {
@@ -861,15 +866,11 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       });
       ws.addEventListener("error", () => {
         if (loopbackSockets.get(endpoint) === ws) loopbackSockets.delete(endpoint);
-        loopbackTargetSessions.clear();
-        loopbackSessionTargets.clear();
         loopbackSessionContexts.clear();
         rejectLoopbackPending(new Error(`CDP socket error ${endpoint}`));
       });
       ws.addEventListener("close", (event) => {
         if (loopbackSockets.get(endpoint) === ws) loopbackSockets.delete(endpoint);
-        loopbackTargetSessions.clear();
-        loopbackSessionTargets.clear();
         loopbackSessionContexts.clear();
         rejectLoopbackPending(
           new Error(
@@ -951,52 +952,34 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     });
   }
 
-  type ServerUpstreamTransportName = "loopback_cdp" | "chrome_debugger";
+  type SelectedServerUpstreamTransportName = "loopback_cdp" | "chrome_debugger";
 
-  type ServerUpstreamTransport = {
-    readonly name: ServerUpstreamTransportName;
-    send(method: string, params?: ProtocolParams, cdpSessionId?: string | null): Promise<ProtocolResult>;
-    on(listener: ServerUpstreamEventListener): { remove: () => void };
-  };
-
+  /**
+   * Sends server-owned upstream CDP traffic over the browser's loopback
+   * WebSocket endpoint.
+   *
+   * This class owns loopback request delivery and loopback event observation
+   * only. It does not choose targets, interpret frame graphs, or decide when
+   * execution contexts should be created; AutoSessionRouter owns that policy.
+   * Lifecycle: configure selects this transport, getTargets initializes
+   * auto-attach/discovery on the loopback socket, command methods send through
+   * callLoopbackWS, and onEvent subscriptions receive normalized loopback CDP
+   * events from the socket message handler.
+   */
   class LoopbackCdpTransport implements ServerUpstreamTransport {
-    readonly name = "loopback_cdp" as const;
-
     constructor() {
-      loopbackUpstreamEventListeners.add((method, payload, cdpSessionId) => {
-        void this.recordTransportEvent(method, payload, cdpSessionId);
+      loopbackUpstreamEventListeners.add((method, payload, _targetId, sessionId) => {
+        this.recordTransportEvent(method, payload, sessionId);
       });
     }
 
-    on(listener: ServerUpstreamEventListener) {
+    onEvent(listener: ServerUpstreamEventListener) {
       loopbackUpstreamEventListeners.add(listener);
       return { remove: () => loopbackUpstreamEventListeners.delete(listener) };
     }
 
-    private async recordTransportEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
-      if (method === Target.AttachedToTargetEvent.id) {
-        const attached = Target.AttachedToTargetEvent.parse(payload);
-        loopbackTargetSessions.set(attached.targetInfo.targetId, attached.sessionId);
-        loopbackSessionTargets.set(attached.sessionId, attached.targetInfo.targetId);
-        if (attached.targetInfo.type === "page" || attached.targetInfo.type === "iframe") {
-          await ModCDPServer.handleCommand("Page.enable", {}, attached.sessionId).catch((error) =>
-            console.error("[ModCDPServer] Page.enable failed for attached target", error),
-          );
-          await ModCDPServer.handleCommand(
-            "Page.setLifecycleEventsEnabled",
-            { enabled: true },
-            attached.sessionId,
-          ).catch((error) =>
-            console.error("[ModCDPServer] Page.setLifecycleEventsEnabled failed for attached target", error),
-          );
-        }
-      } else if (method === Target.DetachedFromTargetEvent.id) {
-        const detached = Target.DetachedFromTargetEvent.parse(payload);
-        const detachedTargetId = detached.targetId ?? loopbackSessionTargets.get(detached.sessionId);
-        if (detachedTargetId != null) loopbackTargetSessions.delete(detachedTargetId);
-        loopbackSessionTargets.delete(detached.sessionId);
-        loopbackSessionContexts.delete(detached.sessionId);
-      } else if (method === Runtime.ExecutionContextCreatedEvent.id && cdpSessionId != null) {
+    private recordTransportEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
+      if (method === Runtime.ExecutionContextCreatedEvent.id && cdpSessionId != null) {
         const context = Runtime.ExecutionContextCreatedEvent.parse(payload).context;
         loopbackSessionContexts.set(cdpSessionId, context.id);
         const waiters = loopbackContextWaiters.get(cdpSessionId);
@@ -1007,215 +990,210 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       }
     }
 
-    async send(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
-      if (!ModCDPServer.loopback_cdp_url) throw new Error(`No loopback_cdp_url configured for ${method}.`);
-
+    async getTargets() {
+      if (!ModCDPServer.loopback_cdp_url) throw new Error(`No loopback_cdp_url configured for Target.getTargets.`);
       await initializeLoopbackCDP();
+      return Target.GetTargetsResult.parse(await callLoopbackWS("Target.getTargets")).targetInfos;
+    }
 
-      const domain = method.split(".")[0] ?? "";
-      if (browserLevelDomains.has(domain)) return await callLoopbackWS(method, params);
-      if (cdpSessionId) return await callLoopbackWS(method, params, cdpSessionId);
-
-      const {
-        debuggee = null,
-        tabId = null,
-        targetId = null,
-        extensionId = null,
-        ...baseCommandParams
-      } = params as CdpDebuggeeCommandParams;
-      const commandParams =
-        method === (Target.AttachToTargetParams.meta() as { method: string }).method && typeof targetId === "string"
-          ? { ...baseCommandParams, targetId }
-          : baseCommandParams;
-      const resolvedDebuggee = debuggee ?? compactDebuggee({ tabId, targetId, extensionId });
-
+    async resolveTargetId(params: CdpDebuggeeCommandParams) {
+      const resolvedDebuggee = params.debuggee ?? compactDebuggee(params);
+      if (resolvedDebuggee.targetId) return resolvedDebuggee.targetId;
       const chromeApi = globalScope.chrome;
-      let resolvedTargetId = resolvedDebuggee.targetId || null;
-      if (!resolvedTargetId) {
-        let resolvedTabId = resolvedDebuggee.tabId || null;
-        let resolvedTabUrl: string | null = null;
-        if (!resolvedTabId) {
-          const [tab] = chromeApi.tabs?.query
-            ? await chromeApi.tabs.query({
-                active: true,
-                lastFocusedWindow: true,
-              })
-            : [];
-          resolvedTabId = tab?.id || null;
-          resolvedTabUrl = tab?.url || tab?.pendingUrl || null;
-        } else if (chromeApi.tabs?.get) {
-          const tab = await chromeApi.tabs.get(resolvedTabId).catch((): null => null);
-          resolvedTabUrl = tab?.url || tab?.pendingUrl || null;
-        }
-        if (resolvedTabId && chromeApi.debugger?.getTargets) {
-          const targets = await chromeApi.debugger.getTargets();
-          resolvedTargetId =
-            targets.find((target) => target.tabId === resolvedTabId && target.type === "page")?.id || null;
-        }
-        if (!resolvedTargetId) {
-          const { targetInfos } = (await callLoopbackWS("Target.getTargets")) as cdp.types.ts.Target.GetTargetsResult;
-          const pageTargets = targetInfos.filter((target) => target.type === "page");
-          resolvedTargetId =
-            pageTargets.find((target) => resolvedTabUrl && target.url === resolvedTabUrl)?.targetId ||
-            pageTargets[0]?.targetId ||
-            null;
-        }
-        if (!resolvedTargetId) {
-          const created = (await callLoopbackWS("Target.createTarget", {
-            url: "about:blank#modcdp",
-          })) as cdp.types.ts.Target.CreateTargetResult;
-          resolvedTargetId = created.targetId || null;
-        }
+      let resolvedTabUrl: string | null = null;
+      if (resolvedDebuggee.tabId && chromeApi.tabs?.get) {
+        const tab = await chromeApi.tabs.get(resolvedDebuggee.tabId).catch((): null => null);
+        resolvedTabUrl = tab?.url || tab?.pendingUrl || null;
       }
-      if (!resolvedTargetId) throw new Error(`loopback_cdp route for ${method} could not resolve a page target.`);
+      if (!resolvedTabUrl) return null;
+      const targetInfos = await this.getTargets();
+      return targetInfos.find((target) => target.type === "page" && target.url === resolvedTabUrl)?.targetId ?? null;
+    }
 
-      const existingSessionId = loopbackTargetSessions.get(resolvedTargetId);
-      if (existingSessionId) return await callLoopbackWS(method, commandParams, existingSessionId);
+    async createTarget(url: string) {
+      return Target.CreateTargetResult.parse(await callLoopbackWS("Target.createTarget", { url })).targetId;
+    }
 
-      const attached = (await callLoopbackWS("Target.attachToTarget", {
-        targetId: resolvedTargetId,
-        flatten: true,
-      })) as cdp.types.ts.Target.AttachToTargetResult;
-      const sessionId = attached.sessionId;
-      loopbackTargetSessions.set(resolvedTargetId, sessionId);
-      loopbackSessionTargets.set(sessionId, resolvedTargetId);
+    async attachToTarget(targetId: cdp.types.ts.Target.TargetID) {
+      return Target.AttachToTargetResult.parse(
+        await callLoopbackWS("Target.attachToTarget", {
+          targetId,
+          flatten: true,
+        }),
+      ).sessionId;
+    }
+
+    async detachFromTarget(sessionId: cdp.types.ts.Target.SessionID) {
+      Target.DetachFromTargetResult.parse(await callLoopbackWS("Target.detachFromTarget", { sessionId }));
+    }
+
+    async sendBrowserCommand(method: string, params: ProtocolParams = {}) {
+      await initializeLoopbackCDP();
+      return await callLoopbackWS(method, params);
+    }
+
+    async sendTargetCommand(
+      targetId: cdp.types.ts.Target.TargetID,
+      sessionId: cdp.types.ts.Target.SessionID | null,
+      method: string,
+      params: ProtocolParams = {},
+    ) {
+      if (sessionId == null)
+        throw new Error(`loopback_cdp route for ${method} has no session for targetId=${targetId}.`);
       await callLoopbackWS("Target.setAutoAttach", targetAutoAttachParams, sessionId).catch(() => {});
-      return await callLoopbackWS(method, commandParams, sessionId);
+      return await callLoopbackWS(method, params, sessionId);
     }
   }
 
+  /**
+   * Sends server-owned upstream CDP traffic through chrome.debugger.
+   *
+   * This class owns chrome.debugger debuggee selection, attachment lifecycle,
+   * and native debugger event normalization. It does not implement routing
+   * policy, topology traversal, or execution-context selection; AutoSessionRouter
+   * asks for generic transport operations and receives normalized events.
+   * Lifecycle: configure selects this transport, getTargets refreshes native
+   * debugger target metadata, attachToTarget attaches the browser debuggee for a
+   * target, command methods send through chrome.debugger.sendCommand, and
+   * onEvent subscriptions receive normalized debugger events.
+   */
   class ChromeDebuggerTransport implements ServerUpstreamTransport {
-    readonly name = "chrome_debugger" as const;
+    // JSON(debuggee) values attached in this service worker. Updated by
+    // attachDebuggee/onDetach; read before attach to avoid duplicate native
+    // chrome.debugger.attach calls.
     private readonly attachedDebuggees = new Set<string>();
+
+    // Normalized CDP event listeners registered by AutoSessionRouter and the
+    // server event publisher. Updated by onEvent; read from installEventListener.
     private readonly eventListeners = new Set<ServerUpstreamEventListener>();
-    private readonly sessionIdFromTargetId = new Map<string, string>();
+
+    // Native Target.SessionID -> TargetID from debugger Target.attachedToTarget
+    // events. Updated by installEventListener; read when sending a command that
+    // already carries a child session id.
     private readonly targetIdFromSessionId = new Map<string, string>();
+
+    // chrome.tabs tab id -> CDP TargetID. Refreshed by getTargets and
+    // Target.attachedToTarget events; read by resolveTargetId/createTarget.
     private readonly targetIdFromTabId = new Map<number, string>();
+
+    // TargetID -> chrome.debugger.Debuggee selected for that target. Updated by
+    // attachToTarget; read by sendTargetCommand so subsequent commands use the
+    // same native debuggee shape.
+    private readonly debuggeeFromTargetId = new Map<string, chrome.debugger.Debuggee>();
+
+    // True once chrome.debugger.onEvent/onDetach listeners are installed in this
+    // service worker. Updated by installEventListener; read by getTargets.
     private eventListenerInstalled = false;
 
-    on(listener: ServerUpstreamEventListener) {
+    onEvent(listener: ServerUpstreamEventListener) {
       this.eventListeners.add(listener);
       return { remove: () => this.eventListeners.delete(listener) };
     }
 
-    async send(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
+    async getTargets() {
       const chromeApi = globalScope.chrome;
-      if (!chromeApi?.debugger?.sendCommand) throw new Error("chrome.debugger is unavailable.");
-
       this.installEventListener();
+      if (!chromeApi?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
+      const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
+        if (typeof target.tabId === "number") this.targetIdFromTabId.set(target.tabId, target.id);
+        return {
+          targetId: target.id,
+          type: target.type,
+          title: target.title,
+          url: target.url,
+          attached: target.attached,
+          canAccessOpener: false,
+          ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
+        };
+      });
+      return Target.GetTargetsResult.parse({ targetInfos }).targetInfos;
+    }
 
-      if (method === Target.GetTargetsParams.id.slice(0, -".params".length)) {
-        const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
-          if (typeof target.tabId === "number") this.targetIdFromTabId.set(target.tabId, target.id);
-          return {
-            targetId: target.id,
-            type: target.type,
-            title: target.title,
-            url: target.url,
-            attached: target.attached,
-            canAccessOpener: false,
-            ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
-          };
-        });
-        return Target.GetTargetsResult.parse({ targetInfos });
+    async resolveTargetId(params: CdpDebuggeeCommandParams) {
+      if (typeof params.targetId === "string" && params.targetId.length > 0) return params.targetId;
+      if (params.debuggee?.targetId) return params.debuggee.targetId;
+      if (typeof params.tabId === "number") {
+        await this.getTargets();
+        return this.targetIdFromTabId.get(params.tabId) ?? null;
       }
+      return null;
+    }
 
-      const {
-        debuggee = null,
-        tabId = null,
-        targetId = null,
-        extensionId = null,
-        ...baseCommandParams
-      } = params as CdpDebuggeeCommandParams;
-      const commandParams =
-        method === Target.AttachToTargetParams.id.slice(0, -".params".length) && typeof targetId === "string"
-          ? { ...baseCommandParams, targetId }
-          : baseCommandParams;
-      const routedTargetId = cdpSessionId ? (this.targetIdFromSessionId.get(cdpSessionId) ?? null) : null;
-      const resolvedDebuggee =
-        debuggee ?? compactDebuggee({ tabId, targetId: routedTargetId ?? targetId, extensionId });
-      if (method === Target.DetachFromTargetParams.id.slice(0, -".params".length)) {
-        const sessionId = typeof commandParams.sessionId === "string" ? commandParams.sessionId : null;
-        if (sessionId) {
-          const targetId = this.targetIdFromSessionId.get(sessionId);
-          if (targetId) this.sessionIdFromTargetId.delete(targetId);
-          this.targetIdFromSessionId.delete(sessionId);
-        }
-        return Target.DetachFromTargetResult.parse({});
-      }
-      if (Object.keys(resolvedDebuggee).length === 0) {
-        let tab: chrome.tabs.Tab | undefined;
-        [tab] = await chromeApi.tabs.query({
-          active: true,
-          lastFocusedWindow: true,
-        });
-        if (!tab?.id) [tab] = await chromeApi.tabs.query({});
-        if (!tab?.id) {
-          try {
-            tab = await chromeApi.tabs.create({
-              url: "https://example.com/#modcdp",
-              active: true,
-            });
-          } catch {
-            const win = await chromeApi.windows.create({
-              url: "https://example.com/#modcdp",
-              focused: true,
-            });
-            tab = win?.tabs?.[0];
-          }
-        }
-        if (!tab?.id) throw new Error(`chrome_debugger route for ${method} could not find an active tab.`);
-        resolvedDebuggee.tabId = tab.id;
-      }
+    async createTarget(url: string) {
+      const tab = await globalScope.chrome.tabs.create({ url, active: true });
+      if (!tab.id) throw new Error(`chrome_debugger could not create a tab for ${url}.`);
+      await this.getTargets();
+      const targetId = this.targetIdFromTabId.get(tab.id);
+      if (!targetId) throw new Error(`chrome_debugger could not resolve target for created tab ${tab.id}.`);
+      return targetId;
+    }
 
-      const key = JSON.stringify(resolvedDebuggee);
-      if (!this.attachedDebuggees.has(key)) {
-        try {
-          await new Promise<void>((resolve, reject) =>
-            chromeApi.debugger.attach(resolvedDebuggee, "1.3", () => {
-              const error = chromeApi.runtime.lastError;
-              if (error) reject(new Error(error.message));
-              else resolve();
-            }),
-          );
-        } catch (error) {
-          if (!errorMessage(error).includes("Another debugger is already attached")) throw error;
-        }
-        await new Promise<void>((resolve, reject) =>
-          chromeApi.debugger.sendCommand(resolvedDebuggee, "Target.setAutoAttach", targetAutoAttachParams, () => {
-            const error = chromeApi.runtime.lastError;
-            if (error) reject(new Error(error.message));
-            else resolve();
-          }),
-        );
-        this.attachedDebuggees.add(key);
-      }
+    async attachToTarget(targetId: cdp.types.ts.Target.TargetID) {
+      const debuggee = await this.debuggeeForTarget(targetId);
+      await this.attachDebuggee(debuggee);
+      this.debuggeeFromTargetId.set(targetId, debuggee);
+      return null;
+    }
 
-      if (
-        method === Target.AttachToTargetParams.id.slice(0, -".params".length) &&
-        typeof commandParams.targetId === "string"
-      ) {
-        const sessionId = commandParams.targetId;
-        this.sessionIdFromTargetId.set(commandParams.targetId, sessionId);
-        this.targetIdFromSessionId.set(sessionId, commandParams.targetId);
-        return Target.AttachToTargetResult.parse({ sessionId });
-      }
+    async detachFromTarget(sessionId: cdp.types.ts.Target.SessionID) {
+      this.targetIdFromSessionId.delete(sessionId);
+    }
 
-      const result = await debuggerSendCommand(resolvedDebuggee, method, commandParams);
-      const attachedSessionId =
-        method === Target.AttachToTargetParams.id.slice(0, -".params".length) && result && typeof result === "object"
-          ? (result as Record<string, unknown>).sessionId
-          : null;
-      const attachedTargetId =
-        method === Target.AttachToTargetParams.id.slice(0, -".params".length) &&
-        typeof commandParams.targetId === "string"
-          ? commandParams.targetId
-          : null;
-      if (typeof attachedSessionId === "string" && attachedTargetId) {
-        this.sessionIdFromTargetId.set(attachedTargetId, attachedSessionId);
-        this.targetIdFromSessionId.set(attachedSessionId, attachedTargetId);
-      }
-      return result;
+    async sendBrowserCommand(method: string, params: ProtocolParams = {}) {
+      if (method === "Target.getTargets")
+        return Target.GetTargetsResult.parse({ targetInfos: await this.getTargets() });
+      const debuggee = await this.defaultDebuggee();
+      await this.attachDebuggee(debuggee);
+      return await debuggerSendCommand(debuggee, method, params as Record<string, unknown>);
+    }
+
+    async sendTargetCommand(
+      targetId: cdp.types.ts.Target.TargetID,
+      sessionId: cdp.types.ts.Target.SessionID | null,
+      method: string,
+      params: ProtocolParams = {},
+    ) {
+      const routedTargetId = sessionId ? (this.targetIdFromSessionId.get(sessionId) ?? targetId) : targetId;
+      const debuggee = this.debuggeeFromTargetId.get(routedTargetId) ?? (await this.debuggeeForTarget(routedTargetId));
+      await this.attachDebuggee(debuggee);
+      return await debuggerSendCommand(debuggee, method, params as Record<string, unknown>);
+    }
+
+    private async debuggeeForTarget(targetId: cdp.types.ts.Target.TargetID) {
+      const targets = await this.getTargets();
+      const target = targets.find((candidate) => candidate.targetId === targetId);
+      if (!target) throw new Error(`chrome_debugger could not resolve targetId=${targetId}.`);
+      const tabId = typeof target.tabId === "number" ? target.tabId : null;
+      return tabId == null ? { targetId } : { tabId };
+    }
+
+    private async defaultDebuggee() {
+      const targetId =
+        (await this.resolveTargetId({})) ??
+        (await this.getTargets()).find((target) => target.type === "page")?.targetId;
+      if (!targetId) return await this.debuggeeForTarget(await this.createTarget("about:blank#modcdp"));
+      return await this.debuggeeForTarget(targetId);
+    }
+
+    private async attachDebuggee(debuggee: chrome.debugger.Debuggee) {
+      const key = JSON.stringify(debuggee);
+      if (this.attachedDebuggees.has(key)) return;
+      const chromeApi = globalScope.chrome;
+      await new Promise<void>((resolve, reject) =>
+        chromeApi.debugger.attach(debuggee, "1.3", () => {
+          const error = chromeApi.runtime.lastError;
+          if (!error || error.message?.includes("Another debugger is already attached")) resolve();
+          else reject(new Error(error.message));
+        }),
+      );
+      await new Promise<void>((resolve, reject) =>
+        chromeApi.debugger.sendCommand(debuggee, "Target.setAutoAttach", targetAutoAttachParams, () => {
+          const error = chromeApi.runtime.lastError;
+          if (error) reject(new Error(error.message));
+          else resolve();
+        }),
+      );
+      this.attachedDebuggees.add(key);
     }
 
     private installEventListener() {
@@ -1226,20 +1204,16 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         const sourceTargetId =
           source.targetId ??
           (typeof source.tabId === "number" ? (this.targetIdFromTabId.get(source.tabId) ?? null) : null);
-        const cdpSessionId =
-          source.sessionId ?? (sourceTargetId ? (this.sessionIdFromTargetId.get(sourceTargetId) ?? null) : null);
+        const cdpSessionId = source.sessionId ?? null;
         if (method === Target.AttachedToTargetEvent.id) {
           const attached = Target.AttachedToTargetEvent.parse(payload);
           if (typeof source.tabId === "number") this.targetIdFromTabId.set(source.tabId, attached.targetInfo.targetId);
-          this.sessionIdFromTargetId.set(attached.targetInfo.targetId, attached.sessionId);
           this.targetIdFromSessionId.set(attached.sessionId, attached.targetInfo.targetId);
         } else if (method === Target.DetachedFromTargetEvent.id) {
           const detached = Target.DetachedFromTargetEvent.parse(payload);
-          const targetId = detached.targetId ?? this.targetIdFromSessionId.get(detached.sessionId);
-          if (targetId) this.sessionIdFromTargetId.delete(targetId);
           this.targetIdFromSessionId.delete(detached.sessionId);
         }
-        for (const listener of this.eventListeners) listener(method, payload, cdpSessionId);
+        for (const listener of this.eventListeners) listener(method, payload, sourceTargetId, cdpSessionId);
       });
       chromeApi.debugger.onDetach?.addListener?.((source) => {
         this.attachedDebuggees.delete(JSON.stringify(compactDebuggee(source)));
@@ -1253,14 +1227,14 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   let activeServerUpstreamTransport: ServerUpstreamTransport | null = null;
   let activeServerUpstreamSubscription: { remove: () => void } | null = null;
 
-  function resolveServerUpstreamTransportName(route: string): ServerUpstreamTransportName {
+  function resolveServerUpstreamTransportName(route: string): SelectedServerUpstreamTransportName {
     if (route === "loopback_cdp" || route === "chrome_debugger") return route;
     if (route === "auto") return ModCDPServer.loopback_cdp_url ? "loopback_cdp" : "chrome_debugger";
     throw new Error(`No ModCDP server upstream transport registered for route ${route}.`);
   }
 
   function configuredServerUpstreamTransportName(routes: ModCDPRoutes) {
-    const upstreams = new Set<ServerUpstreamTransportName>();
+    const upstreams = new Set<SelectedServerUpstreamTransportName>();
     for (const route of Object.values(routes)) {
       if (serverUpstreamRouteNames.has(route)) {
         upstreams.add(resolveServerUpstreamTransportName(route));
@@ -1270,7 +1244,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     return [...upstreams][0] ?? resolveServerUpstreamTransportName("auto");
   }
 
-  function registerServerUpstreamTransport(name: ServerUpstreamTransportName) {
+  function registerServerUpstreamTransport(name: SelectedServerUpstreamTransportName) {
     let transport: ServerUpstreamTransport;
     if (name === "loopback_cdp") {
       loopbackTransport ??= new LoopbackCdpTransport();
@@ -1282,8 +1256,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     if (activeServerUpstreamTransport === transport) return transport;
     activeServerUpstreamSubscription?.remove();
     activeServerUpstreamTransport = transport;
-    const autoRouterSubscription = serverAutoRouter?.listenTo(transport) ?? null;
-    const publishSubscription = transport.on(publishServerUpstreamEvent);
+    serverAutoRouter = new AutoSessionRouter(transport, () => ModCDPServer.loopback_execution_context_timeout_ms);
+    const autoRouterSubscription = serverAutoRouter.listen();
+    const publishSubscription = transport.onEvent(publishServerUpstreamEvent);
     activeServerUpstreamSubscription = {
       remove: () => {
         autoRouterSubscription?.remove();
@@ -1293,7 +1268,12 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     return transport;
   }
 
-  function publishServerUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
+  function publishServerUpstreamEvent(
+    method: string,
+    payload: ProtocolPayload,
+    _targetId: cdp.types.ts.Target.TargetID | null,
+    cdpSessionId: cdp.types.ts.Target.SessionID | null,
+  ) {
     void publishEvent(method, payload, cdpSessionId).catch((error) =>
       console.error("[ModCDPServer] upstream event listener failed", error),
     );
@@ -1604,7 +1584,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         registerServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
       if (!activeServerUpstreamTransport)
         throw new Error(`No ModCDP server upstream transport registered for ${method}.`);
-      result = await activeServerUpstreamTransport.send(method, params, cdpSessionId);
+      if (!serverAutoRouter) throw new Error("ModCDP autorouter is not initialized.");
+      result = await serverAutoRouter.send(method, params, cdpSessionId);
 
       result = await this.runMiddleware("response", method, result, {
         cdpSessionId,
@@ -1693,8 +1674,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
           targetId: worker.targetId,
           flatten: true,
         })) as cdp.types.ts.Target.AttachToTargetResult;
-        loopbackTargetSessions.set(worker.targetId, sessionId);
-        loopbackSessionTargets.set(sessionId, worker.targetId);
         const contextIdPromise = waitForLoopbackExecutionContext(sessionId);
         await callLoopbackWS("Runtime.enable", {}, sessionId);
         const executionContextId = await contextIdPromise;
@@ -1723,20 +1702,10 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     get upstream() {
       if (!activeServerUpstreamTransport)
         registerServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
-      return activeServerUpstreamTransport;
+      if (!serverAutoRouter) throw new Error("ModCDP autorouter is not initialized.");
+      return serverAutoRouter;
     },
   };
-
-  serverAutoRouter = new AutoSessionRouter(
-    (method, params = {}, cdpSessionId = null) => {
-      if (!activeServerUpstreamTransport)
-        registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
-      if (!activeServerUpstreamTransport)
-        throw new Error(`No ModCDP server upstream transport registered for ${method}.`);
-      return activeServerUpstreamTransport.send(method, params, cdpSessionId);
-    },
-    () => ModCDPServer.loopback_execution_context_timeout_ms,
-  );
 
   globalScope.ModCDP = ModCDPServer;
 

@@ -34,7 +34,7 @@ import {
 } from "../transport/UpstreamTransport.js";
 import type { BrowserLauncher, BrowserLaunchOptions, LaunchedBrowser } from "../launcher/BrowserLauncher.js";
 import { type ExtensionInjectorConfig, type ExtensionInjector, type SendCDP } from "../injector/ExtensionInjector.js";
-import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
+import { AutoSessionRouter, type ServerUpstreamTransport } from "../router/AutoSessionRouter.js";
 import type {
   CdpCommandMessage,
   CdpError,
@@ -405,8 +405,8 @@ export class ModCDPClient extends ModCDPEventEmitter {
   command_result_unwrap_keys: Map<string, string>;
   cdp_aliases_hydrated: boolean;
   event_wait_cleanups: Set<() => void>;
+  raw_upstream_event_listeners: Set<Parameters<ServerUpstreamTransport["onEvent"]>[0]>;
   auto_sessions: AutoSessionRouter;
-  auto_session_router_event_handlers_registered: boolean;
   heartbeat_timer: ReturnType<typeof setInterval> | null;
   _injectors: ExtensionInjector[];
   _cdp: {
@@ -462,13 +462,35 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.command_result_unwrap_keys = new Map();
     this.cdp_aliases_hydrated = false;
     this.event_wait_cleanups = new Set();
-    this.auto_session_router_event_handlers_registered = false;
+    this.raw_upstream_event_listeners = new Set();
     this.heartbeat_timer = null;
+    const raw_upstream_transport: ServerUpstreamTransport = {
+      getTargets: async () => Target.GetTargetsResult.parse(await this._sendMessage("Target.getTargets")).targetInfos,
+      resolveTargetId: async (params) =>
+        typeof params.targetId === "string" && params.targetId.length > 0 ? params.targetId : null,
+      createTarget: async (url) =>
+        Target.CreateTargetResult.parse(await this._sendMessage("Target.createTarget", { url })).targetId,
+      attachToTarget: async (targetId) =>
+        Target.AttachToTargetResult.parse(await this._sendMessage("Target.attachToTarget", { targetId, flatten: true }))
+          .sessionId,
+      detachFromTarget: async (sessionId) => {
+        Target.DetachFromTargetResult.parse(await this._sendMessage("Target.detachFromTarget", { sessionId }));
+      },
+      sendBrowserCommand: async (method, params = {}) => this._sendMessage(method, params) as Promise<ProtocolResult>,
+      sendTargetCommand: async (targetId, sessionId, method, params = {}) => {
+        if (sessionId == null) throw new Error(`No CDP session is attached for targetId=${targetId}.`);
+        return this._sendMessage(method, params, sessionId) as Promise<ProtocolResult>;
+      },
+      onEvent: (listener) => {
+        this.raw_upstream_event_listeners.add(listener);
+        return { remove: () => this.raw_upstream_event_listeners.delete(listener) };
+      },
+    };
     this.auto_sessions = new AutoSessionRouter(
-      (method, params = {}, session_id = null) =>
-        this._sendMessage(method, params, session_id) as Promise<ProtocolResult>,
+      raw_upstream_transport,
       () => this.injector.injector_execution_context_timeout_ms,
     );
+    this.auto_sessions.listen();
     this._injectors = [];
     this._launched = null;
 
@@ -482,7 +504,6 @@ export class ModCDPClient extends ModCDPEventEmitter {
     };
     this._hydrateNativeProtocolSchemas();
     void this._hydrateCdpAliases();
-    this._registerAutoSessionRouterEventHandlers();
     this._hydrateCustomSurface();
   }
 
@@ -680,38 +701,6 @@ export class ModCDPClient extends ModCDPEventEmitter {
       }),
     );
     this.cdp_aliases_hydrated = true;
-  }
-
-  _registerAutoSessionRouterEventHandlers() {
-    if (this.auto_session_router_event_handlers_registered) return;
-    this.auto_session_router_event_handlers_registered = true;
-    this.on(Target.AttachedToTargetEvent, (event) =>
-      this.auto_sessions.recordUpstreamEvent(Target.AttachedToTargetEvent.id, event, null),
-    );
-    this.on(Target.DetachedFromTargetEvent, (event) =>
-      this.auto_sessions.recordUpstreamEvent(Target.DetachedFromTargetEvent.id, event, null),
-    );
-    this.on(Target.TargetInfoChangedEvent, (event) =>
-      this.auto_sessions.recordUpstreamEvent(Target.TargetInfoChangedEvent.id, event, null),
-    );
-    this.on(Target.TargetDestroyedEvent, (event) =>
-      this.auto_sessions.recordUpstreamEvent(Target.TargetDestroyedEvent.id, event, null),
-    );
-    this.on(Runtime.ExecutionContextCreatedEvent, (event, sessionId) => {
-      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextCreatedEvent.id, event, sessionId);
-    });
-    this.on(Runtime.ExecutionContextDestroyedEvent, (event, sessionId) => {
-      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextDestroyedEvent.id, event, sessionId);
-    });
-    this.on(Runtime.ExecutionContextsClearedEvent, (event, sessionId) => {
-      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextsClearedEvent.id, event, sessionId);
-    });
-    this.on(Page.FrameNavigatedEvent, (event, sessionId) => {
-      this.auto_sessions.recordUpstreamEvent(Page.FrameNavigatedEvent.id, event, sessionId);
-    });
-    this.on(Page.FrameDetachedEvent, (event, sessionId) => {
-      this.auto_sessions.recordUpstreamEvent(Page.FrameDetachedEvent.id, event, sessionId);
-    });
   }
 
   _hydrateCustomSurface() {
@@ -1294,14 +1283,15 @@ export class ModCDPClient extends ModCDPEventEmitter {
       return;
     }
     const event = CdpEventMessageSchema.parse(msg);
+    const eventParams = (event.params || {}) as ProtocolPayload;
+    for (const listener of this.raw_upstream_event_listeners) {
+      listener(event.method, eventParams, null, event.sessionId || null);
+    }
     if (event.sessionId === this.ext_session_id) {
-      if (event.method === this.Runtime.executionContextCreated.id && event.sessionId) {
-        this.auto_sessions.recordUpstreamEvent(event.method, event.params || {}, event.sessionId);
-      }
       if (event.method !== this.Runtime.bindingCalled.id) return;
       const u = unwrapEventIfNeeded(
         event.method,
-        (event.params || {}) as RuntimeBindingCalledEvent,
+        eventParams as RuntimeBindingCalledEvent,
         event.sessionId || null,
         this.ext_session_id,
       );
@@ -1312,8 +1302,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       return;
     }
     if (event.method) {
-      const data = event.params || {};
-      const payload = this._parseEventPayload(event.method, data);
+      const payload = this._parseEventPayload(event.method, eventParams);
       this.emit(event.method, payload, event.sessionId || null);
     }
   }

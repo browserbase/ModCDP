@@ -96,7 +96,7 @@ class ModCDPTopologyExecutionContext(TypedDict, total=False):
     name: str
     uniqueId: str
     auxData: dict[str, object]
-    sessionId: str
+    sessionId: str | None
     targetId: str
     frameId: str | None
     world: str

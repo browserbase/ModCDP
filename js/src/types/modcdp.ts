@@ -274,7 +274,7 @@ export const ModCDPTopologyExecutionContextSchema = z
     name: z.string().optional(),
     uniqueId: z.string().optional(),
     auxData: z.record(z.string(), z.unknown()).optional(),
-    sessionId: z.string(),
+    sessionId: z.string().nullable(),
     targetId: z.string(),
     frameId: z.string().nullable().optional(),
     world: z.string(),

@@ -103,7 +103,7 @@ test("chrome.debugger server upstream routes commands, events, and topology thro
     const topology = await cdp.Mod.getTopology({ targetId });
     assertTopology(topology, targetId);
     assert.equal(
-      Object.values(topology.targets).some((target) => target.sessionId),
+      Object.values(topology.targets).some((target) => target.targetId === targetId && target.sessionId == null),
       true,
     );
   } finally {
