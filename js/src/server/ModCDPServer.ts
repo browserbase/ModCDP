@@ -1090,6 +1090,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     private readonly eventListeners = new Set<ServerUpstreamEventListener>();
     private readonly sessionIdFromTargetId = new Map<string, string>();
     private readonly targetIdFromSessionId = new Map<string, string>();
+    private readonly targetIdFromTabId = new Map<number, string>();
     private eventListenerInstalled = false;
 
     on(listener: ServerUpstreamEventListener) {
@@ -1104,14 +1105,18 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       this.installEventListener();
 
       if (method === Target.GetTargetsParams.id.slice(0, -".params".length)) {
-        const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => ({
-          targetId: target.id,
-          type: target.type,
-          title: target.title,
-          url: target.url,
-          attached: target.attached,
-          canAccessOpener: false,
-        }));
+        const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
+          if (typeof target.tabId === "number") this.targetIdFromTabId.set(target.tabId, target.id);
+          return {
+            targetId: target.id,
+            type: target.type,
+            title: target.title,
+            url: target.url,
+            attached: target.attached,
+            canAccessOpener: false,
+            ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
+          };
+        });
         return Target.GetTargetsResult.parse({ targetInfos });
       }
 
@@ -1218,10 +1223,14 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       if (this.eventListenerInstalled || !chromeApi?.debugger?.onEvent?.addListener) return;
       chromeApi.debugger.onEvent.addListener((source, method, params) => {
         const payload = (params ?? {}) as ProtocolPayload;
+        const sourceTargetId =
+          source.targetId ??
+          (typeof source.tabId === "number" ? (this.targetIdFromTabId.get(source.tabId) ?? null) : null);
         const cdpSessionId =
-          source.sessionId ?? (source.targetId ? (this.sessionIdFromTargetId.get(source.targetId) ?? null) : null);
+          source.sessionId ?? (sourceTargetId ? (this.sessionIdFromTargetId.get(sourceTargetId) ?? null) : null);
         if (method === Target.AttachedToTargetEvent.id) {
           const attached = Target.AttachedToTargetEvent.parse(payload);
+          if (typeof source.tabId === "number") this.targetIdFromTabId.set(source.tabId, attached.targetInfo.targetId);
           this.sessionIdFromTargetId.set(attached.targetInfo.targetId, attached.sessionId);
           this.targetIdFromSessionId.set(attached.sessionId, attached.targetInfo.targetId);
         } else if (method === Target.DetachedFromTargetEvent.id) {
