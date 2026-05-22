@@ -38,6 +38,7 @@ const EXTENSION_PATH =
   ) ?? path.resolve(HERE, "..", "..", "extension");
 const DEFAULT_DEMO_EVENT_TIMEOUT_MS = 10_000;
 const DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS = 60_000;
+const DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS = 60_000;
 const DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS = 60_000;
 const DEFAULT_LIVE_CDP_POLL_INTERVAL_MS = 250;
 const DEFAULT_LIVE_CDP_ACTIVE_PORT_STALE_MS = 1_000;
@@ -120,6 +121,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     injector_mode: "auto" as const,
     injector_extension_path: EXTENSION_PATH,
     injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
+    injector_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
   };
   if (mode === "direct") {
     return {
@@ -142,6 +144,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     },
     server: {
       server_routes: serverRoutesFor(mode, upstream_mode),
+      server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
     },
   };
 }
@@ -253,6 +256,7 @@ async function main() {
         },
         server: {
           server_routes: serverRoutesFor(mode, upstream_mode),
+          server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
         },
       }),
       "Mod.configure",

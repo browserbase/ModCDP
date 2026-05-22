@@ -29,6 +29,7 @@ import (
 )
 
 const demoCDPSendTimeoutMS = 60_000
+const demoExecutionContextTimeoutMS = 60_000
 const reverseTransportWaitTimeoutMS = 60_000
 
 func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
@@ -46,19 +47,28 @@ func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions 
 		return modcdp.Options{
 			Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
 			Upstream: upstream,
-			Injector: modcdp.InjectorConfig{InjectorMode: "auto", InjectorExtensionPath: extensionPath},
-			Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+			Injector: modcdp.InjectorConfig{
+				InjectorMode:                      "auto",
+				InjectorExtensionPath:             extensionPath,
+				InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
+			},
+			Client: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		}
 	}
 	server := &modcdp.ServerConfig{
-		ServerRoutes: serverRoutesFor(mode, upstreamMode),
+		ServerRoutes:                            serverRoutesFor(mode, upstreamMode),
+		ServerLoopbackExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
 	}
 	return modcdp.Options{
 		Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
 		Upstream: upstream,
-		Injector: modcdp.InjectorConfig{InjectorMode: "auto", InjectorExtensionPath: extensionPath},
-		Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
-		Server:   server,
+		Injector: modcdp.InjectorConfig{
+			InjectorMode:                      "auto",
+			InjectorExtensionPath:             extensionPath,
+			InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
+		},
+		Client: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+		Server: server,
 	}
 }
 
@@ -225,7 +235,10 @@ func main() {
 		fmt.Println("connect timing    ->", string(b))
 	}
 
-	serverConfig := map[string]any{"server_routes": serverRoutesFor(mode, upstreamMode)}
+	serverConfig := map[string]any{
+		"server_routes": serverRoutesFor(mode, upstreamMode),
+		"server_loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS,
+	}
 	configureParams := map[string]any{
 		"upstream": map[string]any{"upstream_mode": upstreamMode},
 		"client":   map[string]any{"client_routes": clientRoutesFor(mode)},
