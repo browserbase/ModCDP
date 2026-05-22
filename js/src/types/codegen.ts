@@ -174,7 +174,7 @@ for (const d of domains) {
 }
 aliases.push(`  Mod: {`);
 for (const base of modcdpCommands) {
-  const optional = base === "Ping";
+  const optional = base === "Ping" || base === "GetTopology";
   if (base === "AddCustomCommand") {
     aliases.push(
       `    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(name: TName, options?: ModCustomCommandOptions<TParamsSchema, TResultSchema>): Promise<cdp.types.ts.Mod.AddCustomCommandResponse>;`,
