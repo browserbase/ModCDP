@@ -5,8 +5,6 @@ import { expect, test } from "vitest";
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { AutoSessionRouter } from "../src/router/AutoSessionRouter.js";
 import { CdpEventMessageSchema } from "../src/types/modcdp.js";
-import * as Runtime from "../src/types/generated/zod/Runtime.js";
-import * as Target from "../src/types/generated/zod/Target.js";
 
 test("AutoSessionRouter tracks real target sessions and execution contexts", async () => {
   const chrome = await new LocalBrowserLauncher({
@@ -21,6 +19,15 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
       send(method, params as Record<string, unknown>, session_id) as Promise<Record<string, unknown>>,
     () => 30_000,
   );
+  const router_event_listeners = new Set<
+    (method: string, payload: Record<string, unknown>, cdpSessionId: string | null) => void
+  >();
+  const router_subscription = router.listenTo({
+    on(listener) {
+      router_event_listeners.add(listener);
+      return { remove: () => router_event_listeners.delete(listener) };
+    },
+  });
 
   function send(method: string, params: Record<string, unknown> = {}, session_id: string | null = null) {
     const id = next_id++;
@@ -48,15 +55,8 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
       return;
     }
     const cdpEvent = CdpEventMessageSchema.parse(message);
-    if (cdpEvent.method === Target.AttachedToTargetEvent.id) {
-      router.recordAttachedToTarget(Target.AttachedToTargetEvent.parse(cdpEvent.params));
-    } else if (cdpEvent.method === Target.DetachedFromTargetEvent.id) {
-      router.recordDetachedFromTarget(Target.DetachedFromTargetEvent.parse(cdpEvent.params));
-    } else if (cdpEvent.method === Runtime.ExecutionContextCreatedEvent.id) {
-      router.recordExecutionContextCreated(
-        Runtime.ExecutionContextCreatedEvent.parse(cdpEvent.params),
-        cdpEvent.sessionId!,
-      );
+    for (const listener of router_event_listeners) {
+      listener(cdpEvent.method, (cdpEvent.params ?? {}) as Record<string, unknown>, cdpEvent.sessionId ?? null);
     }
   });
 
@@ -107,6 +107,7 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
     await expect.poll(() => router.sessionIdFromTargetId.get(pending_target_id), { timeout: 5_000 }).toBeUndefined();
     await send("Target.closeTarget", { targetId: pending_target_id }).catch(() => ({}));
   } finally {
+    router_subscription.remove();
     ws.close();
     await once(ws, "close").catch(() => {});
     await chrome.close();
