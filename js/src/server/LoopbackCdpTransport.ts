@@ -21,7 +21,7 @@ type LoopbackCdpTransportOptions = {
   getWsConnectErrorSettleTimeoutMs: () => number;
 };
 
-const targetAutoAttachParams = {
+const target_auto_attach_params = {
   autoAttach: true,
   waitForDebuggerOnStart: false,
   flatten: true,
@@ -49,33 +49,33 @@ const targetAutoAttachParams = {
 export class LoopbackCdpTransport implements ServerUpstreamTransport {
   // Monotonic WebSocket request id for loopback CDP messages. Written only by
   // sendToLoopback; read only when matching WebSocket responses.
-  private nextLoopbackId = 1;
+  private next_loopback_id = 1;
 
   // CDP endpoint URL -> open WebSocket. Written by loopbackWS; read by
   // loopbackWS and initializeLoopbackCDP so one socket is reused per endpoint.
-  private readonly loopbackSockets = new Map<string, WebSocket>();
+  private readonly loopback_sockets = new Map<string, WebSocket>();
 
   // CDP endpoint URL -> in-flight socket open promise. Written by loopbackWS;
   // read by loopbackWS to coalesce concurrent connection attempts.
-  private readonly loopbackSocketPromises = new Map<string, Promise<WebSocket>>();
+  private readonly loopback_socket_promises = new Map<string, Promise<WebSocket>>();
 
   // Native Target.SessionID -> first Runtime execution context id observed
   // during loopback discovery. Updated by Runtime.executionContextCreated;
   // read by waitForLoopbackExecutionContext.
-  private readonly loopbackSessionContexts = new Map<string, number>();
+  private readonly loopback_session_contexts = new Map<string, number>();
 
   // Native Target.SessionID -> waiters for the first Runtime execution context
   // on that session. Written/read by waitForLoopbackExecutionContext and
   // resolved by Runtime.executionContextCreated.
-  private readonly loopbackContextWaiters = new Map<string, Set<(contextId: number) => void>>();
+  private readonly loopback_context_waiters = new Map<string, Set<(contextId: number) => void>>();
 
   // Sockets that have received Target.setAutoAttach and Target.setDiscoverTargets.
   // Written/read by initializeLoopbackCDP.
-  private readonly initializedLoopbackSockets = new WeakSet<WebSocket>();
+  private readonly initialized_loopback_sockets = new WeakSet<WebSocket>();
 
   // Loopback CDP request id -> pending promise callbacks. Written by
   // sendToLoopback; resolved/rejected by WebSocket response/error/close.
-  private readonly loopbackPending = new Map<
+  private readonly loopback_pending = new Map<
     number,
     { resolve: (value: ProtocolResult) => void; reject: (error: Error) => void }
   >();
@@ -100,10 +100,10 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     this.getWsConnectErrorSettleTimeoutMs = options.getWsConnectErrorSettleTimeoutMs;
     this.on(Runtime.ExecutionContextCreatedEvent, (event, _targetId, sessionId) => {
       if (sessionId == null) return;
-      this.loopbackSessionContexts.set(sessionId, event.context.id);
-      const waiters = this.loopbackContextWaiters.get(sessionId);
+      this.loopback_session_contexts.set(sessionId, event.context.id);
+      const waiters = this.loopback_context_waiters.get(sessionId);
       if (!waiters) return;
-      this.loopbackContextWaiters.delete(sessionId);
+      this.loopback_context_waiters.delete(sessionId);
       for (const resolve of waiters) resolve(event.context.id);
     });
   }
@@ -152,17 +152,17 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
 
   /** Resolve a target id from CDP debuggee-shaped params when possible. */
   async resolveTargetId(params: CdpDebuggeeCommandParams) {
-    const resolvedDebuggee = params.debuggee ?? this.compactDebuggee(params);
-    if (resolvedDebuggee.targetId) return resolvedDebuggee.targetId;
-    const chromeApi = globalThis.chrome;
-    let resolvedTabUrl: string | null = null;
-    if (resolvedDebuggee.tabId && chromeApi?.tabs?.get) {
-      const tab = await chromeApi.tabs.get(resolvedDebuggee.tabId).catch((): null => null);
-      resolvedTabUrl = tab?.url || tab?.pendingUrl || null;
+    const resolved_debuggee = params.debuggee ?? this.compactDebuggee(params);
+    if (resolved_debuggee.targetId) return resolved_debuggee.targetId;
+    const chrome_api = globalThis.chrome;
+    let resolved_tab_url: string | null = null;
+    if (resolved_debuggee.tabId && chrome_api?.tabs?.get) {
+      const tab = await chrome_api.tabs.get(resolved_debuggee.tabId).catch((): null => null);
+      resolved_tab_url = tab?.url || tab?.pendingUrl || null;
     }
-    if (!resolvedTabUrl) return null;
+    if (!resolved_tab_url) return null;
     const targetInfos = await this.getTargets();
-    return targetInfos.find((target) => target.type === "page" && target.url === resolvedTabUrl)?.targetId ?? null;
+    return targetInfos.find((target) => target.type === "page" && target.url === resolved_tab_url)?.targetId ?? null;
   }
 
   /** Create a new page target through loopback CDP. */
@@ -196,7 +196,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
       throw new Error(`loopback_cdp route for ${command.id} has no session for targetId=${route.targetId}.`);
     await this.sendToLoopback(
       Target.SetAutoAttachCommand.id,
-      Target.SetAutoAttachCommand.params.parse(targetAutoAttachParams),
+      Target.SetAutoAttachCommand.params.parse(target_auto_attach_params),
       route.sessionId,
     );
     return command.result.parse(await this.sendToLoopback(command.id, command.params.parse(params), route.sessionId));
@@ -213,9 +213,9 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     if (!browserToken) return { loopback_cdp_url: null as null, verified: false };
 
     const url = "http://127.0.0.1:9222";
-    const previousLoopbackUrl = this.getLoopbackCdpUrl();
+    const previous_loopback_url = this.getLoopbackCdpUrl();
     const fail = (version?: unknown) => {
-      this.setLoopbackCdpUrl(previousLoopbackUrl ?? null);
+      this.setLoopbackCdpUrl(previous_loopback_url ?? null);
       return {
         loopback_cdp_url: null as null,
         verified: false,
@@ -242,9 +242,9 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
           }),
         ),
       );
-      const contextIdPromise = this.waitForLoopbackExecutionContext(sessionId);
+      const execution_context_ready = this.waitForLoopbackExecutionContext(sessionId);
       await this.sendToLoopback(Runtime.EnableCommand.id, Runtime.EnableCommand.params.parse({}), sessionId);
-      const executionContextId = await contextIdPromise;
+      const executionContextId = await execution_context_ready;
       const result = Runtime.CallFunctionOnCommand.result.parse(
         await this.sendToLoopback(
           Runtime.CallFunctionOnCommand.id,
@@ -291,40 +291,40 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   }
 
   private async loopbackWS(endpoint: string): Promise<WebSocket> {
-    const existing = this.loopbackSockets.get(endpoint);
+    const existing = this.loopback_sockets.get(endpoint);
     if (existing?.readyState === WebSocket.OPEN) return existing;
-    const pending = this.loopbackSocketPromises.get(endpoint);
+    const pending = this.loopback_socket_promises.get(endpoint);
     if (pending) return pending;
 
-    const nextSocket = this.openCDPSocket(endpoint).then((ws) => {
-      this.loopbackSockets.set(endpoint, ws);
-      this.loopbackSocketPromises.delete(endpoint);
+    const next_socket = this.openCDPSocket(endpoint).then((ws) => {
+      this.loopback_sockets.set(endpoint, ws);
+      this.loopback_socket_promises.delete(endpoint);
       ws.addEventListener("message", (event) => {
         const msg = JSON.parse(event.data);
         if (!("id" in msg)) {
-          const cdpEvent = CdpEventMessageSchema.parse(msg);
+          const cdp_event = CdpEventMessageSchema.parse(msg);
           this.emitLoopbackUpstreamEvent(
-            cdpEvent.method,
-            (cdpEvent.params ?? {}) as ProtocolPayload,
-            cdpEvent.sessionId ?? null,
+            cdp_event.method,
+            (cdp_event.params ?? {}) as ProtocolPayload,
+            cdp_event.sessionId ?? null,
           );
           return;
         }
         const response = CdpResponseMessageSchema.parse(msg);
-        const pending = this.loopbackPending.get(response.id);
+        const pending = this.loopback_pending.get(response.id);
         if (!pending) return;
-        this.loopbackPending.delete(response.id);
+        this.loopback_pending.delete(response.id);
         if (response.error) pending.reject(new Error(response.error.message));
         else pending.resolve((response.result ?? {}) as ProtocolResult);
       });
       ws.addEventListener("error", () => {
-        if (this.loopbackSockets.get(endpoint) === ws) this.loopbackSockets.delete(endpoint);
-        this.loopbackSessionContexts.clear();
+        if (this.loopback_sockets.get(endpoint) === ws) this.loopback_sockets.delete(endpoint);
+        this.loopback_session_contexts.clear();
         this.rejectLoopbackPending(new Error(`CDP socket error ${endpoint}`));
       });
       ws.addEventListener("close", (event) => {
-        if (this.loopbackSockets.get(endpoint) === ws) this.loopbackSockets.delete(endpoint);
-        this.loopbackSessionContexts.clear();
+        if (this.loopback_sockets.get(endpoint) === ws) this.loopback_sockets.delete(endpoint);
+        this.loopback_session_contexts.clear();
         this.rejectLoopbackPending(
           new Error(
             `CDP socket closed ${endpoint} close.code=${event.code} close.reason=${event.reason || ""} close.wasClean=${
@@ -335,8 +335,8 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
       });
       return ws;
     });
-    this.loopbackSocketPromises.set(endpoint, nextSocket);
-    return nextSocket;
+    this.loopback_socket_promises.set(endpoint, next_socket);
+    return next_socket;
   }
 
   private async openCDPSocket(endpoint: string): Promise<WebSocket> {
@@ -346,10 +346,10 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     return new Promise<WebSocket>((resolve, reject) => {
       const w = new WebSocket(endpoint);
       let settled = false;
-      let errorEvent: Event | null = null;
+      let error_event: Event | null = null;
       const describe = (prefix: string, closeEvent?: CloseEvent) => {
         const parts = [`${prefix} ${endpoint}`, `readyState=${w.readyState}`];
-        if (errorEvent) parts.push(`error.type=${errorEvent.type}`);
+        if (error_event) parts.push(`error.type=${error_event.type}`);
         if (closeEvent) {
           parts.push(`close.code=${closeEvent.code}`);
           parts.push(`close.reason=${closeEvent.reason || ""}`);
@@ -374,7 +374,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
       w.addEventListener(
         "error",
         (event) => {
-          errorEvent = event;
+          error_event = event;
           setTimeout(() => fail(new Error(describe("CDP socket error"))), this.getWsConnectErrorSettleTimeoutMs());
         },
         { once: true },
@@ -387,7 +387,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     const endpoint = this.getLoopbackCdpUrl();
     if (!endpoint) throw new Error(`No loopback_cdp_url configured for ${method}.`);
     const ws = await this.loopbackWS(endpoint);
-    const id = this.nextLoopbackId++;
+    const id = this.next_loopback_id++;
     const message: {
       id: number;
       method: string;
@@ -402,10 +402,10 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     ws.send(JSON.stringify(message));
     return new Promise<ProtocolResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        if (!this.loopbackPending.delete(id)) return;
+        if (!this.loopback_pending.delete(id)) return;
         reject(new Error(`${method} timed out after ${this.getCdpSendTimeoutMs()}ms`));
       }, this.getCdpSendTimeoutMs());
-      this.loopbackPending.set(id, {
+      this.loopback_pending.set(id, {
         resolve: (value) => {
           clearTimeout(timeout);
           resolve(value);
@@ -422,40 +422,40 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     const endpoint = this.getLoopbackCdpUrl();
     if (!endpoint) return;
     const ws = await this.loopbackWS(endpoint);
-    if (this.initializedLoopbackSockets.has(ws)) return;
+    if (this.initialized_loopback_sockets.has(ws)) return;
     await this.sendToLoopback(
       Target.SetAutoAttachCommand.id,
-      Target.SetAutoAttachCommand.params.parse(targetAutoAttachParams),
+      Target.SetAutoAttachCommand.params.parse(target_auto_attach_params),
     );
     await this.sendToLoopback(
       Target.SetDiscoverTargetsCommand.id,
       Target.SetDiscoverTargetsCommand.params.parse({ discover: true }),
     );
-    this.initializedLoopbackSockets.add(ws);
+    this.initialized_loopback_sockets.add(ws);
   }
 
-  private waitForLoopbackExecutionContext(sessionId: string, timeoutMs = this.getExecutionContextTimeoutMs()) {
-    const existing = this.loopbackSessionContexts.get(sessionId);
+  private waitForLoopbackExecutionContext(sessionId: string, timeout_ms = this.getExecutionContextTimeoutMs()) {
+    const existing = this.loopback_session_contexts.get(sessionId);
     if (existing != null) return Promise.resolve(existing);
     return new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        const waiters = this.loopbackContextWaiters.get(sessionId);
+        const waiters = this.loopback_context_waiters.get(sessionId);
         waiters?.delete(complete);
-        if (waiters?.size === 0) this.loopbackContextWaiters.delete(sessionId);
+        if (waiters?.size === 0) this.loopback_context_waiters.delete(sessionId);
         reject(new Error(`Timed out waiting for Runtime.executionContextCreated for session ${sessionId}.`));
-      }, timeoutMs);
+      }, timeout_ms);
       const complete = (contextId: number) => {
         clearTimeout(timeout);
         resolve(contextId);
       };
-      const waiters = this.loopbackContextWaiters.get(sessionId);
+      const waiters = this.loopback_context_waiters.get(sessionId);
       if (waiters) waiters.add(complete);
-      else this.loopbackContextWaiters.set(sessionId, new Set([complete]));
+      else this.loopback_context_waiters.set(sessionId, new Set([complete]));
     });
   }
 
   private rejectLoopbackPending(error: Error) {
-    for (const pending of this.loopbackPending.values()) pending.reject(error);
-    this.loopbackPending.clear();
+    for (const pending of this.loopback_pending.values()) pending.reject(error);
+    this.loopback_pending.clear();
   }
 }

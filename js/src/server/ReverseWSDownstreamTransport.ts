@@ -29,7 +29,7 @@ export class ReverseWSDownstreamTransport {
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the reverse socket opens.
-  private readonly startOffscreenKeepAlive: () => void;
+  private readonly ensureOffscreenKeepAlive: () => unknown;
 
   // Configured reversews endpoint. Set by start, cleared by stop, read by
   // reconnect scheduling.
@@ -49,13 +49,13 @@ export class ReverseWSDownstreamTransport {
 
   constructor({
     handleCommand,
-    startOffscreenKeepAlive,
+    ensureOffscreenKeepAlive,
   }: {
     handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    startOffscreenKeepAlive: () => void;
+    ensureOffscreenKeepAlive: () => unknown;
   }) {
     this.handleCommand = handleCommand;
-    this.startOffscreenKeepAlive = startOffscreenKeepAlive;
+    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
   /** True when the reversews socket is currently open and can receive events. */
@@ -131,7 +131,7 @@ export class ReverseWSDownstreamTransport {
     const ws = new WebSocket(endpoint);
     this.socket = ws;
     ws.addEventListener("open", () => {
-      this.startOffscreenKeepAlive();
+      void this.ensureOffscreenKeepAlive();
       ws.send(
         JSON.stringify({
           type: "modcdp.reverse.hello",

@@ -29,7 +29,7 @@ export class NativeHostDownstreamTransport {
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the native port connects.
-  private readonly startOffscreenKeepAlive: () => void;
+  private readonly ensureOffscreenKeepAlive: () => unknown;
 
   // Configured native host name. Set by start, read by reconnect scheduling.
   private host_name: string | null = null;
@@ -55,13 +55,13 @@ export class NativeHostDownstreamTransport {
 
   constructor({
     handleCommand,
-    startOffscreenKeepAlive,
+    ensureOffscreenKeepAlive,
   }: {
     handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    startOffscreenKeepAlive: () => void;
+    ensureOffscreenKeepAlive: () => unknown;
   }) {
     this.handleCommand = handleCommand;
-    this.startOffscreenKeepAlive = startOffscreenKeepAlive;
+    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
   /** True when the native messaging port is connected and can receive events. */
@@ -100,8 +100,8 @@ export class NativeHostDownstreamTransport {
   }
 
   private connect(hostName: string) {
-    const chromeApi = globalThis.chrome;
-    if (!chromeApi?.runtime?.connectNative) {
+    const chrome_api = globalThis.chrome;
+    if (!chrome_api?.runtime?.connectNative) {
       this.scheduleReconnect(this.reconnect_interval_ms);
       return {
         upstream_nativemessaging_host_name: hostName,
@@ -113,9 +113,9 @@ export class NativeHostDownstreamTransport {
     try {
       this.attempts += 1;
       this.last_error = null;
-      const port = chromeApi.runtime.connectNative(hostName);
+      const port = chrome_api.runtime.connectNative(hostName);
       this.port = port;
-      this.startOffscreenKeepAlive();
+      void this.ensureOffscreenKeepAlive();
       port.postMessage({
         type: "modcdp.native.hello",
         role: "extension-service-worker",
@@ -127,7 +127,7 @@ export class NativeHostDownstreamTransport {
       });
       port.onDisconnect.addListener(() => {
         if (this.port === port) this.port = null;
-        this.last_error = chromeApi.runtime.lastError?.message ?? "Native messaging port disconnected.";
+        this.last_error = chrome_api.runtime.lastError?.message ?? "Native messaging port disconnected.";
         this.scheduleReconnect(this.reconnect_interval_ms);
       });
       return { upstream_nativemessaging_host_name: hostName, connected: true };

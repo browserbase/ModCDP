@@ -5,7 +5,7 @@ import * as Target from "../types/generated/zod/Target.js";
 import type { CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
 
-const targetAutoAttachParams = {
+const target_auto_attach_params = {
   autoAttach: true,
   waitForDebuggerOnStart: false,
   flatten: true,
@@ -83,10 +83,10 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
 
   /** Return current browser targets through chrome.debugger target discovery. */
   async getTargets() {
-    const chromeApi = globalThis.chrome;
+    const chrome_api = globalThis.chrome;
     this.installEventListener();
-    if (!chromeApi?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
-    const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
+    if (!chrome_api?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
+    const targetInfos = (await chrome_api.debugger.getTargets()).map((target) => {
       if (typeof target.tabId === "number") this.targetId_from_tabId.set(target.tabId, target.id);
       return {
         targetId: target.id,
@@ -152,11 +152,10 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
       await this.attachDebuggee(debuggee);
       return command.result.parse(await this.sendToDebugger(debuggee, command.id, command.params.parse(params)));
     }
-    const routed_targetId = route.sessionId
+    const routedTargetId = route.sessionId
       ? (this.targetId_from_sessionId.get(route.sessionId) ?? route.targetId)
       : route.targetId;
-    const debuggee =
-      this.debuggee_from_targetId.get(routed_targetId) ?? (await this.debuggeeForTarget(routed_targetId));
+    const debuggee = this.debuggee_from_targetId.get(routedTargetId) ?? (await this.debuggeeForTarget(routedTargetId));
     await this.attachDebuggee(debuggee);
     return command.result.parse(await this.sendToDebugger(debuggee, command.id, command.params.parse(params)));
   }
@@ -179,21 +178,21 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   private async attachDebuggee(debuggee: chrome.debugger.Debuggee) {
     const key = JSON.stringify(debuggee);
     if (this.attached_debuggees.has(key)) return;
-    const chromeApi = globalThis.chrome;
+    const chrome_api = globalThis.chrome;
     await new Promise<void>((resolve, reject) =>
-      chromeApi.debugger.attach(debuggee, "1.3", () => {
-        const error = chromeApi.runtime.lastError;
+      chrome_api.debugger.attach(debuggee, "1.3", () => {
+        const error = chrome_api.runtime.lastError;
         if (!error || error.message?.includes("Another debugger is already attached")) resolve();
         else reject(new Error(error.message));
       }),
     );
     await new Promise<void>((resolve, reject) =>
-      chromeApi.debugger.sendCommand(
+      chrome_api.debugger.sendCommand(
         debuggee,
         Target.SetAutoAttachCommand.id,
-        Target.SetAutoAttachCommand.params.parse(targetAutoAttachParams),
+        Target.SetAutoAttachCommand.params.parse(target_auto_attach_params),
         () => {
-          const error = chromeApi.runtime.lastError;
+          const error = chrome_api.runtime.lastError;
           if (error) reject(new Error(error.message));
           else resolve();
         },
@@ -203,14 +202,14 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   }
 
   private installEventListener() {
-    const chromeApi = globalThis.chrome;
-    if (this.event_listener_installed || !chromeApi?.debugger?.onEvent?.addListener) return;
-    chromeApi.debugger.onEvent.addListener((source, method, params) => {
+    const chrome_api = globalThis.chrome;
+    if (this.event_listener_installed || !chrome_api?.debugger?.onEvent?.addListener) return;
+    chrome_api.debugger.onEvent.addListener((source, method, params) => {
       const payload = (params ?? {}) as ProtocolPayload;
-      const source_targetId =
+      const sourceTargetId =
         source.targetId ??
         (typeof source.tabId === "number" ? (this.targetId_from_tabId.get(source.tabId) ?? null) : null);
-      const cdp_sessionId = source.sessionId ?? null;
+      const cdpSessionId = source.sessionId ?? null;
       if (method === Target.AttachedToTargetEvent.id) {
         const attached = Target.AttachedToTargetEvent.parse(payload);
         if (typeof source.tabId === "number") this.targetId_from_tabId.set(source.tabId, attached.targetInfo.targetId);
@@ -221,10 +220,10 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
       }
       for (const [event, listeners] of this.event_listeners) {
         if (event.id !== method) continue;
-        for (const listener of listeners) listener(payload, source_targetId, cdp_sessionId);
+        for (const listener of listeners) listener(payload, sourceTargetId, cdpSessionId);
       }
     });
-    chromeApi.debugger.onDetach?.addListener?.((source) => {
+    chrome_api.debugger.onDetach?.addListener?.((source) => {
       this.attached_debuggees.delete(JSON.stringify(this.compactDebuggee(source)));
     });
     this.event_listener_installed = true;
@@ -245,10 +244,10 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
     method: string,
     params: Record<string, unknown> = {},
   ): Promise<ProtocolResult> {
-    const chromeApi = globalThis.chrome;
+    const chrome_api = globalThis.chrome;
     return new Promise<ProtocolResult>((resolve, reject) =>
-      chromeApi.debugger.sendCommand(debuggee, method, params, (result) => {
-        const error = chromeApi.runtime.lastError;
+      chrome_api.debugger.sendCommand(debuggee, method, params, (result) => {
+        const error = chrome_api.runtime.lastError;
         if (error) reject(new Error(error.message));
         else resolve(result as ProtocolResult);
       }),

@@ -30,7 +30,7 @@ export class NATSDownstreamTransport {
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the NATS WebSocket opens.
-  private readonly startOffscreenKeepAlive: () => void;
+  private readonly ensureOffscreenKeepAlive: () => unknown;
 
   // Configured NATS WebSocket URL. Set by start and read by reconnect handling.
   private endpoint: string | null = null;
@@ -55,13 +55,13 @@ export class NATSDownstreamTransport {
 
   constructor({
     handleCommand,
-    startOffscreenKeepAlive,
+    ensureOffscreenKeepAlive,
   }: {
     handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    startOffscreenKeepAlive: () => void;
+    ensureOffscreenKeepAlive: () => unknown;
   }) {
     this.handleCommand = handleCommand;
-    this.startOffscreenKeepAlive = startOffscreenKeepAlive;
+    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
   /** True when the NATS WebSocket is open and can publish CDP event messages. */
@@ -131,7 +131,7 @@ export class NATSDownstreamTransport {
     this.socket = ws;
     this.buffer = "";
     ws.addEventListener("open", () => {
-      this.startOffscreenKeepAlive();
+      void this.ensureOffscreenKeepAlive();
       this.write(`CONNECT ${JSON.stringify(this.connectOptions())}\r\nPING\r\n`);
       this.write(`SUB ${this.subject_prefix}.client_to_browser 1\r\n`);
       this.publish(`${this.subject_prefix}.browser_to_client`, {
@@ -179,22 +179,22 @@ export class NATSDownstreamTransport {
 
   private consumeProtocol(buffer: string) {
     for (;;) {
-      const lineEnd = buffer.indexOf("\r\n");
-      if (lineEnd < 0) return buffer;
-      const line = buffer.slice(0, lineEnd);
+      const line_end = buffer.indexOf("\r\n");
+      if (line_end < 0) return buffer;
+      const line = buffer.slice(0, line_end);
       const upper = line.toUpperCase();
       if (upper.startsWith("MSG ")) {
         const parts = line.split(/\s+/);
         const size = Number(parts[parts.length - 1]);
-        const payloadStart = lineEnd + 2;
-        const payloadEnd = payloadStart + size;
-        if (!Number.isInteger(size) || buffer.length < payloadEnd + 2) return buffer;
-        const payload = buffer.slice(payloadStart, payloadEnd);
-        buffer = buffer.slice(payloadEnd + 2);
+        const payload_start = line_end + 2;
+        const payload_end = payload_start + size;
+        if (!Number.isInteger(size) || buffer.length < payload_end + 2) return buffer;
+        const payload = buffer.slice(payload_start, payload_end);
+        buffer = buffer.slice(payload_end + 2);
         void this.handlePayload(payload);
         continue;
       }
-      buffer = buffer.slice(lineEnd + 2);
+      buffer = buffer.slice(line_end + 2);
       if (upper === "PING") this.write("PONG\r\n");
     }
   }
