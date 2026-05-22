@@ -35,7 +35,6 @@ export class AutoSessionRouter {
   readonly targets = new Map<cdp.types.ts.Target.TargetID, ModCDPTopologyTarget>();
   readonly contexts = new Map<string, ModCDPTopologyExecutionContext>();
 
-  readonly target_sessions = this.sessionIdFromTargetId;
   readonly session_targets = new Map<string, Record<string, unknown>>();
   readonly execution_contexts = new Map<string, number>();
   private readonly execution_context_waiters = new Map<string, Set<ExecutionContextWaiter>>();
@@ -45,10 +44,6 @@ export class AutoSessionRouter {
     private readonly send: SendCDP,
     private readonly defaultExecutionContextTimeoutMs: () => number,
   ) {}
-
-  sessionIdForTarget(targetId: string) {
-    return this.sessionIdFromTargetId.get(targetId) ?? null;
-  }
 
   async attachToTarget(targetId: string) {
     return await this.ensureSession(targetId);
@@ -72,48 +67,46 @@ export class AutoSessionRouter {
     return await this.send(method, params, await this.ensureSession(frame.targetId));
   }
 
-  recordProtocolEvent(method: string, data: unknown, sessionId: string | null) {
-    const eventData = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
-    if (method === "Target.attachedToTarget") {
-      const attachedSessionId = typeof eventData.sessionId === "string" ? eventData.sessionId : sessionId;
-      const targetInfo =
-        eventData.targetInfo && typeof eventData.targetInfo === "object" && !Array.isArray(eventData.targetInfo)
-          ? (eventData.targetInfo as TargetInfo)
-          : null;
-      if (attachedSessionId && targetInfo?.targetId)
-        this.recordTargetSession(targetInfo.targetId, attachedSessionId, targetInfo);
-    } else if (method === "Target.detachedFromTarget") {
-      const detachedSessionId = typeof eventData.sessionId === "string" ? eventData.sessionId : sessionId;
-      if (detachedSessionId) this.forgetSession(detachedSessionId);
-    } else if (method === "Target.targetInfoChanged") {
-      const targetInfo =
-        eventData.targetInfo && typeof eventData.targetInfo === "object" && !Array.isArray(eventData.targetInfo)
-          ? (eventData.targetInfo as TargetInfo)
-          : null;
-      if (targetInfo?.targetId) this.recordTarget(targetInfo);
-    } else if (method === "Target.targetDestroyed") {
-      const targetId = typeof eventData.targetId === "string" ? eventData.targetId : null;
-      if (targetId) this.forgetTarget(targetId);
-    } else if (method === "Runtime.executionContextCreated") {
-      const context =
-        eventData.context && typeof eventData.context === "object" && !Array.isArray(eventData.context)
-          ? (eventData.context as cdp.types.ts.Runtime.ExecutionContextDescription)
-          : null;
-      if (sessionId && typeof context?.id === "number") this.recordExecutionContext(sessionId, context);
-    } else if (method === "Runtime.executionContextDestroyed") {
-      const executionContextId = typeof eventData.executionContextId === "number" ? eventData.executionContextId : null;
-      if (sessionId && executionContextId != null) this.forgetExecutionContextById(sessionId, executionContextId);
-    } else if (method === "Runtime.executionContextsCleared") {
-      if (sessionId) this.forgetExecutionContextsForSession(sessionId);
-    } else if (method === "Page.frameNavigated" || method === "Page.frameDetached") {
-      const frame =
-        eventData.frame && typeof eventData.frame === "object" && !Array.isArray(eventData.frame)
-          ? (eventData.frame as Record<string, unknown>)
-          : null;
-      const frameId =
-        typeof eventData.frameId === "string" ? eventData.frameId : typeof frame?.id === "string" ? frame.id : null;
-      if (sessionId && frameId) this.forgetExecutionContextsForFrame(sessionId, frameId);
-    }
+  recordAttachedToTarget(event: cdp.types.ts.Target.AttachedToTargetEvent) {
+    this.recordTargetSession(event.targetInfo.targetId, event.sessionId, event.targetInfo);
+  }
+
+  recordDetachedFromTarget(event: cdp.types.ts.Target.DetachedFromTargetEvent) {
+    this.forgetSession(event.sessionId);
+  }
+
+  recordTargetInfoChanged(event: cdp.types.ts.Target.TargetInfoChangedEvent) {
+    this.recordTarget(event.targetInfo);
+  }
+
+  recordTargetDestroyed(event: cdp.types.ts.Target.TargetDestroyedEvent) {
+    this.forgetTarget(event.targetId);
+  }
+
+  recordExecutionContextCreated(
+    event: cdp.types.ts.Runtime.ExecutionContextCreatedEvent,
+    sessionId: cdp.types.ts.Target.SessionID,
+  ) {
+    this.recordExecutionContext(sessionId, event.context);
+  }
+
+  recordExecutionContextDestroyed(
+    event: cdp.types.ts.Runtime.ExecutionContextDestroyedEvent,
+    sessionId: cdp.types.ts.Target.SessionID,
+  ) {
+    this.forgetExecutionContextById(sessionId, event.executionContextId);
+  }
+
+  recordExecutionContextsCleared(sessionId: cdp.types.ts.Target.SessionID) {
+    this.forgetExecutionContextsForSession(sessionId);
+  }
+
+  recordFrameNavigated(event: cdp.types.ts.Page.FrameNavigatedEvent, sessionId: cdp.types.ts.Target.SessionID) {
+    this.forgetExecutionContextsForFrame(sessionId, event.frame.id);
+  }
+
+  recordFrameDetached(event: cdp.types.ts.Page.FrameDetachedEvent, sessionId: cdp.types.ts.Target.SessionID) {
+    this.forgetExecutionContextsForFrame(sessionId, event.frameId);
   }
 
   waitForExecutionContext(sessionId: string | null, { timeout_ms }: { timeout_ms?: number } = {}) {

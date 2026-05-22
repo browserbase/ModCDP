@@ -4,64 +4,9 @@ import { expect, test } from "vitest";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { AutoSessionRouter } from "../src/router/AutoSessionRouter.js";
-
-test("AutoSessionRouter rejects pending execution context waiters when a session detaches", async () => {
-  const router = new AutoSessionRouter(
-    async () => ({}),
-    () => 5_000,
-  );
-  const wait = router.waitForExecutionContext("detached-session", {
-    timeout_ms: 5_000,
-  });
-
-  router.recordProtocolEvent(
-    "Target.attachedToTarget",
-    {
-      sessionId: "detached-session",
-      targetInfo: { targetId: "target-1", type: "page" },
-    },
-    null,
-  );
-  router.recordProtocolEvent("Target.detachedFromTarget", { sessionId: "detached-session" }, null);
-  router.recordProtocolEvent("Runtime.executionContextCreated", { context: { id: 42 } }, "detached-session");
-
-  await expect(wait).rejects.toThrow(
-    "Runtime execution context wait cancelled because session detached-session detached.",
-  );
-  expect(router.sessionIdForTarget("target-1")).toBeNull();
-  expect(router.execution_contexts.get("detached-session")).toBeUndefined();
-}, 5_000);
-
-test("AutoSessionRouter bounds detached session guards and clears them when a session reattaches", () => {
-  const router = new AutoSessionRouter(
-    async () => ({}),
-    () => 5_000,
-  );
-
-  for (let index = 0; index < 1034; index += 1) {
-    router.recordProtocolEvent("Target.detachedFromTarget", { sessionId: `detached-session-${index}` }, null);
-  }
-
-  const detached_sessions = (router as unknown as { detached_sessions: Map<string, true> }).detached_sessions;
-  expect(detached_sessions.size).toBeLessThanOrEqual(1024);
-
-  const recent_session_id = "detached-session-1033";
-  router.recordProtocolEvent("Runtime.executionContextCreated", { context: { id: 42 } }, recent_session_id);
-  expect(router.execution_contexts.get(recent_session_id)).toBeUndefined();
-
-  router.recordProtocolEvent(
-    "Target.attachedToTarget",
-    {
-      sessionId: recent_session_id,
-      targetInfo: { targetId: "target-reattached", type: "page" },
-    },
-    null,
-  );
-  router.recordProtocolEvent("Runtime.executionContextCreated", { context: { id: 43 } }, recent_session_id);
-
-  expect(router.sessionIdForTarget("target-reattached")).toBe(recent_session_id);
-  expect(router.execution_contexts.get(recent_session_id)).toBe(43);
-});
+import { CdpEventMessageSchema } from "../src/types/modcdp.js";
+import * as Runtime from "../src/types/generated/zod/Runtime.js";
+import * as Target from "../src/types/generated/zod/Target.js";
 
 test("AutoSessionRouter tracks real target sessions and execution contexts", async () => {
   const chrome = await new LocalBrowserLauncher({
@@ -102,12 +47,17 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
       pending.delete(message.id);
       return;
     }
-    if (typeof message.method !== "string") return;
-    router.recordProtocolEvent(
-      message.method,
-      message.params,
-      typeof message.sessionId === "string" ? message.sessionId : null,
-    );
+    const cdpEvent = CdpEventMessageSchema.parse(message);
+    if (cdpEvent.method === Target.AttachedToTargetEvent.id) {
+      router.recordAttachedToTarget(Target.AttachedToTargetEvent.parse(cdpEvent.params));
+    } else if (cdpEvent.method === Target.DetachedFromTargetEvent.id) {
+      router.recordDetachedFromTarget(Target.DetachedFromTargetEvent.parse(cdpEvent.params));
+    } else if (cdpEvent.method === Runtime.ExecutionContextCreatedEvent.id) {
+      router.recordExecutionContextCreated(
+        Runtime.ExecutionContextCreatedEvent.parse(cdpEvent.params),
+        cdpEvent.sessionId!,
+      );
+    }
   });
 
   try {
@@ -121,8 +71,10 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
       url: "about:blank#modcdp-auto-session-router",
     });
     const target_id = created.targetId as string;
-    await expect.poll(() => router.sessionIdForTarget(target_id), { timeout: 5_000 }).toEqual(expect.any(String));
-    const session_id = router.sessionIdForTarget(target_id)!;
+    await expect
+      .poll(() => router.sessionIdFromTargetId.get(target_id), { timeout: 5_000 })
+      .toEqual(expect.any(String));
+    const session_id = router.sessionIdFromTargetId.get(target_id)!;
 
     const context_promise = router.waitForExecutionContext(session_id, {
       timeout_ms: 30_000,
@@ -132,8 +84,28 @@ test("AutoSessionRouter tracks real target sessions and execution contexts", asy
     expect(router.execution_contexts.get(session_id)).toEqual(expect.any(Number));
 
     await send("Target.detachFromTarget", { sessionId: session_id });
-    await expect.poll(() => router.sessionIdForTarget(target_id), { timeout: 5_000 }).toBeNull();
+    await expect.poll(() => router.sessionIdFromTargetId.get(target_id), { timeout: 5_000 }).toBeUndefined();
+    expect(router.execution_contexts.get(session_id)).toBeUndefined();
     await send("Target.closeTarget", { targetId: target_id }).catch(() => ({}));
+
+    const pending_created = await send("Target.createTarget", {
+      url: "about:blank#modcdp-auto-session-router-pending-context",
+    });
+    const pending_target_id = pending_created.targetId as string;
+    await expect
+      .poll(() => router.sessionIdFromTargetId.get(pending_target_id), { timeout: 5_000 })
+      .toEqual(expect.any(String));
+    const pending_session_id = router.sessionIdFromTargetId.get(pending_target_id)!;
+    const cancelled_context_promise = router.waitForExecutionContext(pending_session_id, {
+      timeout_ms: 30_000,
+    });
+    const cancelled_context_assertion = expect(cancelled_context_promise).rejects.toThrow(
+      `Runtime execution context wait cancelled because session ${pending_session_id} detached.`,
+    );
+    await send("Target.detachFromTarget", { sessionId: pending_session_id });
+    await cancelled_context_assertion;
+    await expect.poll(() => router.sessionIdFromTargetId.get(pending_target_id), { timeout: 5_000 }).toBeUndefined();
+    await send("Target.closeTarget", { targetId: pending_target_id }).catch(() => ({}));
   } finally {
     ws.close();
     await once(ws, "close").catch(() => {});

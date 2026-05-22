@@ -8,7 +8,10 @@
 
 import type { cdp } from "../types/generated/cdp.js";
 import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "../types/generated/zod.js";
-import { normalizeModCDPPayloadSchema } from "../types/modcdp.js";
+import * as Page from "../types/generated/zod/Page.js";
+import * as Runtime from "../types/generated/zod/Runtime.js";
+import * as Target from "../types/generated/zod/Target.js";
+import { CdpEventMessageSchema, CdpResponseMessageSchema, normalizeModCDPPayloadSchema } from "../types/modcdp.js";
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
 import type {
   CdpCommandMessage,
@@ -838,59 +841,39 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       loopbackSocketPromises.delete(endpoint);
       ws.addEventListener("message", (event) => {
         const msg = JSON.parse(event.data);
-        const id = typeof msg.id === "number" ? msg.id : null;
-        if (id == null) {
-          const method = typeof msg.method === "string" ? msg.method : null;
-          if (!method) return;
-          const payload =
-            msg.params && typeof msg.params === "object" && !Array.isArray(msg.params)
-              ? (msg.params as ProtocolPayload)
-              : {};
-          const cdpSessionId = typeof msg.sessionId === "string" ? msg.sessionId : null;
-          const payloadRecord = payload as Record<string, unknown>;
-          const targetInfo =
-            payloadRecord.targetInfo &&
-            typeof payloadRecord.targetInfo === "object" &&
-            !Array.isArray(payloadRecord.targetInfo)
-              ? (payloadRecord.targetInfo as Record<string, unknown>)
-              : null;
-          const attachedSessionId = typeof payloadRecord.sessionId === "string" ? payloadRecord.sessionId : null;
-          const attachedTargetId = typeof targetInfo?.targetId === "string" ? targetInfo.targetId : null;
-          if (method === "Target.attachedToTarget" && attachedSessionId != null && attachedTargetId != null) {
-            loopbackTargetSessions.set(attachedTargetId, attachedSessionId);
-            loopbackSessionTargets.set(attachedSessionId, attachedTargetId);
-          } else if (method === "Target.detachedFromTarget") {
-            const detachedSessionId =
-              typeof payloadRecord.sessionId === "string" ? payloadRecord.sessionId : cdpSessionId;
-            const detachedTargetId =
-              typeof payloadRecord.targetId === "string"
-                ? payloadRecord.targetId
-                : detachedSessionId == null
-                  ? null
-                  : (loopbackSessionTargets.get(detachedSessionId) ?? null);
+        if (!("id" in msg)) {
+          const cdpEvent = CdpEventMessageSchema.parse(msg);
+          const method = cdpEvent.method;
+          const payload = (cdpEvent.params ?? {}) as ProtocolPayload;
+          const cdpSessionId = cdpEvent.sessionId ?? null;
+          let attachedSessionId: string | null = null;
+          let attachedTargetInfo: cdp.types.ts.Target.TargetInfo | null = null;
+          if (method === Target.AttachedToTargetEvent.id) {
+            const attached = Target.AttachedToTargetEvent.parse(payload);
+            attachedSessionId = attached.sessionId;
+            attachedTargetInfo = attached.targetInfo;
+            loopbackTargetSessions.set(attached.targetInfo.targetId, attached.sessionId);
+            loopbackSessionTargets.set(attached.sessionId, attached.targetInfo.targetId);
+          } else if (method === Target.DetachedFromTargetEvent.id) {
+            const detached = Target.DetachedFromTargetEvent.parse(payload);
+            const detachedTargetId = detached.targetId ?? loopbackSessionTargets.get(detached.sessionId);
             if (detachedTargetId != null) loopbackTargetSessions.delete(detachedTargetId);
-            if (detachedSessionId != null) loopbackSessionTargets.delete(detachedSessionId);
-            if (detachedSessionId != null) loopbackSessionContexts.delete(detachedSessionId);
-          } else if (method === "Runtime.executionContextCreated" && cdpSessionId != null) {
-            const context = payloadRecord.context;
-            const contextId =
-              context && typeof context === "object" && "id" in context && typeof context.id === "number"
-                ? context.id
-                : null;
-            if (contextId != null) {
-              loopbackSessionContexts.set(cdpSessionId, contextId);
-              const waiters = loopbackContextWaiters.get(cdpSessionId);
-              if (waiters) {
-                loopbackContextWaiters.delete(cdpSessionId);
-                for (const resolve of waiters) resolve(contextId);
-              }
+            loopbackSessionTargets.delete(detached.sessionId);
+            loopbackSessionContexts.delete(detached.sessionId);
+          } else if (method === Runtime.ExecutionContextCreatedEvent.id && cdpSessionId != null) {
+            const context = Runtime.ExecutionContextCreatedEvent.parse(payload).context;
+            loopbackSessionContexts.set(cdpSessionId, context.id);
+            const waiters = loopbackContextWaiters.get(cdpSessionId);
+            if (waiters) {
+              loopbackContextWaiters.delete(cdpSessionId);
+              for (const resolve of waiters) resolve(context.id);
             }
           }
           void (async () => {
             if (
-              method === "Target.attachedToTarget" &&
+              method === Target.AttachedToTargetEvent.id &&
               attachedSessionId != null &&
-              (targetInfo?.type === "page" || targetInfo?.type === "iframe")
+              (attachedTargetInfo?.type === "page" || attachedTargetInfo?.type === "iframe")
             ) {
               await ModCDPServer.handleCommand("Page.enable", {}, attachedSessionId).catch((error) =>
                 console.error("[ModCDPServer] Page.enable failed for attached target", error),
@@ -907,11 +890,12 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
           })().catch((error) => console.error("[ModCDPServer] loopback event listener failed", error));
           return;
         }
-        const pending = loopbackPending.get(id);
+        const response = CdpResponseMessageSchema.parse(msg);
+        const pending = loopbackPending.get(response.id);
         if (!pending) return;
-        loopbackPending.delete(id);
-        if (msg.error) pending.reject(new Error(msg.error.message));
-        else pending.resolve(msg.result || {});
+        loopbackPending.delete(response.id);
+        if (response.error) pending.reject(new Error(response.error.message));
+        else pending.resolve((response.result ?? {}) as ProtocolResult);
       });
       ws.addEventListener("error", () => {
         if (loopbackSockets.get(endpoint) === ws) loopbackSockets.delete(endpoint);
@@ -1191,32 +1175,16 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       const chromeApi = globalScope.chrome;
       if (this.eventListenerInstalled || !chromeApi?.debugger?.onEvent?.addListener) return;
       chromeApi.debugger.onEvent.addListener((_source, method, params) => {
-        const payload =
-          params && typeof params === "object" && !Array.isArray(params) ? (params as ProtocolPayload) : {};
-        const payloadRecord = payload as Record<string, unknown>;
-        if (method === "Target.attachedToTarget") {
-          const sessionId = typeof payloadRecord.sessionId === "string" ? payloadRecord.sessionId : null;
-          const targetInfo =
-            payloadRecord.targetInfo &&
-            typeof payloadRecord.targetInfo === "object" &&
-            !Array.isArray(payloadRecord.targetInfo)
-              ? (payloadRecord.targetInfo as Record<string, unknown>)
-              : null;
-          const targetId = typeof targetInfo?.targetId === "string" ? targetInfo.targetId : null;
-          if (sessionId && targetId) {
-            this.sessionIdFromTargetId.set(targetId, sessionId);
-            this.targetIdFromSessionId.set(sessionId, targetId);
-          }
-        } else if (method === "Target.detachedFromTarget") {
-          const sessionId = typeof payloadRecord.sessionId === "string" ? payloadRecord.sessionId : null;
-          const targetId =
-            typeof payloadRecord.targetId === "string"
-              ? payloadRecord.targetId
-              : sessionId
-                ? (this.targetIdFromSessionId.get(sessionId) ?? null)
-                : null;
+        const payload = (params ?? {}) as ProtocolPayload;
+        if (method === Target.AttachedToTargetEvent.id) {
+          const attached = Target.AttachedToTargetEvent.parse(payload);
+          this.sessionIdFromTargetId.set(attached.targetInfo.targetId, attached.sessionId);
+          this.targetIdFromSessionId.set(attached.sessionId, attached.targetInfo.targetId);
+        } else if (method === Target.DetachedFromTargetEvent.id) {
+          const detached = Target.DetachedFromTargetEvent.parse(payload);
+          const targetId = detached.targetId ?? this.targetIdFromSessionId.get(detached.sessionId);
           if (targetId) this.sessionIdFromTargetId.delete(targetId);
-          if (sessionId) this.targetIdFromSessionId.delete(sessionId);
+          this.targetIdFromSessionId.delete(detached.sessionId);
         }
         for (const listener of this.eventListeners) listener(method, payload, null);
       });
@@ -1276,7 +1244,33 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   }
 
   function handleServerUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
-    serverAutoRouter?.recordProtocolEvent(method, payload, cdpSessionId);
+    if (serverAutoRouter) {
+      if (method === Target.AttachedToTargetEvent.id) {
+        serverAutoRouter.recordAttachedToTarget(Target.AttachedToTargetEvent.parse(payload));
+      } else if (method === Target.DetachedFromTargetEvent.id) {
+        serverAutoRouter.recordDetachedFromTarget(Target.DetachedFromTargetEvent.parse(payload));
+      } else if (method === Target.TargetInfoChangedEvent.id) {
+        serverAutoRouter.recordTargetInfoChanged(Target.TargetInfoChangedEvent.parse(payload));
+      } else if (method === Target.TargetDestroyedEvent.id) {
+        serverAutoRouter.recordTargetDestroyed(Target.TargetDestroyedEvent.parse(payload));
+      } else if (method === Runtime.ExecutionContextCreatedEvent.id && cdpSessionId) {
+        serverAutoRouter.recordExecutionContextCreated(
+          Runtime.ExecutionContextCreatedEvent.parse(payload),
+          cdpSessionId,
+        );
+      } else if (method === Runtime.ExecutionContextDestroyedEvent.id && cdpSessionId) {
+        serverAutoRouter.recordExecutionContextDestroyed(
+          Runtime.ExecutionContextDestroyedEvent.parse(payload),
+          cdpSessionId,
+        );
+      } else if (method === Runtime.ExecutionContextsClearedEvent.id && cdpSessionId) {
+        serverAutoRouter.recordExecutionContextsCleared(cdpSessionId);
+      } else if (method === Page.FrameNavigatedEvent.id && cdpSessionId) {
+        serverAutoRouter.recordFrameNavigated(Page.FrameNavigatedEvent.parse(payload), cdpSessionId);
+      } else if (method === Page.FrameDetachedEvent.id && cdpSessionId) {
+        serverAutoRouter.recordFrameDetached(Page.FrameDetachedEvent.parse(payload), cdpSessionId);
+      }
+    }
     void publishEvent(method, payload, cdpSessionId).catch((error) =>
       console.error("[ModCDPServer] upstream event listener failed", error),
     );

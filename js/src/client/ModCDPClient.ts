@@ -15,6 +15,9 @@ import type { z } from "zod";
 import { createCdpAliases, type CdpAliases } from "../types/generated/aliases.js";
 export type { CdpAliases } from "../types/generated/aliases.js";
 import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "../types/generated/zod.js";
+import * as Page from "../types/generated/zod/Page.js";
+import * as Runtime from "../types/generated/zod/Runtime.js";
+import * as Target from "../types/generated/zod/Target.js";
 import {
   CUSTOM_EVENT_BINDING_NAME,
   DEFAULT_CLIENT_ROUTES,
@@ -188,11 +191,11 @@ export type ModCDPClientInstance<
 } & {
   on<TName extends Extract<keyof TEvents, string>>(
     eventName: TName,
-    listener: (event: TEvents[TName]) => void,
+    listener: (event: TEvents[TName], sessionId: string | null) => void,
   ): ModCDPClient;
   once<TName extends Extract<keyof TEvents, string>>(
     eventName: TName,
-    listener: (event: TEvents[TName]) => void,
+    listener: (event: TEvents[TName], sessionId: string | null) => void,
   ): ModCDPClient;
 };
 
@@ -403,6 +406,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   cdp_aliases_hydrated: boolean;
   event_wait_cleanups: Set<() => void>;
   auto_sessions: AutoSessionRouter;
+  auto_session_router_event_handlers_registered: boolean;
   heartbeat_timer: ReturnType<typeof setInterval> | null;
   _injectors: ExtensionInjector[];
   _cdp: {
@@ -458,6 +462,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.command_result_unwrap_keys = new Map();
     this.cdp_aliases_hydrated = false;
     this.event_wait_cleanups = new Set();
+    this.auto_session_router_event_handlers_registered = false;
     this.heartbeat_timer = null;
     this.auto_sessions = new AutoSessionRouter(
       (method, params = {}, session_id = null) =>
@@ -477,6 +482,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     };
     this._hydrateNativeProtocolSchemas();
     void this._hydrateCdpAliases();
+    this._registerAutoSessionRouterEventHandlers();
     this._hydrateCustomSurface();
   }
 
@@ -674,6 +680,30 @@ export class ModCDPClient extends ModCDPEventEmitter {
       }),
     );
     this.cdp_aliases_hydrated = true;
+  }
+
+  _registerAutoSessionRouterEventHandlers() {
+    if (this.auto_session_router_event_handlers_registered) return;
+    this.auto_session_router_event_handlers_registered = true;
+    this.on(Target.AttachedToTargetEvent, (event) => this.auto_sessions.recordAttachedToTarget(event));
+    this.on(Target.DetachedFromTargetEvent, (event) => this.auto_sessions.recordDetachedFromTarget(event));
+    this.on(Target.TargetInfoChangedEvent, (event) => this.auto_sessions.recordTargetInfoChanged(event));
+    this.on(Target.TargetDestroyedEvent, (event) => this.auto_sessions.recordTargetDestroyed(event));
+    this.on(Runtime.ExecutionContextCreatedEvent, (event, sessionId) => {
+      if (sessionId) this.auto_sessions.recordExecutionContextCreated(event, sessionId);
+    });
+    this.on(Runtime.ExecutionContextDestroyedEvent, (event, sessionId) => {
+      if (sessionId) this.auto_sessions.recordExecutionContextDestroyed(event, sessionId);
+    });
+    this.on(Runtime.ExecutionContextsClearedEvent, (_event, sessionId) => {
+      if (sessionId) this.auto_sessions.recordExecutionContextsCleared(sessionId);
+    });
+    this.on(Page.FrameNavigatedEvent, (event, sessionId) => {
+      if (sessionId) this.auto_sessions.recordFrameNavigated(event, sessionId);
+    });
+    this.on(Page.FrameDetachedEvent, (event, sessionId) => {
+      if (sessionId) this.auto_sessions.recordFrameDetached(event, sessionId);
+    });
   }
 
   _hydrateCustomSurface() {
@@ -974,7 +1004,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       service_worker_url_suffixes.some((suffix) => suffix.split("/").filter(Boolean).length > 1);
     return {
       send,
-      sessionIdForTarget: (target_id) => this.auto_sessions.sessionIdForTarget(target_id),
+      sessionIdForTarget: (target_id) => this.auto_sessions.sessionIdFromTargetId.get(target_id) ?? null,
       attachToTarget: send ? (target_id) => this.auto_sessions.attachToTarget(target_id) : null,
       waitForExecutionContext: (session_id, timeout_ms) =>
         this.auto_sessions.waitForExecutionContext(session_id, { timeout_ms }),
@@ -1056,11 +1086,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   on<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   on(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  on(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  on(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  on(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  on(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       const name = normalizeModCDPName(event_name);
       this.event_schemas.set(name, event_name);
@@ -1071,11 +1101,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   once<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   once(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  once(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  once(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  once(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  once(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       const name = normalizeModCDPName(event_name);
       this.event_schemas.set(name, event_name);
@@ -1086,11 +1116,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   off<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   off(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  off(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  off(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  off(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  off(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       return super.off(normalizeModCDPName(event_name), listener);
     }
@@ -1257,10 +1287,13 @@ export class ModCDPClient extends ModCDPEventEmitter {
     }
     const event = CdpEventMessageSchema.parse(msg);
     if (event.sessionId === this.ext_session_id) {
-      if (event.method === "Runtime.executionContextCreated") {
-        this.auto_sessions.recordProtocolEvent(event.method, event.params || {}, event.sessionId || null);
+      if (event.method === this.Runtime.executionContextCreated.id && event.sessionId) {
+        this.auto_sessions.recordExecutionContextCreated(
+          this.Runtime.executionContextCreated.parse(event.params || {}),
+          event.sessionId,
+        );
       }
-      if (event.method !== "Runtime.bindingCalled") return;
+      if (event.method !== this.Runtime.bindingCalled.id) return;
       const u = unwrapEventIfNeeded(
         event.method,
         (event.params || {}) as RuntimeBindingCalledEvent,
@@ -1269,7 +1302,6 @@ export class ModCDPClient extends ModCDPEventEmitter {
       );
       if (u) {
         const payload = this._parseEventPayload(u.event, u.data);
-        this.auto_sessions.recordProtocolEvent(u.event, payload as ProtocolPayload, u.sessionId);
         this.emit(u.event, payload, u.sessionId);
       }
       return;
@@ -1277,13 +1309,12 @@ export class ModCDPClient extends ModCDPEventEmitter {
     if (event.method) {
       const data = event.params || {};
       const payload = this._parseEventPayload(event.method, data);
-      this.auto_sessions.recordProtocolEvent(event.method, payload as ProtocolPayload, event.sessionId || null);
       this.emit(event.method, payload, event.sessionId || null);
     }
   }
 
   get auto_target_sessions() {
-    return this.auto_sessions.target_sessions;
+    return this.auto_sessions.sessionIdFromTargetId;
   }
 
   get auto_session_targets() {

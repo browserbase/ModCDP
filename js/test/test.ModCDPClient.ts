@@ -106,8 +106,8 @@ test("ModCDPClient normalizes nested config owners", () => {
 test("ModCDPClient dispatches root events before extension session is attached", () => {
   const cdp = new ModCDPClient();
   const seen: string[] = [];
-  cdp.on("Target.targetCreated", (payload: { targetInfo?: { targetId?: string } }) => {
-    seen.push(String(payload.targetInfo?.targetId));
+  cdp.on(cdp.Target.targetCreated, (payload) => {
+    seen.push(payload.targetInfo.targetId);
   });
 
   cdp._onRecv({
@@ -130,10 +130,10 @@ test("ModCDPClient dispatches root events before extension session is attached",
 test("ModCDPClient event dispatch snapshots handlers when once removes itself", () => {
   const cdp = new ModCDPClient();
   const seen: string[] = [];
-  cdp.once("Target.targetCreated", () => {
+  cdp.once(cdp.Target.targetCreated, () => {
     seen.push("once");
   });
-  cdp.on("Target.targetCreated", () => {
+  cdp.on(cdp.Target.targetCreated, () => {
     seen.push("persistent");
   });
 
