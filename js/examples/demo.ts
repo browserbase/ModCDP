@@ -37,6 +37,7 @@ const EXTENSION_PATH =
     existsSync(path.join(candidate, "modcdp/service_worker.js")),
   ) ?? path.resolve(HERE, "..", "..", "extension");
 const DEFAULT_DEMO_EVENT_TIMEOUT_MS = 10_000;
+const DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS = 60_000;
 const DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS = 60_000;
 const DEFAULT_LIVE_CDP_POLL_INTERVAL_MS = 250;
 const DEFAULT_LIVE_CDP_ACTIVE_PORT_STALE_MS = 1_000;
@@ -127,6 +128,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
       injector,
       client: {
         client_routes: clientRoutesFor(mode),
+        client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
       },
     };
   }
@@ -136,6 +138,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     injector,
     client: {
       client_routes: clientRoutesFor(mode),
+      client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
     },
     server: {
       server_routes: serverRoutesFor(mode, upstream_mode),

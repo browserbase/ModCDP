@@ -28,6 +28,7 @@ import (
 	"golang.org/x/term"
 )
 
+const demoCDPSendTimeoutMS = 60_000
 const reverseTransportWaitTimeoutMS = 60_000
 
 func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
@@ -46,7 +47,7 @@ func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions 
 			Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
 			Upstream: upstream,
 			Injector: modcdp.InjectorConfig{InjectorMode: "auto", InjectorExtensionPath: extensionPath},
-			Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode)},
+			Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		}
 	}
 	server := &modcdp.ServerConfig{
@@ -56,7 +57,7 @@ func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions 
 		Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
 		Upstream: upstream,
 		Injector: modcdp.InjectorConfig{InjectorMode: "auto", InjectorExtensionPath: extensionPath},
-		Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode)},
+		Client:   modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		Server:   server,
 	}
 }

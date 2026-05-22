@@ -27,6 +27,7 @@ from modcdp.types import ProtocolPayload
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 EXTENSION_PATH = ROOT / "dist" / "extension"
+DEMO_CDP_SEND_TIMEOUT_MS = 60_000
 REVERSE_TRANSPORT_WAIT_TIMEOUT_MS = 60_000
 LIVE_DEVTOOLS_ACTIVE_PORTS = [
     Path.home() / "Library" / "Application Support" / "Google" / "Chrome" / "DevToolsActivePort",
@@ -105,7 +106,7 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
             "launcher": {"launcher_mode": "remote" if cdp_url else "local", "launcher_options": launch_options or {}},
             "upstream": upstream,
             "injector": {"injector_mode": "auto", "injector_extension_path": str(EXTENSION_PATH)},
-            "client": {"client_routes": client_routes_for(mode)},
+            "client": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
         }
     server = {
         "server_routes": server_routes_for(mode, upstream_mode),
@@ -114,7 +115,7 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
         "launcher": {"launcher_mode": "remote" if cdp_url else "local", "launcher_options": launch_options or {}},
         "upstream": upstream,
         "injector": {"injector_mode": "auto", "injector_extension_path": str(EXTENSION_PATH)},
-        "client": {"client_routes": client_routes_for(mode)},
+        "client": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
         "server": server,
     }
 
