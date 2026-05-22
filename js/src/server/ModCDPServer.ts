@@ -121,9 +121,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       const expired = clearDownstreamClientLease();
       if (!expired) return;
       if (ModCDPServer.close_browser_on_downstream_disconnect !== true) return;
-      void configuredServerUpstreamTransport()
-        .send("Browser.close", {}, null)
-        .catch(() => {});
+      if (!activeServerUpstreamTransport)
+        registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+      void activeServerUpstreamTransport?.send("Browser.close", {}, null).catch(() => {});
     }, timeout_ms);
     downstream_client_lease = {
       cdpSessionId,
@@ -1248,8 +1248,8 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     }
   }
 
-  const loopbackTransport = new LoopbackCdpTransport();
-  const chromeDebuggerTransport = new ChromeDebuggerTransport();
+  let loopbackTransport: LoopbackCdpTransport | null = null;
+  let chromeDebuggerTransport: ChromeDebuggerTransport | null = null;
   let activeServerUpstreamTransport: ServerUpstreamTransport | null = null;
   let activeServerUpstreamSubscription: { remove: () => void } | null = null;
 
@@ -1271,7 +1271,14 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   }
 
   function registerServerUpstreamTransport(name: ServerUpstreamTransportName) {
-    const transport = name === "loopback_cdp" ? loopbackTransport : chromeDebuggerTransport;
+    let transport: ServerUpstreamTransport;
+    if (name === "loopback_cdp") {
+      loopbackTransport ??= new LoopbackCdpTransport();
+      transport = loopbackTransport;
+    } else {
+      chromeDebuggerTransport ??= new ChromeDebuggerTransport();
+      transport = chromeDebuggerTransport;
+    }
     if (activeServerUpstreamTransport === transport) return transport;
     activeServerUpstreamSubscription?.remove();
     activeServerUpstreamTransport = transport;
@@ -1284,13 +1291,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       },
     };
     return transport;
-  }
-
-  function configuredServerUpstreamTransport() {
-    return (
-      activeServerUpstreamTransport ??
-      registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes))
-    );
   }
 
   function publishServerUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
@@ -1600,7 +1600,11 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
 
       if (!serverUpstreamRouteNames.has(upstream))
         throw new Error(`No service-worker command registered for ${method}.`);
-      result = await configuredServerUpstreamTransport().send(method, params, cdpSessionId);
+      if (!activeServerUpstreamTransport)
+        registerServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
+      if (!activeServerUpstreamTransport)
+        throw new Error(`No ModCDP server upstream transport registered for ${method}.`);
+      result = await activeServerUpstreamTransport.send(method, params, cdpSessionId);
 
       result = await this.runMiddleware("response", method, result, {
         cdpSessionId,
@@ -1623,7 +1627,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
           return ModCDPServer.events;
         },
         get upstream() {
-          return configuredServerUpstreamTransport();
+          if (!activeServerUpstreamTransport)
+            registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+          return activeServerUpstreamTransport;
         },
         send: (method: string, params: ProtocolParams = {}) => this.handleCommand(method, params, cdpSessionId),
         emit: (eventName: string, payload: ProtocolPayload = {}) => this.emit(eventName, payload, cdpSessionId),
@@ -1715,13 +1721,20 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     },
 
     get upstream() {
-      return configuredServerUpstreamTransport();
+      if (!activeServerUpstreamTransport)
+        registerServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
+      return activeServerUpstreamTransport;
     },
   };
 
   serverAutoRouter = new AutoSessionRouter(
-    (method, params = {}, cdpSessionId = null) =>
-      configuredServerUpstreamTransport().send(method, params, cdpSessionId),
+    (method, params = {}, cdpSessionId = null) => {
+      if (!activeServerUpstreamTransport)
+        registerServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+      if (!activeServerUpstreamTransport)
+        throw new Error(`No ModCDP server upstream transport registered for ${method}.`);
+      return activeServerUpstreamTransport.send(method, params, cdpSessionId);
+    },
     () => ModCDPServer.loopback_execution_context_timeout_ms,
   );
 

@@ -126,10 +126,18 @@ export class AutoSessionRouter {
         },
         sessionId,
       )) as cdp.types.ts.Page.CreateIsolatedWorldResult;
-      return await this.waitForMatchingExecutionContext(
-        (context) => context.sessionId === sessionId && context.id === created.executionContextId,
+      const createdContext = this.findExecutionContext(sessionId, frame.frameId, selector);
+      if (createdContext?.id === created.executionContextId) return createdContext;
+      const context: ModCDPTopologyExecutionContext = {
+        id: created.executionContextId,
         sessionId,
-      );
+        targetId: frame.targetId,
+        frameId: frame.frameId,
+        world: selector.world === "piercer" ? "piercer" : selector.worldName || "isolated",
+        name: selector.worldName,
+      };
+      this.contexts.set(`${sessionId}:${context.id}`, context);
+      return context;
     }
 
     return await this.waitForMatchingExecutionContext(
@@ -181,13 +189,13 @@ export class AutoSessionRouter {
     const roots = new Map<cdp.types.ts.Runtime.RemoteObjectId, ModCDPTopologyDomRoot>();
     await runTopologyQueue([...frames.entries()], async ([frameId, frame]) => {
       const context = await this.ensureExecutionContext({ frameId, targetId: frame.targetId }, { world: "piercer" });
-      contexts.set(context.uniqueId, context);
+      contexts.set(context.uniqueId ?? `${context.sessionId}:${context.id}`, context);
       const rootObject = (await this.send(
         "Runtime.evaluate",
         {
           expression: "document.documentElement",
           objectGroup,
-          uniqueContextId: context.uniqueId,
+          ...(context.uniqueId ? { uniqueContextId: context.uniqueId } : { contextId: context.id }),
         },
         context.sessionId,
       )) as cdp.types.ts.Runtime.EvaluateResult;
@@ -203,7 +211,8 @@ export class AutoSessionRouter {
         frameId,
         outerBackendNodeId: frame.outerBackendNodeId ?? null,
         innerBackendNodeId: described.node.backendNodeId ?? null,
-        uniqueContextId: context.uniqueId,
+        executionContextId: context.id,
+        ...(context.uniqueId ? { uniqueContextId: context.uniqueId } : {}),
       });
     });
 
@@ -219,7 +228,7 @@ export class AutoSessionRouter {
 
     for (const context of this.contexts.values()) {
       if ([...frames.values()].some((frame) => frame.targetId === context.targetId))
-        contexts.set(context.uniqueId, context);
+        contexts.set(context.uniqueId ?? `${context.sessionId}:${context.id}`, context);
     }
 
     return {
@@ -298,7 +307,8 @@ export class AutoSessionRouter {
               outerBackendNodeId: hostBackendNodeId ?? node.backendNodeId ?? null,
               innerBackendNodeId: shadowRoot.backendNodeId ?? null,
               mode: shadowRoot.shadowRootType,
-              uniqueContextId: context.uniqueId,
+              executionContextId: context.id,
+              ...(context.uniqueId ? { uniqueContextId: context.uniqueId } : {}),
             });
           }
         }
@@ -352,7 +362,6 @@ export class AutoSessionRouter {
     if (!targetId) return;
     if (typeof context.id !== "number") return;
     if (!this.execution_contexts.has(sessionId)) this.execution_contexts.set(sessionId, context.id);
-    if (!context.uniqueId) return;
     const auxData = context.auxData && typeof context.auxData === "object" ? context.auxData : {};
     const frameId = typeof auxData.frameId === "string" ? auxData.frameId : null;
     const topologyContext: ModCDPTopologyExecutionContext = {
@@ -368,7 +377,7 @@ export class AutoSessionRouter {
             ? "main"
             : context.name || String(auxData.type ?? "isolated"),
     };
-    this.contexts.set(context.uniqueId, topologyContext);
+    this.contexts.set(context.uniqueId ?? `${sessionId}:${context.id}`, topologyContext);
     const waiters = this.execution_context_waiters.get(sessionId);
     if (!waiters) return;
     for (const waiter of [...waiters]) {

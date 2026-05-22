@@ -75,6 +75,7 @@ class ModCDPTopologyDomRoot(TypedDict, total=False):
     outerBackendNodeId: int | None
     innerBackendNodeId: int | None
     mode: Literal["open", "closed", "user-agent"]
+    executionContextId: int
     uniqueContextId: str
 
 

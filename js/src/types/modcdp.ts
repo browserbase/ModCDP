@@ -247,7 +247,8 @@ export const ModCDPTopologyDomRootSchema = z
     outerBackendNodeId: z.number().int().nullable().optional(),
     innerBackendNodeId: z.number().int().nullable().optional(),
     mode: z.enum(["open", "closed", "user-agent"]).optional(),
-    uniqueContextId: z.string(),
+    executionContextId: z.number().int().optional(),
+    uniqueContextId: z.string().optional(),
   })
   .passthrough();
 export type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
@@ -269,9 +270,9 @@ export type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
 export const ModCDPTopologyExecutionContextSchema = z
   .object({
     id: z.number().int(),
-    origin: z.string(),
-    name: z.string(),
-    uniqueId: z.string(),
+    origin: z.string().optional(),
+    name: z.string().optional(),
+    uniqueId: z.string().optional(),
     auxData: z.record(z.string(), z.unknown()).optional(),
     sessionId: z.string(),
     targetId: z.string(),
