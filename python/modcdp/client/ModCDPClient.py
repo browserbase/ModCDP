@@ -721,26 +721,23 @@ class ModCDPClient(CDPSurfaceMixin):
             stop.set()
         self._heartbeat_thread = None
 
-    def _session_id_for_target(self, target_id: str, timeout: float = 0) -> str | None:
-        if timeout <= 0:
-            return self.auto_sessions.sessionIdForTarget(target_id)
-        deadline = time.time() + timeout
-        while time.time() <= deadline:
-            session_id = self.auto_sessions.sessionIdForTarget(target_id)
-            if session_id:
-                return session_id
-            time.sleep(self.injector["injector_target_session_poll_interval_ms"] / 1000)
-        return None
-
-    def _ensure_session_id_for_target(self, target_id: str, timeout: float = 0, allow_attach: bool = False) -> str | None:
-        session_id = self.auto_sessions.sessionIdForTarget(target_id)
+    def _ensureSessionForTarget(self, target_id: str, timeout: float = 0, allow_attach: bool = False) -> str | None:
+        session_id = self.auto_sessions.sessionId_from_targetId.get(target_id)
         if session_id:
             return session_id
         if allow_attach:
             attached_session_id = self.auto_sessions.attachToTarget(target_id)
             if attached_session_id:
                 return attached_session_id
-        return self._session_id_for_target(target_id, timeout=timeout)
+        if timeout <= 0:
+            return self.auto_sessions.sessionId_from_targetId.get(target_id)
+        deadline = time.time() + timeout
+        while time.time() <= deadline:
+            session_id = self.auto_sessions.sessionId_from_targetId.get(target_id)
+            if session_id:
+                return session_id
+            time.sleep(self.injector["injector_target_session_poll_interval_ms"] / 1000)
+        return None
 
     def _browser_launcher(self):
         if self.launcher.get("launcher_mode") == "local":
@@ -910,17 +907,17 @@ class ModCDPClient(CDPSurfaceMixin):
                 timeout=self.client["client_cdp_send_timeout_ms"] / 1000,
             )
 
-        def attach_to_target(target_id: str) -> str | None:
-            return self._ensure_session_id_for_target(
+        def ensure_session_for_target(target_id: str, timeout_ms: int, allow_attach: bool) -> str | None:
+            return self._ensureSessionForTarget(
                 target_id,
-                timeout=self.injector["injector_service_worker_probe_timeout_ms"] / 1000,
-                allow_attach=True,
+                timeout=timeout_ms / 1000,
+                allow_attach=allow_attach,
             )
 
         return {
             "send": send_cdp if send is not None else None,
-            "sessionIdForTarget": self.auto_sessions.sessionIdForTarget,
-            "attachToTarget": attach_to_target if send is not None else None,
+            "sessionId_from_targetId": self.auto_sessions.sessionId_from_targetId,
+            "ensureSessionForTarget": ensure_session_for_target if send is not None else None,
             "waitForExecutionContext": self.auto_sessions.waitForExecutionContext,
             "injector_extension_path": cast(str | None, self.injector.get("injector_extension_path")),
             "injector_extension_id": cast(str | None, self.injector.get("injector_extension_id")),

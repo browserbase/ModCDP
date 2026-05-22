@@ -8,17 +8,13 @@ import (
 
 type AutoSessionRouterSend func(method string, params map[string]any, sessionID string) (map[string]any, error)
 
-const maxDetachedSessionGuards = 1024
-
 type AutoSessionRouter struct {
-	TargetSessions                   map[string]string
-	SessionTargets                   map[string]map[string]any
-	ExecutionContexts                map[string]int
+	SessionId_from_targetId          map[string]string
+	TargetId_from_sessionId          map[string]string
+	Execution_contexts               map[string]int
 	send                             AutoSessionRouterSend
 	defaultExecutionContextTimeoutMS func() int
-	executionContextWaiters          map[string][]chan executionContextResult
-	detachedSessions                 map[string]bool
-	detachedSessionOrder             []string
+	execution_context_waiters        map[string][]chan executionContextResult
 	mu                               sync.Mutex
 }
 
@@ -29,33 +25,28 @@ type executionContextResult struct {
 
 func NewAutoSessionRouter(send AutoSessionRouterSend, defaultExecutionContextTimeoutMS func() int) *AutoSessionRouter {
 	return &AutoSessionRouter{
-		TargetSessions:                   map[string]string{},
-		SessionTargets:                   map[string]map[string]any{},
-		ExecutionContexts:                map[string]int{},
+		SessionId_from_targetId:          map[string]string{},
+		TargetId_from_sessionId:          map[string]string{},
+		Execution_contexts:               map[string]int{},
 		send:                             send,
 		defaultExecutionContextTimeoutMS: defaultExecutionContextTimeoutMS,
-		executionContextWaiters:          map[string][]chan executionContextResult{},
-		detachedSessions:                 map[string]bool{},
-		detachedSessionOrder:             []string{},
+		execution_context_waiters:        map[string][]chan executionContextResult{},
 	}
 }
 
-func (r *AutoSessionRouter) SessionIDForTarget(targetID string) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.TargetSessions[targetID]
-}
-
 func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
-	if sessionID := r.SessionIDForTarget(targetID); sessionID != "" {
+	r.mu.Lock()
+	sessionID := r.SessionId_from_targetId[targetID]
+	r.mu.Unlock()
+	if sessionID != "" {
 		return sessionID
 	}
 	result, err := r.send("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "")
 	if err != nil {
 		return ""
 	}
-	sessionID, _ := result["sessionId"].(string)
-	return sessionID
+	attachedSessionID, _ := result["sessionId"].(string)
+	return attachedSessionID
 }
 
 func (r *AutoSessionRouter) RecordProtocolEvent(method string, data any, sessionID string) {
@@ -73,9 +64,8 @@ func (r *AutoSessionRouter) RecordProtocolEvent(method string, data any, session
 		targetID, _ := targetInfo["targetId"].(string)
 		if attachedSessionID != "" && targetID != "" {
 			r.mu.Lock()
-			r.clearDetachedSessionLocked(attachedSessionID)
-			r.TargetSessions[targetID] = attachedSessionID
-			r.SessionTargets[attachedSessionID] = targetInfo
+			r.SessionId_from_targetId[targetID] = attachedSessionID
+			r.TargetId_from_sessionId[attachedSessionID] = targetID
 			r.mu.Unlock()
 		}
 	case "Runtime.executionContextCreated":
@@ -103,12 +93,12 @@ func (r *AutoSessionRouter) WaitForExecutionContext(sessionID string, timeoutMS 
 		return 0, fmt.Errorf("cannot wait for a Runtime execution context without a session")
 	}
 	r.mu.Lock()
-	if contextID, ok := r.ExecutionContexts[sessionID]; ok {
+	if contextID, ok := r.Execution_contexts[sessionID]; ok {
 		r.mu.Unlock()
 		return contextID, nil
 	}
 	waiter := make(chan executionContextResult, 1)
-	r.executionContextWaiters[sessionID] = append(r.executionContextWaiters[sessionID], waiter)
+	r.execution_context_waiters[sessionID] = append(r.execution_context_waiters[sessionID], waiter)
 	r.mu.Unlock()
 
 	select {
@@ -116,7 +106,7 @@ func (r *AutoSessionRouter) WaitForExecutionContext(sessionID string, timeoutMS 
 		return result.contextID, result.err
 	case <-time.After(time.Duration(timeoutMS) * time.Millisecond):
 		r.mu.Lock()
-		waiters := r.executionContextWaiters[sessionID]
+		waiters := r.execution_context_waiters[sessionID]
 		filtered := waiters[:0]
 		for _, candidate := range waiters {
 			if candidate != waiter {
@@ -124,9 +114,9 @@ func (r *AutoSessionRouter) WaitForExecutionContext(sessionID string, timeoutMS 
 			}
 		}
 		if len(filtered) == 0 {
-			delete(r.executionContextWaiters, sessionID)
+			delete(r.execution_context_waiters, sessionID)
 		} else {
-			r.executionContextWaiters[sessionID] = filtered
+			r.execution_context_waiters[sessionID] = filtered
 		}
 		r.mu.Unlock()
 		return 0, fmt.Errorf("timed out waiting for Runtime.executionContextCreated for session %s", sessionID)
@@ -135,13 +125,13 @@ func (r *AutoSessionRouter) WaitForExecutionContext(sessionID string, timeoutMS 
 
 func (r *AutoSessionRouter) recordExecutionContext(sessionID string, contextID int) {
 	r.mu.Lock()
-	if r.detachedSessions[sessionID] {
+	if _, ok := r.TargetId_from_sessionId[sessionID]; !ok {
 		r.mu.Unlock()
 		return
 	}
-	r.ExecutionContexts[sessionID] = contextID
-	waiters := r.executionContextWaiters[sessionID]
-	delete(r.executionContextWaiters, sessionID)
+	r.Execution_contexts[sessionID] = contextID
+	waiters := r.execution_context_waiters[sessionID]
+	delete(r.execution_context_waiters, sessionID)
 	r.mu.Unlock()
 	for _, waiter := range waiters {
 		waiter <- executionContextResult{contextID: contextID}
@@ -150,43 +140,19 @@ func (r *AutoSessionRouter) recordExecutionContext(sessionID string, contextID i
 
 func (r *AutoSessionRouter) forgetSession(sessionID string) {
 	r.mu.Lock()
-	targetInfo := r.SessionTargets[sessionID]
-	delete(r.SessionTargets, sessionID)
-	if targetID, _ := targetInfo["targetId"].(string); targetID != "" {
-		delete(r.TargetSessions, targetID)
+	targetID := r.TargetId_from_sessionId[sessionID]
+	delete(r.TargetId_from_sessionId, sessionID)
+	if targetID != "" {
+		delete(r.SessionId_from_targetId, targetID)
 	}
-	delete(r.ExecutionContexts, sessionID)
-	r.markDetachedSessionLocked(sessionID)
-	waiters := r.executionContextWaiters[sessionID]
-	delete(r.executionContextWaiters, sessionID)
+	delete(r.Execution_contexts, sessionID)
+	waiters := r.execution_context_waiters[sessionID]
+	delete(r.execution_context_waiters, sessionID)
 	r.mu.Unlock()
 	err := fmt.Errorf("Runtime execution context wait cancelled because session %s detached", sessionID)
 	for _, waiter := range waiters {
 		waiter <- executionContextResult{err: err}
 	}
-}
-
-func (r *AutoSessionRouter) markDetachedSessionLocked(sessionID string) {
-	if !r.detachedSessions[sessionID] {
-		r.detachedSessionOrder = append(r.detachedSessionOrder, sessionID)
-	}
-	r.detachedSessions[sessionID] = true
-	for len(r.detachedSessions) > maxDetachedSessionGuards && len(r.detachedSessionOrder) > 0 {
-		oldestSessionID := r.detachedSessionOrder[0]
-		r.detachedSessionOrder = r.detachedSessionOrder[1:]
-		delete(r.detachedSessions, oldestSessionID)
-	}
-}
-
-func (r *AutoSessionRouter) clearDetachedSessionLocked(sessionID string) {
-	delete(r.detachedSessions, sessionID)
-	filtered := r.detachedSessionOrder[:0]
-	for _, candidateSessionID := range r.detachedSessionOrder {
-		if candidateSessionID != sessionID {
-			filtered = append(filtered, candidateSessionID)
-		}
-	}
-	r.detachedSessionOrder = filtered
 }
 
 func intFromAny(value any) (int, bool) {

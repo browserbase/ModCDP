@@ -36,8 +36,7 @@ var bundledExtensionZip []byte
 const modcdpReadyExpression = `Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)`
 
 type SendCDP = types.SendCDP
-type SessionIDForTarget = types.SessionIDForTarget
-type AttachToTarget = types.AttachToTarget
+type EnsureSessionForTarget = types.EnsureSessionForTarget
 type WaitForExecutionContext = types.WaitForExecutionContext
 type LaunchOptions = types.LaunchOptions
 type ExtensionInjectorConfig = types.ExtensionInjectorConfig
@@ -79,11 +78,11 @@ func (i *ExtensionInjector) Update(config ExtensionInjectorConfig) *ExtensionInj
 	if config.Send != nil {
 		i.Options.Send = config.Send
 	}
-	if config.SessionIDForTarget != nil {
-		i.Options.SessionIDForTarget = config.SessionIDForTarget
+	if config.SessionId_from_targetId != nil {
+		i.Options.SessionId_from_targetId = config.SessionId_from_targetId
 	}
-	if config.AttachToTarget != nil {
-		i.Options.AttachToTarget = config.AttachToTarget
+	if config.EnsureSessionForTarget != nil {
+		i.Options.EnsureSessionForTarget = config.EnsureSessionForTarget
 	}
 	if config.WaitForExecutionContext != nil {
 		i.Options.WaitForExecutionContext = config.WaitForExecutionContext
@@ -213,33 +212,16 @@ func (i ExtensionInjector) SendWithTimeout(method string, params map[string]any,
 	return i.sendWithTimeout(method, params, sessionID, timeoutMS)
 }
 
-func (i ExtensionInjector) sessionIDForTarget(targetID string, timeoutMS int) string {
-	deadline := time.Now().Add(time.Duration(timeoutMS) * time.Millisecond)
-	for {
-		if i.Options.SessionIDForTarget != nil {
-			if sessionID := i.Options.SessionIDForTarget(targetID); sessionID != "" {
-				return sessionID
-			}
-		}
-		if timeoutMS <= 0 || time.Now().After(deadline) {
-			return ""
-		}
-		time.Sleep(time.Duration(i.Options.InjectorTargetSessionPollIntervalMS) * time.Millisecond)
-	}
-}
-
-func (i ExtensionInjector) ensureSessionIDForTarget(targetID string, timeoutMS int, allowAttach bool) string {
-	if i.Options.SessionIDForTarget != nil {
-		if sessionID := i.Options.SessionIDForTarget(targetID); sessionID != "" {
+func (i ExtensionInjector) ensureSessionForTarget(targetID string, timeoutMS int, allowAttach bool) string {
+	if i.Options.SessionId_from_targetId != nil {
+		if sessionID := i.Options.SessionId_from_targetId[targetID]; sessionID != "" {
 			return sessionID
 		}
 	}
-	if allowAttach && i.Options.AttachToTarget != nil {
-		if sessionID := i.Options.AttachToTarget(targetID); sessionID != "" {
-			return sessionID
-		}
+	if i.Options.EnsureSessionForTarget == nil {
+		return ""
 	}
-	return i.sessionIDForTarget(targetID, timeoutMS)
+	return i.Options.EnsureSessionForTarget(targetID, timeoutMS, allowAttach)
 }
 
 func (i ExtensionInjector) targetInfos() ([]map[string]any, error) {
@@ -264,7 +246,7 @@ func (i ExtensionInjector) probeTarget(target map[string]any, sessionTimeoutMS i
 	if targetID == "" || i.UnusableTargetIDs[targetID] {
 		return nil, nil
 	}
-	sessionID := i.ensureSessionIDForTarget(targetID, sessionTimeoutMS, allowAttach)
+	sessionID := i.ensureSessionForTarget(targetID, sessionTimeoutMS, allowAttach)
 	if sessionID == "" {
 		return nil, nil
 	}

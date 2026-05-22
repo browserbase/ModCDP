@@ -54,7 +54,7 @@ export class BorrowedExtensionInjector extends ExtensionInjector {
   }
 
   private async bootstrapTarget(target: TargetInfo): Promise<ExtensionInjectionResult | null> {
-    const session_id = await this.ensureSessionIdForTarget(
+    const session_id = await this.ensureSessionForTarget(
       target.targetId,
       this.options.injector_service_worker_probe_timeout_ms,
       true,

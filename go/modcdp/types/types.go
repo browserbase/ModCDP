@@ -28,14 +28,13 @@ type LaunchOptions struct {
 }
 
 type SendCDP func(method string, params map[string]any, sessionID string) (map[string]any, error)
-type SessionIDForTarget func(targetID string) string
-type AttachToTarget func(targetID string) string
+type EnsureSessionForTarget func(targetID string, timeoutMS int, allowAttach bool) string
 type WaitForExecutionContext func(sessionID string, timeoutMS int) int
 
 type ExtensionInjectorConfig struct {
 	Send                                 SendCDP                 `json:"-"`
-	SessionIDForTarget                   SessionIDForTarget      `json:"-"`
-	AttachToTarget                       AttachToTarget          `json:"-"`
+	SessionId_from_targetId              map[string]string       `json:"-"`
+	EnsureSessionForTarget               EnsureSessionForTarget  `json:"-"`
 	WaitForExecutionContext              WaitForExecutionContext `json:"-"`
 	InjectorExtensionPath                string                  `json:"injector_extension_path,omitempty"`
 	InjectorExtensionID                  string                  `json:"injector_extension_id,omitempty"`

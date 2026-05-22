@@ -408,15 +408,15 @@ test("ModCDPClient preserves explicit null server config", () => {
   assert.equal(cdp.server, null);
 });
 
-test("ModCDPClient only exposes injector attach after CDP send is available", () => {
+test("ModCDPClient only exposes injector ensure after CDP send is available", () => {
   const cdp = new ModCDPClient();
   const disconnected_config = cdp._baseInjectorConfig(null);
   assert.equal(disconnected_config.send, null);
-  assert.equal(disconnected_config.attachToTarget, null);
+  assert.equal(disconnected_config.ensureSessionForTarget, null);
 
   const connected_config = cdp._baseInjectorConfig(async () => ({}));
   assert.equal(typeof connected_config.send, "function");
-  assert.equal(typeof connected_config.attachToTarget, "function");
+  assert.equal(typeof connected_config.ensureSessionForTarget, "function");
 });
 
 test("ModCDPClient defaults launched ModCDP-server upstreams to extension auto", () => {

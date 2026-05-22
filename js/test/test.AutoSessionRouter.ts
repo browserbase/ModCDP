@@ -37,9 +37,9 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
     const created = await cdp.Target.createTarget({ url: "about:blank#modcdp-auto-session-router" });
     targetId = created.targetId;
     await expectEventually(() => {
-      assert.equal(typeof cdp.auto_target_sessions.get(targetId!), "string");
+      assert.equal(typeof cdp.auto_sessions.sessionId_from_targetId.get(targetId!), "string");
     });
-    const sessionId = cdp.auto_target_sessions.get(targetId);
+    const sessionId = cdp.auto_sessions.sessionId_from_targetId.get(targetId);
     assert.equal(typeof sessionId, "string");
 
     const contextPromise = cdp.auto_sessions.waitForExecutionContext(sessionId, {
@@ -48,13 +48,13 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
     await cdp.send("Runtime.enable", {}, sessionId);
     const contextId = await contextPromise;
     assert.equal(typeof contextId, "number");
-    assert.equal(cdp.runtime_execution_contexts.get(sessionId), contextId);
+    assert.equal(cdp.auto_sessions.execution_contexts.get(sessionId), contextId);
 
     await cdp.Target.detachFromTarget({ sessionId });
     await expectEventually(() => {
-      assert.equal(cdp.auto_target_sessions.get(targetId!), undefined);
+      assert.equal(cdp.auto_sessions.sessionId_from_targetId.get(targetId!), undefined);
     });
-    assert.equal(cdp.runtime_execution_contexts.get(sessionId), undefined);
+    assert.equal(cdp.auto_sessions.execution_contexts.get(sessionId), undefined);
     await cdp.Target.closeTarget({ targetId }).catch(() => ({}));
     targetId = null;
 
@@ -63,9 +63,9 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
     });
     pendingTargetId = pendingCreated.targetId;
     await expectEventually(() => {
-      assert.equal(typeof cdp.auto_target_sessions.get(pendingTargetId!), "string");
+      assert.equal(typeof cdp.auto_sessions.sessionId_from_targetId.get(pendingTargetId!), "string");
     });
-    const pendingSessionId = cdp.auto_target_sessions.get(pendingTargetId);
+    const pendingSessionId = cdp.auto_sessions.sessionId_from_targetId.get(pendingTargetId);
     assert.equal(typeof pendingSessionId, "string");
     const cancelledContextPromise = cdp.auto_sessions.waitForExecutionContext(pendingSessionId, {
       timeout_ms: 30_000,
@@ -77,7 +77,7 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
     await cdp.Target.detachFromTarget({ sessionId: pendingSessionId });
     await cancelledContextAssertion;
     await expectEventually(() => {
-      assert.equal(cdp.auto_target_sessions.get(pendingTargetId!), undefined);
+      assert.equal(cdp.auto_sessions.sessionId_from_targetId.get(pendingTargetId!), undefined);
     });
     await cdp.Target.closeTarget({ targetId: pendingTargetId }).catch(() => ({}));
     pendingTargetId = null;

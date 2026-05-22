@@ -159,15 +159,15 @@ class ModCDPClientTests(unittest.TestCase):
 
         self.assertIsNone(cdp.server)
 
-    def test_only_exposes_injector_attach_after_cdp_send_is_available(self) -> None:
+    def test_only_exposes_injector_ensure_after_cdp_send_is_available(self) -> None:
         cdp = ModCDPClient()
         disconnected_config = cdp._base_extension_injector_config(None)
         self.assertIsNone(disconnected_config.get("send"))
-        self.assertIsNone(disconnected_config.get("attachToTarget"))
+        self.assertIsNone(disconnected_config.get("ensureSessionForTarget"))
 
         connected_config = cdp._base_extension_injector_config(lambda method, params=None, session_id=None: {})
         self.assertTrue(callable(connected_config.get("send")))
-        self.assertTrue(callable(connected_config.get("attachToTarget")))
+        self.assertTrue(callable(connected_config.get("ensureSessionForTarget")))
 
     def test_defaults_launched_modcdp_server_upstreams_to_extension_auto(self) -> None:
         for mode in ("nativemessaging", "reversews", "nats"):

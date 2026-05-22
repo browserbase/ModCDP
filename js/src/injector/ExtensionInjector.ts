@@ -24,8 +24,12 @@ export type TargetInfo = { targetId: string; type?: string; url?: string };
 
 export type ExtensionInjectorConfig = {
   send?: SendCDP | null;
-  sessionIdForTarget?: ((target_id: string) => string | null | undefined) | null;
-  attachToTarget?: ((target_id: string) => Promise<string | null | undefined>) | null;
+  sessionId_from_targetId?: Map<string, string> | null;
+  ensureSessionForTarget?: (
+    target_id: string,
+    timeout_ms: number,
+    allow_attach: boolean,
+  ) => Promise<string | null | undefined>;
   waitForExecutionContext?: ((session_id: string, timeout_ms: number) => Promise<number>) | null;
   injector_extension_path?: string | null;
   injector_extension_id?: string | null;
@@ -147,8 +151,8 @@ export class ExtensionInjector {
   constructor(options: ExtensionInjectorConfig = {}) {
     this.options = {
       send: null,
-      sessionIdForTarget: null,
-      attachToTarget: null,
+      sessionId_from_targetId: null,
+      ensureSessionForTarget: null,
       waitForExecutionContext: null,
       injector_extension_path: null,
       injector_extension_id: null,
@@ -234,24 +238,10 @@ export class ExtensionInjector {
     });
   }
 
-  protected async sessionIdForTarget(target_id: string, timeout_ms = 0) {
-    const deadline = Date.now() + timeout_ms;
-    while (true) {
-      const session_id = this.options.sessionIdForTarget?.(target_id);
-      if (typeof session_id === "string" && session_id.length > 0) return session_id;
-      if (Date.now() >= deadline) return null;
-      await delay(this.options.injector_target_session_poll_interval_ms ?? DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS);
-    }
-  }
-
-  protected async ensureSessionIdForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
-    const session_id = this.options.sessionIdForTarget?.(target_id);
+  protected async ensureSessionForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
+    const session_id = this.options.sessionId_from_targetId?.get(target_id);
     if (typeof session_id === "string" && session_id.length > 0) return session_id;
-    if (allow_attach) {
-      const attached_session_id = await this.options.attachToTarget?.(target_id);
-      if (typeof attached_session_id === "string" && attached_session_id.length > 0) return attached_session_id;
-    }
-    return await this.sessionIdForTarget(target_id, timeout_ms);
+    return (await this.options.ensureSessionForTarget?.(target_id, timeout_ms, allow_attach)) ?? null;
   }
 
   protected async targetInfos() {
@@ -264,7 +254,7 @@ export class ExtensionInjector {
     { allow_attach = false }: { allow_attach?: boolean } = {},
   ): Promise<ExtensionInjectionResult | null> {
     if (this.unusable_target_ids.has(target.targetId)) return null;
-    const session_id = await this.ensureSessionIdForTarget(target.targetId, session_timeout_ms, allow_attach);
+    const session_id = await this.ensureSessionForTarget(target.targetId, session_timeout_ms, allow_attach);
     if (session_id == null) return null;
     await this.sendWithTimeout("Runtime.enable", {}, session_id);
     const probe = RuntimeCommands["Runtime.evaluate"].result.parse(

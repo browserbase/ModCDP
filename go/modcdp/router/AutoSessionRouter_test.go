@@ -14,97 +14,6 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
-func TestAutoSessionRouterRejectsPendingExecutionContextWaitersWhenSessionDetaches(t *testing.T) {
-	router := NewAutoSessionRouter(func(string, map[string]any, string) (map[string]any, error) {
-		return map[string]any{}, nil
-	}, func() int { return 5000 })
-
-	result := make(chan error, 1)
-	go func() {
-		_, err := router.WaitForExecutionContext("detached-session", 5000)
-		result <- err
-	}()
-	waitForString(t, func() string {
-		router.mu.Lock()
-		defer router.mu.Unlock()
-		if len(router.executionContextWaiters["detached-session"]) > 0 {
-			return "waiting"
-		}
-		return ""
-	})
-	router.RecordProtocolEvent("Target.attachedToTarget", map[string]any{
-		"sessionId":  "detached-session",
-		"targetInfo": map[string]any{"targetId": "target-1", "type": "page"},
-	}, "")
-	router.RecordProtocolEvent("Target.detachedFromTarget", map[string]any{"sessionId": "detached-session"}, "")
-	router.RecordProtocolEvent("Runtime.executionContextCreated", map[string]any{"context": map[string]any{"id": 42}}, "detached-session")
-
-	select {
-	case err := <-result:
-		if err == nil || !strings.Contains(err.Error(), "Runtime execution context wait cancelled because session detached-session detached") {
-			t.Fatalf("wait error = %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for detach error")
-	}
-	if sessionID := router.SessionIDForTarget("target-1"); sessionID != "" {
-		t.Fatalf("session id after detach = %q", sessionID)
-	}
-	if _, ok := router.ExecutionContexts["detached-session"]; ok {
-		t.Fatal("stale execution context was recorded after detach")
-	}
-}
-
-func TestAutoSessionRouterBoundsDetachedSessionGuardsAndClearsThemWhenSessionReattaches(t *testing.T) {
-	router := NewAutoSessionRouter(func(string, map[string]any, string) (map[string]any, error) {
-		return map[string]any{}, nil
-	}, func() int { return 5000 })
-
-	for index := 0; index < 1034; index++ {
-		router.RecordProtocolEvent("Target.detachedFromTarget", map[string]any{"sessionId": fmt.Sprintf("detached-session-%d", index)}, "")
-	}
-
-	router.mu.Lock()
-	detachedCount := len(router.detachedSessions)
-	detachedOrderCount := len(router.detachedSessionOrder)
-	router.mu.Unlock()
-	if detachedCount > maxDetachedSessionGuards {
-		t.Fatalf("detached session guard count = %d, want <= %d", detachedCount, maxDetachedSessionGuards)
-	}
-	if detachedOrderCount > maxDetachedSessionGuards {
-		t.Fatalf("detached session guard order count = %d, want <= %d", detachedOrderCount, maxDetachedSessionGuards)
-	}
-
-	recentSessionID := "detached-session-1033"
-	router.RecordProtocolEvent("Runtime.executionContextCreated", map[string]any{"context": map[string]any{"id": 42}}, recentSessionID)
-	if _, ok := router.ExecutionContexts[recentSessionID]; ok {
-		t.Fatal("stale execution context was recorded for detached session")
-	}
-
-	router.RecordProtocolEvent("Target.attachedToTarget", map[string]any{
-		"sessionId":  recentSessionID,
-		"targetInfo": map[string]any{"targetId": "target-reattached", "type": "page"},
-	}, "")
-	router.RecordProtocolEvent("Runtime.executionContextCreated", map[string]any{"context": map[string]any{"id": 43}}, recentSessionID)
-
-	if sessionID := router.SessionIDForTarget("target-reattached"); sessionID != recentSessionID {
-		t.Fatalf("session id = %q, want %q", sessionID, recentSessionID)
-	}
-	if contextID := router.ExecutionContexts[recentSessionID]; contextID != 43 {
-		t.Fatalf("context id = %d, want 43", contextID)
-	}
-	router.mu.Lock()
-	defer router.mu.Unlock()
-	if router.detachedSessions[recentSessionID] {
-		t.Fatal("reattached session was still marked detached")
-	}
-	for _, detachedSessionID := range router.detachedSessionOrder {
-		if detachedSessionID == recentSessionID {
-			t.Fatal("reattached session stayed in detached session order")
-		}
-	}
-}
-
 func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testing.T) {
 	headless := true
 	chrome, err := launcher.NewLocalBrowserLauncher(launcher.LaunchOptions{
@@ -195,9 +104,13 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 	}()
 
 	var targetID string
+	var pendingTargetID string
 	defer func() {
 		if targetID != "" {
 			_, _ = send("Target.closeTarget", map[string]any{"targetId": targetID}, "")
+		}
+		if pendingTargetID != "" {
+			_, _ = send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, "")
 		}
 		close(done)
 	}()
@@ -213,7 +126,7 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	targetID, _ = created["targetId"].(string)
-	sessionID := waitForString(t, func() string { return router.SessionIDForTarget(targetID) })
+	sessionID := waitForString(t, func() string { return router.SessionId_from_targetId[targetID] })
 	contextResult := make(chan int, 1)
 	contextError := make(chan error, 1)
 	go func() {
@@ -241,11 +154,54 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	waitForString(t, func() string {
-		if router.SessionIDForTarget(targetID) == "" {
+		if router.SessionId_from_targetId[targetID] == "" {
 			return "detached"
 		}
 		return ""
 	})
+	if _, ok := router.Execution_contexts[sessionID]; ok {
+		t.Fatal("execution context remained after detach")
+	}
+	if _, err := send("Target.closeTarget", map[string]any{"targetId": targetID}, ""); err != nil {
+		t.Fatal(err)
+	}
+	targetID = ""
+
+	pendingCreated, err := send("Target.createTarget", map[string]any{"url": "about:blank#modcdp-auto-session-router-pending-context"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingTargetID, _ = pendingCreated["targetId"].(string)
+	pendingSessionID := waitForString(t, func() string { return router.SessionId_from_targetId[pendingTargetID] })
+	pendingContextError := make(chan error, 1)
+	go func() {
+		_, err := router.WaitForExecutionContext(pendingSessionID, 30000)
+		pendingContextError <- err
+	}()
+	if _, err := send("Target.detachFromTarget", map[string]any{"sessionId": pendingSessionID}, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-pendingContextError:
+		if err == nil || !strings.Contains(err.Error(), "Runtime execution context wait cancelled because session "+pendingSessionID+" detached") {
+			t.Fatalf("wait error = %v", err)
+		}
+	case <-time.After(35 * time.Second):
+		t.Fatal("timed out waiting for detach error")
+	}
+	waitForString(t, func() string {
+		if router.SessionId_from_targetId[pendingTargetID] == "" {
+			return "detached"
+		}
+		return ""
+	})
+	if _, ok := router.Execution_contexts[pendingSessionID]; ok {
+		t.Fatal("execution context was recorded for detached pending session")
+	}
+	if _, err := send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, ""); err != nil {
+		t.Fatal(err)
+	}
+	pendingTargetID = ""
 }
 
 func waitForString(t *testing.T, fn func() string) string {

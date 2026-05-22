@@ -33,15 +33,14 @@ DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100
 DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20
 
 SendCDP = Callable[[str, ProtocolParams | None, str | None], ProtocolResult]
-SessionIdForTarget = Callable[[str], str | None]
-AttachToTarget = Callable[[str], str | None]
+EnsureSessionForTarget = Callable[[str, int, bool], str | None]
 WaitForExecutionContext = Callable[[str, int], int]
 
 
 class ExtensionInjectorConfig(TypedDict, total=False):
     send: SendCDP | None
-    sessionIdForTarget: SessionIdForTarget | None
-    attachToTarget: AttachToTarget | None
+    sessionId_from_targetId: dict[str, str] | None
+    ensureSessionForTarget: EnsureSessionForTarget | None
     waitForExecutionContext: WaitForExecutionContext | None
     injector_extension_path: str | None
     injector_extension_id: str | None
@@ -131,8 +130,8 @@ class ExtensionInjector:
     def __init__(self, options: ExtensionInjectorConfig | None = None) -> None:
         self.options = cast(ExtensionInjectorConfig, {
             "send": None,
-            "sessionIdForTarget": None,
-            "attachToTarget": None,
+            "sessionId_from_targetId": None,
+            "ensureSessionForTarget": None,
             "waitForExecutionContext": None,
             "injector_extension_path": None,
             "injector_extension_id": None,
@@ -235,31 +234,16 @@ class ExtensionInjector:
             raise error
         return result or {}
 
-    def _sessionIdForTarget(self, target_id: str, timeout_ms: int = 0) -> str | None:
-        deadline = time.monotonic() + timeout_ms / 1000
-        while True:
-            session_id = self.options.get("sessionIdForTarget")
-            if session_id is not None:
-                value = session_id(target_id)
-                if value:
-                    return value
-            if time.monotonic() >= deadline:
-                return None
-            time.sleep(_defaulted(self.options.get("injector_target_session_poll_interval_ms"), DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS) / 1000)
-
-    def _ensureSessionIdForTarget(self, target_id: str, timeout_ms: int = 0, allow_attach: bool = False) -> str | None:
-        session_id = self.options.get("sessionIdForTarget")
-        if session_id is not None:
-            value = session_id(target_id)
-            if value:
-                return value
-        if allow_attach:
-            attach_to_target = self.options.get("attachToTarget")
-            if attach_to_target is not None:
-                attached_session_id = attach_to_target(target_id)
-                if attached_session_id:
-                    return attached_session_id
-        return self._sessionIdForTarget(target_id, timeout_ms)
+    def _ensureSessionForTarget(self, target_id: str, timeout_ms: int = 0, allow_attach: bool = False) -> str | None:
+        sessionId_from_targetId = self.options.get("sessionId_from_targetId")
+        if sessionId_from_targetId is not None:
+            session_id = sessionId_from_targetId.get(target_id)
+            if session_id:
+                return session_id
+        ensure_session_for_target = self.options.get("ensureSessionForTarget")
+        if ensure_session_for_target is None:
+            return None
+        return ensure_session_for_target(target_id, timeout_ms, allow_attach)
 
     def _targetInfos(self) -> list[TargetInfo]:
         result = self._sendWithTimeout("Target.getTargets")
@@ -287,7 +271,7 @@ class ExtensionInjector:
         target_id = target["targetId"]
         if target_id in self.unusable_target_ids:
             return None
-        session_id = self._ensureSessionIdForTarget(target_id, session_timeout_ms, allow_attach)
+        session_id = self._ensureSessionForTarget(target_id, session_timeout_ms, allow_attach)
         if session_id is None:
             return None
         self._sendWithTimeout("Runtime.enable", {}, session_id)

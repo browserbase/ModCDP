@@ -1001,8 +1001,10 @@ export class ModCDPClient extends ModCDPEventEmitter {
       service_worker_url_suffixes.some((suffix) => suffix.split("/").filter(Boolean).length > 1);
     return {
       send,
-      sessionIdForTarget: (target_id) => this.auto_sessions.sessionIdFromTargetId.get(target_id) ?? null,
-      attachToTarget: send ? (target_id) => this.auto_sessions.ensureSession(target_id) : null,
+      sessionId_from_targetId: this.auto_sessions.sessionId_from_targetId,
+      ensureSessionForTarget: send
+        ? (target_id, timeout_ms, allow_attach) => this.ensureSessionForTarget(target_id, timeout_ms, allow_attach)
+        : null,
       waitForExecutionContext: (session_id, timeout_ms) =>
         this.auto_sessions.waitForExecutionContext(session_id, { timeout_ms }),
       injector_extension_path: this.injector.injector_extension_path,
@@ -1020,6 +1022,19 @@ export class ModCDPClient extends ModCDPEventEmitter {
       injector_service_worker_poll_interval_ms: this.injector.injector_service_worker_poll_interval_ms,
       injector_target_session_poll_interval_ms: this.injector.injector_target_session_poll_interval_ms,
     };
+  }
+
+  private async ensureSessionForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
+    const session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
+    if (session_id) return session_id;
+    if (allow_attach) return await this.auto_sessions.ensureSession(target_id);
+    const deadline = Date.now() + timeout_ms;
+    while (Date.now() <= deadline) {
+      const current_session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
+      if (current_session_id) return current_session_id;
+      await new Promise((resolve) => setTimeout(resolve, this.injector.injector_target_session_poll_interval_ms));
+    }
+    return null;
   }
 
   async _runInjectors(send: SendCDP, injectors: ExtensionInjector[] | null = null) {
@@ -1305,18 +1320,6 @@ export class ModCDPClient extends ModCDPEventEmitter {
       const payload = this._parseEventPayload(event.method, eventParams);
       this.emit(event.method, payload, event.sessionId || null);
     }
-  }
-
-  get auto_target_sessions() {
-    return this.auto_sessions.sessionIdFromTargetId;
-  }
-
-  get auto_session_targets() {
-    return this.auto_sessions.session_targets;
-  }
-
-  get runtime_execution_contexts() {
-    return this.auto_sessions.execution_contexts;
   }
 }
 

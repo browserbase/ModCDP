@@ -1061,33 +1061,33 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     // JSON(debuggee) values attached in this service worker. Updated by
     // attachDebuggee/onDetach; read before attach to avoid duplicate native
     // chrome.debugger.attach calls.
-    private readonly attachedDebuggees = new Set<string>();
+    private readonly attached_debuggees = new Set<string>();
 
     // Normalized CDP event listeners registered by AutoSessionRouter and the
     // server event publisher. Updated by onEvent; read from installEventListener.
-    private readonly eventListeners = new Set<ServerUpstreamEventListener>();
+    private readonly event_listeners = new Set<ServerUpstreamEventListener>();
 
     // Native Target.SessionID -> TargetID from debugger Target.attachedToTarget
     // events. Updated by installEventListener; read when sending a command that
     // already carries a child session id.
-    private readonly targetIdFromSessionId = new Map<string, string>();
+    private readonly targetId_from_sessionId = new Map<string, string>();
 
     // chrome.tabs tab id -> CDP TargetID. Refreshed by getTargets and
     // Target.attachedToTarget events; read by resolveTargetId/createTarget.
-    private readonly targetIdFromTabId = new Map<number, string>();
+    private readonly targetId_from_tabId = new Map<number, string>();
 
     // TargetID -> chrome.debugger.Debuggee selected for that target. Updated by
     // attachToTarget; read by sendTargetCommand so subsequent commands use the
     // same native debuggee shape.
-    private readonly debuggeeFromTargetId = new Map<string, chrome.debugger.Debuggee>();
+    private readonly debuggee_from_targetId = new Map<string, chrome.debugger.Debuggee>();
 
     // True once chrome.debugger.onEvent/onDetach listeners are installed in this
     // service worker. Updated by installEventListener; read by getTargets.
-    private eventListenerInstalled = false;
+    private event_listener_installed = false;
 
     onEvent(listener: ServerUpstreamEventListener) {
-      this.eventListeners.add(listener);
-      return { remove: () => this.eventListeners.delete(listener) };
+      this.event_listeners.add(listener);
+      return { remove: () => this.event_listeners.delete(listener) };
     }
 
     async getTargets() {
@@ -1095,7 +1095,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       this.installEventListener();
       if (!chromeApi?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
       const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
-        if (typeof target.tabId === "number") this.targetIdFromTabId.set(target.tabId, target.id);
+        if (typeof target.tabId === "number") this.targetId_from_tabId.set(target.tabId, target.id);
         return {
           targetId: target.id,
           type: target.type,
@@ -1114,7 +1114,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       if (params.debuggee?.targetId) return params.debuggee.targetId;
       if (typeof params.tabId === "number") {
         await this.getTargets();
-        return this.targetIdFromTabId.get(params.tabId) ?? null;
+        return this.targetId_from_tabId.get(params.tabId) ?? null;
       }
       return null;
     }
@@ -1123,7 +1123,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       const tab = await globalScope.chrome.tabs.create({ url, active: true });
       if (!tab.id) throw new Error(`chrome_debugger could not create a tab for ${url}.`);
       await this.getTargets();
-      const targetId = this.targetIdFromTabId.get(tab.id);
+      const targetId = this.targetId_from_tabId.get(tab.id);
       if (!targetId) throw new Error(`chrome_debugger could not resolve target for created tab ${tab.id}.`);
       return targetId;
     }
@@ -1131,12 +1131,12 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     async attachToTarget(targetId: cdp.types.ts.Target.TargetID) {
       const debuggee = await this.debuggeeForTarget(targetId);
       await this.attachDebuggee(debuggee);
-      this.debuggeeFromTargetId.set(targetId, debuggee);
+      this.debuggee_from_targetId.set(targetId, debuggee);
       return null;
     }
 
     async detachFromTarget(sessionId: cdp.types.ts.Target.SessionID) {
-      this.targetIdFromSessionId.delete(sessionId);
+      this.targetId_from_sessionId.delete(sessionId);
     }
 
     async sendBrowserCommand(method: string, params: ProtocolParams = {}) {
@@ -1153,8 +1153,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       method: string,
       params: ProtocolParams = {},
     ) {
-      const routedTargetId = sessionId ? (this.targetIdFromSessionId.get(sessionId) ?? targetId) : targetId;
-      const debuggee = this.debuggeeFromTargetId.get(routedTargetId) ?? (await this.debuggeeForTarget(routedTargetId));
+      const routed_targetId = sessionId ? (this.targetId_from_sessionId.get(sessionId) ?? targetId) : targetId;
+      const debuggee =
+        this.debuggee_from_targetId.get(routed_targetId) ?? (await this.debuggeeForTarget(routed_targetId));
       await this.attachDebuggee(debuggee);
       return await debuggerSendCommand(debuggee, method, params as Record<string, unknown>);
     }
@@ -1177,7 +1178,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
 
     private async attachDebuggee(debuggee: chrome.debugger.Debuggee) {
       const key = JSON.stringify(debuggee);
-      if (this.attachedDebuggees.has(key)) return;
+      if (this.attached_debuggees.has(key)) return;
       const chromeApi = globalScope.chrome;
       await new Promise<void>((resolve, reject) =>
         chromeApi.debugger.attach(debuggee, "1.3", () => {
@@ -1193,32 +1194,33 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
           else resolve();
         }),
       );
-      this.attachedDebuggees.add(key);
+      this.attached_debuggees.add(key);
     }
 
     private installEventListener() {
       const chromeApi = globalScope.chrome;
-      if (this.eventListenerInstalled || !chromeApi?.debugger?.onEvent?.addListener) return;
+      if (this.event_listener_installed || !chromeApi?.debugger?.onEvent?.addListener) return;
       chromeApi.debugger.onEvent.addListener((source, method, params) => {
         const payload = (params ?? {}) as ProtocolPayload;
-        const sourceTargetId =
+        const source_targetId =
           source.targetId ??
-          (typeof source.tabId === "number" ? (this.targetIdFromTabId.get(source.tabId) ?? null) : null);
-        const cdpSessionId = source.sessionId ?? null;
+          (typeof source.tabId === "number" ? (this.targetId_from_tabId.get(source.tabId) ?? null) : null);
+        const cdp_sessionId = source.sessionId ?? null;
         if (method === Target.AttachedToTargetEvent.id) {
           const attached = Target.AttachedToTargetEvent.parse(payload);
-          if (typeof source.tabId === "number") this.targetIdFromTabId.set(source.tabId, attached.targetInfo.targetId);
-          this.targetIdFromSessionId.set(attached.sessionId, attached.targetInfo.targetId);
+          if (typeof source.tabId === "number")
+            this.targetId_from_tabId.set(source.tabId, attached.targetInfo.targetId);
+          this.targetId_from_sessionId.set(attached.sessionId, attached.targetInfo.targetId);
         } else if (method === Target.DetachedFromTargetEvent.id) {
           const detached = Target.DetachedFromTargetEvent.parse(payload);
-          this.targetIdFromSessionId.delete(detached.sessionId);
+          this.targetId_from_sessionId.delete(detached.sessionId);
         }
-        for (const listener of this.eventListeners) listener(method, payload, sourceTargetId, cdpSessionId);
+        for (const listener of this.event_listeners) listener(method, payload, source_targetId, cdp_sessionId);
       });
       chromeApi.debugger.onDetach?.addListener?.((source) => {
-        this.attachedDebuggees.delete(JSON.stringify(compactDebuggee(source)));
+        this.attached_debuggees.delete(JSON.stringify(compactDebuggee(source)));
       });
-      this.eventListenerInstalled = true;
+      this.event_listener_installed = true;
     }
   }
 

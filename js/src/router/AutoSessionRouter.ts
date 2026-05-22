@@ -58,7 +58,6 @@ export type ServerUpstreamTransport = {
   ): { remove: () => void };
 };
 
-const maxDetachedSessionGuards = 1024;
 const topologyConcurrency = 8;
 const piercerWorldName = "__modcdp_piercer__";
 
@@ -89,11 +88,11 @@ const targetAutoAttachParams = {
 export class AutoSessionRouter {
   // TargetID -> native flattened Target.SessionID. Updated by ensureTargetRoute
   // and Target.attachedToTarget events; read by routing, injectors, and topology.
-  readonly sessionIdFromTargetId = new Map<cdp.types.ts.Target.TargetID, cdp.types.ts.Target.SessionID>();
+  readonly sessionId_from_targetId = new Map<cdp.types.ts.Target.TargetID, cdp.types.ts.Target.SessionID>();
 
   // Native flattened Target.SessionID -> TargetID. Updated with
-  // sessionIdFromTargetId; read when events arrive with only a session id.
-  readonly targetIdFromSessionId = new Map<cdp.types.ts.Target.SessionID, cdp.types.ts.Target.TargetID>();
+  // sessionId_from_targetId; read when events arrive with only a session id.
+  readonly targetId_from_sessionId = new Map<cdp.types.ts.Target.SessionID, cdp.types.ts.Target.TargetID>();
 
   // TargetID -> latest target metadata plus router-owned session metadata.
   // Updated from target discovery/events; read by topology and target selection.
@@ -104,26 +103,14 @@ export class AutoSessionRouter {
   // Page.createIsolatedWorld; read by waits, DOM root resolution, and topology.
   readonly contexts = new Map<string, ModCDPTopologyExecutionContext>();
 
-  // SessionID -> target metadata. Updated only when a real native session id
-  // exists; read by ModCDPClient and tests that inspect router state.
-  readonly session_targets = new Map<cdp.types.ts.Target.SessionID, ModCDPTopologyTarget>();
-
   // SessionID -> first Runtime execution context id observed for that session.
   // Updated by Runtime.executionContextCreated; read by ModCDPClient injectors.
   readonly execution_contexts = new Map<cdp.types.ts.Target.SessionID, cdp.types.ts.Runtime.ExecutionContextId>();
-
-  // Target ids that are addressable through the upstream without a native CDP
-  // session id. Updated by ensureTargetRoute; read before reattaching.
-  private readonly attachedTargetIdsWithoutSession = new Set<cdp.types.ts.Target.TargetID>();
 
   // Context waiters keyed by native session id or by target id for sessionless
   // upstreams. Added by waitForMatchingExecutionContext and resolved/rejected by
   // recordExecutionContext and invalidation methods.
   private readonly execution_context_waiters = new Map<string, Set<ExecutionContextWaiter>>();
-
-  // Recently detached native sessions. Updated on detach and bounded to avoid
-  // reusing stale ids after event ordering races.
-  private readonly detached_sessions = new Map<cdp.types.ts.Target.SessionID, true>();
 
   // Semantic upstream selected by the owner. The router calls methods on this
   // object but never mutates transport-owned private state.
@@ -149,7 +136,7 @@ export class AutoSessionRouter {
       return await this.upstream.sendBrowserCommand(method, params);
     }
     if (requestedSessionId != null) {
-      const targetId = this.targetIdFromSessionId.get(requestedSessionId);
+      const targetId = this.targetId_from_sessionId.get(requestedSessionId);
       if (!targetId) throw new Error(`No target is recorded for sessionId=${requestedSessionId}.`);
       return await this.upstream.sendTargetCommand(targetId, requestedSessionId, method, params);
     }
@@ -169,13 +156,13 @@ export class AutoSessionRouter {
   /** Ensure a target is addressable by the selected upstream. */
   async ensureTargetRoute(targetId: cdp.types.ts.Target.TargetID | null): Promise<TargetRoute> {
     targetId ??= await this.resolveTargetId(CdpDebuggeeCommandParamsSchema.parse({}));
-    const sessionId = targetId ? this.sessionIdFromTargetId.get(targetId) : null;
-    if (targetId && sessionId != null && !this.detached_sessions.has(sessionId)) return { targetId, sessionId };
-    if (targetId && this.attachedTargetIdsWithoutSession.has(targetId)) return { targetId, sessionId: null };
+    const sessionId = targetId ? this.sessionId_from_targetId.get(targetId) : null;
+    if (targetId && sessionId != null) return { targetId, sessionId };
+    const target = targetId ? this.targets.get(targetId) : null;
+    if (targetId && target?.sessionId === null) return { targetId, sessionId: null };
     targetId ??= await this.upstream.createTarget("about:blank#modcdp");
     const attachedSessionId = await this.upstream.attachToTarget(targetId);
     if (attachedSessionId == null) {
-      this.attachedTargetIdsWithoutSession.add(targetId);
       this.recordTargetSessionlessAttachment(targetId);
       return { targetId, sessionId: null };
     }
@@ -197,7 +184,7 @@ export class AutoSessionRouter {
     targetIdOrSessionId: cdp.types.ts.Target.TargetID | cdp.types.ts.Target.SessionID | null,
     sessionId: cdp.types.ts.Target.SessionID | null = null,
   ): void {
-    const targetId = sessionId == null ? null : targetIdOrSessionId;
+    const targetId = sessionId == null ? targetIdOrSessionId : (this.targetId_from_sessionId.get(sessionId) ?? null);
     const cdpSessionId = sessionId ?? targetIdOrSessionId;
     if (method === Target.AttachedToTargetEvent.id) {
       const event = Target.AttachedToTargetEvent.parse(payload);
@@ -205,7 +192,6 @@ export class AutoSessionRouter {
     } else if (method === Target.DetachedFromTargetEvent.id) {
       const event = Target.DetachedFromTargetEvent.parse(payload);
       this.forgetSession(event.sessionId);
-      if (event.targetId) this.attachedTargetIdsWithoutSession.delete(event.targetId);
     } else if (method === Target.TargetInfoChangedEvent.id) {
       this.recordTarget(Target.TargetInfoChangedEvent.parse(payload).targetInfo);
     } else if (method === Target.TargetDestroyedEvent.id) {
@@ -480,13 +466,16 @@ export class AutoSessionRouter {
   }
 
   private recordTarget(targetInfo: TargetInfo): void {
-    const sessionId = this.sessionIdFromTargetId.get(targetInfo.targetId) ?? null;
-    this.targets.set(targetInfo.targetId, {
+    const sessionId = this.sessionId_from_targetId.get(targetInfo.targetId);
+    const existing = this.targets.get(targetInfo.targetId);
+    const target: ModCDPTopologyTarget = {
       ...targetInfo,
       targetId: targetInfo.targetId,
       type: targetInfo.type,
-      sessionId,
-    });
+    };
+    if (sessionId !== undefined) target.sessionId = sessionId;
+    else if (existing?.sessionId === null) target.sessionId = null;
+    this.targets.set(targetInfo.targetId, target);
   }
 
   private recordTargetSession(
@@ -494,21 +483,20 @@ export class AutoSessionRouter {
     sessionId: cdp.types.ts.Target.SessionID,
     targetInfo: TargetInfo | ModCDPTopologyTarget | null | undefined,
   ): void {
-    this.detached_sessions.delete(sessionId);
-    this.attachedTargetIdsWithoutSession.delete(targetId);
-    this.sessionIdFromTargetId.set(targetId, sessionId);
-    this.targetIdFromSessionId.set(sessionId, targetId);
+    this.sessionId_from_targetId.set(targetId, sessionId);
+    this.targetId_from_sessionId.set(sessionId, targetId);
     const target = targetInfo
       ? { ...targetInfo, targetId, type: targetInfo.type, sessionId }
       : { targetId, type: this.targets.get(targetId)?.type ?? "page", sessionId };
     this.targets.set(targetId, target);
-    this.session_targets.set(sessionId, target);
   }
 
   private recordTargetSessionlessAttachment(targetId: cdp.types.ts.Target.TargetID): void {
     const existing = this.targets.get(targetId);
-    if (!existing) return;
-    this.targets.set(targetId, { ...existing, sessionId: null });
+    this.targets.set(
+      targetId,
+      existing ? { ...existing, sessionId: null } : { targetId, type: "page", sessionId: null },
+    );
   }
 
   private recordExecutionContext(
@@ -516,8 +504,7 @@ export class AutoSessionRouter {
     sessionId: cdp.types.ts.Target.SessionID | null,
     context: cdp.types.ts.Runtime.ExecutionContextDescription,
   ): void {
-    if (sessionId && this.detached_sessions.has(sessionId)) return;
-    const targetId = eventTargetId ?? (sessionId ? (this.targetIdFromSessionId.get(sessionId) ?? null) : null);
+    const targetId = eventTargetId ?? (sessionId ? (this.targetId_from_sessionId.get(sessionId) ?? null) : null);
     if (!targetId) return;
     if (sessionId && !this.execution_contexts.has(sessionId)) this.execution_contexts.set(sessionId, context.id);
     const auxData = context.auxData && typeof context.auxData === "object" ? context.auxData : {};
@@ -593,20 +580,17 @@ export class AutoSessionRouter {
   }
 
   private forgetTarget(targetId: cdp.types.ts.Target.TargetID): void {
-    const sessionId = this.sessionIdFromTargetId.get(targetId);
+    const sessionId = this.sessionId_from_targetId.get(targetId);
     if (sessionId) this.forgetSession(sessionId);
-    this.attachedTargetIdsWithoutSession.delete(targetId);
     this.targets.delete(targetId);
     this.forgetExecutionContextsForRoute(targetId);
   }
 
   private forgetSession(sessionId: cdp.types.ts.Target.SessionID): void {
-    const targetId = this.targetIdFromSessionId.get(sessionId);
-    if (targetId) this.sessionIdFromTargetId.delete(targetId);
-    this.targetIdFromSessionId.delete(sessionId);
-    this.session_targets.delete(sessionId);
+    const targetId = this.targetId_from_sessionId.get(sessionId);
+    if (targetId) this.sessionId_from_targetId.delete(targetId);
+    this.targetId_from_sessionId.delete(sessionId);
     this.forgetExecutionContextsForRoute(sessionId);
-    this.markDetachedSession(sessionId);
     const waiters = this.execution_context_waiters.get(sessionId);
     if (!waiters) return;
     this.execution_context_waiters.delete(sessionId);
@@ -645,16 +629,6 @@ export class AutoSessionRouter {
       if (context.frameId !== frameId) continue;
       if (sessionId != null && context.sessionId === sessionId) this.contexts.delete(contextKey);
       else if (targetId != null && context.targetId === targetId) this.contexts.delete(contextKey);
-    }
-  }
-
-  private markDetachedSession(sessionId: cdp.types.ts.Target.SessionID): void {
-    this.detached_sessions.delete(sessionId);
-    this.detached_sessions.set(sessionId, true);
-    while (this.detached_sessions.size > maxDetachedSessionGuards) {
-      const oldestSessionId = this.detached_sessions.keys().next().value;
-      if (!oldestSessionId) break;
-      this.detached_sessions.delete(oldestSessionId);
     }
   }
 
