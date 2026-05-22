@@ -10,7 +10,8 @@ import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "
 import * as Browser from "../types/generated/zod/Browser.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import { ProtocolPayloadSchema, normalizeModCDPPayloadSchema } from "../types/modcdp.js";
-import { AutoSessionRouter, type ServerUpstreamTransport } from "../router/AutoSessionRouter.js";
+import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
+import type { ServerUpstreamTransport } from "./ServerUpstreamTransport.js";
 import { ChromeDebuggerTransport } from "./ChromeDebuggerTransport.js";
 import { LoopbackCdpTransport } from "./LoopbackCdpTransport.js";
 import {
@@ -341,7 +342,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     const existing = serverUpstreamTransports.get("loopback_cdp");
     if (existing) return existing as LoopbackCdpTransport;
     const transport = new LoopbackCdpTransport({
-      globalScope,
       getLoopbackCdpUrl: () => ModCDPServer.loopback_cdp_url,
       setLoopbackCdpUrl: (url) => {
         ModCDPServer.loopback_cdp_url = url;
@@ -357,7 +357,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   function getChromeDebuggerTransport() {
     const existing = serverUpstreamTransports.get("chrome_debugger");
     if (existing) return existing as ChromeDebuggerTransport;
-    const transport = new ChromeDebuggerTransport({ globalScope });
+    const transport = new ChromeDebuggerTransport();
     serverUpstreamTransports.set("chrome_debugger", transport);
     return transport;
   }
@@ -824,19 +824,16 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   };
 
   reversewsDownstream = new ReverseWSDownstreamTransport({
-    globalScope,
     startOffscreenKeepAlive,
     handleCommand: (message) =>
       ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
   });
   nativeHostDownstream = new NativeHostDownstreamTransport({
-    globalScope,
     startOffscreenKeepAlive,
     handleCommand: (message) =>
       ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
   });
   natsDownstream = new NATSDownstreamTransport({
-    globalScope,
     startOffscreenKeepAlive,
     handleCommand: (message) =>
       ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),

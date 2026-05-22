@@ -3,11 +3,7 @@ import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "../router/AutoSessionRouter.js";
-
-type ChromeDebuggerTransportOptions = {
-  globalScope: typeof globalThis & { chrome?: typeof chrome };
-};
+import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
 
 const targetAutoAttachParams = {
   autoAttach: true,
@@ -61,14 +57,6 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   // service worker. Updated by installEventListener; read by getTargets.
   private event_listener_installed = false;
 
-  // The extension service-worker global scope that exposes chrome.debugger and
-  // chrome.tabs. Read by all debugger operations.
-  private readonly globalScope: ChromeDebuggerTransportOptions["globalScope"];
-
-  constructor(options: ChromeDebuggerTransportOptions) {
-    this.globalScope = options.globalScope;
-  }
-
   /** Register a typed listener for one native CDP event schema. */
   on<Event extends CdpNamedSchema<z.ZodType>>(
     event: Event,
@@ -95,7 +83,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
 
   /** Return current browser targets through chrome.debugger target discovery. */
   async getTargets() {
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     this.installEventListener();
     if (!chromeApi?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
     const targetInfos = (await chromeApi.debugger.getTargets()).map((target) => {
@@ -126,7 +114,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
 
   /** Create a new foreground tab and return the corresponding CDP target id. */
   async createTarget(url: string) {
-    const tab = await this.globalScope.chrome.tabs.create({ url, active: true });
+    const tab = await globalThis.chrome.tabs.create({ url, active: true });
     if (!tab.id) throw new Error(`chrome_debugger could not create a tab for ${url}.`);
     await this.getTargets();
     const targetId = this.targetId_from_tabId.get(tab.id);
@@ -191,7 +179,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   private async attachDebuggee(debuggee: chrome.debugger.Debuggee) {
     const key = JSON.stringify(debuggee);
     if (this.attached_debuggees.has(key)) return;
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     await new Promise<void>((resolve, reject) =>
       chromeApi.debugger.attach(debuggee, "1.3", () => {
         const error = chromeApi.runtime.lastError;
@@ -215,7 +203,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   }
 
   private installEventListener() {
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     if (this.event_listener_installed || !chromeApi?.debugger?.onEvent?.addListener) return;
     chromeApi.debugger.onEvent.addListener((source, method, params) => {
       const payload = (params ?? {}) as ProtocolPayload;
@@ -257,7 +245,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
     method: string,
     params: Record<string, unknown> = {},
   ): Promise<ProtocolResult> {
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     return new Promise<ProtocolResult>((resolve, reject) =>
       chromeApi.debugger.sendCommand(debuggee, method, params, (result) => {
         const error = chromeApi.runtime.lastError;

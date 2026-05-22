@@ -16,7 +16,6 @@ import { createCdpAliases, type CdpAliases } from "../types/generated/aliases.js
 export type { CdpAliases } from "../types/generated/aliases.js";
 import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "../types/generated/zod.js";
 import type { CdpNamedSchema } from "../types/generated/zod/helpers.js";
-import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
 import {
@@ -35,11 +34,8 @@ import {
 } from "../transport/UpstreamTransport.js";
 import type { BrowserLauncher, BrowserLaunchOptions, LaunchedBrowser } from "../launcher/BrowserLauncher.js";
 import { type ExtensionInjectorConfig, type ExtensionInjector, type SendCDP } from "../injector/ExtensionInjector.js";
-import {
-  AutoSessionRouter,
-  type ServerUpstreamEventListener,
-  type ServerUpstreamTransport,
-} from "../router/AutoSessionRouter.js";
+import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
+import type { ServerUpstreamEventListener, ServerUpstreamTransport } from "../server/ServerUpstreamTransport.js";
 import type {
   CdpCommandMessage,
   CdpError,
@@ -48,7 +44,6 @@ import type {
   RuntimeBindingCalledEvent,
   ModCDPConfigureParams,
   ModCDPServerOptions,
-  ModCDPCustomPayload,
   ModCDPAddCustomCommandParams,
   ModCDPAddCustomEventObjectParams,
   ModCDPAddMiddlewareParams,

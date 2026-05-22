@@ -24,10 +24,6 @@ export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  *    and schedules reconnect while a host is still configured.
  */
 export class NativeHostDownstreamTransport {
-  // Extension service-worker global scope. Read for chrome.runtime native
-  // messaging APIs and runtime id in hello payloads.
-  private readonly globalScope: typeof globalThis & { chrome?: typeof chrome };
-
   // Server-owned command executor. Read by port message handling; this class
   // never interprets routes, custom commands, or middleware itself.
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
@@ -58,15 +54,12 @@ export class NativeHostDownstreamTransport {
   last_error: string | null = null;
 
   constructor({
-    globalScope,
     handleCommand,
     startOffscreenKeepAlive,
   }: {
-    globalScope: typeof globalThis & { chrome?: typeof chrome };
     handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
     startOffscreenKeepAlive: () => void;
   }) {
-    this.globalScope = globalScope;
     this.handleCommand = handleCommand;
     this.startOffscreenKeepAlive = startOffscreenKeepAlive;
   }
@@ -107,7 +100,7 @@ export class NativeHostDownstreamTransport {
   }
 
   private connect(hostName: string) {
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     if (!chromeApi?.runtime?.connectNative) {
       this.scheduleReconnect(this.reconnect_interval_ms);
       return {
@@ -127,7 +120,7 @@ export class NativeHostDownstreamTransport {
         type: "modcdp.native.hello",
         role: "extension-service-worker",
         version: 1,
-        extension_id: this.globalScope.chrome?.runtime?.id ?? null,
+        extension_id: globalThis.chrome?.runtime?.id ?? null,
       });
       port.onMessage.addListener((message) => {
         void this.handleMessage(port, message);

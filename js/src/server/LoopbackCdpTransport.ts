@@ -11,10 +11,9 @@ import {
   type ProtocolPayload,
   type ProtocolResult,
 } from "../types/modcdp.js";
-import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "../router/AutoSessionRouter.js";
+import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
 
 type LoopbackCdpTransportOptions = {
-  globalScope: typeof globalThis & { chrome?: typeof chrome };
   getLoopbackCdpUrl: () => string | null;
   setLoopbackCdpUrl: (url: string | null) => void;
   getCdpSendTimeoutMs: () => number;
@@ -87,7 +86,6 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
 
   // Runtime/config accessors owned by ModCDPServer. Read whenever a command or
   // socket operation needs current config values.
-  private readonly globalScope: LoopbackCdpTransportOptions["globalScope"];
   private readonly getLoopbackCdpUrl: LoopbackCdpTransportOptions["getLoopbackCdpUrl"];
   private readonly setLoopbackCdpUrl: LoopbackCdpTransportOptions["setLoopbackCdpUrl"];
   private readonly getCdpSendTimeoutMs: LoopbackCdpTransportOptions["getCdpSendTimeoutMs"];
@@ -95,7 +93,6 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   private readonly getWsConnectErrorSettleTimeoutMs: LoopbackCdpTransportOptions["getWsConnectErrorSettleTimeoutMs"];
 
   constructor(options: LoopbackCdpTransportOptions) {
-    this.globalScope = options.globalScope;
     this.getLoopbackCdpUrl = options.getLoopbackCdpUrl;
     this.setLoopbackCdpUrl = options.setLoopbackCdpUrl;
     this.getCdpSendTimeoutMs = options.getCdpSendTimeoutMs;
@@ -157,7 +154,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   async resolveTargetId(params: CdpDebuggeeCommandParams) {
     const resolvedDebuggee = params.debuggee ?? this.compactDebuggee(params);
     if (resolvedDebuggee.targetId) return resolvedDebuggee.targetId;
-    const chromeApi = this.globalScope.chrome;
+    const chromeApi = globalThis.chrome;
     let resolvedTabUrl: string | null = null;
     if (resolvedDebuggee.tabId && chromeApi?.tabs?.get) {
       const tab = await chromeApi.tabs.get(resolvedDebuggee.tabId).catch((): null => null);

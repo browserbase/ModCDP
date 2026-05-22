@@ -25,9 +25,6 @@ export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
  *    is still configured.
  */
 export class NATSDownstreamTransport {
-  // Extension service-worker global scope. Read for runtime id in hello payloads.
-  private readonly globalScope: typeof globalThis & { chrome?: typeof chrome };
-
   // Server-owned command executor. Read by NATS payload handling; this class
   // never interprets routes, custom commands, or middleware itself.
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
@@ -57,15 +54,12 @@ export class NATSDownstreamTransport {
   private buffer = "";
 
   constructor({
-    globalScope,
     handleCommand,
     startOffscreenKeepAlive,
   }: {
-    globalScope: typeof globalThis & { chrome?: typeof chrome };
     handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
     startOffscreenKeepAlive: () => void;
   }) {
-    this.globalScope = globalScope;
     this.handleCommand = handleCommand;
     this.startOffscreenKeepAlive = startOffscreenKeepAlive;
   }
@@ -144,7 +138,7 @@ export class NATSDownstreamTransport {
         type: "modcdp.nats.hello",
         role: "extension-service-worker",
         version: 1,
-        extension_id: this.globalScope.chrome?.runtime?.id ?? null,
+        extension_id: globalThis.chrome?.runtime?.id ?? null,
       });
     });
     ws.addEventListener("message", (event) => {
@@ -218,7 +212,7 @@ export class NATSDownstreamTransport {
         type: "modcdp.nats.hello",
         role: "extension-service-worker",
         version: 1,
-        extension_id: this.globalScope.chrome?.runtime?.id ?? null,
+        extension_id: globalThis.chrome?.runtime?.id ?? null,
       });
       return;
     }

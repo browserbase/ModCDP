@@ -1,11 +1,11 @@
-import type { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
 import { commands as nativeCommandSchemas } from "../types/generated/zod.js";
-import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as DOM from "../types/generated/zod/DOM.js";
 import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
+import type { ServerUpstreamTransport, TargetRoute } from "../server/ServerUpstreamTransport.js";
 import {
   CdpDebuggeeCommandParamsSchema,
   type CdpDebuggeeCommandParams,
@@ -16,17 +16,12 @@ import {
   type ModCDPTopologyFrame,
   type ModCDPTopologyTarget,
   type ProtocolParams,
-  type ProtocolPayload,
   type ProtocolResult,
 } from "../types/modcdp.js";
 
 type FrameTree = cdp.types.ts.Page.FrameTree;
 type DomNode = cdp.types.ts.DOM.Node;
 type TargetInfo = cdp.types.ts.Target.TargetInfo;
-export type TargetRoute = {
-  targetId: cdp.types.ts.Target.TargetID;
-  sessionId?: cdp.types.ts.Target.SessionID | null;
-};
 type ContextSelector = {
   world: string;
   worldName?: string;
@@ -36,36 +31,6 @@ type ExecutionContextWaiter = {
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
   matches: (context: ModCDPTopologyExecutionContext) => boolean;
-};
-export type ServerUpstreamEventListener = (
-  payload: ProtocolPayload,
-  targetId: cdp.types.ts.Target.TargetID | null,
-  sessionId: cdp.types.ts.Target.SessionID | null,
-) => void;
-
-export type ServerUpstreamTransport = {
-  getTargets(): Promise<cdp.types.ts.Target.TargetInfo[]>;
-  resolveTargetId(params: CdpDebuggeeCommandParams): Promise<cdp.types.ts.Target.TargetID | null>;
-  createTarget(url: string): Promise<cdp.types.ts.Target.TargetID>;
-  attachToTarget(targetId: cdp.types.ts.Target.TargetID): Promise<cdp.types.ts.Target.SessionID | null>;
-  detachFromTarget(sessionId: cdp.types.ts.Target.SessionID): Promise<void>;
-  send<
-    Params extends z.ZodType<Record<string, unknown>>,
-    Result extends z.ZodType<Record<string, unknown>>,
-    Name extends string,
-  >(
-    command: CdpCommandSchema<Params, Result, Name>,
-    params?: z.input<Params>,
-    route?: TargetRoute,
-  ): Promise<z.output<Result>>;
-  on<Event extends CdpNamedSchema<z.ZodType>>(
-    event: Event,
-    listener: (
-      payload: z.output<Event>,
-      targetId: cdp.types.ts.Target.TargetID | null,
-      sessionId: cdp.types.ts.Target.SessionID | null,
-    ) => void,
-  ): { remove: () => void };
 };
 
 const topologyConcurrency = 8;
