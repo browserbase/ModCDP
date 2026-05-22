@@ -32,6 +32,10 @@ test("translate routes, wraps, and unwraps ModCDP protocol messages deterministi
   const configured = wrapCommandIfNeeded("Mod.configure", { server: { server_routes: { "*.*": "loopback_cdp" } } });
   assert.equal(configured.steps[0]?.unwrap, "runtime_json");
 
+  const ping = wrapCommandIfNeeded("Mod.ping", {});
+  const ping_step_params = ping.steps[0]?.params as { arguments?: Array<{ value?: unknown }> } | undefined;
+  assert.deepEqual(JSON.parse(String(ping_step_params?.arguments?.[1]?.value)), {});
+
   const custom = wrapCommandIfNeeded(
     "Custom.echo",
     { secret: "x".repeat(100), nested: { ok: true } },
@@ -47,17 +51,17 @@ test("translate routes, wraps, and unwraps ModCDP protocol messages deterministi
     secret: "x".repeat(100),
     nested: { ok: true },
   });
-  assert.equal(custom_step_params?.arguments?.[2]?.value, null);
+  assert.equal(custom_step_params?.arguments?.[2]?.value, "session-1");
 
-  const customWithTarget = wrapCommandIfNeeded(
+  const customWithSession = wrapCommandIfNeeded(
     "Custom.echo",
     { secret: "targeted" },
-    { cdpSessionId: "session-1", targetCdpSessionId: "target-session-1" },
+    { cdpSessionId: "target-session-1" },
   );
-  const custom_with_target_params = customWithTarget.steps[0]?.params as
+  const custom_with_session_params = customWithSession.steps[0]?.params as
     | { arguments?: Array<{ value?: unknown }> }
     | undefined;
-  assert.equal(custom_with_target_params?.arguments?.[2]?.value, "target-session-1");
+  assert.equal(custom_with_session_params?.arguments?.[2]?.value, "target-session-1");
 
   assert.deepEqual(unwrapResponseIfNeeded({ result: { type: "object", value: { ok: true } } }, "runtime"), {
     ok: true,

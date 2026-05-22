@@ -39,6 +39,10 @@ class TranslateTests(unittest.TestCase):
         )
         self.assertEqual(configured["steps"][0].get("unwrap"), "runtime_json")
 
+        ping = wrap_command_if_needed("Mod.ping", {})
+        ping_arguments = cast("list[dict[str, object]]", ping["steps"][0].get("params", {}).get("arguments", []))
+        self.assertEqual(json.loads(str(ping_arguments[1].get("value"))), {})
+
         custom = wrap_command_if_needed(
             "Custom.echo",
             {"secret": "x" * 100, "nested": {"ok": True}},
@@ -50,16 +54,15 @@ class TranslateTests(unittest.TestCase):
         custom_arguments = cast("list[dict[str, object]]", custom_step_params.get("arguments", []))
         self.assertEqual(custom_arguments[0].get("value"), "Custom.echo")
         self.assertEqual(json.loads(str(custom_arguments[1].get("value"))), {"secret": "x" * 100, "nested": {"ok": True}})
-        self.assertIsNone(custom_arguments[2].get("value"))
+        self.assertEqual(custom_arguments[2].get("value"), "session-1")
 
-        custom_with_target = wrap_command_if_needed(
+        custom_with_session = wrap_command_if_needed(
             "Custom.echo",
             {"secret": "targeted"},
-            cdp_session_id="session-1",
-            target_cdp_session_id="target-session-1",
+            cdp_session_id="target-session-1",
         )
-        custom_with_target_arguments = cast("list[dict[str, object]]", custom_with_target["steps"][0].get("params", {}).get("arguments", []))
-        self.assertEqual(custom_with_target_arguments[2].get("value"), "target-session-1")
+        custom_with_session_arguments = cast("list[dict[str, object]]", custom_with_session["steps"][0].get("params", {}).get("arguments", []))
+        self.assertEqual(custom_with_session_arguments[2].get("value"), "target-session-1")
 
         self.assertEqual(unwrap_response_if_needed({"result": {"type": "object", "value": {"ok": True}}}, "runtime"), {"ok": True})
         self.assertEqual(unwrap_response_if_needed({"product": "Chrome/1"}, None), {"product": "Chrome/1"})

@@ -508,8 +508,7 @@ class ModCDPClient(CDPSurfaceMixin):
             method,
             command_params,
             routes=cast(ModCDPRoutes, self.client["client_routes"]),
-            cdp_session_id=self.ext_session_id,
-            target_cdp_session_id=session_id,
+            cdp_session_id=session_id,
         )
         result = self._send_raw(command)
         if should_validate_result and method != "Mod.addCustomCommand":

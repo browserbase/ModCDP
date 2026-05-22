@@ -1198,11 +1198,11 @@ func (c *ModCDPClient) validateEventData(event string, data any) (any, bool) {
 }
 
 func (c *ModCDPClient) Send(method string, params map[string]any, sessionID ...string) (any, error) {
-	targetSessionID := ""
+	cdpSessionID := ""
 	if len(sessionID) > 0 {
-		targetSessionID = sessionID[0]
+		cdpSessionID = sessionID[0]
 	}
-	return c.sendCommand(method, params, targetSessionID, true)
+	return c.sendCommand(method, params, cdpSessionID, true)
 }
 
 func (d ModDomain) Evaluate(params map[string]any) (any, error) {
@@ -1254,7 +1254,7 @@ func (d ModDomain) GetTopology(params map[string]any) (any, error) {
 	return d.client.Send("Mod.getTopology", params)
 }
 
-func (c *ModCDPClient) sendCommand(method string, params map[string]any, targetSessionID string, validateSchema bool) (any, error) {
+func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSessionID string, validateSchema bool) (any, error) {
 	startedAt := time.Now().UnixMilli()
 	if params == nil {
 		params = map[string]any{}
@@ -1328,7 +1328,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, targetS
 		}
 		return result, nil
 	}
-	command, err := translate.WrapCommandIfNeeded(method, params, c.Client.ClientRoutes, c.ExtSessionID, targetSessionID)
+	command, err := translate.WrapCommandIfNeeded(method, params, c.Client.ClientRoutes, cdpSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -1359,11 +1359,11 @@ func (c *ModCDPClient) SendRaw(method string, params map[string]any, sessionID .
 	if params == nil {
 		params = map[string]any{}
 	}
-	targetSessionID := ""
+	cdpSessionID := ""
 	if len(sessionID) > 0 {
-		targetSessionID = sessionID[0]
+		cdpSessionID = sessionID[0]
 	}
-	result, err := c.sendMessage(method, params, targetSessionID)
+	result, err := c.sendMessage(method, params, cdpSessionID)
 	completedAt := time.Now().UnixMilli()
 	c.LastRawTiming = map[string]any{
 		"method":       method,

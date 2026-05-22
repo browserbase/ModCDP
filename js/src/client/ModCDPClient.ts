@@ -682,7 +682,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     }
     const command = wrapCommandIfNeeded(method, command_params as ProtocolParams, {
       routes: this.client.client_routes,
-      targetCdpSessionId: session_id,
+      cdpSessionId: session_id,
     });
     const result = await this._sendRaw(command);
     const completed_at = Date.now();
