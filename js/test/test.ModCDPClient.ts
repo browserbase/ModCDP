@@ -196,6 +196,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       launcher_mode: "local",
       launcher_options: {
         headless: true,
+        chrome_ready_timeout_ms: 60_000,
       },
     },
     upstream: { upstream_mode: "ws" },
