@@ -15,6 +15,7 @@ import type { z } from "zod";
 import { createCdpAliases, type CdpAliases } from "../types/generated/aliases.js";
 export type { CdpAliases } from "../types/generated/aliases.js";
 import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "../types/generated/zod.js";
+import type { CdpNamedSchema } from "../types/generated/zod/helpers.js";
 import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
@@ -34,7 +35,11 @@ import {
 } from "../transport/UpstreamTransport.js";
 import type { BrowserLauncher, BrowserLaunchOptions, LaunchedBrowser } from "../launcher/BrowserLauncher.js";
 import { type ExtensionInjectorConfig, type ExtensionInjector, type SendCDP } from "../injector/ExtensionInjector.js";
-import { AutoSessionRouter, type ServerUpstreamTransport } from "../router/AutoSessionRouter.js";
+import {
+  AutoSessionRouter,
+  type ServerUpstreamEventListener,
+  type ServerUpstreamTransport,
+} from "../router/AutoSessionRouter.js";
 import type {
   CdpCommandMessage,
   CdpError,
@@ -405,7 +410,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   command_result_unwrap_keys: Map<string, string>;
   cdp_aliases_hydrated: boolean;
   event_wait_cleanups: Set<() => void>;
-  raw_upstream_event_listeners: Set<Parameters<ServerUpstreamTransport["onEvent"]>[0]>;
+  upstream_event_listeners: Map<CdpNamedSchema<z.ZodType>, Set<ServerUpstreamEventListener>>;
   auto_sessions: AutoSessionRouter;
   heartbeat_timer: ReturnType<typeof setInterval> | null;
   _injectors: ExtensionInjector[];
@@ -462,28 +467,39 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.command_result_unwrap_keys = new Map();
     this.cdp_aliases_hydrated = false;
     this.event_wait_cleanups = new Set();
-    this.raw_upstream_event_listeners = new Set();
+    this.upstream_event_listeners = new Map();
     this.heartbeat_timer = null;
     const raw_upstream_transport: ServerUpstreamTransport = {
-      getTargets: async () => Target.GetTargetsResult.parse(await this._sendMessage("Target.getTargets")).targetInfos,
+      getTargets: async () => (await raw_upstream_transport.send(Target.GetTargetsCommand, {})).targetInfos,
       resolveTargetId: async (params) =>
         typeof params.targetId === "string" && params.targetId.length > 0 ? params.targetId : null,
-      createTarget: async (url) =>
-        Target.CreateTargetResult.parse(await this._sendMessage("Target.createTarget", { url })).targetId,
+      createTarget: async (url) => (await raw_upstream_transport.send(Target.CreateTargetCommand, { url })).targetId,
       attachToTarget: async (targetId) =>
-        Target.AttachToTargetResult.parse(await this._sendMessage("Target.attachToTarget", { targetId, flatten: true }))
-          .sessionId,
+        (await raw_upstream_transport.send(Target.AttachToTargetCommand, { targetId, flatten: true })).sessionId,
       detachFromTarget: async (sessionId) => {
-        Target.DetachFromTargetResult.parse(await this._sendMessage("Target.detachFromTarget", { sessionId }));
+        await raw_upstream_transport.send(Target.DetachFromTargetCommand, { sessionId });
       },
-      sendBrowserCommand: async (method, params = {}) => this._sendMessage(method, params) as Promise<ProtocolResult>,
-      sendTargetCommand: async (targetId, sessionId, method, params = {}) => {
-        if (sessionId == null) throw new Error(`No CDP session is attached for targetId=${targetId}.`);
-        return this._sendMessage(method, params, sessionId) as Promise<ProtocolResult>;
+      send: async (command, params, route = undefined) => {
+        if (route && route.sessionId == null)
+          throw new Error(`No CDP session is attached for targetId=${route.targetId}.`);
+        return command.result.parse(
+          await this._sendMessage(command.id, command.params.parse(params), route?.sessionId ?? null),
+        );
       },
-      onEvent: (listener) => {
-        this.raw_upstream_event_listeners.add(listener);
-        return { remove: () => this.raw_upstream_event_listeners.delete(listener) };
+      on: (event, listener) => {
+        const typed_listener: ServerUpstreamEventListener = (payload, targetId, sessionId) => {
+          listener(event.parse(payload), targetId, sessionId);
+        };
+        const listeners = this.upstream_event_listeners.get(event);
+        if (listeners) listeners.add(typed_listener);
+        else this.upstream_event_listeners.set(event, new Set([typed_listener]));
+        return {
+          remove: () => {
+            const current_listeners = this.upstream_event_listeners.get(event);
+            current_listeners?.delete(typed_listener);
+            if (current_listeners?.size === 0) this.upstream_event_listeners.delete(event);
+          },
+        };
       },
     };
     this.auto_sessions = new AutoSessionRouter(
@@ -560,12 +576,20 @@ export class ModCDPClient extends ModCDPEventEmitter {
     const ext_context = this.auto_sessions.waitForExecutionContext(this.ext_session_id, {
       timeout_ms: this.injector.injector_execution_context_timeout_ms,
     });
-    await this._sendMessage("Runtime.enable", {}, this.ext_session_id);
+    await this._sendMessage(Runtime.EnableCommand.id, Runtime.EnableCommand.params.parse({}), this.ext_session_id);
     this.ext_execution_context_id = await ext_context;
     await Promise.all([
-      this._sendMessage("Runtime.addBinding", { name: CUSTOM_EVENT_BINDING_NAME }, this.ext_session_id),
+      this._sendMessage(
+        Runtime.AddBindingCommand.id,
+        Runtime.AddBindingCommand.params.parse({ name: CUSTOM_EVENT_BINDING_NAME }),
+        this.ext_session_id,
+      ),
       this.client.client_mirror_upstream_events
-        ? this._sendMessage("Runtime.addBinding", { name: UPSTREAM_EVENT_BINDING_NAME }, this.ext_session_id)
+        ? this._sendMessage(
+            Runtime.AddBindingCommand.id,
+            Runtime.AddBindingCommand.params.parse({ name: UPSTREAM_EVENT_BINDING_NAME }),
+            this.ext_session_id,
+          )
         : Promise.resolve(),
     ]);
     if (this.server !== null) {
@@ -1027,7 +1051,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   private async ensureSessionForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
     const session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
     if (session_id) return session_id;
-    if (allow_attach) return await this.auto_sessions.ensureSession(target_id);
+    if (allow_attach) return await this.auto_sessions.ensureSessionForTarget(target_id);
     const deadline = Date.now() + timeout_ms;
     while (Date.now() <= deadline) {
       const current_session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
@@ -1060,12 +1084,18 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   async _initializeRawCDPTransport() {
     await Promise.all([
-      this._sendMessage("Target.setAutoAttach", {
-        autoAttach: true,
-        waitForDebuggerOnStart: false,
-        flatten: true,
-      }),
-      this._sendMessage("Target.setDiscoverTargets", { discover: true }),
+      this._sendMessage(
+        Target.SetAutoAttachCommand.id,
+        Target.SetAutoAttachCommand.params.parse({
+          autoAttach: true,
+          waitForDebuggerOnStart: false,
+          flatten: true,
+        }),
+      ),
+      this._sendMessage(
+        Target.SetDiscoverTargetsCommand.id,
+        Target.SetDiscoverTargetsCommand.params.parse({ discover: true }),
+      ),
     ]);
   }
 
@@ -1202,7 +1232,9 @@ export class ModCDPClient extends ModCDPEventEmitter {
     let unwrap = null;
     for (const step of command.steps) {
       const step_params =
-        step.method === "Runtime.callFunctionOn" && step.params && !Object.hasOwn(step.params, "executionContextId")
+        step.method === Runtime.CallFunctionOnCommand.id &&
+        step.params &&
+        !Object.hasOwn(step.params, "executionContextId")
           ? {
               ...step.params,
               executionContextId:
@@ -1299,8 +1331,9 @@ export class ModCDPClient extends ModCDPEventEmitter {
     }
     const event = CdpEventMessageSchema.parse(msg);
     const eventParams = (event.params || {}) as ProtocolPayload;
-    for (const listener of this.raw_upstream_event_listeners) {
-      listener(event.method, eventParams, null, event.sessionId || null);
+    for (const [upstream_event, listeners] of this.upstream_event_listeners) {
+      if (upstream_event.id !== event.method) continue;
+      for (const listener of listeners) listener(eventParams, null, event.sessionId || null);
     }
     if (event.sessionId === this.ext_session_id) {
       if (event.method !== this.Runtime.bindingCalled.id) return;
