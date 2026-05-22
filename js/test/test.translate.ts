@@ -47,7 +47,17 @@ test("translate routes, wraps, and unwraps ModCDP protocol messages deterministi
     secret: "x".repeat(100),
     nested: { ok: true },
   });
-  assert.equal(custom_step_params?.arguments?.[2]?.value, "session-1");
+  assert.equal(custom_step_params?.arguments?.[2]?.value, null);
+
+  const customWithTarget = wrapCommandIfNeeded(
+    "Custom.echo",
+    { secret: "targeted" },
+    { cdpSessionId: "session-1", targetCdpSessionId: "target-session-1" },
+  );
+  const custom_with_target_params = customWithTarget.steps[0]?.params as
+    | { arguments?: Array<{ value?: unknown }> }
+    | undefined;
+  assert.equal(custom_with_target_params?.arguments?.[2]?.value, "target-session-1");
 
   assert.deepEqual(unwrapResponseIfNeeded({ result: { type: "object", value: { ok: true } } }, "runtime"), {
     ok: true,

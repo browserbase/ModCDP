@@ -22,7 +22,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	modcdp "github.com/browserbase/modcdp/go/modcdp"
@@ -67,11 +66,13 @@ func clientRoutesFor(mode string) map[string]string {
 	if mode == "direct" {
 		route = "direct_cdp"
 	}
-	return map[string]string{
-		"Mod.*":    "service_worker",
-		"Custom.*": "service_worker",
-		"*.*":      route,
+	routes := map[string]string{
+		"Mod.*":     "service_worker",
+		"Custom.*":  "service_worker",
+		"Runtime.*": "service_worker",
+		"*.*":       route,
 	}
+	return routes
 }
 
 func serverRoutesFor(mode, upstreamMode string) map[string]string {
@@ -212,28 +213,6 @@ func main() {
 	}
 
 	cdp := modcdp.New(optionsFor(mode, upstreamMode, cdpURL, extensionPath, launchOptions))
-	var (
-		eventsMu             sync.Mutex
-		targetCreatedEvents  []modcdp.TargetTargetCreatedEvent
-		runtimeConsoleEvents []modcdp.RuntimeConsoleAPICalledEvent
-		pageTargetEvents     []map[string]any
-	)
-	cdp.Target.On.TargetCreated(func(event modcdp.TargetTargetCreatedEvent) {
-		fmt.Printf("Target.targetCreated -> %s\n", event.TargetID())
-		eventsMu.Lock()
-		targetCreatedEvents = append(targetCreatedEvents, event)
-		eventsMu.Unlock()
-	})
-	cdp.Runtime.On.ConsoleAPICalled(func(event modcdp.RuntimeConsoleAPICalledEvent) {
-		values := make([]string, 0, len(event.Args))
-		for _, arg := range event.Args {
-			values = append(values, fmt.Sprint(arg.Value))
-		}
-		fmt.Printf("Runtime.consoleAPICalled -> %s\n", strings.Join(values, " "))
-		eventsMu.Lock()
-		runtimeConsoleEvents = append(runtimeConsoleEvents, event)
-		eventsMu.Unlock()
-	})
 
 	if err := cdp.Connect(); err != nil {
 		log.Fatalf("connect: %v", err)
@@ -300,16 +279,6 @@ func main() {
 		} else {
 			fmt.Println("Browser.getVersion -> (debugger route rejected:", err, ")")
 		}
-		runtimeEval := mustMap(mustSend(cdp, "Runtime.evaluate", map[string]any{
-			"expression":    "(() => 42)()",
-			"returnByValue": true,
-		}), "Runtime.evaluate")
-		runtimeResult := mustMap(runtimeEval["result"], "Runtime.evaluate.result")
-		if runtimeResult["value"] != float64(42) && runtimeResult["value"] != 42 {
-			log.Fatalf("unexpected Runtime.evaluate result: %v", runtimeEval)
-		}
-		b, _ := json.Marshal(runtimeEval)
-		fmt.Println("Runtime.evaluate ->", string(b))
 	} else {
 		version, err := cdp.Browser.GetVersion()
 		if err != nil {
@@ -333,6 +302,32 @@ func main() {
 		fmt.Println("Mod.evaluate     ->", string(b))
 	}
 
+	responseMiddlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
+		Name:       "Custom.echo",
+		Phase:      "response",
+		Expression: `async (payload, next) => next({ ...payload, responseMiddleware: "ok" })`,
+	})
+	if err != nil {
+		log.Fatalf("Mod.addMiddleware response: %v", err)
+	}
+	responseMiddlewareRegistration := mustMap(responseMiddlewareRegistrationRaw, "Mod.addMiddleware response")
+	if responseMiddlewareRegistration["registered"] != true || responseMiddlewareRegistration["phase"] != "response" {
+		log.Fatalf("unexpected response middleware registration: %v", responseMiddlewareRegistration)
+	}
+
+	eventMiddlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
+		Name:       "Custom.demoEvent",
+		Phase:      "event",
+		Expression: `async (payload, next) => next({ ...payload, eventMiddleware: "ok" })`,
+	})
+	if err != nil {
+		log.Fatalf("Mod.addMiddleware event: %v", err)
+	}
+	eventMiddlewareRegistration := mustMap(eventMiddlewareRegistrationRaw, "Mod.addMiddleware event")
+	if eventMiddlewareRegistration["registered"] != true || eventMiddlewareRegistration["phase"] != "event" {
+		log.Fatalf("unexpected event middleware registration: %v", eventMiddlewareRegistration)
+	}
+
 	echoRegistrationRaw, err := cdp.Mod.AddCustomCommand(modcdp.CustomCommand{
 		Name:       "Custom.echo",
 		Expression: `async (params, method) => ({ echoed: params.value, method })`,
@@ -345,69 +340,11 @@ func main() {
 		log.Fatalf("unexpected Custom.echo registration: %v", echoRegistration)
 	}
 	echoResult := mustMap(mustSend(cdp, "Custom.echo", map[string]any{"value": "custom-command-ok"}), "Custom.echo")
-	if echoResult["echoed"] != "custom-command-ok" || echoResult["method"] != "Custom.echo" {
+	if echoResult["echoed"] != "custom-command-ok" || echoResult["method"] != "Custom.echo" || echoResult["responseMiddleware"] != "ok" {
 		log.Fatalf("unexpected Custom.echo result: %v", echoResult)
 	}
 	b, _ := json.Marshal(echoResult)
 	fmt.Println("Custom.echo      ->", string(b))
-
-	tabCommandRegistrationRaw, err := cdp.Mod.AddCustomCommand(modcdp.CustomCommand{
-		Name: "Custom.TabIdFromTargetId",
-		Expression: `async ({ targetId }) => {
-          const targets = await chrome.debugger.getTargets();
-          const target = targets.find(target => target.id === targetId);
-          return { tabId: target?.tabId ?? null };
-        }`,
-	})
-	if err != nil {
-		log.Fatalf("Mod.addCustomCommand Custom.TabIdFromTargetId: %v", err)
-	}
-	tabCommandRegistration := mustMap(tabCommandRegistrationRaw, "Mod.addCustomCommand Custom.TabIdFromTargetId")
-	if tabCommandRegistration["registered"] != true {
-		log.Fatalf("unexpected TabIdFromTargetId registration: %v", tabCommandRegistration)
-	}
-	targetCommandRegistrationRaw, err := cdp.Mod.AddCustomCommand(modcdp.CustomCommand{
-		Name: "Custom.targetIdFromTabId",
-		Expression: `async ({ tabId }) => {
-          const targets = await chrome.debugger.getTargets();
-          const target = targets.find(target => target.type === "page" && target.tabId === tabId);
-          return { targetId: target?.id ?? null };
-        }`,
-	})
-	if err != nil {
-		log.Fatalf("Mod.addCustomCommand Custom.targetIdFromTabId: %v", err)
-	}
-	targetCommandRegistration := mustMap(targetCommandRegistrationRaw, "Mod.addCustomCommand Custom.targetIdFromTabId")
-	if targetCommandRegistration["registered"] != true {
-		log.Fatalf("unexpected targetIdFromTabId registration: %v", targetCommandRegistration)
-	}
-	for _, phase := range []string{"response", "event"} {
-		middlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
-			Name:  "*",
-			Phase: phase,
-			Expression: `async (payload, next) => {
-              const seen = new WeakSet();
-              const visit = async value => {
-                if (!value || typeof value !== "object" || seen.has(value)) return;
-                seen.add(value);
-                if (!Array.isArray(value) && typeof value.targetId === "string" && value.tabId == null) {
-                  const { tabId } = await cdp.send("Custom.TabIdFromTargetId", { targetId: value.targetId });
-                  if (tabId != null) value.tabId = tabId;
-                }
-                for (const child of Array.isArray(value) ? value : Object.values(value)) await visit(child);
-              };
-              await visit(payload);
-              return next(payload);
-            }`,
-		})
-		if err != nil {
-			log.Fatalf("Mod.addMiddleware %s: %v", phase, err)
-		}
-		middlewareRegistration := mustMap(middlewareRegistrationRaw, "Mod.addMiddleware "+phase)
-		if middlewareRegistration["registered"] != true || middlewareRegistration["phase"] != phase {
-			log.Fatalf("unexpected %s middleware registration: %v", phase, middlewareRegistration)
-		}
-	}
 
 	demoEventCh := make(chan map[string]any, 16)
 	cdp.On("Custom.demoEvent", func(data any) {
@@ -434,278 +371,36 @@ func main() {
 		log.Fatalf("unexpected Custom.demoEvent emit result: %v", emitResult)
 	}
 	demoEvent := waitForEvent(demoEventCh, "Custom.demoEvent", func(event map[string]any) bool {
-		return event["value"] == "custom-event-ok"
+		return event["value"] == "custom-event-ok" && event["eventMiddleware"] == "ok"
 	})
 	fmt.Println("Custom.demoEvent ->", demoEvent)
 
-	pageTargetEventRegistrationRaw, err := cdp.Mod.AddCustomEvent(modcdp.CustomEvent{Name: "Custom.pageTargetUpdated"})
-	if err != nil {
-		log.Fatalf("Mod.addCustomEvent Custom.pageTargetUpdated: %v", err)
-	}
-	pageTargetEventRegistration := mustMap(pageTargetEventRegistrationRaw, "Mod.addCustomEvent Custom.pageTargetUpdated")
-	if pageTargetEventRegistration["registered"] != true {
-		log.Fatalf("unexpected page target event registration: %v", pageTargetEventRegistration)
-	}
-	cdp.On("Custom.pageTargetUpdated", func(p any) {
-		event, _ := p.(map[string]any)
-		fmt.Printf("Custom.pageTargetUpdated -> %v\n", event)
-		eventsMu.Lock()
-		pageTargetEvents = append(pageTargetEvents, event)
-		eventsMu.Unlock()
+	runtimeContextCh := make(chan map[string]any, 16)
+	cdp.On("Runtime.executionContextCreated", func(data any) {
+		if event, ok := data.(map[string]any); ok {
+			runtimeContextCh <- event
+		}
 	})
-
-	if mode == "debugger" {
-		normalEventMarker := ""
-		if upstreamMode == "pipe" {
-			if _, err := cdp.SendRaw("Target.setDiscoverTargets", map[string]any{"discover": true}); err != nil {
-				log.Fatalf("Target.setDiscoverTargets: %v", err)
-			}
-			createdTarget, err := cdp.SendRaw("Target.createTarget", map[string]any{
-				"url":        "https://example.com",
-				"background": true,
-			})
-			if err != nil {
-				log.Fatalf("Target.createTarget: %v", err)
-			}
-			normalEventMarker, _ = createdTarget["targetId"].(string)
-			deadline := time.Now().Add(3 * time.Second)
-			matchedTargetEvent := false
-			for time.Now().Before(deadline) {
-				eventsMu.Lock()
-				for _, event := range targetCreatedEvents {
-					if event.TargetID() == normalEventMarker {
-						matchedTargetEvent = true
-						break
-					}
-				}
-				eventsMu.Unlock()
-				if matchedTargetEvent {
-					break
-				}
-				time.Sleep(20 * time.Millisecond)
-			}
-			if !matchedTargetEvent {
-				log.Fatalf("expected Target.targetCreated for %s", normalEventMarker)
-			}
-		} else {
-			normalEventMarker = fmt.Sprintf("modcdp-debugger-event-%d", time.Now().UnixMilli())
-			if _, err := cdp.Runtime.Enable(); err != nil {
-				log.Fatalf("Runtime.enable: %v", err)
-			}
-			if _, err := cdp.Runtime.Evaluate(modcdp.RuntimeEvaluateParams{
-				Expression:    fmt.Sprintf("console.log(%q)", normalEventMarker),
-				ReturnByValue: modcdp.Bool(true),
-			}); err != nil {
-				log.Fatalf("Runtime.evaluate console event: %v", err)
-			}
-			deadline := time.Now().Add(3 * time.Second)
-			matchedConsoleEvent := false
-			for time.Now().Before(deadline) {
-				eventsMu.Lock()
-				for _, event := range runtimeConsoleEvents {
-					for _, arg := range event.Args {
-						if arg.Value == normalEventMarker {
-							matchedConsoleEvent = true
-							break
-						}
-					}
-					if matchedConsoleEvent {
-						break
-					}
-				}
-				eventsMu.Unlock()
-				if matchedConsoleEvent {
-					break
-				}
-				time.Sleep(20 * time.Millisecond)
-			}
-			if !matchedConsoleEvent {
-				log.Fatalf("expected Runtime.consoleAPICalled for %s", normalEventMarker)
-			}
-		}
-		fmt.Println("normal event matched ->", normalEventMarker)
-
-		debuggerTargetRaw, err := cdp.Mod.Evaluate(map[string]any{
-			"expression": `async () => {
-              const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-              const targets = await chrome.debugger.getTargets();
-              const target = targets.find(target => target.type === "page" && tab?.id != null && target.tabId === tab.id)
-                ?? targets.find(target => target.type === "page");
-              if (!target?.id) throw new Error("no page target found");
-              return { targetId: target.id, tabId: target.tabId };
-            }`,
-		})
-		if err != nil {
-			log.Fatalf("debugger target lookup: %v", err)
-		}
-		debuggerTarget := mustMap(debuggerTargetRaw, "debugger target lookup")
-		debuggerTargetID, _ := debuggerTarget["targetId"].(string)
-		debuggerTabID, tabOK := debuggerTarget["tabId"].(float64)
-		if debuggerTargetID == "" || !tabOK {
-			log.Fatalf("unexpected debugger target lookup result: %v", debuggerTarget)
-		}
-		b, _ := json.Marshal(debuggerTarget)
-		fmt.Println("Custom.TabIdFromTargetId ->", string(b))
-
-		pageTargetEmitRaw, err := cdp.Mod.Evaluate(map[string]any{
-			"params": map[string]any{"targetId": debuggerTargetID},
-			"expression": `async ({ targetId }) => {
-              const targets = await chrome.debugger.getTargets();
-              const target = targets.find(target => target.id === targetId);
-              if (!target?.id) throw new Error(` + "`target ${targetId} not found`" + `);
-              await cdp.emit("Custom.pageTargetUpdated", { targetId: target.id, url: target.url ?? null });
-              return { emitted: true, targetId: target.id };
-            }`,
-		})
-		if err != nil {
-			log.Fatalf("Custom.pageTargetUpdated emit: %v", err)
-		}
-		pageTargetEmit := mustMap(pageTargetEmitRaw, "Custom.pageTargetUpdated emit")
-		if pageTargetEmit["emitted"] != true || pageTargetEmit["targetId"] != debuggerTargetID {
-			log.Fatalf("unexpected Custom.pageTargetUpdated emit result: %v", pageTargetEmit)
-		}
-		deadline := time.Now().Add(3 * time.Second)
-		var pageTarget map[string]any
-		for time.Now().Before(deadline) {
-			eventsMu.Lock()
-			for _, event := range pageTargetEvents {
-				if event["targetId"] == debuggerTargetID {
-					pageTarget = event
-					break
-				}
-			}
-			eventsMu.Unlock()
-			if pageTarget != nil {
-				break
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-		if pageTarget == nil {
-			log.Fatalf("expected Custom.pageTargetUpdated for %s", debuggerTargetID)
-		}
-		pageTargetTabID, _ := pageTarget["tabId"].(float64)
-		if pageTargetTabID != debuggerTabID {
-			log.Fatalf("unexpected Custom.pageTargetUpdated result: %v", pageTarget)
-		}
-
-		targetFromTabRaw, err := cdp.Send("Custom.targetIdFromTabId", map[string]any{"tabId": pageTarget["tabId"]})
-		if err != nil {
-			log.Fatalf("Custom.targetIdFromTabId: %v", err)
-		}
-		targetFromTab := mustMap(targetFromTabRaw, "Custom.targetIdFromTabId")
-		middlewareTabID, _ := targetFromTab["tabId"].(float64)
-		if targetFromTab["targetId"] != debuggerTargetID || middlewareTabID != pageTargetTabID {
-			log.Fatalf("unexpected Custom.targetIdFromTabId/middleware result: %v", targetFromTab)
-		}
-		b, _ = json.Marshal(targetFromTab)
-		fmt.Println("Custom.targetIdFromTabId ->", string(b))
-
-		fmt.Printf("\nSUCCESS (%s/%s): normal command, normal event, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
-		return
+	if _, err := cdp.Send("Runtime.enable", map[string]any{}); err != nil {
+		log.Fatalf("Runtime.enable: %v", err)
 	}
-
-	if _, err := cdp.Target.SetDiscoverTargets(modcdp.TargetSetDiscoverTargetsParams{Discover: true}); err != nil {
-		log.Fatal(err)
-	}
-	createdTarget, err := cdp.Target.CreateTarget(modcdp.TargetCreateTargetParams{
-		URL:        "https://example.com",
-		Background: modcdp.Bool(true),
+	runtimeContext := waitForEvent(runtimeContextCh, "Runtime.executionContextCreated", func(event map[string]any) bool {
+		context, _ := event["context"].(map[string]any)
+		return context["id"] != nil
 	})
-	if err != nil {
-		log.Fatalf("Target.createTarget: %v", err)
+	runtimeEval := mustMap(mustSend(cdp, "Runtime.evaluate", map[string]any{
+		"expression":    "(() => 42)()",
+		"returnByValue": true,
+	}), "Runtime.evaluate")
+	runtimeResult := mustMap(runtimeEval["result"], "Runtime.evaluate.result")
+	if runtimeResult["value"] != float64(42) && runtimeResult["value"] != 42 {
+		log.Fatalf("unexpected Runtime.evaluate result: %v", runtimeEval)
 	}
-	createdTargetID := string(createdTarget.TargetID)
-	if createdTargetID == "" {
-		log.Fatalf("Target.createTarget returned no targetId: %v", createdTarget)
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	var matchedTargetEvent *modcdp.TargetTargetCreatedEvent
-	for time.Now().Before(deadline) {
-		eventsMu.Lock()
-		for i := range targetCreatedEvents {
-			if targetCreatedEvents[i].TargetID() == createdTargetID {
-				matchedTargetEvent = &targetCreatedEvents[i]
-				break
-			}
-		}
-		eventsMu.Unlock()
-		if matchedTargetEvent != nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if matchedTargetEvent == nil {
-		log.Fatalf("expected Target.targetCreated for %s", createdTargetID)
-	}
-	fmt.Println("normal event matched ->", createdTargetID)
+	fmt.Println("Runtime.executionContextCreated ->", runtimeContext)
+	b, _ = json.Marshal(runtimeEval)
+	fmt.Println("Runtime.evaluate ->", string(b))
 
-	tabFromTargetRaw, err := cdp.Send("Custom.TabIdFromTargetId", map[string]any{"targetId": createdTargetID})
-	if err != nil {
-		log.Fatalf("Custom.TabIdFromTargetId: %v", err)
-	}
-	tabFromTarget, _ := tabFromTargetRaw.(map[string]any)
-	b, _ = json.Marshal(tabFromTarget)
-	fmt.Println("Custom.TabIdFromTargetId ->", string(b))
-
-	if _, err := cdp.Target.ActivateTarget(modcdp.TargetActivateTargetParams{TargetID: modcdp.TargetTargetID(createdTargetID)}); err != nil {
-		log.Fatalf("Target.activateTarget: %v", err)
-	}
-	pageTargetEmitRaw, err := cdp.Mod.Evaluate(map[string]any{
-		"params": map[string]any{"targetId": createdTargetID},
-		"expression": `async ({ targetId }) => {
-          const targets = await chrome.debugger.getTargets();
-          const target = targets.find(target => target.id === targetId);
-          if (!target?.id) throw new Error(` + "`target ${targetId} not found`" + `);
-          await cdp.emit("Custom.pageTargetUpdated", { targetId: target.id, url: target.url ?? null });
-          return { emitted: true, targetId: target.id };
-        }`,
-	})
-	if err != nil {
-		log.Fatalf("Custom.pageTargetUpdated emit: %v", err)
-	}
-	pageTargetEmit := mustMap(pageTargetEmitRaw, "Custom.pageTargetUpdated emit")
-	if pageTargetEmit["emitted"] != true || pageTargetEmit["targetId"] != createdTargetID {
-		log.Fatalf("unexpected Custom.pageTargetUpdated emit result: %v", pageTargetEmit)
-	}
-	deadline = time.Now().Add(3 * time.Second)
-	var pageTarget map[string]any
-	for time.Now().Before(deadline) {
-		eventsMu.Lock()
-		for _, event := range pageTargetEvents {
-			if event["targetId"] == createdTargetID {
-				pageTarget = event
-				break
-			}
-		}
-		eventsMu.Unlock()
-		if pageTarget != nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if pageTarget == nil {
-		log.Fatalf("expected Custom.pageTargetUpdated for %s", createdTargetID)
-	}
-
-	pageTargetTabID, _ := pageTarget["tabId"].(float64)
-	tabID, _ := tabFromTarget["tabId"].(float64)
-	if tabID != pageTargetTabID {
-		log.Fatalf("unexpected Custom.TabIdFromTargetId result: %v", tabFromTarget)
-	}
-
-	targetFromTabRaw, err := cdp.Send("Custom.targetIdFromTabId", map[string]any{"tabId": pageTarget["tabId"]})
-	if err != nil {
-		log.Fatalf("Custom.targetIdFromTabId: %v", err)
-	}
-	targetFromTab, _ := targetFromTabRaw.(map[string]any)
-	middlewareTabID, _ := targetFromTab["tabId"].(float64)
-	if targetFromTab["targetId"] != createdTargetID || middlewareTabID != pageTargetTabID {
-		log.Fatalf("unexpected Custom.targetIdFromTabId/middleware result: %v", targetFromTab)
-	}
-	b, _ = json.Marshal(targetFromTab)
-	fmt.Println("Custom.targetIdFromTabId ->", string(b))
-
-	fmt.Printf("\nSUCCESS (%s/%s): normal command, normal event, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
+	fmt.Printf("\nSUCCESS (%s/%s): native command/event, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
 
 	// TTY-only REPL. Lets you poke at the live browser interactively;
 	// subscribed events print as they arrive. Skip when stdin is not a tty
@@ -776,7 +471,7 @@ func runRepl(cdp *modcdp.ModCDPClient, mode string) {
 	fmt.Println("Enter commands as Domain.method({...JSON params...}). Examples:")
 	fmt.Println(`  Browser.getVersion({})`)
 	fmt.Println(`  Mod.evaluate({"expression": "chrome.tabs.query({active: true})"})`)
-	fmt.Println(`  Custom.TabIdFromTargetId({"targetId": "..."})`)
+	fmt.Println(`  Runtime.evaluate({"expression": "document.title", "returnByValue": true})`)
 	fmt.Println("Type exit or quit to disconnect (browser keeps running).")
 	cmdRE := regexp.MustCompile(`^([A-Za-z_]\w*\.[A-Za-z_]\w*)(?:\((.*)\))?$`)
 	sc := bufio.NewScanner(os.Stdin)

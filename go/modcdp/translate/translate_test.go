@@ -79,8 +79,23 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 	if customPayload["secret"] != strings.Repeat("x", 100) || customPayload["nested"].(map[string]any)["ok"] != true {
 		t.Fatalf("params argument = %#v", customPayload)
 	}
-	if customArguments[2]["value"] != "session-1" {
+	if customArguments[2]["value"] != nil {
 		t.Fatalf("session argument = %#v", customArguments[2])
+	}
+
+	customWithTarget, err := wrapCommandIfNeeded(
+		"Custom.echo",
+		map[string]any{"secret": "targeted"},
+		DefaultClientRoutes(),
+		"session-1",
+		"target-session-1",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	customWithTargetArguments := customWithTarget.Steps[0].Params["arguments"].([]map[string]any)
+	if customWithTargetArguments[2]["value"] != "target-session-1" {
+		t.Fatalf("target session argument = %#v", customWithTargetArguments[2])
 	}
 
 	unwrapped, err := unwrapResponseIfNeeded(map[string]any{"result": map[string]any{"type": "object", "value": map[string]any{"ok": true}}}, "runtime")

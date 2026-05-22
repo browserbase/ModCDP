@@ -151,7 +151,7 @@ def _wrap_modcdp_add_middleware(params: ProtocolParams) -> RuntimeCallFunctionOn
     )
 
 
-def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str) -> RuntimeCallFunctionOnParams:
+def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str | None) -> RuntimeCallFunctionOnParams:
     runtime_params = _call_function_params(
         "async function(method, paramsJson, cdpSessionId) { "
         "return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); "
@@ -186,7 +186,7 @@ def _wrap_service_worker_command(
     elif method == "Mod.addMiddleware":
         runtime_params = _wrap_modcdp_add_middleware(params)
     else:
-        runtime_params = _wrap_custom_command(method, params, target_session_id or _optional_string(params, "cdpSessionId") or session_id)
+        runtime_params = _wrap_custom_command(method, params, target_session_id or _optional_string(params, "cdpSessionId"))
         unwrap = "runtime_json"
     return [{"method": "Runtime.callFunctionOn", "params": runtime_params, "unwrap": unwrap}]
 

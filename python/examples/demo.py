@@ -18,13 +18,12 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modcdp import ModCDPClient
-from modcdp.types import JsonValue, ProtocolPayload
+from modcdp.types import ProtocolPayload
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 EXTENSION_PATH = ROOT / "dist" / "extension"
@@ -60,6 +59,7 @@ def client_routes_for(mode: str) -> ProtocolPayload:
         "Custom.*": "service_worker",
         "*.*": "direct_cdp" if mode == "direct" else "service_worker",
     }
+    routes["Runtime.*"] = "service_worker"
     return routes
 
 
@@ -158,29 +158,6 @@ def main():
                 launch_options["executable_path"] = os.environ["CHROME_PATH"]
 
         cdp = ModCDPClient(**client_options_for(mode, upstream_mode, cdp_url, launch_options))
-        page_target_events = []
-        target_created_events = []
-        runtime_console_events = []
-        events_lock = threading.Lock()
-
-        def on_target_created(payload, *_):
-            print(f"Target.targetCreated -> {payload.get('targetInfo', {}).get('targetId')}")
-            with events_lock:
-                target_created_events.append(payload)
-
-        def on_page_target_updated(payload, *_):
-            print(f"Custom.pageTargetUpdated -> {payload}")
-            with events_lock:
-                page_target_events.append(payload)
-
-        def on_runtime_console_api_called(payload, *_):
-            values = [arg.get("value") for arg in payload.get("args", []) if isinstance(arg, dict)]
-            print(f"Runtime.consoleAPICalled -> {' '.join(str(value) for value in values)}")
-            with events_lock:
-                runtime_console_events.append(payload)
-
-        cdp.on("Target.targetCreated", on_target_created)
-        cdp.on("Runtime.consoleAPICalled", on_runtime_console_api_called)
 
         cdp.connect()
         print(f"upstream cdp: {cdp.cdp_url}")
@@ -235,11 +212,6 @@ def main():
                 print(f"Browser.getVersion -> {version}")
             except Exception as e:
                 print(f"Browser.getVersion -> (debugger route rejected: {str(e).splitlines()[0]} )")
-            runtime_eval = expect_object(cdp.send("Runtime.evaluate", {"expression": "(() => 42)()", "returnByValue": True}), "Runtime.evaluate")
-            result = expect_object(runtime_eval.get("result"), "Runtime.evaluate.result")
-            if result.get("value") != 42:
-                raise RuntimeError(f"unexpected Runtime.evaluate result {runtime_eval}")
-            print(f"Runtime.evaluate -> {runtime_eval}")
         else:
             version = expect_object(cdp.send("Browser.getVersion"), "Browser.getVersion")
             if not isinstance(version.get("protocolVersion"), str) or not isinstance(version.get("product"), str):
@@ -251,6 +223,22 @@ def main():
             raise RuntimeError(f"unexpected Mod.evaluate result {modcdp_eval}")
         print(f"Mod.evaluate     -> {modcdp_eval}")
 
+        response_middleware_registration = expect_object(cdp.send("Mod.addMiddleware", {
+            "name": "Custom.echo",
+            "phase": "response",
+            "expression": '''async (payload, next) => next({ ...payload, responseMiddleware: "ok" })''',
+        }), "Mod.addMiddleware response")
+        if response_middleware_registration.get("registered") is not True or response_middleware_registration.get("phase") != "response":
+            raise RuntimeError(f"unexpected response middleware registration {response_middleware_registration}")
+
+        event_middleware_registration = expect_object(cdp.send("Mod.addMiddleware", {
+            "name": "Custom.demoEvent",
+            "phase": "event",
+            "expression": '''async (payload, next) => next({ ...payload, eventMiddleware: "ok" })''',
+        }), "Mod.addMiddleware event")
+        if event_middleware_registration.get("registered") is not True or event_middleware_registration.get("phase") != "event":
+            raise RuntimeError(f"unexpected event middleware registration {event_middleware_registration}")
+
         echo_registration = expect_object(cdp.send("Mod.addCustomCommand", {
             "name": "Custom.echo",
             "expression": "async (params, method) => ({ echoed: params.value, method })",
@@ -258,55 +246,13 @@ def main():
         if echo_registration.get("registered") is not True or echo_registration.get("name") != "Custom.echo":
             raise RuntimeError(f"unexpected Custom.echo registration {echo_registration}")
         echo_result = expect_object(cdp.send("Custom.echo", {"value": "custom-command-ok"}), "Custom.echo")
-        if echo_result.get("echoed") != "custom-command-ok" or echo_result.get("method") != "Custom.echo":
+        if (
+            echo_result.get("echoed") != "custom-command-ok"
+            or echo_result.get("method") != "Custom.echo"
+            or echo_result.get("responseMiddleware") != "ok"
+        ):
             raise RuntimeError(f"unexpected Custom.echo result {echo_result}")
         print(f"Custom.echo      -> {echo_result}")
-
-        tab_command_registration = expect_object(cdp.send("Mod.addCustomCommand", {
-            "name": "Custom.TabIdFromTargetId",
-            "expression": '''async ({ targetId }) => {
-              const targets = await chrome.debugger.getTargets();
-              const target = targets.find(target => target.id === targetId);
-              return { tabId: target?.tabId ?? null };
-            }''',
-        }), "Mod.addCustomCommand Custom.TabIdFromTargetId")
-        if tab_command_registration.get("registered") is not True:
-            raise RuntimeError(f"unexpected TabIdFromTargetId registration {tab_command_registration}")
-        target_command_registration = expect_object(cdp.send("Mod.addCustomCommand", {
-            "name": "Custom.targetIdFromTabId",
-            "expression": '''async ({ tabId }) => {
-              const targets = await chrome.debugger.getTargets();
-              const target = targets.find(target => target.type === "page" && target.tabId === tabId);
-              return { targetId: target?.id ?? null };
-            }''',
-        }), "Mod.addCustomCommand Custom.targetIdFromTabId")
-        if target_command_registration.get("registered") is not True:
-            raise RuntimeError(f"unexpected targetIdFromTabId registration {target_command_registration}")
-        middleware_registered = False
-        for phase in ("response", "event"):
-            middleware_registration = expect_object(cdp.send("Mod.addMiddleware", {
-                "name": "*",
-                "phase": phase,
-                "expression": '''async (payload, next) => {
-                  const seen = new WeakSet();
-                  const visit = async value => {
-                    if (!value || typeof value !== "object" || seen.has(value)) return;
-                    seen.add(value);
-                    if (!Array.isArray(value) && typeof value.targetId === "string" && value.tabId == null) {
-                      const { tabId } = await cdp.send("Custom.TabIdFromTargetId", { targetId: value.targetId });
-                      if (tabId != null) value.tabId = tabId;
-                    }
-                    for (const child of Array.isArray(value) ? value : Object.values(value)) await visit(child);
-                  };
-                  await visit(payload);
-                  return next(payload);
-                }''',
-            }), f"Mod.addMiddleware {phase}")
-            if middleware_registration.get("registered") is not True or middleware_registration.get("phase") != phase:
-                raise RuntimeError(f"unexpected {phase} middleware registration {middleware_registration}")
-            middleware_registered = True
-        if not middleware_registered:
-            raise RuntimeError("middleware registration loop did not run")
 
         demo_events = []
         demo_lock = threading.Lock()
@@ -325,7 +271,7 @@ def main():
         deadline = time.monotonic() + 3.0
         while True:
             with demo_lock:
-                demo_event = next((event for event in demo_events if event.get("value") == "custom-event-ok"), None)
+                demo_event = next((event for event in demo_events if event.get("value") == "custom-event-ok" and event.get("eventMiddleware") == "ok"), None)
             if demo_event or time.monotonic() >= deadline:
                 break
             time.sleep(0.02)
@@ -333,145 +279,32 @@ def main():
             raise RuntimeError("expected Custom.demoEvent")
         print(f"Custom.demoEvent -> {demo_event}")
 
-        page_target_event_registration = expect_object(cdp.send("Mod.addCustomEvent", {"name": "Custom.pageTargetUpdated"}), "Mod.addCustomEvent Custom.pageTargetUpdated")
-        if page_target_event_registration.get("registered") is not True:
-            raise RuntimeError(f"unexpected page target event registration {page_target_event_registration}")
-        cdp.on("Custom.pageTargetUpdated", on_page_target_updated)
+        runtime_contexts = []
+        runtime_context_lock = threading.Lock()
 
-        if mode == "debugger":
-            if upstream_mode == "pipe":
-                cdp.sendRaw("Target.setDiscoverTargets", {"discover": True})
-                created_target = expect_object(cdp.sendRaw("Target.createTarget", {"url": "https://example.com", "background": True}), "Target.createTarget")
-                normal_event_marker = str(created_target.get("targetId"))
-                deadline = time.monotonic() + 3.0
-                while True:
-                    with events_lock:
-                        matched_target_event = next((event for event in target_created_events if event.get("targetInfo", {}).get("targetId") == normal_event_marker), None)
-                    if matched_target_event or time.monotonic() >= deadline:
-                        break
-                    time.sleep(0.02)
-                if not matched_target_event:
-                    raise RuntimeError(f"expected Target.targetCreated for {normal_event_marker}")
-            else:
-                normal_event_marker = f"modcdp-debugger-event-{int(time.time() * 1000)}"
-                cdp.send("Runtime.enable", {})
-                cdp.send("Runtime.evaluate", {"expression": f"console.log({json.dumps(normal_event_marker)})", "returnByValue": True})
-                deadline = time.monotonic() + 3.0
-                while True:
-                    with events_lock:
-                        matched_console_event = next(
-                            (
-                                event
-                                for event in runtime_console_events
-                                if any(isinstance(arg, dict) and arg.get("value") == normal_event_marker for arg in event.get("args", []))
-                            ),
-                            None,
-                        )
-                    if matched_console_event or time.monotonic() >= deadline:
-                        break
-                    time.sleep(0.02)
-                if not matched_console_event:
-                    raise RuntimeError(f"expected Runtime.consoleAPICalled for {normal_event_marker}")
-            print(f"normal event matched -> {normal_event_marker}")
+        def on_runtime_context_created(payload, *_):
+            with runtime_context_lock:
+                runtime_contexts.append(payload)
 
-            debugger_target = expect_object(cdp.send("Mod.evaluate", {
-                "expression": '''async () => {
-                  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-                  const targets = await chrome.debugger.getTargets();
-                  const target = targets.find(target => target.type === "page" && tab?.id != null && target.tabId === tab.id)
-                    ?? targets.find(target => target.type === "page");
-                  if (!target?.id) throw new Error("no page target found");
-                  return { targetId: target.id, tabId: target.tabId };
-                }''',
-            }), "debugger target lookup")
-            if not isinstance(debugger_target.get("targetId"), str) or not isinstance(debugger_target.get("tabId"), int | float):
-                raise RuntimeError(f"unexpected debugger target lookup result {debugger_target}")
-            print(f"Custom.TabIdFromTargetId -> {debugger_target}")
-
-            page_target_emit_result = expect_object(cdp.send("Mod.evaluate", {
-                "params": {"targetId": debugger_target["targetId"]},
-                "expression": '''async ({ targetId }) => {
-                  const targets = await chrome.debugger.getTargets();
-                  const target = targets.find(target => target.id === targetId);
-                  if (!target?.id) throw new Error(`target ${targetId} not found`);
-                  await cdp.emit("Custom.pageTargetUpdated", { targetId: target.id, url: target.url ?? null });
-                  return { emitted: true, targetId: target.id };
-                }''',
-            }), "Custom.pageTargetUpdated emit")
-            if page_target_emit_result.get("emitted") is not True or page_target_emit_result.get("targetId") != debugger_target["targetId"]:
-                raise RuntimeError(f"unexpected Custom.pageTargetUpdated emit result {page_target_emit_result}")
-            deadline = time.monotonic() + 3.0
-            while True:
-                with events_lock:
-                    page_target = next((event for event in page_target_events if event.get("targetId") == debugger_target["targetId"]), None)
-                if page_target or time.monotonic() >= deadline:
-                    break
-                time.sleep(0.02)
-            if not page_target:
-                raise RuntimeError(f"expected Custom.pageTargetUpdated for {debugger_target['targetId']}")
-            if page_target.get("tabId") != debugger_target.get("tabId"):
-                raise RuntimeError(f"unexpected Custom.pageTargetUpdated result {page_target}")
-
-            target_from_tab = expect_object(cdp.send("Custom.targetIdFromTabId", {"tabId": page_target["tabId"]}), "Custom.targetIdFromTabId")
-            if target_from_tab.get("targetId") != debugger_target["targetId"] or target_from_tab.get("tabId") != page_target.get("tabId"):
-                raise RuntimeError(f"unexpected Custom.targetIdFromTabId/middleware result {target_from_tab}")
-            print(f"Custom.targetIdFromTabId -> {target_from_tab}")
-
-            print(f"\nSUCCESS ({mode}/{upstream_mode}): normal command, normal event, custom commands, custom event, and middleware all passed")
-            return 0
-
-        cdp.send("Target.setDiscoverTargets", {"discover": True})
-        created_target = expect_object(cdp.send("Target.createTarget", {"url": "https://example.com", "background": True}), "Target.createTarget")
-        created_target_id = created_target.get("targetId")
-        if not created_target_id:
-            raise RuntimeError(f"Target.createTarget returned no targetId: {created_target}")
+        cdp.on("Runtime.executionContextCreated", on_runtime_context_created)
+        cdp.send("Runtime.enable", {})
         deadline = time.monotonic() + 3.0
         while True:
-            with events_lock:
-                matched_target_event = next((event for event in target_created_events if event.get("targetInfo", {}).get("targetId") == created_target_id), None)
-            if matched_target_event or time.monotonic() >= deadline:
+            with runtime_context_lock:
+                runtime_context = runtime_contexts[0] if runtime_contexts else None
+            if runtime_context or time.monotonic() >= deadline:
                 break
             time.sleep(0.02)
-        if not matched_target_event:
-            raise RuntimeError(f"expected Target.targetCreated for {created_target_id}")
-        print(f"normal event matched -> {created_target_id}")
+        if not runtime_context:
+            raise RuntimeError("expected Runtime.executionContextCreated")
+        runtime_eval = expect_object(cdp.send("Runtime.evaluate", {"expression": "(() => 42)()", "returnByValue": True}), "Runtime.evaluate")
+        result = expect_object(runtime_eval.get("result"), "Runtime.evaluate.result")
+        if result.get("value") != 42:
+            raise RuntimeError(f"unexpected Runtime.evaluate result {runtime_eval}")
+        print(f"Runtime.executionContextCreated -> {runtime_context}")
+        print(f"Runtime.evaluate -> {runtime_eval}")
 
-        tab_from_target = expect_object(cdp.send("Custom.TabIdFromTargetId", {"targetId": created_target_id}), "Custom.TabIdFromTargetId")
-        if not isinstance(tab_from_target.get("tabId"), int | float):
-            raise RuntimeError(f"unexpected Custom.TabIdFromTargetId result {tab_from_target}")
-        print(f"Custom.TabIdFromTargetId -> {tab_from_target}")
-
-        cdp.send("Target.activateTarget", {"targetId": created_target_id})
-        page_target_emit_result = expect_object(cdp.send("Mod.evaluate", {
-            "params": {"targetId": created_target_id},
-            "expression": '''async ({ targetId }) => {
-              const targets = await chrome.debugger.getTargets();
-              const target = targets.find(target => target.id === targetId);
-              if (!target?.id) throw new Error(`target ${targetId} not found`);
-              await cdp.emit("Custom.pageTargetUpdated", { targetId: target.id, url: target.url ?? null });
-              return { emitted: true, targetId: target.id };
-            }''',
-        }), "Custom.pageTargetUpdated emit")
-        if page_target_emit_result.get("emitted") is not True or page_target_emit_result.get("targetId") != created_target_id:
-            raise RuntimeError(f"unexpected Custom.pageTargetUpdated emit result {page_target_emit_result}")
-        deadline = time.monotonic() + 3.0
-        while True:
-            with events_lock:
-                page_target = next((event for event in page_target_events if event.get("targetId") == created_target_id), None)
-            if page_target or time.monotonic() >= deadline:
-                break
-            time.sleep(0.02)
-        if not page_target:
-            raise RuntimeError(f"expected Custom.pageTargetUpdated for {created_target_id}")
-        if tab_from_target.get("tabId") != page_target.get("tabId"):
-            raise RuntimeError(f"unexpected Custom.pageTargetUpdated result {page_target}")
-
-        target_from_tab = expect_object(cdp.send("Custom.targetIdFromTabId", {"tabId": page_target["tabId"]}), "Custom.targetIdFromTabId")
-        if target_from_tab.get("targetId") != created_target_id or target_from_tab.get("tabId") != page_target.get("tabId"):
-            raise RuntimeError(f"unexpected Custom.targetIdFromTabId/middleware result {target_from_tab}")
-        print(f"Custom.targetIdFromTabId -> {target_from_tab}")
-
-        print(f"\nSUCCESS ({mode}/{upstream_mode}): normal command, normal event, custom commands, custom event, and middleware all passed")
+        print(f"\nSUCCESS ({mode}/{upstream_mode}): native command/event, custom commands, custom event, and middleware all passed")
 
         # TTY-only: drop into a REPL where you can send live commands and
         # watch events as they print. Skip when run non-interactively so the
@@ -493,7 +326,7 @@ def run_repl(cdp, mode):
     print("Enter commands as Domain.method({...JSON params...}). Examples:")
     print('  Browser.getVersion({})')
     print('  Mod.evaluate({"expression": "chrome.tabs.query({active: true})"})')
-    print('  Custom.TabIdFromTargetId({"targetId": "..."})')
+    print('  Runtime.evaluate({"expression": "document.title", "returnByValue": true})')
     print("Type exit or quit to disconnect (browser keeps running).")
     cmd_re = re.compile(r"^([A-Za-z_]\w*\.[A-Za-z_]\w*)(?:\((.*)\))?$")
     while True:

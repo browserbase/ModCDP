@@ -183,7 +183,12 @@ export function wrapCustomCommand(
   };
 }
 
-function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
+function wrapServiceWorkerCommand(
+  method: string,
+  params: ProtocolParams = {},
+  cdpSessionId: string | null = null,
+  targetCdpSessionId: string | null = null,
+) {
   if (method === "Mod.ping" && !Object.prototype.hasOwnProperty.call(params, "sent_at")) {
     params = { ...(params as ModCDPPingParams), sent_at: Date.now() };
   }
@@ -216,7 +221,7 @@ function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, c
     runtimeParams = wrapCustomCommand(
       method,
       params,
-      ((params as ModCDPCustomPayload).cdpSessionId as string) ?? cdpSessionId,
+      ((params as ModCDPCustomPayload).cdpSessionId as string) ?? targetCdpSessionId,
     );
     unwrap = "runtime_json";
   }
@@ -248,7 +253,7 @@ export function wrapCommandIfNeeded(
     return {
       route,
       target: "service_worker",
-      steps: wrapServiceWorkerCommand(method, params, cdpSessionId),
+      steps: wrapServiceWorkerCommand(method, params, cdpSessionId, targetCdpSessionId),
     };
   }
   throw new Error(`Unsupported client route "${route}" for ${method}`);

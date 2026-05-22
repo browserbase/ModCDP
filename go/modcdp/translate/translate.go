@@ -134,7 +134,7 @@ func wrapModCDPAddMiddleware(params map[string]any) map[string]any {
 	))
 }
 
-func wrapCustomCommand(method string, params map[string]any, sessionID string) map[string]any {
+func wrapCustomCommand(method string, params map[string]any, sessionID any) map[string]any {
 	p, _ := json.Marshal(params)
 	runtimeParams := callFunctionParams(`async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }`)
 	runtimeParams["arguments"] = []map[string]any{{"value": method}, {"value": string(p)}, {"value": sessionID}}
@@ -144,9 +144,6 @@ func wrapCustomCommand(method string, params map[string]any, sessionID string) m
 func wrapServiceWorkerCommand(method string, params map[string]any, sessionID string, targetSessionID string) []rawStep {
 	if params == nil {
 		params = map[string]any{}
-	}
-	if targetSessionID == "" {
-		targetSessionID = sessionID
 	}
 	if method == "Mod.ping" {
 		if _, ok := params["sent_at"]; !ok {
@@ -168,14 +165,16 @@ func wrapServiceWorkerCommand(method string, params map[string]any, sessionID st
 	unwrap := "runtime"
 	switch method {
 	case "Mod.evaluate":
-		runtimeParams = wrapModCDPEvaluate(params, targetSessionID)
+		runtimeParams = wrapModCDPEvaluate(params, sessionID)
 	case "Mod.addCustomCommand":
 		runtimeParams = wrapModCDPAddCustomCommand(params)
 	case "Mod.addMiddleware":
 		runtimeParams = wrapModCDPAddMiddleware(params)
 	default:
-		cdpSessionID, _ := params["cdpSessionId"].(string)
-		if cdpSessionID == "" {
+		var cdpSessionID any
+		if paramsSessionID, _ := params["cdpSessionId"].(string); paramsSessionID != "" {
+			cdpSessionID = paramsSessionID
+		} else if targetSessionID != "" {
 			cdpSessionID = targetSessionID
 		}
 		runtimeParams = wrapCustomCommand(method, params, cdpSessionID)
