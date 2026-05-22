@@ -204,20 +204,6 @@ def main():
         }
         print(f"ping latency      -> {ping_latency}")
 
-        if mode == "debugger":
-            try:
-                version = expect_object(cdp.send("Browser.getVersion"), "Browser.getVersion")
-                if not isinstance(version.get("protocolVersion"), str) or not isinstance(version.get("product"), str):
-                    raise RuntimeError(f"unexpected Browser.getVersion result {version}")
-                print(f"Browser.getVersion -> {version}")
-            except Exception as e:
-                print(f"Browser.getVersion -> (debugger route rejected: {str(e).splitlines()[0]} )")
-        else:
-            version = expect_object(cdp.send("Browser.getVersion"), "Browser.getVersion")
-            if not isinstance(version.get("protocolVersion"), str) or not isinstance(version.get("product"), str):
-                raise RuntimeError(f"unexpected Browser.getVersion result {version}")
-            print(f"Browser.getVersion -> {version}")
-
         modcdp_eval = expect_object(cdp.send("Mod.evaluate", {"expression": "({ extension_id: chrome.runtime.id })"}), "Mod.evaluate")
         if not isinstance(modcdp_eval.get("extension_id"), str) or (cdp.extension_id and modcdp_eval.get("extension_id") != cdp.extension_id):
             raise RuntimeError(f"unexpected Mod.evaluate result {modcdp_eval}")

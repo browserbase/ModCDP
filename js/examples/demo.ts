@@ -274,24 +274,6 @@ async function main() {
       return_path_ms: typeof pong.received_at === "number" ? ping_returned_at - pong.received_at : null,
     });
 
-    if (mode === "debugger") {
-      try {
-        const version = assertObject(await cdp.Browser.getVersion(), "Browser.getVersion");
-        if (typeof version.protocolVersion !== "string" || typeof version.product !== "string") {
-          throw new Error(`unexpected Browser.getVersion result ${JSON.stringify(version)}`);
-        }
-        console.log("Browser.getVersion ->", version);
-      } catch (e) {
-        console.log("Browser.getVersion -> (debugger route rejected:", e.message.replace(/\n/g, " "), ")");
-      }
-    } else {
-      const version = assertObject(await cdp.Browser.getVersion(), "Browser.getVersion");
-      if (typeof version.protocolVersion !== "string" || typeof version.product !== "string") {
-        throw new Error(`unexpected Browser.getVersion result ${JSON.stringify(version)}`);
-      }
-      console.log("Browser.getVersion ->", version);
-    }
-
     const modcdpEval = (await cdp.Mod.evaluate({
       expression: "({ extension_id: chrome.runtime.id })",
     })) as {

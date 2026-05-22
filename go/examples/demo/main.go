@@ -272,22 +272,6 @@ func main() {
 		fmt.Println("ping latency      ->", string(b))
 	}
 
-	if mode == "debugger" {
-		if version, err := cdp.Browser.GetVersion(); err == nil {
-			b, _ := json.Marshal(version)
-			fmt.Println("Browser.getVersion ->", string(b))
-		} else {
-			fmt.Println("Browser.getVersion -> (debugger route rejected:", err, ")")
-		}
-	} else {
-		version, err := cdp.Browser.GetVersion()
-		if err != nil {
-			log.Fatalf("Browser.getVersion: %v", err)
-		}
-		b, _ := json.Marshal(version)
-		fmt.Println("Browser.getVersion ->", string(b))
-	}
-
 	if r, err := cdp.Mod.Evaluate(map[string]any{
 		"expression": "({ extension_id: chrome.runtime.id })",
 	}); err != nil {
