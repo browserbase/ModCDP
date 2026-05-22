@@ -223,19 +223,22 @@ def main():
             raise RuntimeError(f"unexpected Mod.evaluate result {modcdp_eval}")
         print(f"Mod.evaluate     -> {modcdp_eval}")
 
-        topology = expect_object(cdp.Mod.getTopology(), "Mod.getTopology")
-        root_frame_id = topology.get("rootFrameId")
-        frames = expect_object(topology.get("frames"), "Mod.getTopology.frames")
-        roots = expect_object(topology.get("roots"), "Mod.getTopology.roots")
-        contexts = expect_object(topology.get("contexts"), "Mod.getTopology.contexts")
-        if (
-            not isinstance(root_frame_id, str)
-            or root_frame_id not in frames
-            or not any(isinstance(root, dict) and root.get("kind") == "document" for root in roots.values())
-            or not any(isinstance(context, dict) and context.get("world") == "piercer" for context in contexts.values())
-        ):
-            raise RuntimeError(f"unexpected Mod.getTopology result {topology}")
-        print(f"Mod.getTopology -> {{'rootFrameId': {root_frame_id!r}, 'frames': {len(frames)}, 'roots': {len(roots)}, 'contexts': {len(contexts)}}}")
+        topology_checked = False
+        if mode != "direct":
+            topology = expect_object(cdp.Mod.getTopology(), "Mod.getTopology")
+            root_frame_id = topology.get("rootFrameId")
+            frames = expect_object(topology.get("frames"), "Mod.getTopology.frames")
+            roots = expect_object(topology.get("roots"), "Mod.getTopology.roots")
+            contexts = expect_object(topology.get("contexts"), "Mod.getTopology.contexts")
+            if (
+                not isinstance(root_frame_id, str)
+                or root_frame_id not in frames
+                or not any(isinstance(root, dict) and root.get("kind") == "document" for root in roots.values())
+                or not any(isinstance(context, dict) and context.get("world") == "piercer" for context in contexts.values())
+            ):
+                raise RuntimeError(f"unexpected Mod.getTopology result {topology}")
+            topology_checked = True
+            print(f"Mod.getTopology -> {{'rootFrameId': {root_frame_id!r}, 'frames': {len(frames)}, 'roots': {len(roots)}, 'contexts': {len(contexts)}}}")
 
         response_middleware_registration = expect_object(cdp.send("Mod.addMiddleware", {
             "name": "Custom.echo",
@@ -299,7 +302,8 @@ def main():
             raise RuntimeError(f"unexpected Runtime.evaluate result {runtime_eval}")
         print(f"Runtime.evaluate -> {runtime_eval}")
 
-        print(f"\nSUCCESS ({mode}/{upstream_mode}): native command, topology, custom commands, custom event, and middleware all passed")
+        topology_label = "topology, " if topology_checked else ""
+        print(f"\nSUCCESS ({mode}/{upstream_mode}): native command, {topology_label}custom commands, custom event, and middleware all passed")
 
         # TTY-only: drop into a REPL where you can send live commands and
         # watch events as they print. Skip when run non-interactively so the

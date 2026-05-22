@@ -52,10 +52,6 @@ export class AutoSessionRouter {
     private readonly defaultExecutionContextTimeoutMs: () => number,
   ) {}
 
-  async attachToTarget(targetId: string) {
-    return await this.ensureSession(targetId);
-  }
-
   async ensureSession(targetId: cdp.types.ts.Target.TargetID) {
     const existingSessionId = this.sessionIdFromTargetId.get(targetId);
     if (existingSessionId != null && !this.detached_sessions.has(existingSessionId)) return existingSessionId;
@@ -70,75 +66,36 @@ export class AutoSessionRouter {
     return sessionId;
   }
 
-  async sendToFrame(frame: { targetId: cdp.types.ts.Target.TargetID }, method: string, params: ProtocolParams = {}) {
-    return await this.send(method, params, await this.ensureSession(frame.targetId));
-  }
-
   listenTo(source: CDPEventSource) {
-    return source.on((method, payload, cdpSessionId) => this.recordUpstreamEvent(method, payload, cdpSessionId));
+    const subscription = source.on((method, payload, cdpSessionId) => {
+      this.recordUpstreamEvent(method, payload, cdpSessionId);
+    });
+    return subscription;
   }
 
-  recordAttachedToTarget(event: cdp.types.ts.Target.AttachedToTargetEvent) {
-    this.recordTargetSession(event.targetInfo.targetId, event.sessionId, event.targetInfo);
-  }
-
-  recordDetachedFromTarget(event: cdp.types.ts.Target.DetachedFromTargetEvent) {
-    this.forgetSession(event.sessionId);
-  }
-
-  recordTargetInfoChanged(event: cdp.types.ts.Target.TargetInfoChangedEvent) {
-    this.recordTarget(event.targetInfo);
-  }
-
-  recordTargetDestroyed(event: cdp.types.ts.Target.TargetDestroyedEvent) {
-    this.forgetTarget(event.targetId);
-  }
-
-  recordExecutionContextCreated(
-    event: cdp.types.ts.Runtime.ExecutionContextCreatedEvent,
-    sessionId: cdp.types.ts.Target.SessionID,
-  ) {
-    this.recordExecutionContext(sessionId, event.context);
-  }
-
-  recordExecutionContextDestroyed(
-    event: cdp.types.ts.Runtime.ExecutionContextDestroyedEvent,
-    sessionId: cdp.types.ts.Target.SessionID,
-  ) {
-    this.forgetExecutionContextById(sessionId, event.executionContextId);
-  }
-
-  recordExecutionContextsCleared(sessionId: cdp.types.ts.Target.SessionID) {
-    this.forgetExecutionContextsForSession(sessionId);
-  }
-
-  recordFrameNavigated(event: cdp.types.ts.Page.FrameNavigatedEvent, sessionId: cdp.types.ts.Target.SessionID) {
-    this.forgetExecutionContextsForFrame(sessionId, event.frame.id);
-  }
-
-  recordFrameDetached(event: cdp.types.ts.Page.FrameDetachedEvent, sessionId: cdp.types.ts.Target.SessionID) {
-    this.forgetExecutionContextsForFrame(sessionId, event.frameId);
-  }
-
-  private recordUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
+  recordUpstreamEvent(method: string, payload: ProtocolPayload, cdpSessionId: string | null) {
     if (method === Target.AttachedToTargetEvent.id) {
-      this.recordAttachedToTarget(Target.AttachedToTargetEvent.parse(payload));
+      const event = Target.AttachedToTargetEvent.parse(payload);
+      this.recordTargetSession(event.targetInfo.targetId, event.sessionId, event.targetInfo);
     } else if (method === Target.DetachedFromTargetEvent.id) {
-      this.recordDetachedFromTarget(Target.DetachedFromTargetEvent.parse(payload));
+      this.forgetSession(Target.DetachedFromTargetEvent.parse(payload).sessionId);
     } else if (method === Target.TargetInfoChangedEvent.id) {
-      this.recordTargetInfoChanged(Target.TargetInfoChangedEvent.parse(payload));
+      this.recordTarget(Target.TargetInfoChangedEvent.parse(payload).targetInfo);
     } else if (method === Target.TargetDestroyedEvent.id) {
-      this.recordTargetDestroyed(Target.TargetDestroyedEvent.parse(payload));
+      this.forgetTarget(Target.TargetDestroyedEvent.parse(payload).targetId);
     } else if (method === Runtime.ExecutionContextCreatedEvent.id && cdpSessionId) {
-      this.recordExecutionContextCreated(Runtime.ExecutionContextCreatedEvent.parse(payload), cdpSessionId);
+      this.recordExecutionContext(cdpSessionId, Runtime.ExecutionContextCreatedEvent.parse(payload).context);
     } else if (method === Runtime.ExecutionContextDestroyedEvent.id && cdpSessionId) {
-      this.recordExecutionContextDestroyed(Runtime.ExecutionContextDestroyedEvent.parse(payload), cdpSessionId);
+      this.forgetExecutionContextById(
+        cdpSessionId,
+        Runtime.ExecutionContextDestroyedEvent.parse(payload).executionContextId,
+      );
     } else if (method === Runtime.ExecutionContextsClearedEvent.id && cdpSessionId) {
-      this.recordExecutionContextsCleared(cdpSessionId);
+      this.forgetExecutionContextsForSession(cdpSessionId);
     } else if (method === Page.FrameNavigatedEvent.id && cdpSessionId) {
-      this.recordFrameNavigated(Page.FrameNavigatedEvent.parse(payload), cdpSessionId);
+      this.forgetExecutionContextsForFrame(cdpSessionId, Page.FrameNavigatedEvent.parse(payload).frame.id);
     } else if (method === Page.FrameDetachedEvent.id && cdpSessionId) {
-      this.recordFrameDetached(Page.FrameDetachedEvent.parse(payload), cdpSessionId);
+      this.forgetExecutionContextsForFrame(cdpSessionId, Page.FrameDetachedEvent.parse(payload).frameId);
     }
   }
 

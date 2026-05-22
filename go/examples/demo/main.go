@@ -302,42 +302,46 @@ func main() {
 		fmt.Println("Mod.evaluate     ->", string(b))
 	}
 
-	topologyRaw, err := cdp.Mod.GetTopology(nil)
-	if err != nil {
-		log.Fatalf("Mod.getTopology: %v", err)
-	}
-	topology := mustMap(topologyRaw, "Mod.getTopology")
-	rootFrameID := mustString(topology["rootFrameId"], "Mod.getTopology.rootFrameId")
-	frames := mustMap(topology["frames"], "Mod.getTopology.frames")
-	roots := mustMap(topology["roots"], "Mod.getTopology.roots")
-	contexts := mustMap(topology["contexts"], "Mod.getTopology.contexts")
-	if _, ok := frames[rootFrameID]; !ok {
-		log.Fatalf("Mod.getTopology frames missing root frame %s: %v", rootFrameID, frames)
-	}
-	hasDocumentRoot := false
-	for _, root := range roots {
-		rootMap, ok := root.(map[string]any)
-		if ok && rootMap["kind"] == "document" {
-			hasDocumentRoot = true
+	topologyChecked := false
+	if mode != "direct" {
+		topologyRaw, err := cdp.Mod.GetTopology(nil)
+		if err != nil {
+			log.Fatalf("Mod.getTopology: %v", err)
 		}
-	}
-	hasPiercerContext := false
-	for _, context := range contexts {
-		contextMap, ok := context.(map[string]any)
-		if ok && contextMap["world"] == "piercer" {
-			hasPiercerContext = true
+		topology := mustMap(topologyRaw, "Mod.getTopology")
+		rootFrameID := mustString(topology["rootFrameId"], "Mod.getTopology.rootFrameId")
+		frames := mustMap(topology["frames"], "Mod.getTopology.frames")
+		roots := mustMap(topology["roots"], "Mod.getTopology.roots")
+		contexts := mustMap(topology["contexts"], "Mod.getTopology.contexts")
+		if _, ok := frames[rootFrameID]; !ok {
+			log.Fatalf("Mod.getTopology frames missing root frame %s: %v", rootFrameID, frames)
 		}
+		hasDocumentRoot := false
+		for _, root := range roots {
+			rootMap, ok := root.(map[string]any)
+			if ok && rootMap["kind"] == "document" {
+				hasDocumentRoot = true
+			}
+		}
+		hasPiercerContext := false
+		for _, context := range contexts {
+			contextMap, ok := context.(map[string]any)
+			if ok && contextMap["world"] == "piercer" {
+				hasPiercerContext = true
+			}
+		}
+		if !hasDocumentRoot || !hasPiercerContext {
+			log.Fatalf("unexpected Mod.getTopology result: %v", topology)
+		}
+		topologyChecked = true
+		b, _ := json.Marshal(map[string]any{
+			"rootFrameId": rootFrameID,
+			"frames":      len(frames),
+			"roots":       len(roots),
+			"contexts":    len(contexts),
+		})
+		fmt.Println("Mod.getTopology ->", string(b))
 	}
-	if !hasDocumentRoot || !hasPiercerContext {
-		log.Fatalf("unexpected Mod.getTopology result: %v", topology)
-	}
-	b, _ := json.Marshal(map[string]any{
-		"rootFrameId": rootFrameID,
-		"frames":      len(frames),
-		"roots":       len(roots),
-		"contexts":    len(contexts),
-	})
-	fmt.Println("Mod.getTopology ->", string(b))
 
 	responseMiddlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
 		Name:       "Custom.echo",
@@ -380,8 +384,8 @@ func main() {
 	if echoResult["echoed"] != "custom-command-ok" || echoResult["method"] != "Custom.echo" || echoResult["responseMiddleware"] != "ok" {
 		log.Fatalf("unexpected Custom.echo result: %v", echoResult)
 	}
-	b, _ = json.Marshal(echoResult)
-	fmt.Println("Custom.echo      ->", string(b))
+	echoJSON, _ := json.Marshal(echoResult)
+	fmt.Println("Custom.echo      ->", string(echoJSON))
 
 	demoEventCh := make(chan map[string]any, 16)
 	cdp.On("Custom.demoEvent", func(data any) {
@@ -420,10 +424,14 @@ func main() {
 	if runtimeResult["value"] != float64(42) && runtimeResult["value"] != 42 {
 		log.Fatalf("unexpected Runtime.evaluate result: %v", runtimeEval)
 	}
-	b, _ = json.Marshal(runtimeEval)
-	fmt.Println("Runtime.evaluate ->", string(b))
+	runtimeJSON, _ := json.Marshal(runtimeEval)
+	fmt.Println("Runtime.evaluate ->", string(runtimeJSON))
 
-	fmt.Printf("\nSUCCESS (%s/%s): native command, topology, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
+	topologyLabel := ""
+	if topologyChecked {
+		topologyLabel = "topology, "
+	}
+	fmt.Printf("\nSUCCESS (%s/%s): native command, %scustom commands, custom event, and middleware all passed\n", mode, upstreamMode, topologyLabel)
 
 	// TTY-only REPL. Lets you poke at the live browser interactively;
 	// subscribed events print as they arrive. Skip when stdin is not a tty

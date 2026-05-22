@@ -685,24 +685,32 @@ export class ModCDPClient extends ModCDPEventEmitter {
   _registerAutoSessionRouterEventHandlers() {
     if (this.auto_session_router_event_handlers_registered) return;
     this.auto_session_router_event_handlers_registered = true;
-    this.on(Target.AttachedToTargetEvent, (event) => this.auto_sessions.recordAttachedToTarget(event));
-    this.on(Target.DetachedFromTargetEvent, (event) => this.auto_sessions.recordDetachedFromTarget(event));
-    this.on(Target.TargetInfoChangedEvent, (event) => this.auto_sessions.recordTargetInfoChanged(event));
-    this.on(Target.TargetDestroyedEvent, (event) => this.auto_sessions.recordTargetDestroyed(event));
+    this.on(Target.AttachedToTargetEvent, (event) =>
+      this.auto_sessions.recordUpstreamEvent(Target.AttachedToTargetEvent.id, event, null),
+    );
+    this.on(Target.DetachedFromTargetEvent, (event) =>
+      this.auto_sessions.recordUpstreamEvent(Target.DetachedFromTargetEvent.id, event, null),
+    );
+    this.on(Target.TargetInfoChangedEvent, (event) =>
+      this.auto_sessions.recordUpstreamEvent(Target.TargetInfoChangedEvent.id, event, null),
+    );
+    this.on(Target.TargetDestroyedEvent, (event) =>
+      this.auto_sessions.recordUpstreamEvent(Target.TargetDestroyedEvent.id, event, null),
+    );
     this.on(Runtime.ExecutionContextCreatedEvent, (event, sessionId) => {
-      if (sessionId) this.auto_sessions.recordExecutionContextCreated(event, sessionId);
+      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextCreatedEvent.id, event, sessionId);
     });
     this.on(Runtime.ExecutionContextDestroyedEvent, (event, sessionId) => {
-      if (sessionId) this.auto_sessions.recordExecutionContextDestroyed(event, sessionId);
+      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextDestroyedEvent.id, event, sessionId);
     });
-    this.on(Runtime.ExecutionContextsClearedEvent, (_event, sessionId) => {
-      if (sessionId) this.auto_sessions.recordExecutionContextsCleared(sessionId);
+    this.on(Runtime.ExecutionContextsClearedEvent, (event, sessionId) => {
+      this.auto_sessions.recordUpstreamEvent(Runtime.ExecutionContextsClearedEvent.id, event, sessionId);
     });
     this.on(Page.FrameNavigatedEvent, (event, sessionId) => {
-      if (sessionId) this.auto_sessions.recordFrameNavigated(event, sessionId);
+      this.auto_sessions.recordUpstreamEvent(Page.FrameNavigatedEvent.id, event, sessionId);
     });
     this.on(Page.FrameDetachedEvent, (event, sessionId) => {
-      if (sessionId) this.auto_sessions.recordFrameDetached(event, sessionId);
+      this.auto_sessions.recordUpstreamEvent(Page.FrameDetachedEvent.id, event, sessionId);
     });
   }
 
@@ -1005,7 +1013,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     return {
       send,
       sessionIdForTarget: (target_id) => this.auto_sessions.sessionIdFromTargetId.get(target_id) ?? null,
-      attachToTarget: send ? (target_id) => this.auto_sessions.attachToTarget(target_id) : null,
+      attachToTarget: send ? (target_id) => this.auto_sessions.ensureSession(target_id) : null,
       waitForExecutionContext: (session_id, timeout_ms) =>
         this.auto_sessions.waitForExecutionContext(session_id, { timeout_ms }),
       injector_extension_path: this.injector.injector_extension_path,
@@ -1288,10 +1296,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     const event = CdpEventMessageSchema.parse(msg);
     if (event.sessionId === this.ext_session_id) {
       if (event.method === this.Runtime.executionContextCreated.id && event.sessionId) {
-        this.auto_sessions.recordExecutionContextCreated(
-          this.Runtime.executionContextCreated.parse(event.params || {}),
-          event.sessionId,
-        );
+        this.auto_sessions.recordUpstreamEvent(event.method, event.params || {}, event.sessionId);
       }
       if (event.method !== this.Runtime.bindingCalled.id) return;
       const u = unwrapEventIfNeeded(
