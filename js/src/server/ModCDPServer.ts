@@ -56,16 +56,67 @@ type ProtocolCommandSchema = {
 type ProtocolEventSchema = {
   parse(value: unknown): ProtocolPayload;
 };
+type SelectedServerUpstreamTransportName = "loopback_cdp" | "chrome_debugger";
+export type ModCDPSessionHandle = {
+  sessionId: string | null;
+  readonly types: (typeof import("../types/generated/zod.js"))["types"] | null;
+  readonly commands: (typeof import("../types/generated/zod.js"))["commands"] | null;
+  readonly events: (typeof import("../types/generated/zod.js"))["events"] | null;
+  readonly upstream: AutoSessionRouter;
+  send(method: string, params?: ProtocolParams): Promise<ProtocolResult>;
+  emit(eventName: string, payload?: ProtocolPayload): Promise<ProtocolResult>;
+};
+export type ModCDPServerInstance = {
+  __ModCDPServerVersion: number;
+  routes: ModCDPRoutes;
+  loopback_cdp_url: string | null;
+  browser_token: string | null;
+  upstream: LoopbackCdpTransport | ChromeDebuggerTransport | null;
+  upstream_name: SelectedServerUpstreamTransportName | null;
+  router: AutoSessionRouter | null;
+  cdp_send_timeout_ms: number;
+  loopback_execution_context_timeout_ms: number;
+  ws_connect_error_settle_timeout_ms: number;
+  downstream_client_timeout_ms: number;
+  close_browser_on_downstream_disconnect: boolean;
+  types: (typeof import("../types/generated/zod.js"))["types"] | null;
+  commands: (typeof import("../types/generated/zod.js"))["commands"] | null;
+  events: (typeof import("../types/generated/zod.js"))["events"] | null;
+  startDownstreamTransports(): Record<ServerDownstreamTransportName, ProtocolPayload>;
+  stopDownstreamTransports(reason?: string): Record<ServerDownstreamTransportName, ProtocolPayload>;
+  downstreamTransports(): Record<ServerDownstreamTransportName, ServerDownstreamTransportStatus>;
+  ensureOffscreenKeepAlive(): Promise<ProtocolResult>;
+  loadTypes(): Promise<unknown>;
+  configure(params?: ModCDPConfigureParams): Promise<ProtocolResult>;
+  addCustomCommand(registration: ModCDPCustomCommandRegistration): ProtocolResult;
+  addCustomEvent(registration: ModCDPCustomEventRegistration): ProtocolResult;
+  addEventListener(listener: (event: string, data: ProtocolPayload, cdpSessionId: string | null) => void): {
+    remove: () => boolean;
+  };
+  addMiddleware(registration: ModCDPMiddlewareRegistration): ProtocolResult;
+  runMiddleware(
+    phase: MiddlewarePhase,
+    name: string,
+    payload: ProtocolPayload,
+    context?: ProtocolPayload,
+  ): Promise<ProtocolPayload>;
+  handleCommand(method: string, params?: ProtocolParams, cdpSessionId?: string | null): Promise<ProtocolResult>;
+  attachToSession(cdpSessionId?: string | null): ModCDPSessionHandle;
+  emit(eventName: string, payload?: ProtocolPayload, cdpSessionId?: string | null): Promise<ProtocolResult>;
+  discoverLoopbackCDP(): Promise<{
+    loopback_cdp_url: string | null;
+    verified: boolean;
+    version?: unknown;
+  }>;
+};
 type ModCDPGlobalScope = typeof globalThis &
   Record<string, unknown> & {
-    ModCDP?: {
-      __ModCDPServerVersion?: number;
-      addCustomEvent?: unknown;
-      handleCommand?: unknown;
-    };
+    ModCDP?: ModCDPServerInstance;
   };
 
-export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis as ModCDPGlobalScope) {
+export function installModCDPServer(
+  globalScope: ModCDPGlobalScope = globalThis as ModCDPGlobalScope,
+): ModCDPServerInstance {
   const MODCDP_SERVER_VERSION = 2;
   const DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000;
   const DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
@@ -293,8 +344,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     return chrome_api.runtime.getURL(service_worker_path);
   }
 
-  type SelectedServerUpstreamTransportName = "loopback_cdp" | "chrome_debugger";
-
   let active_server_upstream_subscription: { remove: () => void } | null = null;
 
   function setupServerUpstreamTransport(): LoopbackCdpTransport | ChromeDebuggerTransport;
@@ -447,7 +496,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     }
   }
 
-  const ModCDPServer = {
+  const ModCDPServer: ModCDPServerInstance = {
     __ModCDPServerVersion: MODCDP_SERVER_VERSION,
     routes: { ...default_routes },
     loopback_cdp_url: null as string | null,

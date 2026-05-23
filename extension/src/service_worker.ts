@@ -2,25 +2,11 @@
 
 import { ModCDPServer } from "../../js/src/server/ModCDPServer.js";
 
-type ServiceWorkerModCDPServer = {
-  __ModCDPServerVersion?: number;
-  routes: unknown;
-  loopback_cdp_url: string | null;
-  browser_token: string | null;
-  cdp_send_timeout_ms: number;
-  loopback_execution_context_timeout_ms: number;
-  ws_connect_error_settle_timeout_ms: number;
-  ensureOffscreenKeepAlive(): unknown;
-  startDownstreamTransports(): unknown;
-  downstreamTransports(): unknown;
-};
-
-const server = ModCDPServer as unknown as ServiceWorkerModCDPServer;
 const started_at = new Date().toISOString();
 
 function startConfiguredTransports() {
-  void server.ensureOffscreenKeepAlive();
-  server.startDownstreamTransports();
+  void ModCDPServer.ensureOffscreenKeepAlive();
+  ModCDPServer.startDownstreamTransports();
 }
 
 startConfiguredTransports();
@@ -40,14 +26,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         started_at,
       },
       server: {
-        __ModCDPServerVersion: server.__ModCDPServerVersion,
-        routes: server.routes,
-        loopback_cdp_url: server.loopback_cdp_url,
-        browser_token: server.browser_token ? "set" : null,
-        cdp_send_timeout_ms: server.cdp_send_timeout_ms,
-        loopback_execution_context_timeout_ms: server.loopback_execution_context_timeout_ms,
-        ws_connect_error_settle_timeout_ms: server.ws_connect_error_settle_timeout_ms,
-        downstream_transports: server.downstreamTransports(),
+        __ModCDPServerVersion: ModCDPServer.__ModCDPServerVersion,
+        routes: ModCDPServer.routes,
+        loopback_cdp_url: ModCDPServer.loopback_cdp_url,
+        browser_token: ModCDPServer.browser_token ? "set" : null,
+        cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
+        loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
+        ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
+        downstream_transports: ModCDPServer.downstreamTransports(),
       },
     },
   });
