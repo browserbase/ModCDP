@@ -13,20 +13,14 @@ import { ProtocolPayloadSchema, normalizeModCDPPayloadSchema } from "../types/mo
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
 import { ChromeDebuggerTransport } from "./ChromeDebuggerTransport.js";
 import { LoopbackCdpTransport } from "./LoopbackCdpTransport.js";
-import {
-  DEFAULT_NATIVE_BRIDGE_HOST_NAME,
-  DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
-  NativeHostDownstreamTransport,
-} from "./NativeHostDownstreamTransport.js";
-import {
-  DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS,
-  DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-  NATSDownstreamTransport,
-} from "./NATSDownstreamTransport.js";
-import {
-  DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS,
-  ReverseWSDownstreamTransport,
-} from "./ReverseWSDownstreamTransport.js";
+import { NativeHostDownstreamTransport } from "./NativeHostDownstreamTransport.js";
+import { NATSDownstreamTransport } from "./NATSDownstreamTransport.js";
+import { ReverseWSDownstreamTransport } from "./ReverseWSDownstreamTransport.js";
+import type {
+  ServerDownstreamTransport,
+  ServerDownstreamTransportName,
+  ServerDownstreamTransportStatus,
+} from "./ServerDownstreamTransport.js";
 import type {
   CdpEventMessage,
   ModCDPConfigureParams,
@@ -188,9 +182,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       params: (payload ?? {}) as CdpEventMessage["params"],
     };
     if (cdpSessionId) message.sessionId = cdpSessionId;
-    const emitted_through_reverse_bridge = reversews_downstream.emit(message);
-    const emitted_through_native_bridge = native_host_downstream.emit(message);
-    const emitted_through_nats_bridge = nats_downstream.emit(message);
+    const emitted_through_downstream = [...downstream_transports.values()].some((transport) => transport.emit(message));
 
     const is_custom_event = registryMatch(event_bindings, eventName) != null;
     let emitted_through_binding = false;
@@ -219,10 +211,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         emitted_through_binding = true;
       }
     }
-    return emitted_through_binding ||
-      emitted_through_reverse_bridge ||
-      emitted_through_native_bridge ||
-      emitted_through_nats_bridge
+    return emitted_through_binding || emitted_through_downstream
       ? { event: eventName, emitted: true }
       : { event: eventName, emitted: false, reason: "binding_not_installed" };
   }
@@ -232,9 +221,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     "Custom.*": "service_worker",
     "*.*": "auto",
   } satisfies ModCDPRoutes;
-  let reversews_downstream: ReverseWSDownstreamTransport;
-  let nats_downstream: NATSDownstreamTransport;
-  let native_host_downstream: NativeHostDownstreamTransport;
+  let downstream_transports: Map<ServerDownstreamTransportName, ServerDownstreamTransport>;
   const offscreen_keep_alive_port_name = "ModCDPOffscreenKeepAlive";
   const offscreen_keep_alive_path = "offscreen/keepalive.html";
   let creating_offscreen_keep_alive: Promise<void> | null = null;
@@ -468,15 +455,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     upstream: null as LoopbackCdpTransport | ChromeDebuggerTransport | null,
     upstream_name: null as SelectedServerUpstreamTransportName | null,
     router: null as AutoSessionRouter | null,
-    get native_bridge_attempts() {
-      return native_host_downstream.attempts;
-    },
-    get native_bridge_last_error() {
-      return native_host_downstream.last_error;
-    },
-    get native_bridge_connected() {
-      return native_host_downstream.connected;
-    },
     cdp_send_timeout_ms: DEFAULT_CDP_SEND_TIMEOUT_MS,
     loopback_execution_context_timeout_ms: DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS,
     ws_connect_error_settle_timeout_ms: DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
@@ -485,40 +463,26 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     types: null as (typeof import("../types/generated/zod.js"))["types"] | null,
     commands: null as (typeof import("../types/generated/zod.js"))["commands"] | null,
     events: null as (typeof import("../types/generated/zod.js"))["events"] | null,
-    startReverseBridge(
-      endpoint: string,
-      {
-        reconnect_interval_ms = DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS,
-      }: {
-        reconnect_interval_ms?: number;
-      } = {},
-    ) {
-      return reversews_downstream.start(endpoint, { reconnect_interval_ms });
+    startDownstreamTransports() {
+      const results: Record<ServerDownstreamTransportName, ProtocolPayload> = {};
+      for (const [name, transport] of downstream_transports) {
+        const result = transport.startDefault();
+        if (result != null) results[name] = result;
+      }
+      return results;
     },
-    stopReverseBridge(reason = "stopped") {
-      return reversews_downstream.stop(reason);
+    stopDownstreamTransports(reason = "stopped") {
+      const results: Record<ServerDownstreamTransportName, ProtocolPayload> = {};
+      for (const [name, transport] of downstream_transports) {
+        const result = transport.stop(reason);
+        if (result != null) results[name] = result;
+      }
+      return results;
     },
-    startNativeBridge(
-      hostName = DEFAULT_NATIVE_BRIDGE_HOST_NAME,
-      {
-        reconnect_interval_ms = DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
-      }: {
-        reconnect_interval_ms?: number;
-      } = {},
-    ) {
-      return native_host_downstream.start(hostName, { reconnect_interval_ms });
-    },
-    startNatsBridge(
-      endpoint: string,
-      {
-        upstream_nats_subject_prefix = DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-        reconnect_interval_ms = DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS,
-      }: {
-        upstream_nats_subject_prefix?: string;
-        reconnect_interval_ms?: number;
-      } = {},
-    ) {
-      return nats_downstream.start(endpoint, { upstream_nats_subject_prefix, reconnect_interval_ms });
+    downstreamTransports() {
+      const status: Record<ServerDownstreamTransportName, ServerDownstreamTransportStatus> = {};
+      for (const [name, transport] of downstream_transports) status[name] = transport.status();
+      return status;
     },
     ensureOffscreenKeepAlive,
 
@@ -533,7 +497,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     },
 
     async configure(params: ModCDPConfigureParams = {}) {
-      const upstream = params.upstream ?? {};
       const server = params.server ?? {};
       const {
         server_loopback_cdp_url = this.loopback_cdp_url,
@@ -553,11 +516,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       this.ws_connect_error_settle_timeout_ms = server_ws_connect_error_settle_timeout_ms;
       this.downstream_client_timeout_ms = server_downstream_client_timeout_ms;
       this.close_browser_on_downstream_disconnect = server_close_browser_on_downstream_disconnect;
-      if (upstream.upstream_mode === "nats" && upstream.upstream_nats_url) {
-        this.startNatsBridge(upstream.upstream_nats_url, {
-          upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix ?? DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-        });
-      }
+      for (const transport of downstream_transports.values()) transport.configure(params);
       if (server_routes) this.routes = { ...default_routes, ...server_routes };
       else {
         this.routes = { ...default_routes };
@@ -768,9 +727,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       const custom_binding = globalScope[CUSTOM_EVENT_BINDING_NAME];
       if (
         typeof custom_binding !== "function" &&
-        !reversews_downstream.connected &&
-        !native_host_downstream.connected &&
-        !nats_downstream.connected
+        ![...downstream_transports.values()].some((transport) => transport.status().connected)
       )
         return {
           event: eventName,
@@ -800,21 +757,26 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     },
   };
 
-  reversews_downstream = new ReverseWSDownstreamTransport({
-    ensureOffscreenKeepAlive,
-    handleCommand: (message) =>
-      ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-  });
-  native_host_downstream = new NativeHostDownstreamTransport({
-    ensureOffscreenKeepAlive,
-    handleCommand: (message) =>
-      ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-  });
-  nats_downstream = new NATSDownstreamTransport({
-    ensureOffscreenKeepAlive,
-    handleCommand: (message) =>
-      ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-  });
+  downstream_transports = new Map<ServerDownstreamTransportName, ServerDownstreamTransport>();
+  for (const transport of [
+    new ReverseWSDownstreamTransport({
+      ensureOffscreenKeepAlive,
+      handleCommand: (message) =>
+        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
+    }),
+    new NativeHostDownstreamTransport({
+      ensureOffscreenKeepAlive,
+      handleCommand: (message) =>
+        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
+    }),
+    new NATSDownstreamTransport({
+      ensureOffscreenKeepAlive,
+      handleCommand: (message) =>
+        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
+    }),
+  ]) {
+    downstream_transports.set(transport.name, transport);
+  }
 
   globalScope.ModCDP = ModCDPServer;
 

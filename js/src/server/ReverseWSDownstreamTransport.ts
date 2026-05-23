@@ -1,4 +1,10 @@
-import { CdpCommandMessageSchema, type CdpCommandMessage, type CdpEventMessage } from "../types/modcdp.js";
+import {
+  CdpCommandMessageSchema,
+  type CdpCommandMessage,
+  type CdpEventMessage,
+  type ModCDPConfigureParams,
+} from "../types/modcdp.js";
+import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
 
 export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 
@@ -23,7 +29,9 @@ export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  *    while an endpoint is still configured.
  * 5. `stop()` clears the endpoint and reconnect timer, then closes the socket.
  */
-export class ReverseWSDownstreamTransport {
+export class ReverseWSDownstreamTransport implements ServerDownstreamTransport {
+  readonly name = "reversews";
+
   // Server-owned command executor. Read by message handling; this class never
   // interprets routes, custom commands, or middleware itself.
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
@@ -87,6 +95,17 @@ export class ReverseWSDownstreamTransport {
     };
   }
 
+  /** Start the default reversews listener configured into the shipped extension. */
+  startDefault() {
+    return this.start("ws://127.0.0.1:29292", { reconnect_interval_ms: DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS });
+  }
+
+  /** Keep reversews alive only for reversews clients; other clients use their own downstream. */
+  configure(params: ModCDPConfigureParams) {
+    if (params.upstream?.upstream_mode === "reversews") return null;
+    return this.stop("non-reverse downstream connected");
+  }
+
   /** Stop reconnecting and close the active reversews socket. */
   stop(reason = "stopped") {
     const upstream_reversews_url = this.endpoint;
@@ -108,6 +127,16 @@ export class ReverseWSDownstreamTransport {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
     this.socket.send(JSON.stringify(message));
     return true;
+  }
+
+  /** Return generic status without exposing reversews-specific state to ModCDPServer. */
+  status() {
+    return {
+      connected: this.connected,
+      config: this.endpoint
+        ? { upstream_reversews_url: this.endpoint, reconnect_interval_ms: this.reconnect_interval_ms }
+        : {},
+    };
   }
 
   private scheduleReconnect(delay_ms: number) {

@@ -1,4 +1,10 @@
-import { CdpCommandMessageSchema, type CdpCommandMessage, type CdpEventMessage } from "../types/modcdp.js";
+import {
+  CdpCommandMessageSchema,
+  type CdpCommandMessage,
+  type CdpEventMessage,
+  type ModCDPConfigureParams,
+} from "../types/modcdp.js";
+import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
 
 export const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
@@ -24,7 +30,9 @@ export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
  * 5. `error`/`close` drops the socket and schedules reconnect while an endpoint
  *    is still configured.
  */
-export class NATSDownstreamTransport {
+export class NATSDownstreamTransport implements ServerDownstreamTransport {
+  readonly name = "nats";
+
   // Server-owned command executor. Read by NATS payload handling; this class
   // never interprets routes, custom commands, or middleware itself.
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
@@ -96,6 +104,37 @@ export class NATSDownstreamTransport {
     };
   }
 
+  /** NATS has no built-in extension default; it starts only from Mod.configure. */
+  startDefault() {
+    return null;
+  }
+
+  /** Start NATS when the downstream client configured the NATS transport. */
+  configure(params: ModCDPConfigureParams) {
+    const upstream = params.upstream ?? {};
+    if (upstream.upstream_mode !== "nats" || !upstream.upstream_nats_url) return null;
+    return this.start(upstream.upstream_nats_url, {
+      upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix ?? DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
+    });
+  }
+
+  /** Stop reconnecting and close the active NATS socket. */
+  stop(reason = "stopped") {
+    const upstream_nats_url = this.endpoint;
+    const upstream_nats_subject_prefix = this.subject_prefix;
+    this.endpoint = null;
+    if (this.reconnect_timer) {
+      clearTimeout(this.reconnect_timer);
+      this.reconnect_timer = null;
+    }
+    const socket = this.socket;
+    this.socket = null;
+    if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
+      socket.close(1000, reason);
+    }
+    return { upstream_nats_url, upstream_nats_subject_prefix, stopped: true, reason };
+  }
+
   /** Publish one CDP event message to the NATS browser-to-client subject. */
   emit(message: CdpEventMessage) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
@@ -104,6 +143,20 @@ export class NATSDownstreamTransport {
       message,
     });
     return true;
+  }
+
+  /** Return generic status without exposing NATS lifecycle to ModCDPServer. */
+  status() {
+    return {
+      connected: this.connected,
+      config: this.endpoint
+        ? {
+            upstream_nats_url: this.endpoint,
+            upstream_nats_subject_prefix: this.subject_prefix,
+            reconnect_interval_ms: this.reconnect_interval_ms,
+          }
+        : {},
+    };
   }
 
   private scheduleReconnect(delay_ms: number) {
@@ -118,7 +171,9 @@ export class NATSDownstreamTransport {
 
   private async connect(endpoint: string) {
     if (!/^wss?:\/\//i.test(endpoint)) {
-      throw new Error(`nats bridge endpoint must be a ws:// or wss:// URL for extension transport, got ${endpoint}.`);
+      throw new Error(
+        `NATS downstream endpoint must be a ws:// or wss:// URL for extension transport, got ${endpoint}.`,
+      );
     }
     if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
       return {

@@ -4,10 +4,6 @@ import { ModCDPServer } from "../../js/src/server/ModCDPServer.js";
 
 const bridge = ModCDPServer as Record<string, any>;
 const started_at = new Date().toISOString();
-const DEFAULT_REVERSEWS_URL = "ws://127.0.0.1:29292";
-const DEFAULT_REVERSEWS_RECONNECT_INTERVAL_MS = 2_000;
-const DEFAULT_NATIVE_HOST_NAME = "com.modcdp.bridge";
-const DEFAULT_NATIVE_RECONNECT_INTERVAL_MS = 2_000;
 const downstream_clients: Record<string, any> = {};
 const upstream_servers: Record<string, any> = {};
 const client_id_by_config_session = new Map<string, string>();
@@ -71,9 +67,6 @@ const configuredClient = (params: unknown, session_id?: string | null) => {
     client: configure?.client ?? {},
     server: configure?.server ?? {},
   };
-  if (client.downstream_transport !== "reversews") {
-    bridge.stopReverseBridge?.("non-reverse downstream connected");
-  }
   return client;
 };
 const downstreamClient = (session_id?: string | null) => {
@@ -152,24 +145,16 @@ if (bridge) {
   bridge.addEventListener?.((event: string, _payload: unknown, session_id?: string | null) =>
     logTraffic("event", event, _payload, session_id),
   );
-  for (const [method, key] of [
-    ["startReverseBridge", "reverse"],
-    ["stopReverseBridge", "reverse"],
-    ["startNativeBridge", "native"],
-    ["startNatsBridge", "nats"],
-  ]) {
-    const start = bridge[method]?.bind(bridge);
-    if (start) {
-      bridge[method] = (...args: unknown[]) => {
-        const result = start(...args);
-        self_transports[key] = {
-          args: compact(args),
-          result: compact(result),
-          updated_at: new Date().toISOString(),
-        };
-        return result;
+  const startDownstreamTransports = bridge.startDownstreamTransports?.bind(bridge);
+  if (startDownstreamTransports) {
+    bridge.startDownstreamTransports = () => {
+      const result = startDownstreamTransports();
+      self_transports.default_start = {
+        result: compact(result),
+        updated_at: new Date().toISOString(),
       };
-    }
+      return result;
+    };
   }
   for (const [method, key] of [
     ["addCustomCommand", "commands"],
@@ -186,13 +171,8 @@ if (bridge) {
 }
 
 const startConfiguredTransports = () => {
-  bridge.startOffscreenKeepAlive?.();
-  bridge.startReverseBridge?.(DEFAULT_REVERSEWS_URL, {
-    reconnect_interval_ms: DEFAULT_REVERSEWS_RECONNECT_INTERVAL_MS,
-  });
-  bridge.startNativeBridge?.(DEFAULT_NATIVE_HOST_NAME, {
-    reconnect_interval_ms: DEFAULT_NATIVE_RECONNECT_INTERVAL_MS,
-  });
+  bridge.ensureOffscreenKeepAlive?.();
+  bridge.startDownstreamTransports?.();
 };
 
 startConfiguredTransports();
@@ -217,9 +197,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       cdp_send_timeout_ms: bridge.cdp_send_timeout_ms,
       loopback_execution_context_timeout_ms: bridge.loopback_execution_context_timeout_ms,
       ws_connect_error_settle_timeout_ms: bridge.ws_connect_error_settle_timeout_ms,
-      native_bridge_attempts: bridge.native_bridge_attempts,
-      native_bridge_connected: bridge.native_bridge_connected,
-      native_bridge_last_error: bridge.native_bridge_last_error,
+      downstream_transports: bridge.downstreamTransports?.() ?? {},
     },
     ...(Object.keys(self_transports).length ? { transports: self_transports } : {}),
     custom: {

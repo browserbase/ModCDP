@@ -1,4 +1,10 @@
-import { CdpCommandMessageSchema, type CdpCommandMessage, type CdpEventMessage } from "../types/modcdp.js";
+import {
+  CdpCommandMessageSchema,
+  type CdpCommandMessage,
+  type CdpEventMessage,
+  type ModCDPConfigureParams,
+} from "../types/modcdp.js";
+import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
 
 export const DEFAULT_NATIVE_BRIDGE_HOST_NAME = "com.modcdp.bridge";
 export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
@@ -23,7 +29,9 @@ export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  * 4. `onDisconnect` clears the active port, stores the browser-provided error,
  *    and schedules reconnect while a host is still configured.
  */
-export class NativeHostDownstreamTransport {
+export class NativeHostDownstreamTransport implements ServerDownstreamTransport {
+  readonly name = "native";
+
   // Server-owned command executor. Read by port message handling; this class
   // never interprets routes, custom commands, or middleware itself.
   private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
@@ -83,11 +91,49 @@ export class NativeHostDownstreamTransport {
     return this.connect(hostName);
   }
 
+  /** Start the default native host configured into the shipped extension. */
+  startDefault() {
+    return this.start(DEFAULT_NATIVE_BRIDGE_HOST_NAME, {
+      reconnect_interval_ms: DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
+    });
+  }
+
+  /** Native host default lifecycle is not configured by Mod.configure. */
+  configure(_params: ModCDPConfigureParams) {
+    return null;
+  }
+
+  /** Stop reconnecting and disconnect the active native messaging port. */
+  stop(reason = "stopped") {
+    const upstream_nativemessaging_host_name = this.host_name;
+    this.host_name = null;
+    if (this.reconnect_timer) {
+      clearTimeout(this.reconnect_timer);
+      this.reconnect_timer = null;
+    }
+    const port = this.port;
+    this.port = null;
+    try {
+      port?.disconnect();
+    } catch {}
+    return { upstream_nativemessaging_host_name, stopped: true, reason };
+  }
+
   /** Emit one CDP event message to the connected native host. */
   emit(message: CdpEventMessage) {
     if (!this.port) return false;
     this.port.postMessage(message);
     return true;
+  }
+
+  /** Return generic status without exposing native-host lifecycle to ModCDPServer. */
+  status() {
+    return {
+      connected: this.connected,
+      attempts: this.attempts,
+      last_error: this.last_error,
+      config: this.host_name ? { upstream_nativemessaging_host_name: this.host_name } : {},
+    };
   }
 
   private scheduleReconnect(delay_ms: number) {
