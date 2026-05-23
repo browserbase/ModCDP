@@ -14,7 +14,7 @@ EXTENSION_PATH = HERE.parents[1] / "dist" / "extension"
 GET_TARGETS_OVERRIDE = r"""
 async (params) => {
   const [upstream, tabs] = await Promise.all([
-    ModCDP.upstream.send("Target.getTargets", params),
+    cdp.upstream.send("Target.getTargets", params),
     chrome.tabs.query({}),
   ]);
 

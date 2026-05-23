@@ -13,7 +13,7 @@ const DEFAULT_ROUTED_OVERRIDES_TEST_TIMEOUT_MS = 45_000;
 const getTargetsOverride = String.raw`
 async (params) => {
   const [upstream, tabs] = await Promise.all([
-    ModCDP.upstream.send("Target.getTargets", params),
+    cdp.upstream.send("Target.getTargets", params),
     chrome.tabs.query({}),
   ]);
 

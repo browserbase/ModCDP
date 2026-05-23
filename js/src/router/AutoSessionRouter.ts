@@ -94,13 +94,20 @@ export class AutoSessionRouter {
   // object but never mutates transport-owned private state.
   private readonly upstream: ServerUpstreamTransport;
 
-  // Timeout supplier owned by client/server config. Read when installing a new
-  // Runtime.executionContextCreated waiter.
-  private readonly defaultExecutionContextTimeoutMs: () => number;
+  // Timeout in milliseconds for Runtime.executionContextCreated waits. Set once
+  // by the owner when constructing the router; read when installing a new
+  // execution-context waiter.
+  private readonly loopback_execution_context_timeout_ms: number;
 
-  constructor(upstream: ServerUpstreamTransport, defaultExecutionContextTimeoutMs: () => number) {
+  constructor({
+    upstream,
+    loopback_execution_context_timeout_ms,
+  }: {
+    upstream: ServerUpstreamTransport;
+    loopback_execution_context_timeout_ms: number;
+  }) {
     this.upstream = upstream;
-    this.defaultExecutionContextTimeoutMs = defaultExecutionContextTimeoutMs;
+    this.loopback_execution_context_timeout_ms = loopback_execution_context_timeout_ms;
   }
 
   /** Route a CDP command using router-owned target/session policy. */
@@ -521,7 +528,7 @@ export class AutoSessionRouter {
   private waitForExecutionContextMatching(
     matches: (context: ModCDPTopologyExecutionContext) => boolean,
     waiterKey: string | null,
-    timeoutMs = this.defaultExecutionContextTimeoutMs(),
+    timeoutMs = this.loopback_execution_context_timeout_ms,
   ): Promise<ModCDPTopologyExecutionContext> {
     for (const context of this.contexts.values()) {
       if (matches(context)) return Promise.resolve(context);

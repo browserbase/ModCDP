@@ -497,10 +497,10 @@ export class ModCDPClient extends ModCDPEventEmitter {
         };
       },
     };
-    this.auto_sessions = new AutoSessionRouter(
-      raw_upstream_transport,
-      () => this.injector.injector_execution_context_timeout_ms,
-    );
+    this.auto_sessions = new AutoSessionRouter({
+      upstream: raw_upstream_transport,
+      loopback_execution_context_timeout_ms: this.injector.injector_execution_context_timeout_ms,
+    });
     this.auto_sessions.listen();
     this._injectors = [];
     this._launched = null;
@@ -952,7 +952,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   _serverNeedsLoopbackCdp() {
     if (!this.server || this.server.server_loopback_cdp_url) return false;
-    return Object.values(this.server.server_routes ?? {}).includes("loopback_cdp");
+    return this.server.server_routes?.["*.*"] === "loopback_cdp";
   }
 
   _upstreamTransportConfig() {

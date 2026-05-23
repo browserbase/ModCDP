@@ -825,7 +825,7 @@ class ModCDPClient(CDPSurfaceMixin):
     def _server_needs_loopback_cdp(self) -> bool:
         if self.server is None or self.server.get("server_loopback_cdp_url"):
             return False
-        return "loopback_cdp" in set((self.server.get("server_routes") or {}).values())
+        return (self.server.get("server_routes") or {}).get("*.*") == "loopback_cdp"
 
     def _upstream_transport_config(self) -> dict[str, Any]:
         return {

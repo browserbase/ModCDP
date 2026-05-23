@@ -133,8 +133,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       const expired = clearDownstreamClientLease();
       if (!expired) return;
       if (ModCDPServer.close_browser_on_downstream_disconnect !== true) return;
-      if (!ModCDPServer.upstream)
-        setupServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+      if (!ModCDPServer.upstream) setupServerUpstreamTransport();
       void ModCDPServer.upstream?.send(Browser.CloseCommand, {}).catch(() => {});
     }, timeout_ms);
     downstream_client_lease = {
@@ -233,8 +232,6 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
     "Custom.*": "service_worker",
     "*.*": "auto",
   } satisfies ModCDPRoutes;
-  const server_upstream_route_names = new Set(["auto", "loopback_cdp", "chrome_debugger"]);
-
   let reversews_downstream: ReverseWSDownstreamTransport;
   let nats_downstream: NATSDownstreamTransport;
   let native_host_downstream: NativeHostDownstreamTransport;
@@ -313,54 +310,37 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
 
   let active_server_upstream_subscription: { remove: () => void } | null = null;
 
-  function resolveServerUpstreamTransportName(route: string): SelectedServerUpstreamTransportName {
-    if (route === "loopback_cdp" || route === "chrome_debugger") return route;
-    if (route === "auto") return ModCDPServer.loopback_cdp_url ? "loopback_cdp" : "chrome_debugger";
-    throw new Error(`No ModCDP server upstream transport registered for route ${route}.`);
-  }
-
-  function configuredServerUpstreamTransportName(routes: ModCDPRoutes) {
-    const upstreams = new Set<SelectedServerUpstreamTransportName>();
-    for (const route of Object.values(routes)) {
-      if (server_upstream_route_names.has(route)) {
-        upstreams.add(resolveServerUpstreamTransportName(route));
-      }
-    }
-    if (upstreams.size > 1) throw new Error("server_routes cannot mix loopback_cdp and chrome_debugger routes.");
-    return [...upstreams][0] ?? resolveServerUpstreamTransportName("auto");
-  }
-
+  function setupServerUpstreamTransport(): LoopbackCdpTransport | ChromeDebuggerTransport;
   function setupServerUpstreamTransport(name: "loopback_cdp"): LoopbackCdpTransport;
   function setupServerUpstreamTransport(name: "chrome_debugger"): ChromeDebuggerTransport;
   function setupServerUpstreamTransport(
-    name: SelectedServerUpstreamTransportName,
+    name?: SelectedServerUpstreamTransportName,
   ): LoopbackCdpTransport | ChromeDebuggerTransport;
   function setupServerUpstreamTransport(
-    name: SelectedServerUpstreamTransportName,
+    name?: SelectedServerUpstreamTransportName,
   ): LoopbackCdpTransport | ChromeDebuggerTransport {
-    if (ModCDPServer.upstream_name === name && ModCDPServer.upstream && ModCDPServer.router) {
+    const selected_name =
+      name ?? ModCDPServer.upstream_name ?? (ModCDPServer.loopback_cdp_url ? "loopback_cdp" : "chrome_debugger");
+    if (ModCDPServer.upstream_name === selected_name && ModCDPServer.upstream && ModCDPServer.router) {
       return ModCDPServer.upstream;
     }
     active_server_upstream_subscription?.remove();
     const transport =
-      name === "loopback_cdp"
+      selected_name === "loopback_cdp"
         ? new LoopbackCdpTransport({
-            getLoopbackCdpUrl: () => ModCDPServer.loopback_cdp_url,
-            setLoopbackCdpUrl: (url) => {
-              ModCDPServer.loopback_cdp_url = url;
-            },
-            getCdpSendTimeoutMs: () => ModCDPServer.cdp_send_timeout_ms,
-            getExecutionContextTimeoutMs: () => ModCDPServer.loopback_execution_context_timeout_ms,
-            getWsConnectErrorSettleTimeoutMs: () => ModCDPServer.ws_connect_error_settle_timeout_ms,
+            loopback_cdp_url: ModCDPServer.loopback_cdp_url,
+            cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
+            loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
+            ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
           })
         : new ChromeDebuggerTransport();
-    ModCDPServer.upstream_name = name;
+    ModCDPServer.upstream_name = selected_name;
     ModCDPServer.upstream = transport;
     if (!ModCDPServer.upstream) throw new Error("ModCDP server upstream transport is not initialized.");
-    ModCDPServer.router = new AutoSessionRouter(
-      ModCDPServer.upstream,
-      () => ModCDPServer.loopback_execution_context_timeout_ms,
-    );
+    ModCDPServer.router = new AutoSessionRouter({
+      upstream: ModCDPServer.upstream,
+      loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
+    });
     const auto_router_subscription = ModCDPServer.router.listen();
     const publish_subscriptions = Object.values(nativeEventSchemas).map((event) =>
       transport.on(event, (payload, _targetId, cdpSessionId) => {
@@ -379,8 +359,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   }
 
   async function evaluateInServiceWorker(expression: string): Promise<ProtocolResult> {
-    if (!ModCDPServer.upstream)
-      setupServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+    if (!ModCDPServer.upstream) setupServerUpstreamTransport();
     if (!ModCDPServer.upstream) throw new Error("ModCDP server upstream transport is not initialized.");
     if (!ModCDPServer.router) throw new Error("ModCDP autorouter is not initialized.");
 
@@ -584,7 +563,14 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         this.routes = { ...default_routes };
         await this.discoverLoopbackCDP();
       }
-      setupServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
+      const default_server_route = server_routes?.["*.*"];
+      setupServerUpstreamTransport(
+        default_server_route === "loopback_cdp" || default_server_route === "chrome_debugger"
+          ? default_server_route
+          : this.loopback_cdp_url
+            ? "loopback_cdp"
+            : "chrome_debugger",
+      );
       for (const command of custom_commands) this.addCustomCommand(command as ModCDPCustomCommandRegistration);
       for (const event of custom_events) this.addCustomEvent(event as ModCDPCustomEventRegistration);
       for (const middleware of custom_middlewares) this.addMiddleware(middleware as ModCDPMiddlewareRegistration);
@@ -732,9 +718,10 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
         }
       }
 
-      if (!server_upstream_route_names.has(upstream))
+      if (upstream === "service_worker") throw new Error(`No service-worker command registered for ${method}.`);
+      if (upstream !== "auto" && upstream !== "loopback_cdp" && upstream !== "chrome_debugger")
         throw new Error(`No service-worker command registered for ${method}.`);
-      if (!ModCDPServer.upstream) setupServerUpstreamTransport(configuredServerUpstreamTransportName(this.routes));
+      if (!ModCDPServer.upstream) setupServerUpstreamTransport();
       if (!ModCDPServer.upstream) throw new Error(`No ModCDP server upstream transport registered for ${method}.`);
       if (!ModCDPServer.router) throw new Error("ModCDP autorouter is not initialized.");
       result = await ModCDPServer.router.send(method, params, cdpSessionId);
@@ -760,9 +747,9 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
           return ModCDPServer.events;
         },
         get upstream() {
-          if (!ModCDPServer.upstream)
-            setupServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
-          return ModCDPServer.upstream;
+          if (!ModCDPServer.router) setupServerUpstreamTransport();
+          if (!ModCDPServer.router) throw new Error("ModCDP autorouter is not initialized.");
+          return ModCDPServer.router;
         },
         send: (method: string, params: ProtocolParams = {}) => this.handleCommand(method, params, cdpSessionId),
         emit: (eventName: string, payload: ProtocolPayload = {}) => this.emit(eventName, payload, cdpSessionId),
@@ -798,11 +785,18 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
       verified: boolean;
       version?: unknown;
     }> {
-      const transport = setupServerUpstreamTransport("loopback_cdp");
-      return transport.discoverLoopbackCDP({
+      const transport = new LoopbackCdpTransport({
+        loopback_cdp_url: ModCDPServer.loopback_cdp_url,
+        cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
+        loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
+        ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
+      });
+      const result = await transport.discoverLoopbackCDP({
         browserToken: this.browser_token,
         serviceWorkerUrl: currentServiceWorkerUrl(),
       });
+      this.loopback_cdp_url = result.loopback_cdp_url;
+      return result;
     },
   };
 
@@ -866,8 +860,7 @@ export function installModCDPServer(globalScope: ModCDPGlobalScope = globalThis 
   ModCDPServer.addCustomCommand({
     name: "Mod.getTopology",
     handler: async (params: ProtocolParams = {}) => {
-      if (!ModCDPServer.router)
-        setupServerUpstreamTransport(configuredServerUpstreamTransportName(ModCDPServer.routes));
+      if (!ModCDPServer.router) setupServerUpstreamTransport();
       if (!ModCDPServer.router) throw new Error("ModCDP autorouter is not initialized.");
       return await ModCDPServer.router.getTopology(params as Record<string, unknown>);
     },

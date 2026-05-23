@@ -831,12 +831,7 @@ func (c *ModCDPClient) serverNeedsLoopbackCDP() bool {
 	if c.Server == nil || c.Server.ServerLoopbackCDPURL != "" {
 		return false
 	}
-	for _, route := range c.Server.ServerRoutes {
-		if route == "loopback_cdp" {
-			return true
-		}
-	}
-	return false
+	return c.Server.ServerRoutes["*.*"] == "loopback_cdp"
 }
 
 func (c *ModCDPClient) ensureModCDPServerConfigured() error {

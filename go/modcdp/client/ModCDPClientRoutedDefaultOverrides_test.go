@@ -9,7 +9,7 @@ import (
 const getTargetsOverride = `
 async (params) => {
   const [upstream, tabs] = await Promise.all([
-    ModCDP.upstream.send("Target.getTargets", params),
+    cdp.upstream.send("Target.getTargets", params),
     chrome.tabs.query({}),
   ]);
 

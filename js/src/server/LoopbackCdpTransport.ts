@@ -14,11 +14,10 @@ import {
 import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
 
 type LoopbackCdpTransportOptions = {
-  getLoopbackCdpUrl: () => string | null;
-  setLoopbackCdpUrl: (url: string | null) => void;
-  getCdpSendTimeoutMs: () => number;
-  getExecutionContextTimeoutMs: () => number;
-  getWsConnectErrorSettleTimeoutMs: () => number;
+  loopback_cdp_url: string | null;
+  cdp_send_timeout_ms: number;
+  loopback_execution_context_timeout_ms: number;
+  ws_connect_error_settle_timeout_ms: number;
 };
 
 const target_auto_attach_params = {
@@ -38,7 +37,7 @@ const target_auto_attach_params = {
  * discovery probe needed to verify the current service worker.
  *
  * Lifecycle:
- * 1. The server constructs the transport with config accessors.
+ * 1. The server constructs the transport with current config values.
  * 2. `getTargets()` or `send()` opens the loopback WebSocket and initializes
  *    target auto-attach/discovery once per socket.
  * 3. CDP socket event messages are normalized and dispatched to typed
@@ -84,20 +83,27 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   // emitLoopbackUpstreamEvent from the WebSocket message handler.
   private readonly event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<ServerUpstreamEventListener>>();
 
-  // Runtime/config accessors owned by ModCDPServer. Read whenever a command or
-  // socket operation needs current config values.
-  private readonly getLoopbackCdpUrl: LoopbackCdpTransportOptions["getLoopbackCdpUrl"];
-  private readonly setLoopbackCdpUrl: LoopbackCdpTransportOptions["setLoopbackCdpUrl"];
-  private readonly getCdpSendTimeoutMs: LoopbackCdpTransportOptions["getCdpSendTimeoutMs"];
-  private readonly getExecutionContextTimeoutMs: LoopbackCdpTransportOptions["getExecutionContextTimeoutMs"];
-  private readonly getWsConnectErrorSettleTimeoutMs: LoopbackCdpTransportOptions["getWsConnectErrorSettleTimeoutMs"];
+  // Current loopback CDP endpoint owned by this transport instance. Written by
+  // discoverLoopbackCDP while probing; read by all loopback CDP sends.
+  private loopback_cdp_url: string | null;
+
+  // Request timeout for loopback CDP sends. Set at construction from server
+  // config; read by sendToLoopback.
+  private readonly cdp_send_timeout_ms: number;
+
+  // Runtime.executionContextCreated wait timeout for discovery. Set at
+  // construction from server config; read by waitForLoopbackExecutionContext.
+  private readonly loopback_execution_context_timeout_ms: number;
+
+  // Delay used to let websocket close details arrive after an error event. Set
+  // at construction from server config; read by loopbackWS.
+  private readonly ws_connect_error_settle_timeout_ms: number;
 
   constructor(options: LoopbackCdpTransportOptions) {
-    this.getLoopbackCdpUrl = options.getLoopbackCdpUrl;
-    this.setLoopbackCdpUrl = options.setLoopbackCdpUrl;
-    this.getCdpSendTimeoutMs = options.getCdpSendTimeoutMs;
-    this.getExecutionContextTimeoutMs = options.getExecutionContextTimeoutMs;
-    this.getWsConnectErrorSettleTimeoutMs = options.getWsConnectErrorSettleTimeoutMs;
+    this.loopback_cdp_url = options.loopback_cdp_url;
+    this.cdp_send_timeout_ms = options.cdp_send_timeout_ms;
+    this.loopback_execution_context_timeout_ms = options.loopback_execution_context_timeout_ms;
+    this.ws_connect_error_settle_timeout_ms = options.ws_connect_error_settle_timeout_ms;
     this.on(Runtime.ExecutionContextCreatedEvent, (event, _targetId, sessionId) => {
       if (sessionId == null) return;
       this.loopback_session_contexts.set(sessionId, event.context.id);
@@ -145,7 +151,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
 
   /** Return current browser targets through the loopback CDP endpoint. */
   async getTargets() {
-    if (!this.getLoopbackCdpUrl()) throw new Error(`No loopback_cdp_url configured for Target.getTargets.`);
+    if (!this.loopback_cdp_url) throw new Error(`No loopback_cdp_url configured for Target.getTargets.`);
     await this.initializeLoopbackCDP();
     return (await this.send(Target.GetTargetsCommand, {})).targetInfos;
   }
@@ -213,9 +219,9 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     if (!browserToken) return { loopback_cdp_url: null as null, verified: false };
 
     const url = "http://127.0.0.1:9222";
-    const previous_loopback_url = this.getLoopbackCdpUrl();
+    const previous_loopback_url = this.loopback_cdp_url;
     const fail = (version?: unknown) => {
-      this.setLoopbackCdpUrl(previous_loopback_url ?? null);
+      this.loopback_cdp_url = previous_loopback_url ?? null;
       return {
         loopback_cdp_url: null as null,
         verified: false,
@@ -226,7 +232,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
       const version = await fetch(`${url}/json/version`).then((response) => response.ok && response.json());
       if (!version?.webSocketDebuggerUrl) return fail();
 
-      this.setLoopbackCdpUrl(version.webSocketDebuggerUrl);
+      this.loopback_cdp_url = version.webSocketDebuggerUrl;
       const { targetInfos } = Target.GetTargetsCommand.result.parse(
         await this.sendToLoopback(Target.GetTargetsCommand.id, Target.GetTargetsCommand.params.parse({})),
       );
@@ -260,7 +266,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
 
       await this.initializeLoopbackCDP();
       return {
-        loopback_cdp_url: this.getLoopbackCdpUrl(),
+        loopback_cdp_url: this.loopback_cdp_url,
         verified: true,
         version,
       };
@@ -375,7 +381,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
         "error",
         (event) => {
           error_event = event;
-          setTimeout(() => fail(new Error(describe("CDP socket error"))), this.getWsConnectErrorSettleTimeoutMs());
+          setTimeout(() => fail(new Error(describe("CDP socket error"))), this.ws_connect_error_settle_timeout_ms);
         },
         { once: true },
       );
@@ -384,7 +390,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   }
 
   private async sendToLoopback(method: string, params: ProtocolParams = {}, sessionId: string | null = null) {
-    const endpoint = this.getLoopbackCdpUrl();
+    const endpoint = this.loopback_cdp_url;
     if (!endpoint) throw new Error(`No loopback_cdp_url configured for ${method}.`);
     const ws = await this.loopbackWS(endpoint);
     const id = this.next_loopback_id++;
@@ -403,8 +409,8 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     return new Promise<ProtocolResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         if (!this.loopback_pending.delete(id)) return;
-        reject(new Error(`${method} timed out after ${this.getCdpSendTimeoutMs()}ms`));
-      }, this.getCdpSendTimeoutMs());
+        reject(new Error(`${method} timed out after ${this.cdp_send_timeout_ms}ms`));
+      }, this.cdp_send_timeout_ms);
       this.loopback_pending.set(id, {
         resolve: (value) => {
           clearTimeout(timeout);
@@ -419,7 +425,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   }
 
   private async initializeLoopbackCDP() {
-    const endpoint = this.getLoopbackCdpUrl();
+    const endpoint = this.loopback_cdp_url;
     if (!endpoint) return;
     const ws = await this.loopbackWS(endpoint);
     if (this.initialized_loopback_sockets.has(ws)) return;
@@ -434,7 +440,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     this.initialized_loopback_sockets.add(ws);
   }
 
-  private waitForLoopbackExecutionContext(sessionId: string, timeout_ms = this.getExecutionContextTimeoutMs()) {
+  private waitForLoopbackExecutionContext(sessionId: string, timeout_ms = this.loopback_execution_context_timeout_ms) {
     const existing = this.loopback_session_contexts.get(sessionId);
     if (existing != null) return Promise.resolve(existing);
     return new Promise<number>((resolve, reject) => {
