@@ -13,9 +13,6 @@ export type CdpAliasHooks = {
   onCustomCommand?: (name: string, params_schema?: z.ZodType | null, result_schema?: z.ZodType | null) => void;
   onCustomEvent?: (name: string, event_schema?: z.ZodType | null) => void;
 };
-type ModSchemaInfer<T> = T extends z.ZodType<infer TValue> ? TValue : T extends Record<string, z.ZodType> ? z.infer<z.ZodObject<T>> : unknown;
-type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
-type UnwrapSingleObject<T> = T extends Record<string, unknown> ? IsUnion<keyof T> extends true ? T : T[keyof T] : T;
 export type ModCustomCommandOptions<TParamsSchema = unknown, TResultSchema = unknown> = {
   params_schema?: TParamsSchema | null;
   result_schema?: TResultSchema | null;
@@ -1047,15 +1044,9 @@ export type CdpAliases = {
   };
   Mod: {
     evaluate(params: cdp.types.ts.Mod.EvaluateParams): Promise<cdp.types.ts.Mod.EvaluateResponse>;
-    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(
-      name: TName,
-      options?: ModCustomCommandOptions<TParamsSchema, TResultSchema>,
-    ): Promise<cdp.types.ts.Mod.AddCustomCommandResponse>;
+    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(name: TName, options?: ModCustomCommandOptions<TParamsSchema, TResultSchema>): Promise<cdp.types.ts.Mod.AddCustomCommandResponse>;
     addCustomCommand(params: cdp.types.ts.Mod.AddCustomCommandParams): Promise<cdp.types.ts.Mod.AddCustomCommandResponse>;
-    addCustomEvent<TName extends string, TEventSchema>(
-      name: TName,
-      options?: { event_schema?: TEventSchema | null },
-    ): Promise<cdp.types.ts.Mod.AddCustomEventResponse>;
+    addCustomEvent<TName extends string, TEventSchema>(name: TName, options?: { event_schema?: TEventSchema | null }): Promise<cdp.types.ts.Mod.AddCustomEventResponse>;
     addCustomEvent(params: cdp.types.ts.Mod.AddCustomEventParams): Promise<cdp.types.ts.Mod.AddCustomEventResponse>;
     addMiddleware(params: cdp.types.ts.Mod.AddMiddlewareParams): Promise<cdp.types.ts.Mod.AddMiddlewareResponse>;
     configure(params: cdp.types.ts.Mod.ConfigureParams): Promise<cdp.types.ts.Mod.ConfigureResponse>;
@@ -2103,14 +2094,7 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
         return Mod.EvaluateResponse.parse(await send("Mod.evaluate", parsed));
       },
       addCustomCommand: async (params_or_name?: unknown, options: Record<string, unknown> = {}) => {
-        const input = typeof params_or_name === "string"
-          ? {
-              name: params_or_name,
-              expression: options.expression ?? null,
-              params_schema: options.params_schema ?? null,
-              result_schema: options.result_schema ?? null,
-            }
-          : params_or_name;
+        const input = typeof params_or_name === "string" ? { name: params_or_name, expression: options.expression ?? null, params_schema: options.params_schema ?? null, result_schema: options.result_schema ?? null } : params_or_name;
         const parsed = Mod.AddCustomCommandParams.parse(input ?? {});
         const name = normalizeModCDPName(parsed.name);
         const params_schema = normalizeModCDPPayloadSchema(parsed.params_schema);
@@ -2120,9 +2104,7 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
         return response;
       },
       addCustomEvent: async (params_or_name?: unknown, options: Record<string, unknown> = {}) => {
-        const input = typeof params_or_name === "string"
-          ? { name: params_or_name, event_schema: options.event_schema ?? null }
-          : params_or_name;
+        const input = typeof params_or_name === "string" ? { name: params_or_name, event_schema: options.event_schema ?? null } : params_or_name;
         const parsed = Mod.AddCustomEventParams.parse(input ?? {});
         const directSchema = Mod.ZodType.safeParse(parsed);
         if (directSchema.success) {

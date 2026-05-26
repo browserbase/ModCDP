@@ -4,22 +4,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ModCDPClient } from "../src/client/ModCDPClient.js";
-import { events } from "../src/types/generated/zod.js";
+import type { cdp } from "../src/types/generated/cdp.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 const DEFAULT_ROUTED_OVERRIDES_TEST_TIMEOUT_MS = 45_000;
 
-function hasTargetInfo(value: unknown): value is { targetInfo: Record<string, unknown> } {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
-  const targetInfo = (value as Record<string, unknown>).targetInfo;
-  return targetInfo != null && typeof targetInfo === "object" && !Array.isArray(targetInfo);
-}
-
 const getTargetsOverride = String.raw`
 async (params) => {
   const [upstream, tabs] = await Promise.all([
-    ModCDP.sendLoopback("Target.getTargets", params),
+    cdp.upstream.send("Target.getTargets", params),
     chrome.tabs.query({}),
   ]);
 
@@ -166,9 +160,8 @@ test(
 
       await cdp.Mod.addCustomEvent({ name: cdp.Target.targetCreated });
 
-      const transformedEvents: unknown[] = [];
-      cdp.on("Target.targetCreated", (params) => {
-        if (!hasTargetInfo(params)) return;
+      const transformedEvents: cdp.types.ts.Target.TargetCreatedEvent[] = [];
+      cdp.on(cdp.Target.targetCreated, (params) => {
         if (!Object.hasOwn(params.targetInfo || {}, "tabId")) return;
         transformedEvents.push(params);
       });
@@ -181,16 +174,15 @@ test(
         const createdTarget = await cdp.Target.createTarget({ url: "about:blank#modcdp-target-created" });
         await cdp.Target.getTargets();
         assert.ok(
-          transformedEvents.some((params) => {
-            if (!hasTargetInfo(params)) return;
-            return params.targetInfo.targetId === createdTarget.targetId;
-          }),
+          transformedEvents.some((event) => event.targetInfo.targetId === createdTarget.targetId),
           `expected transformed Target.targetCreated for ${createdTarget.targetId}`,
         );
       }
 
-      const event = events["Target.targetCreated"].parse(transformedEvents[0]);
-      assert.ok(Object.hasOwn(event.targetInfo, "tabId"), "transformed event targetInfo should include tabId");
+      assert.ok(
+        transformedEvents.some((event) => Object.hasOwn(event.targetInfo, "tabId")),
+        "transformed event targetInfo should include tabId",
+      );
     } finally {
       try {
         await cdp.Target.setDiscoverTargets({ discover: false });

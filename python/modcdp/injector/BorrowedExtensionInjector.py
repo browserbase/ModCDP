@@ -42,7 +42,7 @@ class BorrowedExtensionInjector(ExtensionInjector):
         return borrowed[0] if borrowed else None
 
     def _bootstrapTarget(self, target) -> ExtensionInjectionResult | None:
-        session_id = self._ensureSessionIdForTarget(
+        session_id = self._ensureSessionForTarget(
             target["targetId"],
             self.options.get("injector_service_worker_probe_timeout_ms") or DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
             True,

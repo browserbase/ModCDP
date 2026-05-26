@@ -10,7 +10,6 @@ import type {
   ModCDPBindingPayload,
   ModCDPCustomPayload,
   ModCDPEvaluateParams,
-  ModCDPPingParams,
   ModCDPRoutes,
   ProtocolParams,
   ProtocolResult,
@@ -29,7 +28,7 @@ export const DEFAULT_CLIENT_ROUTES = {
   "*.*": "service_worker",
 } satisfies ModCDPRoutes;
 
-type TranslateOptions = { routes?: ModCDPRoutes; cdpSessionId?: string | null; targetCdpSessionId?: string | null };
+type TranslateOptions = { routes?: ModCDPRoutes; cdpSessionId?: string | null };
 
 function normalizeModCDPName(
   value:
@@ -184,10 +183,6 @@ export function wrapCustomCommand(
 }
 
 function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
-  if (method === "Mod.ping" && !Object.prototype.hasOwnProperty.call(params, "sent_at")) {
-    params = { ...(params as ModCDPPingParams), sent_at: Date.now() };
-  }
-
   if (method === "Mod.addCustomEvent") {
     const eventParams = params as { name: any };
     const eventName = normalizeModCDPName(eventParams.name);
@@ -233,7 +228,7 @@ function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, c
 export function wrapCommandIfNeeded(
   method: string,
   params: ProtocolParams = {},
-  { routes = DEFAULT_CLIENT_ROUTES, cdpSessionId = null, targetCdpSessionId = null }: TranslateOptions = {},
+  { routes = DEFAULT_CLIENT_ROUTES, cdpSessionId = null }: TranslateOptions = {},
 ): TranslatedCommand {
   params = params ?? {};
   const route = routeFor(method, routes);
@@ -241,7 +236,7 @@ export function wrapCommandIfNeeded(
     return {
       route,
       target: "direct_cdp",
-      steps: [{ method, params, ...(targetCdpSessionId ? { sessionId: targetCdpSessionId } : {}) }],
+      steps: [{ method, params, ...(cdpSessionId ? { sessionId: cdpSessionId } : {}) }],
     };
   }
   if (route === "service_worker") {

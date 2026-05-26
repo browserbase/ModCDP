@@ -728,7 +728,7 @@ async function handleConnection(
     ext_execution_context_id: cdp.ext_execution_context_id,
     hidden_session_ids: new Set(), // sessions we attached for ourselves
     hidden_target_ids: new Set(), // SW target the client must never see
-    target_session_ids: cdp.auto_target_sessions,
+    target_session_ids: cdp.auto_sessions.sessionId_from_targetId,
     client_session_ids: new Set(), // session ids the client has attached
     forward_mirrored_upstream_events: forward_mirrored_upstream_events,
     bootstrapped: false,

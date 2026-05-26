@@ -2,6 +2,7 @@
 import type { z } from "zod";
 
 export type CdpNamedSchema<T extends z.ZodType> = T & { readonly id: string; readonly name: string; readonly kind: string; meta(): { id: string; name: string; kind: string } };
+export type CdpCommandSchema<Params extends z.ZodType<Record<string, unknown>> = z.ZodType<Record<string, unknown>>, Result extends z.ZodType<Record<string, unknown>> = z.ZodType<Record<string, unknown>>, Name extends string = string> = { readonly id: Name; readonly name: Name; readonly kind: "command"; readonly params: Params; readonly result: Result; meta(): { id: Name; name: Name; kind: "command" } };
 export const withCdpMeta = <T extends z.ZodType>(schema: T, id: string, kind: string, extra = {}): CdpNamedSchema<T> => {
   const meta = { id, name: id, kind, ...extra };
   const named = schema.meta(meta);
@@ -11,4 +12,15 @@ export const withCdpMeta = <T extends z.ZodType>(schema: T, id: string, kind: st
     kind: { value: kind, enumerable: true, configurable: true },
   });
   return named as CdpNamedSchema<T>;
+};
+export const withCdpCommand = <Name extends string, Params extends z.ZodType<Record<string, unknown>>, Result extends z.ZodType<Record<string, unknown>>>(id: Name, params: Params, result: Result): CdpCommandSchema<Params, Result, Name> => {
+  const meta = { id, name: id, kind: "command" as const };
+  return {
+    id,
+    name: id,
+    kind: "command",
+    params,
+    result,
+    meta: () => meta,
+  };
 };

@@ -6,28 +6,23 @@ from typing import Any
 
 
 SendCDP = Callable[[str, dict[str, Any], str | None], dict[str, Any]]
-max_detached_session_guards = 1024
 
 
 class AutoSessionRouter:
     def __init__(self, send: SendCDP, defaultExecutionContextTimeoutMs: Callable[[], int]) -> None:
         self.send = send
         self.defaultExecutionContextTimeoutMs = defaultExecutionContextTimeoutMs
-        self.target_sessions: dict[str, str] = {}
-        self.session_targets: dict[str, dict[str, Any]] = {}
+        self.sessionId_from_targetId: dict[str, str] = {}
+        self.targetId_from_sessionId: dict[str, str] = {}
         self.execution_contexts: dict[str, int] = {}
         self._execution_context_waiters: dict[str, list[tuple[threading.Event, dict[str, Any]]]] = {}
-        self._detached_sessions: dict[str, None] = {}
         self._lock = threading.RLock()
 
-    def sessionIdForTarget(self, target_id: str) -> str | None:
-        with self._lock:
-            return self.target_sessions.get(target_id)
-
     def attachToTarget(self, target_id: str) -> str | None:
-        existing_session_id = self.sessionIdForTarget(target_id)
-        if existing_session_id is not None:
-            return existing_session_id
+        with self._lock:
+            session_id = self.sessionId_from_targetId.get(target_id)
+        if session_id is not None:
+            return session_id
         result = self.send("Target.attachToTarget", {"targetId": target_id, "flatten": True}, None)
         session_id = result.get("sessionId")
         return session_id if isinstance(session_id, str) and session_id else None
@@ -41,9 +36,8 @@ class AutoSessionRouter:
             target_id = target_info.get("targetId") if target_info else None
             if isinstance(attached_session_id, str) and isinstance(target_id, str) and target_info:
                 with self._lock:
-                    self._detached_sessions.pop(attached_session_id, None)
-                    self.target_sessions[target_id] = attached_session_id
-                    self.session_targets[attached_session_id] = target_info
+                    self.sessionId_from_targetId[target_id] = attached_session_id
+                    self.targetId_from_sessionId[attached_session_id] = target_id
         elif method == "Runtime.executionContextCreated":
             raw_context = event_data.get("context")
             context = raw_context if isinstance(raw_context, Mapping) else None
@@ -80,7 +74,7 @@ class AutoSessionRouter:
 
     def _recordExecutionContext(self, session_id: str, context_id: int) -> None:
         with self._lock:
-            if session_id in self._detached_sessions:
+            if session_id not in self.targetId_from_sessionId:
                 return
             self.execution_contexts[session_id] = context_id
             waiters = self._execution_context_waiters.pop(session_id, [])
@@ -90,23 +84,12 @@ class AutoSessionRouter:
 
     def _forgetSession(self, session_id: str) -> None:
         with self._lock:
-            target_info = self.session_targets.pop(session_id, None)
-            target_id = target_info.get("targetId") if target_info else None
-            if isinstance(target_id, str):
-                self.target_sessions.pop(target_id, None)
+            target_id = self.targetId_from_sessionId.pop(session_id, None)
+            if target_id is not None:
+                self.sessionId_from_targetId.pop(target_id, None)
             self.execution_contexts.pop(session_id, None)
-            self._markDetachedSession(session_id)
             waiters = self._execution_context_waiters.pop(session_id, [])
         error = RuntimeError(f"Runtime execution context wait cancelled because session {session_id} detached.")
         for event, result in waiters:
             result["error"] = error
             event.set()
-
-    def _markDetachedSession(self, session_id: str) -> None:
-        self._detached_sessions.pop(session_id, None)
-        self._detached_sessions[session_id] = None
-        while len(self._detached_sessions) > max_detached_session_guards:
-            oldest_session_id = next(iter(self._detached_sessions), None)
-            if oldest_session_id is None:
-                break
-            self._detached_sessions.pop(oldest_session_id, None)

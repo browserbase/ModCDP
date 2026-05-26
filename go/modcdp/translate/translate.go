@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 )
 
 const UpstreamEventBindingName = "__ModCDP_event_from_upstream__"
@@ -134,31 +133,17 @@ func wrapModCDPAddMiddleware(params map[string]any) map[string]any {
 	))
 }
 
-func wrapCustomCommand(method string, params map[string]any, sessionID string) map[string]any {
+func wrapCustomCommand(method string, params map[string]any, sessionID any) map[string]any {
 	p, _ := json.Marshal(params)
 	runtimeParams := callFunctionParams(`async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }`)
 	runtimeParams["arguments"] = []map[string]any{{"value": method}, {"value": string(p)}, {"value": sessionID}}
 	return runtimeParams
 }
 
-func wrapServiceWorkerCommand(method string, params map[string]any, sessionID string, targetSessionID string) []rawStep {
+func wrapServiceWorkerCommand(method string, params map[string]any, sessionID string) []rawStep {
 	if params == nil {
 		params = map[string]any{}
 	}
-	if targetSessionID == "" {
-		targetSessionID = sessionID
-	}
-	if method == "Mod.ping" {
-		if _, ok := params["sent_at"]; !ok {
-			next := map[string]any{}
-			for key, value := range params {
-				next[key] = value
-			}
-			next["sent_at"] = time.Now().UnixMilli()
-			params = next
-		}
-	}
-
 	if method == "Mod.addCustomEvent" {
 		return []rawStep{
 			{Method: "Runtime.callFunctionOn", Params: wrapModCDPAddCustomEvent(params), Unwrap: "runtime"},
@@ -168,15 +153,17 @@ func wrapServiceWorkerCommand(method string, params map[string]any, sessionID st
 	unwrap := "runtime"
 	switch method {
 	case "Mod.evaluate":
-		runtimeParams = wrapModCDPEvaluate(params, targetSessionID)
+		runtimeParams = wrapModCDPEvaluate(params, sessionID)
 	case "Mod.addCustomCommand":
 		runtimeParams = wrapModCDPAddCustomCommand(params)
 	case "Mod.addMiddleware":
 		runtimeParams = wrapModCDPAddMiddleware(params)
 	default:
-		cdpSessionID, _ := params["cdpSessionId"].(string)
-		if cdpSessionID == "" {
-			cdpSessionID = targetSessionID
+		var cdpSessionID any
+		if paramsSessionID, _ := params["cdpSessionId"].(string); paramsSessionID != "" {
+			cdpSessionID = paramsSessionID
+		} else if sessionID != "" {
+			cdpSessionID = sessionID
 		}
 		runtimeParams = wrapCustomCommand(method, params, cdpSessionID)
 		unwrap = "runtime_json"
@@ -184,17 +171,13 @@ func wrapServiceWorkerCommand(method string, params map[string]any, sessionID st
 	return []rawStep{{Method: "Runtime.callFunctionOn", Params: runtimeParams, Unwrap: unwrap}}
 }
 
-func WrapCommandIfNeeded(method string, params map[string]any, routes map[string]string, sessionID string, targetSessionID ...string) (rawCommand, error) {
-	targetSession := ""
-	if len(targetSessionID) > 0 {
-		targetSession = targetSessionID[0]
-	}
+func WrapCommandIfNeeded(method string, params map[string]any, routes map[string]string, sessionID string) (rawCommand, error) {
 	route := RouteFor(method, routes)
 	if route == "direct_cdp" {
-		return rawCommand{Route: route, Target: "direct_cdp", Steps: []rawStep{{Method: method, Params: params, SessionID: targetSession}}}, nil
+		return rawCommand{Route: route, Target: "direct_cdp", Steps: []rawStep{{Method: method, Params: params, SessionID: sessionID}}}, nil
 	}
 	if route == "service_worker" {
-		return rawCommand{Route: route, Target: "service_worker", Steps: wrapServiceWorkerCommand(method, params, sessionID, targetSession)}, nil
+		return rawCommand{Route: route, Target: "service_worker", Steps: wrapServiceWorkerCommand(method, params, sessionID)}, nil
 	}
 	return rawCommand{}, fmt.Errorf("unsupported client route %q for %s", route, method)
 }

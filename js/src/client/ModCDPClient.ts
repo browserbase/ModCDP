@@ -15,6 +15,9 @@ import type { z } from "zod";
 import { createCdpAliases, type CdpAliases } from "../types/generated/aliases.js";
 export type { CdpAliases } from "../types/generated/aliases.js";
 import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "../types/generated/zod.js";
+import type { CdpNamedSchema } from "../types/generated/zod/helpers.js";
+import * as Runtime from "../types/generated/zod/Runtime.js";
+import * as Target from "../types/generated/zod/Target.js";
 import {
   CUSTOM_EVENT_BINDING_NAME,
   DEFAULT_CLIENT_ROUTES,
@@ -32,6 +35,7 @@ import {
 import type { BrowserLauncher, BrowserLaunchOptions, LaunchedBrowser } from "../launcher/BrowserLauncher.js";
 import { type ExtensionInjectorConfig, type ExtensionInjector, type SendCDP } from "../injector/ExtensionInjector.js";
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
+import type { ServerUpstreamEventListener, ServerUpstreamTransport } from "../server/ServerUpstreamTransport.js";
 import type {
   CdpCommandMessage,
   CdpError,
@@ -40,7 +44,6 @@ import type {
   RuntimeBindingCalledEvent,
   ModCDPConfigureParams,
   ModCDPServerOptions,
-  ModCDPCustomPayload,
   ModCDPAddCustomCommandParams,
   ModCDPAddCustomEventObjectParams,
   ModCDPAddMiddlewareParams,
@@ -188,11 +191,11 @@ export type ModCDPClientInstance<
 } & {
   on<TName extends Extract<keyof TEvents, string>>(
     eventName: TName,
-    listener: (event: TEvents[TName]) => void,
+    listener: (event: TEvents[TName], sessionId: string | null) => void,
   ): ModCDPClient;
   once<TName extends Extract<keyof TEvents, string>>(
     eventName: TName,
-    listener: (event: TEvents[TName]) => void,
+    listener: (event: TEvents[TName], sessionId: string | null) => void,
   ): ModCDPClient;
 };
 
@@ -402,6 +405,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
   command_result_unwrap_keys: Map<string, string>;
   cdp_aliases_hydrated: boolean;
   event_wait_cleanups: Set<() => void>;
+  upstream_event_listeners: Map<CdpNamedSchema<z.ZodType>, Set<ServerUpstreamEventListener>>;
   auto_sessions: AutoSessionRouter;
   heartbeat_timer: ReturnType<typeof setInterval> | null;
   _injectors: ExtensionInjector[];
@@ -458,12 +462,46 @@ export class ModCDPClient extends ModCDPEventEmitter {
     this.command_result_unwrap_keys = new Map();
     this.cdp_aliases_hydrated = false;
     this.event_wait_cleanups = new Set();
+    this.upstream_event_listeners = new Map();
     this.heartbeat_timer = null;
-    this.auto_sessions = new AutoSessionRouter(
-      (method, params = {}, session_id = null) =>
-        this._sendMessage(method, params, session_id) as Promise<ProtocolResult>,
-      () => this.injector.injector_execution_context_timeout_ms,
-    );
+    const raw_upstream_transport: ServerUpstreamTransport = {
+      getTargets: async () => (await raw_upstream_transport.send(Target.GetTargetsCommand, {})).targetInfos,
+      resolveTargetId: async (params) =>
+        typeof params.targetId === "string" && params.targetId.length > 0 ? params.targetId : null,
+      createTarget: async (url) => (await raw_upstream_transport.send(Target.CreateTargetCommand, { url })).targetId,
+      attachToTarget: async (targetId) =>
+        (await raw_upstream_transport.send(Target.AttachToTargetCommand, { targetId, flatten: true })).sessionId,
+      detachFromTarget: async (sessionId) => {
+        await raw_upstream_transport.send(Target.DetachFromTargetCommand, { sessionId });
+      },
+      send: async (command, params, route = undefined) => {
+        if (route && route.sessionId == null)
+          throw new Error(`No CDP session is attached for targetId=${route.targetId}.`);
+        return command.result.parse(
+          await this._sendMessage(command.id, command.params.parse(params), route?.sessionId ?? null),
+        );
+      },
+      on: (event, listener) => {
+        const typed_listener: ServerUpstreamEventListener = (payload, targetId, sessionId) => {
+          listener(event.parse(payload), targetId, sessionId);
+        };
+        const listeners = this.upstream_event_listeners.get(event);
+        if (listeners) listeners.add(typed_listener);
+        else this.upstream_event_listeners.set(event, new Set([typed_listener]));
+        return {
+          remove: () => {
+            const current_listeners = this.upstream_event_listeners.get(event);
+            current_listeners?.delete(typed_listener);
+            if (current_listeners?.size === 0) this.upstream_event_listeners.delete(event);
+          },
+        };
+      },
+    };
+    this.auto_sessions = new AutoSessionRouter({
+      upstream: raw_upstream_transport,
+      loopback_execution_context_timeout_ms: this.injector.injector_execution_context_timeout_ms,
+    });
+    this.auto_sessions.listen();
     this._injectors = [];
     this._launched = null;
 
@@ -533,12 +571,20 @@ export class ModCDPClient extends ModCDPEventEmitter {
     const ext_context = this.auto_sessions.waitForExecutionContext(this.ext_session_id, {
       timeout_ms: this.injector.injector_execution_context_timeout_ms,
     });
-    await this._sendMessage("Runtime.enable", {}, this.ext_session_id);
+    await this._sendMessage(Runtime.EnableCommand.id, Runtime.EnableCommand.params.parse({}), this.ext_session_id);
     this.ext_execution_context_id = await ext_context;
     await Promise.all([
-      this._sendMessage("Runtime.addBinding", { name: CUSTOM_EVENT_BINDING_NAME }, this.ext_session_id),
+      this._sendMessage(
+        Runtime.AddBindingCommand.id,
+        Runtime.AddBindingCommand.params.parse({ name: CUSTOM_EVENT_BINDING_NAME }),
+        this.ext_session_id,
+      ),
       this.client.client_mirror_upstream_events
-        ? this._sendMessage("Runtime.addBinding", { name: UPSTREAM_EVENT_BINDING_NAME }, this.ext_session_id)
+        ? this._sendMessage(
+            Runtime.AddBindingCommand.id,
+            Runtime.AddBindingCommand.params.parse({ name: UPSTREAM_EVENT_BINDING_NAME }),
+            this.ext_session_id,
+          )
         : Promise.resolve(),
     ]);
     if (this.server !== null) {
@@ -631,7 +677,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     }
     const command = wrapCommandIfNeeded(method, command_params as ProtocolParams, {
       routes: this.client.client_routes,
-      targetCdpSessionId: session_id,
+      cdpSessionId: session_id,
     });
     const result = await this._sendRaw(command);
     const completed_at = Date.now();
@@ -904,7 +950,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   _serverNeedsLoopbackCdp() {
     if (!this.server || this.server.server_loopback_cdp_url) return false;
-    return Object.values(this.server.server_routes ?? {}).includes("loopback_cdp");
+    return this.server.server_routes?.["*.*"] === "loopback_cdp";
   }
 
   _upstreamTransportConfig() {
@@ -972,8 +1018,10 @@ export class ModCDPClient extends ModCDPEventEmitter {
       service_worker_url_suffixes.some((suffix) => suffix.split("/").filter(Boolean).length > 1);
     return {
       send,
-      sessionIdForTarget: (target_id) => this.auto_sessions.sessionIdForTarget(target_id),
-      attachToTarget: send ? (target_id) => this.auto_sessions.attachToTarget(target_id) : null,
+      sessionId_from_targetId: this.auto_sessions.sessionId_from_targetId,
+      ensureSessionForTarget: send
+        ? (target_id, timeout_ms, allow_attach) => this.ensureSessionForTarget(target_id, timeout_ms, allow_attach)
+        : null,
       waitForExecutionContext: (session_id, timeout_ms) =>
         this.auto_sessions.waitForExecutionContext(session_id, { timeout_ms }),
       injector_extension_path: this.injector.injector_extension_path,
@@ -991,6 +1039,19 @@ export class ModCDPClient extends ModCDPEventEmitter {
       injector_service_worker_poll_interval_ms: this.injector.injector_service_worker_poll_interval_ms,
       injector_target_session_poll_interval_ms: this.injector.injector_target_session_poll_interval_ms,
     };
+  }
+
+  private async ensureSessionForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
+    const session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
+    if (session_id) return session_id;
+    if (allow_attach) return await this.auto_sessions.ensureSessionForTarget(target_id);
+    const deadline = Date.now() + timeout_ms;
+    while (Date.now() <= deadline) {
+      const current_session_id = this.auto_sessions.sessionId_from_targetId.get(target_id);
+      if (current_session_id) return current_session_id;
+      await new Promise((resolve) => setTimeout(resolve, this.injector.injector_target_session_poll_interval_ms));
+    }
+    return null;
   }
 
   async _runInjectors(send: SendCDP, injectors: ExtensionInjector[] | null = null) {
@@ -1016,12 +1077,18 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   async _initializeRawCDPTransport() {
     await Promise.all([
-      this._sendMessage("Target.setAutoAttach", {
-        autoAttach: true,
-        waitForDebuggerOnStart: false,
-        flatten: true,
-      }),
-      this._sendMessage("Target.setDiscoverTargets", { discover: true }),
+      this._sendMessage(
+        Target.SetAutoAttachCommand.id,
+        Target.SetAutoAttachCommand.params.parse({
+          autoAttach: true,
+          waitForDebuggerOnStart: false,
+          flatten: true,
+        }),
+      ),
+      this._sendMessage(
+        Target.SetDiscoverTargetsCommand.id,
+        Target.SetDiscoverTargetsCommand.params.parse({ discover: true }),
+      ),
     ]);
   }
 
@@ -1054,11 +1121,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   on<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   on(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  on(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  on(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  on(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  on(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       const name = normalizeModCDPName(event_name);
       this.event_schemas.set(name, event_name);
@@ -1069,11 +1136,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   once<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   once(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  once(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  once(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  once(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  once(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       const name = normalizeModCDPName(event_name);
       this.event_schemas.set(name, event_name);
@@ -1084,11 +1151,11 @@ export class ModCDPClient extends ModCDPEventEmitter {
 
   off<TEvent extends z.ZodType & ModCDPNamedValue>(
     event_name: TEvent,
-    listener: (event: ModCDPEventPayload<TEvent>) => void,
+    listener: (event: ModCDPEventPayload<TEvent>, sessionId: string | null) => void,
   ): this;
   off(event_name: string | symbol, listener: (...args: unknown[]) => void): this;
-  off(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void): this;
-  off(event_name: ModCDPEventNameInput, listener: (...args: unknown[]) => void) {
+  off(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void): this;
+  off(event_name: ModCDPEventNameInput, listener: (...args: any[]) => void) {
     if (typeof event_name !== "string" && typeof event_name !== "symbol") {
       return super.off(normalizeModCDPName(event_name), listener);
     }
@@ -1158,7 +1225,9 @@ export class ModCDPClient extends ModCDPEventEmitter {
     let unwrap = null;
     for (const step of command.steps) {
       const step_params =
-        step.method === "Runtime.callFunctionOn" && step.params && !Object.hasOwn(step.params, "executionContextId")
+        step.method === Runtime.CallFunctionOnCommand.id &&
+        step.params &&
+        !Object.hasOwn(step.params, "executionContextId")
           ? {
               ...step.params,
               executionContextId:
@@ -1254,42 +1323,29 @@ export class ModCDPClient extends ModCDPEventEmitter {
       return;
     }
     const event = CdpEventMessageSchema.parse(msg);
+    const eventParams = (event.params || {}) as ProtocolPayload;
+    for (const [upstream_event, listeners] of this.upstream_event_listeners) {
+      if (upstream_event.id !== event.method) continue;
+      for (const listener of listeners) listener(eventParams, null, event.sessionId || null);
+    }
     if (event.sessionId === this.ext_session_id) {
-      if (event.method === "Runtime.executionContextCreated") {
-        this.auto_sessions.recordProtocolEvent(event.method, event.params || {}, event.sessionId || null);
-      }
-      if (event.method !== "Runtime.bindingCalled") return;
+      if (event.method !== this.Runtime.bindingCalled.id) return;
       const u = unwrapEventIfNeeded(
         event.method,
-        (event.params || {}) as RuntimeBindingCalledEvent,
+        eventParams as RuntimeBindingCalledEvent,
         event.sessionId || null,
         this.ext_session_id,
       );
       if (u) {
         const payload = this._parseEventPayload(u.event, u.data);
-        this.auto_sessions.recordProtocolEvent(u.event, payload as ProtocolPayload, u.sessionId);
         this.emit(u.event, payload, u.sessionId);
       }
       return;
     }
     if (event.method) {
-      const data = event.params || {};
-      const payload = this._parseEventPayload(event.method, data);
-      this.auto_sessions.recordProtocolEvent(event.method, payload as ProtocolPayload, event.sessionId || null);
+      const payload = this._parseEventPayload(event.method, eventParams);
       this.emit(event.method, payload, event.sessionId || null);
     }
-  }
-
-  get auto_target_sessions() {
-    return this.auto_sessions.target_sessions;
-  }
-
-  get auto_session_targets() {
-    return this.auto_sessions.session_targets;
-  }
-
-  get runtime_execution_contexts() {
-    return this.auto_sessions.execution_contexts;
   }
 }
 

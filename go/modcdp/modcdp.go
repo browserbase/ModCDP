@@ -47,11 +47,6 @@ type NativeMessagingUpstreamTransportOptions = transport.NativeMessagingUpstream
 type NatsUpstreamTransport = transport.NatsUpstreamTransport
 type NatsUpstreamTransportOptions = transport.NatsUpstreamTransportOptions
 type AutoSessionRouter = client.AutoSessionRouter
-type TargetTargetCreatedEvent = client.TargetTargetCreatedEvent
-type TargetSetDiscoverTargetsParams = client.TargetSetDiscoverTargetsParams
-type TargetCreateTargetParams = client.TargetCreateTargetParams
-type TargetActivateTargetParams = client.TargetActivateTargetParams
-type TargetTargetID = client.TargetTargetID
 
 var New = client.New
 var Bool = client.Bool

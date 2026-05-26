@@ -70,7 +70,7 @@ type NoopBrowserLauncher = launcher.NoopBrowserLauncher
 type ExtensionInjectorConfig = types.ExtensionInjectorConfig
 type ExtensionInjectionResult = types.ExtensionInjectionResult
 type SendCDP = types.SendCDP
-type AttachToTarget = types.AttachToTarget
+type EnsureSessionForTarget = types.EnsureSessionForTarget
 type ExtensionInjector = injector.ExtensionInjector
 type DiscoveredExtensionInjector = injector.DiscoveredExtensionInjector
 type BBBrowserExtensionInjector = injector.BBBrowserExtensionInjector
@@ -831,12 +831,7 @@ func (c *ModCDPClient) serverNeedsLoopbackCDP() bool {
 	if c.Server == nil || c.Server.ServerLoopbackCDPURL != "" {
 		return false
 	}
-	for _, route := range c.Server.ServerRoutes {
-		if route == "loopback_cdp" {
-			return true
-		}
-	}
-	return false
+	return c.Server.ServerRoutes["*.*"] == "loopback_cdp"
 }
 
 func (c *ModCDPClient) ensureModCDPServerConfigured() error {
@@ -1198,11 +1193,11 @@ func (c *ModCDPClient) validateEventData(event string, data any) (any, bool) {
 }
 
 func (c *ModCDPClient) Send(method string, params map[string]any, sessionID ...string) (any, error) {
-	targetSessionID := ""
+	cdpSessionID := ""
 	if len(sessionID) > 0 {
-		targetSessionID = sessionID[0]
+		cdpSessionID = sessionID[0]
 	}
-	return c.sendCommand(method, params, targetSessionID, true)
+	return c.sendCommand(method, params, cdpSessionID, true)
 }
 
 func (d ModDomain) Evaluate(params map[string]any) (any, error) {
@@ -1250,7 +1245,7 @@ func (d ModDomain) Ping(params map[string]any) (any, error) {
 	return d.client.Send("Mod.ping", params)
 }
 
-func (c *ModCDPClient) sendCommand(method string, params map[string]any, targetSessionID string, validateSchema bool) (any, error) {
+func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSessionID string, validateSchema bool) (any, error) {
 	startedAt := time.Now().UnixMilli()
 	if params == nil {
 		params = map[string]any{}
@@ -1324,7 +1319,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, targetS
 		}
 		return result, nil
 	}
-	command, err := translate.WrapCommandIfNeeded(method, params, c.Client.ClientRoutes, c.ExtSessionID, targetSessionID)
+	command, err := translate.WrapCommandIfNeeded(method, params, c.Client.ClientRoutes, cdpSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -1355,11 +1350,11 @@ func (c *ModCDPClient) SendRaw(method string, params map[string]any, sessionID .
 	if params == nil {
 		params = map[string]any{}
 	}
-	targetSessionID := ""
+	cdpSessionID := ""
 	if len(sessionID) > 0 {
-		targetSessionID = sessionID[0]
+		cdpSessionID = sessionID[0]
 	}
-	result, err := c.sendMessage(method, params, targetSessionID)
+	result, err := c.sendMessage(method, params, cdpSessionID)
 	completedAt := time.Now().UnixMilli()
 	c.LastRawTiming = map[string]any{
 		"method":       method,
@@ -1532,16 +1527,16 @@ func isKnownExtensionMode(mode string) bool {
 
 func (c *ModCDPClient) baseExtensionInjectorConfig(send SendCDP) ExtensionInjectorConfig {
 	trustMatchedServiceWorker := c.trustServiceWorkerTarget()
-	var attachToTarget AttachToTarget
+	var ensureSessionForTarget EnsureSessionForTarget
 	if send != nil {
-		attachToTarget = func(targetID string) string {
-			return c.ensureSessionIDForTarget(targetID, time.Duration(c.Injector.InjectorServiceWorkerProbeTimeoutMS)*time.Millisecond, true)
+		ensureSessionForTarget = func(targetID string, timeoutMS int, allowAttach bool) string {
+			return c.ensureSessionForTarget(targetID, time.Duration(timeoutMS)*time.Millisecond, allowAttach)
 		}
 	}
 	return ExtensionInjectorConfig{
-		Send:               send,
-		SessionIDForTarget: func(targetID string) string { return c.autoSessions.SessionIDForTarget(targetID) },
-		AttachToTarget:     attachToTarget,
+		Send:                    send,
+		SessionId_from_targetId: c.autoSessions.SessionId_from_targetId,
+		EnsureSessionForTarget:  ensureSessionForTarget,
 		WaitForExecutionContext: func(sessionID string, timeoutMS int) int {
 			contextID, _ := c.autoSessions.WaitForExecutionContext(sessionID, timeoutMS)
 			return contextID
@@ -1904,23 +1899,8 @@ func (c *ModCDPClient) trustServiceWorkerTarget() bool {
 	return false
 }
 
-func (c *ModCDPClient) sessionIDForTarget(targetID string, timeout time.Duration) string {
-	if timeout <= 0 {
-		return c.autoSessions.SessionIDForTarget(targetID)
-	}
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline.Add(time.Millisecond)) {
-		sessionID := c.autoSessions.SessionIDForTarget(targetID)
-		if sessionID != "" {
-			return sessionID
-		}
-		time.Sleep(time.Duration(c.Injector.InjectorTargetSessionPollIntervalMS) * time.Millisecond)
-	}
-	return ""
-}
-
-func (c *ModCDPClient) ensureSessionIDForTarget(targetID string, timeout time.Duration, allowAttach bool) string {
-	sessionID := c.autoSessions.SessionIDForTarget(targetID)
+func (c *ModCDPClient) ensureSessionForTarget(targetID string, timeout time.Duration, allowAttach bool) string {
+	sessionID := c.autoSessions.SessionId_from_targetId[targetID]
 	if sessionID != "" {
 		return sessionID
 	}
@@ -1930,5 +1910,16 @@ func (c *ModCDPClient) ensureSessionIDForTarget(targetID string, timeout time.Du
 			return attachedSessionID
 		}
 	}
-	return c.sessionIDForTarget(targetID, timeout)
+	if timeout <= 0 {
+		return c.autoSessions.SessionId_from_targetId[targetID]
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline.Add(time.Millisecond)) {
+		sessionID := c.autoSessions.SessionId_from_targetId[targetID]
+		if sessionID != "" {
+			return sessionID
+		}
+		time.Sleep(time.Duration(c.Injector.InjectorTargetSessionPollIntervalMS) * time.Millisecond)
+	}
+	return ""
 }

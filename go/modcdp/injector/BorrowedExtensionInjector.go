@@ -73,7 +73,7 @@ func (i *BorrowedExtensionInjector) borrowVisibleServiceWorkers() (*ExtensionInj
 func (i *BorrowedExtensionInjector) bootstrapTarget(target map[string]any) (*ExtensionInjectionResult, error) {
 	targetID, _ := target["targetId"].(string)
 	targetURL, _ := target["url"].(string)
-	sessionID := i.ensureSessionIDForTarget(targetID, i.Options.InjectorServiceWorkerProbeTimeoutMS, true)
+	sessionID := i.ensureSessionForTarget(targetID, i.Options.InjectorServiceWorkerProbeTimeoutMS, true)
 	if sessionID == "" {
 		return nil, nil
 	}

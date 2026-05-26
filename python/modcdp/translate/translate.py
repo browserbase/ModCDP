@@ -1,7 +1,6 @@
 """Pure ModCDP <-> CDP translation helpers for the Python client."""
 
 import json
-import time
 from typing import cast
 
 from ..types.modcdp import (
@@ -77,16 +76,15 @@ def _call_function_params(function_declaration: str) -> RuntimeCallFunctionOnPar
 
 def _wrap_modcdp_evaluate(
     params: ProtocolParams,
-    session_id: str,
-    target_session_id: str | None = None,
+    cdp_session_id: str | None = None,
 ) -> RuntimeCallFunctionOnParams:
     expression = _required_string(params, "expression")
     user_params = params.get("params", {})
-    cdp_session_id = target_session_id or _optional_string(params, "cdpSessionId") or session_id
+    resolved_cdp_session_id = _optional_string(params, "cdpSessionId") or cdp_session_id
     return _call_function_params(
         "async function() {\n"
         f"  const params = {json.dumps(user_params)};\n"
-        f"  const cdp = globalThis.ModCDP.attachToSession({json.dumps(cdp_session_id)});\n"
+        f"  const cdp = globalThis.ModCDP.attachToSession({json.dumps(resolved_cdp_session_id)});\n"
         "  const ModCDP = globalThis.ModCDP;\n"
         "  const chrome = globalThis.chrome;\n"
         f"  const value = ({expression});\n"
@@ -151,7 +149,7 @@ def _wrap_modcdp_add_middleware(params: ProtocolParams) -> RuntimeCallFunctionOn
     )
 
 
-def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str) -> RuntimeCallFunctionOnParams:
+def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str | None) -> RuntimeCallFunctionOnParams:
     runtime_params = _call_function_params(
         "async function(method, paramsJson, cdpSessionId) { "
         "return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); "
@@ -164,12 +162,8 @@ def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str) -
 def _wrap_service_worker_command(
     method: str,
     params: ProtocolParams,
-    session_id: str,
-    target_session_id: str | None = None,
+    cdp_session_id: str | None = None,
 ) -> list[TranslatedStep]:
-    if method == "Mod.ping" and "sent_at" not in params:
-        params = {**params, "sent_at": int(time.time() * 1000)}
-
     if method == "Mod.addCustomEvent":
         return [
             {
@@ -180,13 +174,13 @@ def _wrap_service_worker_command(
         ]
     unwrap = "runtime"
     if method == "Mod.evaluate":
-        runtime_params = _wrap_modcdp_evaluate(params, session_id, target_session_id)
+        runtime_params = _wrap_modcdp_evaluate(params, cdp_session_id)
     elif method == "Mod.addCustomCommand":
         runtime_params = _wrap_modcdp_add_custom_command(params)
     elif method == "Mod.addMiddleware":
         runtime_params = _wrap_modcdp_add_middleware(params)
     else:
-        runtime_params = _wrap_custom_command(method, params, target_session_id or _optional_string(params, "cdpSessionId") or session_id)
+        runtime_params = _wrap_custom_command(method, params, _optional_string(params, "cdpSessionId") or cdp_session_id)
         unwrap = "runtime_json"
     return [{"method": "Runtime.callFunctionOn", "params": runtime_params, "unwrap": unwrap}]
 
@@ -197,22 +191,19 @@ def wrap_command_if_needed(
     *,
     routes: ModCDPRoutes | None = None,
     cdp_session_id: str | None = None,
-    target_cdp_session_id: str | None = None,
 ) -> TranslatedCommand:
     params = params or {}
     route = route_for(method, routes or DEFAULT_CLIENT_ROUTES)
     if route == "direct_cdp":
         step: TranslatedStep = {"method": method, "params": params}
-        if target_cdp_session_id:
-            step["sessionId"] = target_cdp_session_id
+        if cdp_session_id:
+            step["sessionId"] = cdp_session_id
         return {"route": route, "target": "direct_cdp", "steps": [step]}
     if route == "service_worker":
-        if cdp_session_id is None:
-            raise RuntimeError(f"service_worker route requires a CDP session id for {method}")
         return {
             "route": route,
             "target": "service_worker",
-            "steps": _wrap_service_worker_command(method, params, cdp_session_id, target_cdp_session_id),
+            "steps": _wrap_service_worker_command(method, params, cdp_session_id),
         }
     raise RuntimeError(f"Unsupported client route '{route}' for {method}")
 

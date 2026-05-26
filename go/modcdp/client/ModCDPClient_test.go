@@ -524,14 +524,14 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 	}
 }
 
-func TestModCDPClientOnlyExposesInjectorAttachAfterCDPSendIsAvailable(t *testing.T) {
+func TestModCDPClientOnlyExposesInjectorEnsureAfterCDPSendIsAvailable(t *testing.T) {
 	cdp := New(Options{})
 	disconnectedConfig := cdp.baseExtensionInjectorConfig(nil)
 	if disconnectedConfig.Send != nil {
 		t.Fatalf("disconnected Send = %#v", disconnectedConfig.Send)
 	}
-	if disconnectedConfig.AttachToTarget != nil {
-		t.Fatalf("disconnected AttachToTarget = %#v", disconnectedConfig.AttachToTarget)
+	if disconnectedConfig.EnsureSessionForTarget != nil {
+		t.Fatalf("disconnected EnsureSessionForTarget = %#v", disconnectedConfig.EnsureSessionForTarget)
 	}
 
 	connectedConfig := cdp.baseExtensionInjectorConfig(func(method string, params map[string]any, sessionID string) (map[string]any, error) {
@@ -540,8 +540,8 @@ func TestModCDPClientOnlyExposesInjectorAttachAfterCDPSendIsAvailable(t *testing
 	if connectedConfig.Send == nil {
 		t.Fatal("connected Send is nil")
 	}
-	if connectedConfig.AttachToTarget == nil {
-		t.Fatal("connected AttachToTarget is nil")
+	if connectedConfig.EnsureSessionForTarget == nil {
+		t.Fatal("connected EnsureSessionForTarget is nil")
 	}
 }
 

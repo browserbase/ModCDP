@@ -52,6 +52,19 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 		t.Fatalf("configure unwrap = %q", configured.Steps[0].Unwrap)
 	}
 
+	ping, err := wrapCommandIfNeeded("Mod.ping", map[string]any{}, DefaultClientRoutes(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pingArguments := ping.Steps[0].Params["arguments"].([]map[string]any)
+	var pingPayload map[string]any
+	if err := json.Unmarshal([]byte(pingArguments[1]["value"].(string)), &pingPayload); err != nil {
+		t.Fatal(err)
+	}
+	if len(pingPayload) != 0 {
+		t.Fatalf("ping params = %#v", pingPayload)
+	}
+
 	custom, err := wrapCommandIfNeeded(
 		"Custom.echo",
 		map[string]any{"secret": strings.Repeat("x", 100), "nested": map[string]any{"ok": true}},
@@ -81,6 +94,20 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 	}
 	if customArguments[2]["value"] != "session-1" {
 		t.Fatalf("session argument = %#v", customArguments[2])
+	}
+
+	customWithSession, err := wrapCommandIfNeeded(
+		"Custom.echo",
+		map[string]any{"secret": "targeted"},
+		DefaultClientRoutes(),
+		"target-session-1",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	customWithSessionArguments := customWithSession.Steps[0].Params["arguments"].([]map[string]any)
+	if customWithSessionArguments[2]["value"] != "target-session-1" {
+		t.Fatalf("target session argument = %#v", customWithSessionArguments[2])
 	}
 
 	unwrapped, err := unwrapResponseIfNeeded(map[string]any{"result": map[string]any{"type": "object", "value": map[string]any{"ok": true}}}, "runtime")

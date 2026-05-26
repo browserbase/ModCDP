@@ -106,8 +106,8 @@ test("ModCDPClient normalizes nested config owners", () => {
 test("ModCDPClient dispatches root events before extension session is attached", () => {
   const cdp = new ModCDPClient();
   const seen: string[] = [];
-  cdp.on("Target.targetCreated", (payload: { targetInfo?: { targetId?: string } }) => {
-    seen.push(String(payload.targetInfo?.targetId));
+  cdp.on(cdp.Target.targetCreated, (payload) => {
+    seen.push(payload.targetInfo.targetId);
   });
 
   cdp._onRecv({
@@ -130,10 +130,10 @@ test("ModCDPClient dispatches root events before extension session is attached",
 test("ModCDPClient event dispatch snapshots handlers when once removes itself", () => {
   const cdp = new ModCDPClient();
   const seen: string[] = [];
-  cdp.once("Target.targetCreated", () => {
+  cdp.once(cdp.Target.targetCreated, () => {
     seen.push("once");
   });
-  cdp.on("Target.targetCreated", () => {
+  cdp.on(cdp.Target.targetCreated, () => {
     seen.push("persistent");
   });
 
@@ -196,6 +196,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       launcher_mode: "local",
       launcher_options: {
         headless: true,
+        chrome_ready_timeout_ms: 60_000,
       },
     },
     upstream: { upstream_mode: "ws" },
@@ -407,15 +408,15 @@ test("ModCDPClient preserves explicit null server config", () => {
   assert.equal(cdp.server, null);
 });
 
-test("ModCDPClient only exposes injector attach after CDP send is available", () => {
+test("ModCDPClient only exposes injector ensure after CDP send is available", () => {
   const cdp = new ModCDPClient();
   const disconnected_config = cdp._baseInjectorConfig(null);
   assert.equal(disconnected_config.send, null);
-  assert.equal(disconnected_config.attachToTarget, null);
+  assert.equal(disconnected_config.ensureSessionForTarget, null);
 
   const connected_config = cdp._baseInjectorConfig(async () => ({}));
   assert.equal(typeof connected_config.send, "function");
-  assert.equal(typeof connected_config.attachToTarget, "function");
+  assert.equal(typeof connected_config.ensureSessionForTarget, "function");
 });
 
 test("ModCDPClient defaults launched ModCDP-server upstreams to extension auto", () => {

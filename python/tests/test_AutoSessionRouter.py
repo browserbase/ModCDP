@@ -13,54 +13,6 @@ from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
 
 
 class AutoSessionRouterTests(unittest.TestCase):
-    def test_rejects_pending_execution_context_waiters_when_session_detaches(self) -> None:
-        router = AutoSessionRouter(lambda _method, _params, _session_id: {}, lambda: 5_000)
-        result: Queue[int | BaseException] = Queue()
-        threading.Thread(
-            target=lambda: _put_result(result, lambda: router.waitForExecutionContext("detached-session", 5_000)),
-            daemon=True,
-        ).start()
-
-        router.recordProtocolEvent(
-            "Target.attachedToTarget",
-            {"sessionId": "detached-session", "targetInfo": {"targetId": "target-1", "type": "page"}},
-            None,
-        )
-        router.recordProtocolEvent("Target.detachedFromTarget", {"sessionId": "detached-session"}, None)
-        router.recordProtocolEvent(
-            "Runtime.executionContextCreated",
-            {"context": {"id": 42}},
-            "detached-session",
-        )
-
-        error = result.get(timeout=1)
-        self.assertIsInstance(error, RuntimeError)
-        self.assertIn("Runtime execution context wait cancelled because session detached-session detached.", str(error))
-        self.assertIsNone(router.sessionIdForTarget("target-1"))
-        self.assertNotIn("detached-session", router.execution_contexts)
-
-    def test_bounds_detached_session_guards_and_clears_them_when_session_reattaches(self) -> None:
-        router = AutoSessionRouter(lambda _method, _params, _session_id: {}, lambda: 5_000)
-
-        for index in range(1034):
-            router.recordProtocolEvent("Target.detachedFromTarget", {"sessionId": f"detached-session-{index}"}, None)
-
-        self.assertLessEqual(len(router._detached_sessions), 1024)
-
-        recent_session_id = "detached-session-1033"
-        router.recordProtocolEvent("Runtime.executionContextCreated", {"context": {"id": 42}}, recent_session_id)
-        self.assertNotIn(recent_session_id, router.execution_contexts)
-
-        router.recordProtocolEvent(
-            "Target.attachedToTarget",
-            {"sessionId": recent_session_id, "targetInfo": {"targetId": "target-reattached", "type": "page"}},
-            None,
-        )
-        router.recordProtocolEvent("Runtime.executionContextCreated", {"context": {"id": 43}}, recent_session_id)
-
-        self.assertEqual(router.sessionIdForTarget("target-reattached"), recent_session_id)
-        self.assertEqual(router.execution_contexts[recent_session_id], 43)
-
     def test_tracks_real_target_sessions_and_execution_contexts(self) -> None:
         chrome = LocalBrowserLauncher({"headless": True}).launch()
         ws = create_connection(str(chrome["cdp_url"]), timeout=10)
@@ -113,12 +65,14 @@ class AutoSessionRouterTests(unittest.TestCase):
         thread = threading.Thread(target=reader, daemon=True)
         thread.start()
         target_id: str | None = None
+        pending_target_id: str | None = None
         try:
             send("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True})
             send("Target.setDiscoverTargets", {"discover": True})
             created = send("Target.createTarget", {"url": "about:blank#modcdp-auto-session-router"})
-            target_id = str(created["targetId"])
-            session_id = _wait_for(lambda: router.sessionIdForTarget(target_id))
+            created_target_id = str(created["targetId"])
+            target_id = created_target_id
+            session_id = _wait_for(lambda: router.sessionId_from_targetId.get(created_target_id))
             context_result: Queue[int | BaseException] = Queue()
             threading.Thread(
                 target=lambda: _put_result(context_result, lambda: router.waitForExecutionContext(session_id, 30_000)),
@@ -132,11 +86,43 @@ class AutoSessionRouterTests(unittest.TestCase):
             self.assertEqual(router.execution_contexts[session_id], context_id)
 
             send("Target.detachFromTarget", {"sessionId": session_id})
-            _wait_for(lambda: None if router.sessionIdForTarget(target_id) else "detached")
+            _wait_for(lambda: None if router.sessionId_from_targetId.get(created_target_id) else "detached")
+            self.assertNotIn(session_id, router.execution_contexts)
+            send("Target.closeTarget", {"targetId": created_target_id})
+            target_id = None
+
+            pending_created = send("Target.createTarget", {"url": "about:blank#modcdp-auto-session-router-pending-context"})
+            created_pending_target_id = str(pending_created["targetId"])
+            pending_target_id = created_pending_target_id
+            pending_session_id = _wait_for(lambda: router.sessionId_from_targetId.get(created_pending_target_id))
+            pending_result: Queue[int | BaseException] = Queue()
+            threading.Thread(
+                target=lambda: _put_result(
+                    pending_result,
+                    lambda: router.waitForExecutionContext(pending_session_id, 30_000),
+                ),
+                daemon=True,
+            ).start()
+            send("Target.detachFromTarget", {"sessionId": pending_session_id})
+            pending_error = pending_result.get(timeout=35)
+            self.assertIsInstance(pending_error, RuntimeError)
+            self.assertIn(
+                f"Runtime execution context wait cancelled because session {pending_session_id} detached.",
+                str(pending_error),
+            )
+            _wait_for(lambda: None if router.sessionId_from_targetId.get(created_pending_target_id) else "detached")
+            self.assertNotIn(pending_session_id, router.execution_contexts)
+            send("Target.closeTarget", {"targetId": created_pending_target_id})
+            pending_target_id = None
         finally:
             if target_id:
                 try:
                     send("Target.closeTarget", {"targetId": target_id})
+                except Exception:
+                    pass
+            if pending_target_id:
+                try:
+                    send("Target.closeTarget", {"targetId": pending_target_id})
                 except Exception:
                     pass
             closed = True
