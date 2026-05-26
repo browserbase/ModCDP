@@ -4,7 +4,6 @@ import json
 import struct
 import sys
 import threading
-from pathlib import Path
 from collections.abc import Mapping
 from typing import Any
 
@@ -22,10 +21,8 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
         super().__init__()
         normalized_options = dict(options or {})
         self.upstream_nativemessaging_host_name = str(normalized_options.get("upstream_nativemessaging_host_name") or DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME)
-        self.url = f"native://{self.upstream_nativemessaging_host_name}"
         self.connected = False
         self._closed = False
-        self._reader: threading.Thread | None = None
 
     def update(self, config: dict[str, Any] | None = None) -> "NativeMessagingUpstreamTransport":
         return self
@@ -41,8 +38,7 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
             return
         self.connected = True
         self._closed = False
-        self._reader = threading.Thread(target=self._read_loop, daemon=True)
-        self._reader.start()
+        threading.Thread(target=self._read_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
         if not self.connected:
@@ -66,28 +62,6 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
         except Exception as error:
             if not self._closed:
                 self._emit_close(error if isinstance(error, Exception) else Exception(str(error)))
-
-def default_native_messaging_manifest_paths(upstream_nativemessaging_host_name: str, home: str | None = None) -> list[str]:
-    home = home or str(Path.home())
-    if sys.platform == "darwin":
-        return [
-            f"{home}/Library/Application Support/Google/Chrome/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/Library/Application Support/Google/Chrome SxS/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/Library/Application Support/Chromium/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-        ]
-    if sys.platform.startswith("linux"):
-        return [
-            f"{home}/.config/google-chrome/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/.config/google-chrome-for-testing/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/.config/chromium/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-            f"{home}/.config/chromium-browser/NativeMessagingHosts/{upstream_nativemessaging_host_name}.json",
-        ]
-    if sys.platform.startswith("win"):
-        return [str(Path(home) / ".modcdp" / "native-messaging" / f"{upstream_nativemessaging_host_name}.json")]
-    raise RuntimeError("Native messaging host manifest path discovery is not supported on this platform.")
 
 
 def _write_length_prefixed_json(stream: Any, message: dict[str, Any]) -> None:

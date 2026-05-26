@@ -1,6 +1,4 @@
 import type { z } from "zod";
-import path from "node:path";
-import os from "node:os";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
@@ -14,11 +12,10 @@ type NativeMessagingOptions = {
 export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nativemessaging" as const;
   readonly endpoint_kind = "modcdp_server" as const;
-  upstream_nativemessaging_url: string;
+  declare upstream_nativemessaging_host_name: string;
   private connected = false;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
-  declare upstream_nativemessaging_host_name: string;
 
   constructor({
     upstream_nativemessaging_host_name = DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
@@ -26,7 +23,6 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     super();
     this.upstream_nativemessaging_host_name =
       upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
-    this.upstream_nativemessaging_url = `native://${this.upstream_nativemessaging_host_name}`;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -116,31 +112,6 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     }
     this.connected = false;
   }
-}
-
-export function defaultNativeMessagingManifestPaths(upstream_nativemessaging_host_name: string, home = os.homedir()) {
-  if (process.platform === "darwin") {
-    return [
-      `${home}/Library/Application Support/Google/Chrome/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/Library/Application Support/Google Chrome for Testing/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/Library/Application Support/Google Chrome SxS/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/Library/Application Support/Chromium/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-    ];
-  }
-  if (process.platform === "linux") {
-    return [
-      `${home}/.config/google-chrome/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/.config/google-chrome-for-testing/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/.config/chromium/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-      `${home}/.config/chromium-browser/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
-    ];
-  }
-  if (process.platform === "win32") {
-    return [path.join(home, ".modcdp", "native-messaging", `${upstream_nativemessaging_host_name}.json`)];
-  }
-  throw new Error("Native messaging host manifest path discovery is not supported on this platform.");
 }
 
 function writeLengthPrefixedJSON(stream: { write: (chunk: Buffer) => void }, message: unknown) {

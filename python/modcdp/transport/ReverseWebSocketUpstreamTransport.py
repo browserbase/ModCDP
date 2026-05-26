@@ -28,8 +28,6 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
         self.wait_timeout_ms = int(options.get("upstream_reversews_wait_timeout_ms") or DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS)
         self.server_socket: socket.socket | None = None
         self.socket: socket.socket | None = None
-        self.accept_thread: threading.Thread | None = None
-        self.reader_thread: threading.Thread | None = None
         self.peer_info: dict[str, Any] | None = None
         self.peer_event = threading.Event()
         self._peer_condition = threading.Condition()
@@ -72,8 +70,7 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
             self._close_generation += 1
             self.peer_event.clear()
         self.closed = False
-        self.accept_thread = threading.Thread(target=self._accept_loop, daemon=True)
-        self.accept_thread.start()
+        threading.Thread(target=self._accept_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
         if self.socket is None:
@@ -141,8 +138,7 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
                 self.peer_info = hello
                 self.peer_event.set()
                 self._peer_condition.notify_all()
-            self.reader_thread = threading.Thread(target=self._read_loop, args=(sock,), daemon=True)
-            self.reader_thread.start()
+            threading.Thread(target=self._read_loop, args=(sock,), daemon=True).start()
         except Exception as error:
             try:
                 sock.close()

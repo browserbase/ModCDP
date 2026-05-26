@@ -16,7 +16,6 @@ class PipeUpstreamTransport(UpstreamTransport):
         options = options or {}
         self.pipe_read = options.get("pipe_read")
         self.pipe_write = options.get("pipe_write")
-        self._thread: threading.Thread | None = None
         self._connected = False
         self._closed = False
 
@@ -36,8 +35,7 @@ class PipeUpstreamTransport(UpstreamTransport):
             return
         self._connected = True
         self._closed = False
-        self._thread = threading.Thread(target=self._read_loop, daemon=True)
-        self._thread.start()
+        threading.Thread(target=self._read_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
         if not self._connected or self.pipe_write is None:

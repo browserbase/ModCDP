@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
 	"sync"
 )
 
@@ -17,7 +15,6 @@ const DefaultUpstreamNativeMessagingHostName = "com.modcdp.bridge"
 type NativeMessagingUpstreamTransport struct {
 	UpstreamTransport
 	UpstreamNativeMessagingHostName string
-	URL                             string
 	writeMu                         sync.Mutex
 	stateMu                         sync.Mutex
 	connected                       bool
@@ -32,7 +29,6 @@ func NewNativeMessagingUpstreamTransport(options NativeMessagingUpstreamTranspor
 	nativeHostName := firstNonEmptyString(options.UpstreamNativeMessagingHostName, DefaultUpstreamNativeMessagingHostName)
 	return &NativeMessagingUpstreamTransport{
 		UpstreamNativeMessagingHostName: nativeHostName,
-		URL:                             "native://" + nativeHostName,
 	}
 }
 
@@ -108,32 +104,6 @@ func (t *NativeMessagingUpstreamTransport) readLoop() {
 		}
 		t.emitRecv(message)
 	}
-}
-
-func DefaultUpstreamNativeMessagingManifestPaths(nativeHostName string) []string {
-	home, _ := os.UserHomeDir()
-	if runtime.GOOS == "darwin" {
-		return []string{
-			filepath.Join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, "Library/Application Support/Google/Chrome Canary/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, "Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, "Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, "Library/Application Support/Google/Chrome SxS/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, "Library/Application Support/Chromium/NativeMessagingHosts", nativeHostName+".json"),
-		}
-	}
-	if runtime.GOOS == "linux" {
-		return []string{
-			filepath.Join(home, ".config/google-chrome/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, ".config/google-chrome-for-testing/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, ".config/chromium/NativeMessagingHosts", nativeHostName+".json"),
-			filepath.Join(home, ".config/chromium-browser/NativeMessagingHosts", nativeHostName+".json"),
-		}
-	}
-	if runtime.GOOS == "windows" {
-		return []string{filepath.Join(home, ".modcdp", "native-messaging", nativeHostName+".json")}
-	}
-	return nil
 }
 
 func writeLengthPrefixedJSON(writer io.Writer, message map[string]any) error {
