@@ -39,7 +39,6 @@ class NatsUpstreamTransport(UpstreamTransport):
         self.wait_timeout_ms = int(normalized_options.get("upstream_nats_wait_timeout_ms") or DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS)
         self.socket: WebSocket | socket.socket | None = None
         self.connected = False
-        self.closed = False
         self.peer_seen = threading.Event()
         self._peer_condition = threading.Condition()
         self._close_generation = 0
@@ -70,7 +69,6 @@ class NatsUpstreamTransport(UpstreamTransport):
     def connect(self) -> None:
         if self.connected:
             return
-        self.closed = False
         with self._peer_condition:
             self._close_generation += 1
             close_generation = self._close_generation
@@ -114,7 +112,6 @@ class NatsUpstreamTransport(UpstreamTransport):
                 self._peer_condition.wait(remaining)
 
     def close(self) -> None:
-        self.closed = True
         try:
             if isinstance(self.socket, WebSocket):
                 self.socket.close()
@@ -153,7 +150,7 @@ class NatsUpstreamTransport(UpstreamTransport):
 
     def _generation_closed(self, close_generation: int) -> bool:
         with self._peer_condition:
-            return self.closed or close_generation != self._close_generation
+            return close_generation != self._close_generation
 
     def _read_websocket_loop(self, ws: WebSocket, close_generation: int) -> None:
         try:

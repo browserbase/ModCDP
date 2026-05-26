@@ -5,7 +5,7 @@ import {
   type CdpResponseMessage,
   type ModCDPConfigureParams,
 } from "../types/modcdp.js";
-import { DownstreamTransport } from "../transport/DownstreamTransport.js";
+import { DownstreamTransport } from "./DownstreamTransport.js";
 
 export const DEFAULT_NATIVE_BRIDGE_HOST_NAME = "com.modcdp.bridge";
 export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
@@ -52,11 +52,11 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
 
   // Number of native connection attempts. Incremented by connect, read by the
   // server status surface.
-  attempts = 0;
+  private attempts = 0;
 
   // Last native messaging error. Updated by connect/disconnect, read by the
   // server status surface.
-  last_error: string | null = null;
+  private last_error: string | null = null;
 
   // Request object -> native port that sent it. Written by handleMessage and
   // read by sendResponse so responses go only to the originating downstream client.

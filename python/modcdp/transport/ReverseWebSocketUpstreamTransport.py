@@ -29,10 +29,8 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
         self.server_socket: socket.socket | None = None
         self.socket: socket.socket | None = None
         self.peer_info: dict[str, Any] | None = None
-        self.peer_event = threading.Event()
         self._peer_condition = threading.Condition()
         self._close_generation = 0
-        self.closed = False
         self.write_lock = threading.Lock()
         self._setBind(str(options.get("upstream_reversews_bind") or DEFAULT_UPSTREAM_REVERSEWS_BIND))
 
@@ -68,8 +66,6 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
         self.server_socket = server_socket
         with self._peer_condition:
             self._close_generation += 1
-            self.peer_event.clear()
-        self.closed = False
         threading.Thread(target=self._accept_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
@@ -94,7 +90,6 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
                 self._peer_condition.wait(remaining)
 
     def close(self) -> None:
-        self.closed = True
         for sock in (self.socket, self.server_socket):
             try:
                 sock.close() if sock is not None else None
@@ -103,15 +98,15 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
         self.socket = None
         self.server_socket = None
         self.peer_info = None
-        self.peer_event.clear()
         with self._peer_condition:
             self._close_generation += 1
             self._peer_condition.notify_all()
 
     def _accept_loop(self) -> None:
-        while not self.closed and self.server_socket is not None:
+        server_socket = self.server_socket
+        while self.server_socket is server_socket and server_socket is not None:
             try:
-                sock, _ = self.server_socket.accept()
+                sock, _ = server_socket.accept()
                 self._accept(sock)
             except OSError:
                 return
@@ -136,7 +131,6 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
             with self._peer_condition:
                 self.socket = sock
                 self.peer_info = hello
-                self.peer_event.set()
                 self._peer_condition.notify_all()
             threading.Thread(target=self._read_loop, args=(sock,), daemon=True).start()
         except Exception as error:
@@ -148,13 +142,13 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
 
     def _read_loop(self, sock: socket.socket) -> None:
         try:
-            while not self.closed and self.socket is sock:
+            while self.socket is sock:
                 data = _read_client_text_frame(sock, None)
                 if data is None:
                     break
                 self._parse_and_emit_recv(data)
         except Exception as error:
-            if not self.closed:
+            if self.socket is sock:
                 self._emit_close(error if isinstance(error, Exception) else RuntimeError(str(error)))
         finally:
             if self.socket is sock:
@@ -162,7 +156,6 @@ class ReverseWebSocketUpstreamTransport(UpstreamTransport):
                     if self.socket is sock:
                         self.socket = None
                         self.peer_info = None
-                        self.peer_event.clear()
                         self._peer_condition.notify_all()
             try:
                 sock.close()

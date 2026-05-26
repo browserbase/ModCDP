@@ -76,9 +76,6 @@ func TestNatsUpstreamTransportCloseResetsPeerWaitState(t *testing.T) {
 	if err := transport.WaitForPeer(); err == nil || !strings.Contains(err.Error(), "timed out waiting 5ms for NATS ModCDP peer") {
 		t.Fatalf("WaitForPeer after close = %v", err)
 	}
-	if transport.Closed() != true {
-		t.Fatalf("closed after Close = %v", transport.Closed())
-	}
 }
 
 func TestNatsUpstreamTransportCloseRejectsPendingPeerWaits(t *testing.T) {
@@ -117,26 +114,20 @@ func TestNatsUpstreamTransportReconnectsAfterCloseAgainstRealNATSServer(t *testi
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	if !transport.Connected() {
-		t.Fatal("expected transport to be connected")
+	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err != nil {
+		t.Fatalf("Send after Connect = %v", err)
 	}
 	if err := transport.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if transport.Connected() {
-		t.Fatal("expected transport to be disconnected after Close")
-	}
-	if !transport.Closed() {
-		t.Fatal("expected transport to be closed after Close")
+	if err := transport.Send(map[string]any{"id": 2, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "NATS transport is not connected") {
+		t.Fatalf("Send after Close error = %v", err)
 	}
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	if !transport.Connected() {
-		t.Fatal("expected transport to reconnect")
-	}
-	if transport.Closed() {
-		t.Fatal("expected transport.Closed() to reset after reconnect")
+	if err := transport.Send(map[string]any{"id": 3, "method": "Browser.getVersion"}); err != nil {
+		t.Fatalf("Send after reconnect = %v", err)
 	}
 }
 

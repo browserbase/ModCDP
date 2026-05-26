@@ -24,7 +24,6 @@ export class NatsUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nats" as const;
   readonly endpoint_kind = "modcdp_server" as const;
   private upstream_nats_role: NatsRole;
-  private wait_timeout_ms: number;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
   private ws_buffer = "";
@@ -47,8 +46,7 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     this.upstream_nats_url = url;
     this.upstream_nats_subject_prefix = upstream_nats_subject_prefix;
     this.upstream_nats_role = options.upstream_nats_role ?? "client";
-    this.wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
-    this.upstream_nats_wait_timeout_ms = this.wait_timeout_ms;
+    this.upstream_nats_wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
     this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
   }
 
@@ -115,7 +113,6 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     if (config.upstream_nats_role === "client" || config.upstream_nats_role === "browser")
       this.upstream_nats_role = config.upstream_nats_role;
     if (typeof config.upstream_nats_wait_timeout_ms === "number") {
-      this.wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
       this.upstream_nats_wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
     }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
@@ -156,10 +153,11 @@ export class NatsUpstreamTransport extends UpstreamTransport {
         reject: (error: Error) => void;
         timeout: ReturnType<typeof setTimeout>;
       };
+      const wait_timeout_ms = this.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
       const timeout = setTimeout(() => {
         this.peer_waiters.delete(waiter);
-        reject(new Error(`Timed out waiting ${this.wait_timeout_ms}ms for NATS ModCDP peer.`));
-      }, this.wait_timeout_ms);
+        reject(new Error(`Timed out waiting ${wait_timeout_ms}ms for NATS ModCDP peer.`));
+      }, wait_timeout_ms);
       waiter = { resolve, reject, timeout };
       this.peer_waiters.add(waiter);
     });

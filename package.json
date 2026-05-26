@@ -61,6 +61,10 @@
       "types": "./dist/js/src/transport/UpstreamTransport.d.ts",
       "import": "./dist/js/src/transport/UpstreamTransport.js"
     },
+    "./transport/DownstreamTransport.js": {
+      "types": "./dist/js/src/transport/DownstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/DownstreamTransport.js"
+    },
     "./transport/WebSocketUpstreamTransport.js": {
       "types": "./dist/js/src/transport/WebSocketUpstreamTransport.d.ts",
       "import": "./dist/js/src/transport/WebSocketUpstreamTransport.js"
@@ -80,6 +84,18 @@
     "./transport/NatsUpstreamTransport.js": {
       "types": "./dist/js/src/transport/NatsUpstreamTransport.d.ts",
       "import": "./dist/js/src/transport/NatsUpstreamTransport.js"
+    },
+    "./transport/ReverseWSDownstreamTransport.js": {
+      "types": "./dist/js/src/transport/ReverseWSDownstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/ReverseWSDownstreamTransport.js"
+    },
+    "./transport/NativeHostDownstreamTransport.js": {
+      "types": "./dist/js/src/transport/NativeHostDownstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/NativeHostDownstreamTransport.js"
+    },
+    "./transport/NATSDownstreamTransport.js": {
+      "types": "./dist/js/src/transport/NATSDownstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/NATSDownstreamTransport.js"
     },
     "./injector/ExtensionInjector.js": {
       "types": "./dist/js/src/injector/ExtensionInjector.d.ts",

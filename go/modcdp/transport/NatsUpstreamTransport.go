@@ -30,7 +30,6 @@ type NatsUpstreamTransport struct {
 	IsWebSocket               bool
 	buffer                    string
 	connected                 bool
-	closed                    bool
 	writeMu                   sync.Mutex
 	bufferMu                  sync.Mutex
 	peerCh                    chan struct{}
@@ -85,11 +84,11 @@ func (t *NatsUpstreamTransport) GetInjectorConfig() ExtensionInjectorConfig {
 }
 
 func (t *NatsUpstreamTransport) Connect() error {
-	if t.Connected() {
+	t.stateMu.Lock()
+	if t.connected {
+		t.stateMu.Unlock()
 		return nil
 	}
-	t.stateMu.Lock()
-	t.closed = false
 	t.closeCh = make(chan struct{})
 	closeCh := t.closeCh
 	t.stateMu.Unlock()
@@ -154,13 +153,15 @@ func (t *NatsUpstreamTransport) Connect() error {
 	}
 	t.stateMu.Lock()
 	t.connected = true
-	t.closed = false
 	t.stateMu.Unlock()
 	return nil
 }
 
 func (t *NatsUpstreamTransport) Send(message map[string]any) error {
-	if !t.Connected() || t.currentConn() == nil {
+	t.stateMu.Lock()
+	connected := t.connected
+	t.stateMu.Unlock()
+	if !connected || t.currentConn() == nil {
 		return fmt.Errorf("NATS transport is not connected")
 	}
 	return t.publish(t.outgoingSubject(), map[string]any{"type": "modcdp.nats.message", "message": message})
@@ -183,7 +184,6 @@ func (t *NatsUpstreamTransport) WaitForPeer() error {
 
 func (t *NatsUpstreamTransport) Close() error {
 	t.stateMu.Lock()
-	t.closed = true
 	t.connected = false
 	closeCh := t.closeCh
 	t.closeCh = make(chan struct{})
@@ -201,18 +201,6 @@ func (t *NatsUpstreamTransport) Close() error {
 	}
 	t.writeMu.Unlock()
 	return nil
-}
-
-func (t *NatsUpstreamTransport) Connected() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.connected
-}
-
-func (t *NatsUpstreamTransport) Closed() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.closed
 }
 
 func (t *NatsUpstreamTransport) currentConn() net.Conn {

@@ -5,7 +5,7 @@ import {
   type CdpResponseMessage,
   type ModCDPConfigureParams,
 } from "../types/modcdp.js";
-import { DownstreamTransport } from "../transport/DownstreamTransport.js";
+import { DownstreamTransport } from "./DownstreamTransport.js";
 
 export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 

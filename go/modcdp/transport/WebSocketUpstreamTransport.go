@@ -16,10 +16,6 @@ type WebSocketUpstreamTransport struct {
 	URL     string
 	Conn    net.Conn
 	writeMu sync.Mutex
-	stateMu sync.Mutex
-	ctx     context.Context
-	cancel  context.CancelFunc
-	closed  bool
 }
 
 type WebSocketUpstreamTransportOptions struct {
@@ -56,15 +52,13 @@ func (t *WebSocketUpstreamTransport) Connect() error {
 		return err
 	}
 	t.URL = resolvedURL
-	t.ctx, t.cancel = context.WithCancel(context.Background())
-	conn, _, _, err := ws.Dial(t.ctx, t.URL)
+	conn, _, _, err := ws.Dial(context.Background(), t.URL)
 	if err != nil {
 		return err
 	}
 	t.writeMu.Lock()
 	t.Conn = conn
 	t.writeMu.Unlock()
-	t.setClosed(false)
 	go t.readLoop(conn)
 	return nil
 }
@@ -84,11 +78,6 @@ func (t *WebSocketUpstreamTransport) Send(message map[string]any) error {
 }
 
 func (t *WebSocketUpstreamTransport) Close() error {
-	t.setClosed(true)
-	if t.cancel != nil {
-		t.cancel()
-		t.cancel = nil
-	}
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 	if t.Conn != nil {
@@ -100,10 +89,13 @@ func (t *WebSocketUpstreamTransport) Close() error {
 }
 
 func (t *WebSocketUpstreamTransport) readLoop(conn net.Conn) {
-	for !t.isClosed() {
+	for {
 		data, err := wsutil.ReadServerText(conn)
 		if err != nil {
-			if !t.isClosed() {
+			t.writeMu.Lock()
+			currentConn := t.Conn
+			t.writeMu.Unlock()
+			if currentConn == conn {
 				t.emitClose(err)
 			}
 			return
@@ -113,16 +105,4 @@ func (t *WebSocketUpstreamTransport) readLoop(conn net.Conn) {
 			t.emitRecv(message)
 		}
 	}
-}
-
-func (t *WebSocketUpstreamTransport) setClosed(closed bool) {
-	t.stateMu.Lock()
-	t.closed = closed
-	t.stateMu.Unlock()
-}
-
-func (t *WebSocketUpstreamTransport) isClosed() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.closed
 }

@@ -22,7 +22,6 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
         normalized_options = dict(options or {})
         self.upstream_nativemessaging_host_name = str(normalized_options.get("upstream_nativemessaging_host_name") or DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME)
         self.connected = False
-        self._closed = False
 
     def update(self, config: dict[str, Any] | None = None) -> "NativeMessagingUpstreamTransport":
         return self
@@ -37,7 +36,6 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
         if self.connected:
             return
         self.connected = True
-        self._closed = False
         threading.Thread(target=self._read_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
@@ -50,17 +48,16 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
             raise RuntimeError(f"Native messaging stdio is not connected for {self.upstream_nativemessaging_host_name}.")
 
     def close(self) -> None:
-        self._closed = True
         self.connected = False
 
     def _read_loop(self) -> None:
         try:
             for message in _read_length_prefixed_json_messages(sys.stdin.buffer):
-                if self._closed:
+                if not self.connected:
                     return
                 self._emit_recv(message)
         except Exception as error:
-            if not self._closed:
+            if self.connected:
                 self._emit_close(error if isinstance(error, Exception) else Exception(str(error)))
 
 

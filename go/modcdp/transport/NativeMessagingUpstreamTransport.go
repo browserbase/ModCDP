@@ -18,7 +18,6 @@ type NativeMessagingUpstreamTransport struct {
 	writeMu                         sync.Mutex
 	stateMu                         sync.Mutex
 	connected                       bool
-	closed                          bool
 }
 
 type NativeMessagingUpstreamTransportOptions struct {
@@ -50,7 +49,6 @@ func (t *NativeMessagingUpstreamTransport) Connect() error {
 		return nil
 	}
 	t.connected = true
-	t.closed = false
 	t.stateMu.Unlock()
 	go t.readLoop()
 	return nil
@@ -59,14 +57,20 @@ func (t *NativeMessagingUpstreamTransport) Connect() error {
 func (t *NativeMessagingUpstreamTransport) Send(message map[string]any) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
-	if !t.Connected() {
+	t.stateMu.Lock()
+	connected := t.connected
+	t.stateMu.Unlock()
+	if !connected {
 		return fmt.Errorf("native messaging stdio is not connected for %s", t.UpstreamNativeMessagingHostName)
 	}
 	return writeLengthPrefixedJSON(os.Stdout, message)
 }
 
 func (t *NativeMessagingUpstreamTransport) WaitForPeer() error {
-	if !t.Connected() {
+	t.stateMu.Lock()
+	connected := t.connected
+	t.stateMu.Unlock()
+	if !connected {
 		return fmt.Errorf("native messaging stdio is not connected for %s", t.UpstreamNativeMessagingHostName)
 	}
 	return nil
@@ -74,22 +78,9 @@ func (t *NativeMessagingUpstreamTransport) WaitForPeer() error {
 
 func (t *NativeMessagingUpstreamTransport) Close() error {
 	t.stateMu.Lock()
-	t.closed = true
 	t.connected = false
 	t.stateMu.Unlock()
 	return nil
-}
-
-func (t *NativeMessagingUpstreamTransport) Connected() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.connected
-}
-
-func (t *NativeMessagingUpstreamTransport) Closed() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.closed
 }
 
 func (t *NativeMessagingUpstreamTransport) readLoop() {
@@ -97,7 +88,10 @@ func (t *NativeMessagingUpstreamTransport) readLoop() {
 	for {
 		message, err := readLengthPrefixedJSON(reader)
 		if err != nil {
-			if !t.Closed() {
+			t.stateMu.Lock()
+			connected := t.connected
+			t.stateMu.Unlock()
+			if connected {
 				t.emitClose(err)
 			}
 			return

@@ -25,11 +25,20 @@ export { BorrowedExtensionInjector } from "./injector/BorrowedExtensionInjector.
 export { BBBrowserExtensionInjector } from "./injector/BBBrowserExtensionInjector.js";
 export { UpstreamTransport, endpointKindForUpstream, parseHostPort } from "./transport/UpstreamTransport.js";
 export type { UpstreamEndpointKind, UpstreamMode, UpstreamTransportConfig } from "./transport/UpstreamTransport.js";
+export { DownstreamTransport } from "./transport/DownstreamTransport.js";
+export type {
+  DownstreamRequestHandler,
+  DownstreamTransportName,
+  DownstreamTransportStatus,
+} from "./transport/DownstreamTransport.js";
 export { WebSocketUpstreamTransport } from "./transport/WebSocketUpstreamTransport.js";
 export { ReverseWebSocketUpstreamTransport } from "./transport/ReverseWebSocketUpstreamTransport.js";
 export { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUpstreamTransport.js";
 export { NatsUpstreamTransport } from "./transport/NatsUpstreamTransport.js";
 export { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
+export { ReverseWSDownstreamTransport } from "./transport/ReverseWSDownstreamTransport.js";
+export { NativeHostDownstreamTransport } from "./transport/NativeHostDownstreamTransport.js";
+export { NATSDownstreamTransport } from "./transport/NATSDownstreamTransport.js";
 export { AutoSessionRouter } from "./router/AutoSessionRouter.js";
 export { wrapCommandIfNeeded, unwrapResponseIfNeeded, unwrapEventIfNeeded } from "./translate/translate.js";
 export * as server from "./server/ModCDPServer.js";
@@ -45,11 +54,15 @@ export * as discoveredExtensionInjector from "./injector/DiscoveredExtensionInje
 export * as borrowedExtensionInjector from "./injector/BorrowedExtensionInjector.js";
 export * as bbBrowserExtensionInjector from "./injector/BBBrowserExtensionInjector.js";
 export * as upstreamTransport from "./transport/UpstreamTransport.js";
+export * as downstreamTransport from "./transport/DownstreamTransport.js";
 export * as webSocketUpstreamTransport from "./transport/WebSocketUpstreamTransport.js";
 export * as reverseWebSocketUpstreamTransport from "./transport/ReverseWebSocketUpstreamTransport.js";
 export * as nativeMessagingUpstreamTransport from "./transport/NativeMessagingUpstreamTransport.js";
 export * as natsUpstreamTransport from "./transport/NatsUpstreamTransport.js";
 export * as pipeUpstreamTransport from "./transport/PipeUpstreamTransport.js";
+export * as reverseWSDownstreamTransport from "./transport/ReverseWSDownstreamTransport.js";
+export * as nativeHostDownstreamTransport from "./transport/NativeHostDownstreamTransport.js";
+export * as natsDownstreamTransport from "./transport/NATSDownstreamTransport.js";
 export * as router from "./router/AutoSessionRouter.js";
 export * as translate from "./translate/translate.js";
 export * as proxy from "./proxy/proxy.js";

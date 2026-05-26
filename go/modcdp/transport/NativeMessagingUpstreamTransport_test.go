@@ -23,7 +23,4 @@ func TestNativeMessagingUpstreamTransportConnectsToNativeMessagingStdioDirectly(
 	if err := transport.Close(); err != nil {
 		t.Fatalf("Close = %v", err)
 	}
-	if !transport.Closed() {
-		t.Fatalf("closed after Close = %v", transport.Closed())
-	}
 }

@@ -14,7 +14,7 @@ type PipeUpstreamTransport struct {
 	PipeWrite *os.File
 	writeMu   sync.Mutex
 	stateMu   sync.Mutex
-	closed    bool
+	connected bool
 }
 
 type PipeUpstreamTransportOptions struct {
@@ -46,13 +46,22 @@ func (t *PipeUpstreamTransport) Connect() error {
 	if t.PipeRead == nil || t.PipeWrite == nil {
 		return fmt.Errorf("upstream.upstream_mode=pipe requires launcher-provided pipe_read and pipe_write handles")
 	}
-	t.setClosed(false)
+	t.stateMu.Lock()
+	if t.connected {
+		t.stateMu.Unlock()
+		return nil
+	}
+	t.connected = true
+	t.stateMu.Unlock()
 	go t.readLoop()
 	return nil
 }
 
 func (t *PipeUpstreamTransport) Send(message map[string]any) error {
-	if t.PipeWrite == nil || t.isClosed() {
+	t.stateMu.Lock()
+	connected := t.connected
+	t.stateMu.Unlock()
+	if t.PipeWrite == nil || !connected {
 		return fmt.Errorf("CDP pipe is not connected")
 	}
 	t.writeMu.Lock()
@@ -61,7 +70,9 @@ func (t *PipeUpstreamTransport) Send(message map[string]any) error {
 }
 
 func (t *PipeUpstreamTransport) Close() error {
-	t.setClosed(true)
+	t.stateMu.Lock()
+	t.connected = false
+	t.stateMu.Unlock()
 	if t.PipeRead != nil {
 		_ = t.PipeRead.Close()
 	}
@@ -75,24 +86,15 @@ func (t *PipeUpstreamTransport) readLoop() {
 	for {
 		message, err := launcher.ReadPipeMessage(t.PipeRead)
 		if err != nil {
-			if !t.isClosed() {
-				t.setClosed(true)
+			t.stateMu.Lock()
+			connected := t.connected
+			t.connected = false
+			t.stateMu.Unlock()
+			if connected {
 				t.emitClose(err)
 			}
 			return
 		}
 		t.emitRecv(message)
 	}
-}
-
-func (t *PipeUpstreamTransport) setClosed(closed bool) {
-	t.stateMu.Lock()
-	t.closed = closed
-	t.stateMu.Unlock()
-}
-
-func (t *PipeUpstreamTransport) isClosed() bool {
-	t.stateMu.Lock()
-	defer t.stateMu.Unlock()
-	return t.closed
 }

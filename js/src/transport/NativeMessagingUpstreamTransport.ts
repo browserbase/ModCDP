@@ -13,7 +13,6 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nativemessaging" as const;
   readonly endpoint_kind = "modcdp_server" as const;
   declare upstream_nativemessaging_host_name: string;
-  private connected = false;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
 
@@ -52,7 +51,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
-      if (!this.connected)
+      if (!this.read_native_message)
         throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
       writeLengthPrefixedJSON(process.stdout, command_or_message_or_method);
       return;
@@ -87,8 +86,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     if (typeof process !== "object" || !process?.versions?.node) {
       throw new Error("upstream.upstream_mode=nativemessaging requires Node.");
     }
-    if (this.connected) return;
-    this.connected = true;
+    if (this.read_native_message) return;
     this.read_native_message = (chunk) => {
       this.buffer = Buffer.concat([this.buffer, chunk]);
       this.buffer = readLengthPrefixedJSON(this.buffer, (message) => {
@@ -101,7 +99,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   }
 
   async waitForPeer() {
-    if (!this.connected)
+    if (!this.read_native_message)
       throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
   }
 
@@ -110,7 +108,6 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       process.stdin.off("data", this.read_native_message);
       this.read_native_message = null;
     }
-    this.connected = false;
   }
 }
 

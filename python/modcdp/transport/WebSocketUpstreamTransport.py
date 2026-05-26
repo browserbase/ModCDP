@@ -20,7 +20,6 @@ class WebSocketUpstreamTransport(UpstreamTransport):
         self.url = str(options.get("cdp_url") or "")
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None
-        self._closed = False
         self._generation = 0
 
     def update(self, config: dict[str, Any] | None = None) -> "WebSocketUpstreamTransport":
@@ -44,7 +43,6 @@ class WebSocketUpstreamTransport(UpstreamTransport):
         if previous_ws is not None:
             previous_ws.close()
         self.ws = create_connection(self.url, timeout=10)
-        self._closed = False
         self._reader_thread = threading.Thread(target=lambda: self._read_loop(generation), daemon=True)
         self._reader_thread.start()
 
@@ -59,7 +57,6 @@ class WebSocketUpstreamTransport(UpstreamTransport):
         return self.ws.recv()
 
     def close(self) -> None:
-        self._closed = True
         self._generation += 1
         if self.ws is not None:
             self.ws.close()
@@ -74,11 +71,11 @@ class WebSocketUpstreamTransport(UpstreamTransport):
         if ws is None:
             return
         try:
-            while not self._closed and self.ws is ws and self._generation == generation:
+            while self.ws is ws and self._generation == generation:
                 raw = ws.recv()
                 if not raw:
                     break
                 self._parse_and_emit_recv(raw)
         except Exception as error:
-            if not self._closed and self.ws is ws and self._generation == generation:
+            if self.ws is ws and self._generation == generation:
                 self._emit_close(error if isinstance(error, Exception) else RuntimeError(str(error)))

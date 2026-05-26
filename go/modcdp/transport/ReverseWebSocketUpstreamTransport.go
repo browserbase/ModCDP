@@ -18,7 +18,6 @@ const DefaultUpstreamReverseWSWaitTimeoutMS = 10_000
 
 type ReverseWebSocketUpstreamTransport struct {
 	UpstreamTransport
-	Bind          string
 	URL           string
 	WaitTimeoutMS int
 	Listener      net.Listener
@@ -68,8 +67,7 @@ func (t *ReverseWebSocketUpstreamTransport) setBind(bind string) {
 	if port == "" {
 		port = "29292"
 	}
-	t.Bind = net.JoinHostPort(host, port)
-	t.URL = "ws://" + t.Bind
+	t.URL = "ws://" + net.JoinHostPort(host, port)
 }
 
 func (t *ReverseWebSocketUpstreamTransport) Update(config map[string]any) {
@@ -85,10 +83,14 @@ func (t *ReverseWebSocketUpstreamTransport) Update(config map[string]any) {
 }
 
 func (t *ReverseWebSocketUpstreamTransport) Connect() error {
+	parsed, err := url.Parse(t.URL)
+	if err != nil {
+		return err
+	}
 	t.stateMu.Lock()
 	t.closeCh = make(chan struct{})
 	t.stateMu.Unlock()
-	listener, err := net.Listen("tcp", t.Bind)
+	listener, err := net.Listen("tcp", net.JoinHostPort(parsed.Hostname(), parsed.Port()))
 	if err != nil {
 		return err
 	}

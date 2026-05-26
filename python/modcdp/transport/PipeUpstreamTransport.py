@@ -17,7 +17,6 @@ class PipeUpstreamTransport(UpstreamTransport):
         self.pipe_read = options.get("pipe_read")
         self.pipe_write = options.get("pipe_write")
         self._connected = False
-        self._closed = False
 
     def update(self, config: dict[str, Any] | None = None) -> "PipeUpstreamTransport":
         config = config or {}
@@ -34,7 +33,6 @@ class PipeUpstreamTransport(UpstreamTransport):
         if self._connected:
             return
         self._connected = True
-        self._closed = False
         threading.Thread(target=self._read_loop, daemon=True).start()
 
     def send(self, message: dict[str, Any]) -> None:
@@ -44,22 +42,21 @@ class PipeUpstreamTransport(UpstreamTransport):
         self.pipe_write.flush()
 
     def close(self) -> None:
-        self._closed = True
+        self._connected = False
         for pipe in (self.pipe_read, self.pipe_write):
             try:
                 if pipe is not None:
                     pipe.close()
             except Exception:
                 pass
-        self._connected = False
 
     def _read_loop(self) -> None:
         buffer = b""
         try:
-            while not self._closed and self.pipe_read is not None:
+            while self._connected and self.pipe_read is not None:
                 chunk = self.pipe_read.read(1)
                 if not chunk:
-                    if not self._closed:
+                    if self._connected:
                         self._handle_close(RuntimeError("CDP pipe closed"))
                     break
                 buffer += chunk
@@ -69,7 +66,7 @@ class PipeUpstreamTransport(UpstreamTransport):
                 if raw:
                     self._parse_and_emit_recv(raw)
         except Exception as error:
-            if not self._closed:
+            if self._connected:
                 self._handle_close(error if isinstance(error, Exception) else Exception(str(error)))
 
     def _handle_close(self, error: Exception) -> None:

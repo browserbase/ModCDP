@@ -28,8 +28,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
   }>();
   peer_info: ReverseHello | null = null;
 
-  private wait_timeout_ms: number;
-
   get upstream_reversews_url() {
     return this.endpoint_url;
   }
@@ -45,7 +43,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     this.upstream_reversews_bind = upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND;
     this.upstream_reversews_wait_timeout_ms =
       upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
-    this.wait_timeout_ms = upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.endpoint_url = endpointFromBind(this.upstream_reversews_bind);
   }
 
@@ -104,7 +101,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     }
     if (typeof config.upstream_reversews_wait_timeout_ms === "number") {
       this.upstream_reversews_wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;
-      this.wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;
     }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
@@ -134,10 +130,11 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
         reject: (error: Error) => void;
         timeout: ReturnType<typeof setTimeout>;
       };
+      const wait_timeout_ms = this.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
       const timeout = setTimeout(() => {
         this.peer_waiters.delete(waiter);
-        reject(new Error(`Timed out waiting ${this.wait_timeout_ms}ms for reverse ModCDP extension connection.`));
-      }, this.wait_timeout_ms);
+        reject(new Error(`Timed out waiting ${wait_timeout_ms}ms for reverse ModCDP extension connection.`));
+      }, wait_timeout_ms);
       waiter = { resolve, reject, timeout };
       this.peer_waiters.add(waiter);
     });
@@ -164,7 +161,10 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
         socket.close(1008, message.slice(0, 120));
       } catch {}
     };
-    const timeout = setTimeout(() => fail("reverse hello timeout"), this.wait_timeout_ms);
+    const timeout = setTimeout(
+      () => fail("reverse hello timeout"),
+      this.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
+    );
     socket.once("message", (buf: unknown) => {
       clearTimeout(timeout);
       let hello: ReverseHello;

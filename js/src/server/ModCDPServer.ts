@@ -13,14 +13,14 @@ import { ProtocolPayloadSchema, normalizeModCDPPayloadSchema } from "../types/mo
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
 import { ChromeDebuggerTransport } from "./ChromeDebuggerTransport.js";
 import { LoopbackCdpTransport } from "./LoopbackCdpTransport.js";
-import { NativeHostDownstreamTransport } from "./NativeHostDownstreamTransport.js";
-import { NATSDownstreamTransport } from "./NATSDownstreamTransport.js";
-import { ReverseWSDownstreamTransport } from "./ReverseWSDownstreamTransport.js";
 import type {
   DownstreamTransport,
   DownstreamTransportName,
   DownstreamTransportStatus,
 } from "../transport/DownstreamTransport.js";
+import { NativeHostDownstreamTransport } from "../transport/NativeHostDownstreamTransport.js";
+import { NATSDownstreamTransport } from "../transport/NATSDownstreamTransport.js";
+import { ReverseWSDownstreamTransport } from "../transport/ReverseWSDownstreamTransport.js";
 import type {
   CdpEventMessage,
   CdpResponseMessage,
@@ -42,12 +42,12 @@ export const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
 export {
   DEFAULT_NATIVE_BRIDGE_HOST_NAME,
   DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
-} from "./NativeHostDownstreamTransport.js";
+} from "../transport/NativeHostDownstreamTransport.js";
 export {
   DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS,
   DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-} from "./NATSDownstreamTransport.js";
-export { DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS } from "./ReverseWSDownstreamTransport.js";
+} from "../transport/NATSDownstreamTransport.js";
+export { DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS } from "../transport/ReverseWSDownstreamTransport.js";
 
 type MiddlewarePhase = "request" | "response" | "event";
 type ProtocolCommandSchema = {
