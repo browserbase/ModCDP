@@ -48,6 +48,7 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     this.upstream_nats_subject_prefix = upstream_nats_subject_prefix;
     this.upstream_nats_role = options.upstream_nats_role ?? "client";
     this.wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
+    this.upstream_nats_wait_timeout_ms = this.wait_timeout_ms;
     this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
   }
 
@@ -113,8 +114,10 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     }
     if (config.upstream_nats_role === "client" || config.upstream_nats_role === "browser")
       this.upstream_nats_role = config.upstream_nats_role;
-    if (typeof config.upstream_nats_wait_timeout_ms === "number")
+    if (typeof config.upstream_nats_wait_timeout_ms === "number") {
       this.wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
+      this.upstream_nats_wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
+    }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
   }

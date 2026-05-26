@@ -372,6 +372,17 @@ export class ModCDPClient extends ModCDPEventEmitter {
       default:
         throw new Error(`unknown upstream.upstream_mode=${upstream_mode}`);
     }
+    this.upstream.upstream_nats_wait_timeout_ms =
+      upstream.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
+    this.upstream.upstream_reversews_wait_timeout_ms =
+      upstream.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
+    this.upstream.upstream_nativemessaging_manifest = upstream.upstream_nativemessaging_manifest ?? null;
+    this.upstream.upstream_nativemessaging_manifests = upstream.upstream_nativemessaging_manifests ?? [];
+    this.upstream.upstream_nativemessaging_host_name = upstream.upstream_nativemessaging_host_name ?? null;
+    this.upstream.upstream_nativemessaging_wait_timeout_ms =
+      upstream.upstream_nativemessaging_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS;
+    this.upstream.upstream_ws_connect_error_settle_timeout_ms =
+      upstream.upstream_ws_connect_error_settle_timeout_ms ?? DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
     this.injector = {
       injector_mode,
       injector_extension_path: injector.injector_extension_path ?? null,
@@ -1188,7 +1199,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
     const event = CdpEventMessageSchema.parse(msg);
     const eventParams = (event.params || {}) as ProtocolPayload;
     if (event.sessionId === this.ext_session_id) {
-      if (event.method !== this.Runtime.bindingCalled.id) return;
+      if (event.method !== Runtime.BindingCalledEvent.id) return;
       const u = unwrapEventIfNeeded(
         event.method,
         eventParams as RuntimeBindingCalledEvent,

@@ -56,6 +56,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
     this.extension_id = injector_extension_id || DEFAULT_MODCDP_EXTENSION_ID;
     this.wait_timeout_ms = upstream_nativemessaging_wait_timeout_ms;
+    this.upstream_nativemessaging_wait_timeout_ms = upstream_nativemessaging_wait_timeout_ms;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -121,8 +122,10 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       this.upstream_nativemessaging_host_name = config.upstream_nativemessaging_host_name;
       should_install_native_host = true;
     }
-    if (typeof config.upstream_nativemessaging_wait_timeout_ms === "number")
+    if (typeof config.upstream_nativemessaging_wait_timeout_ms === "number") {
       this.wait_timeout_ms = config.upstream_nativemessaging_wait_timeout_ms;
+      this.upstream_nativemessaging_wait_timeout_ms = config.upstream_nativemessaging_wait_timeout_ms;
+    }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     if (config.injector_extension_id) {
       this.extension_id = config.injector_extension_id;
