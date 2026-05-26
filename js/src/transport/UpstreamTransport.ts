@@ -82,7 +82,6 @@ export class UpstreamTransport {
   private recv_listeners = new Set<(message: CdpResponseMessage | CdpEventMessage) => void>();
   private close_listeners = new Set<(error: Error) => void>();
   private event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<UpstreamEventListener>>();
-  protected send_command: ((message: CdpCommandMessage) => void) | null = null;
 
   async connect() {
     throw new Error(`${this.constructor.name}.connect is not implemented.`);
@@ -133,11 +132,6 @@ export class UpstreamTransport {
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
-      if (!this.send_command) throw new Error(`${this.constructor.name}.send is not implemented.`);
-      this.send_command(command_or_message_or_method);
-      return;
-    }
-    if (typeof command_or_message_or_method === "object" && typeof command_or_message_or_method.id === "number") {
       throw new Error(`${this.constructor.name}.send is not implemented.`);
     }
     if (typeof command_or_message_or_method === "string") {

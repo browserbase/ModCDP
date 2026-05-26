@@ -2,8 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import type { Server, Socket } from "node:net";
+import type { z } from "zod";
 import { DEFAULT_MODCDP_EXTENSION_ID } from "../injector/ExtensionInjector.js";
-import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
 export const DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS = 10_000;
@@ -20,8 +24,8 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nativemessaging" as const;
   readonly endpoint_kind = "modcdp_server" as const;
   upstream_nativemessaging_url = "";
-  private server: any = null;
-  private socket: any = null;
+  private native_host_listener: Server | null = null;
+  private socket: Socket | null = null;
   private peer_waiters = new Set<{
     resolve: () => void;
     reject: (error: Error) => void;
@@ -52,11 +56,53 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
     this.extension_id = injector_extension_id || DEFAULT_MODCDP_EXTENSION_ID;
     this.wait_timeout_ms = upstream_nativemessaging_wait_timeout_ms;
-    this.send_command = (message) => {
+  }
+
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params?: z.input<Params>,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+    options: { timeout_ms?: number | null } = {},
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.socket || this.socket.destroyed)
         throw new Error(`No native messaging peer is connected for ${this.upstream_nativemessaging_host_name}.`);
-      writeLengthPrefixedJSON(this.socket, message);
-    };
+      writeLengthPrefixedJSON(this.socket, command_or_message_or_method);
+      return;
+    }
+    if (typeof command_or_message_or_method === "string") {
+      return super.send(
+        command_or_message_or_method,
+        params as ProtocolPayload,
+        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+        options,
+      );
+    }
+    return super.send(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
   }
 
   update(config: UpstreamTransportConfig = {}) {
@@ -108,7 +154,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     }
     const net = await import("node:net");
     const server = net.createServer((socket) => this.accept(socket));
-    this.server = server;
+    this.native_host_listener = server;
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(0, "127.0.0.1", () => resolve());
@@ -146,8 +192,9 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       this.socket?.destroy();
     } catch {}
     this.socket = null;
-    if (this.server) await new Promise<void>((resolve) => this.server.close(() => resolve()));
-    this.server = null;
+    if (this.native_host_listener)
+      await new Promise<void>((resolve) => this.native_host_listener?.close(() => resolve()));
+    this.native_host_listener = null;
     for (const waiter of this.peer_waiters) {
       clearTimeout(waiter.timeout);
       waiter.reject(
@@ -159,7 +206,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     this.peer_waiters.clear();
   }
 
-  private accept(socket: any) {
+  private accept(socket: Socket) {
     if (this.socket && this.socket !== socket) {
       try {
         this.socket.destroy();

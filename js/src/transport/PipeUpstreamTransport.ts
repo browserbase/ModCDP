@@ -1,4 +1,7 @@
-import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import type { z } from "zod";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export class PipeUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "pipe" as const;
@@ -22,10 +25,52 @@ export class PipeUpstreamTransport extends UpstreamTransport {
     this.pipe_read = pipe_read;
     this.pipe_write = pipe_write;
     this.upstream_cdp_url = cdp_url ?? "pipe://unknown";
-    this.send_command = (message) => {
+  }
+
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params?: z.input<Params>,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+    options: { timeout_ms?: number | null } = {},
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.pipe_write || !this.connected) throw new Error("CDP pipe is not connected.");
-      this.pipe_write.write(`${JSON.stringify(message)}\0`);
-    };
+      this.pipe_write.write(`${JSON.stringify(command_or_message_or_method)}\0`);
+      return;
+    }
+    if (typeof command_or_message_or_method === "string") {
+      return super.send(
+        command_or_message_or_method,
+        params as ProtocolPayload,
+        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+        options,
+      );
+    }
+    return super.send(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
   }
 
   update(config: UpstreamTransportConfig = {}) {

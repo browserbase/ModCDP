@@ -1,7 +1,10 @@
 import net from "node:net";
 import tls from "node:tls";
 import { randomUUID } from "node:crypto";
-import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import type { z } from "zod";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
 export const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
@@ -46,14 +49,56 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     this.upstream_nats_role = options.upstream_nats_role ?? "client";
     this.wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
     this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
-    this.send_command = (message) => {
+  }
+
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params?: z.input<Params>,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+    options: { timeout_ms?: number | null } = {},
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.connected || !this.socket) throw new Error("NATS transport is not connected.");
       this.publish(this.outgoingSubject(), {
         type: "modcdp.nats.message",
         ...(this.upstream_nats_role === "client" ? { reply_subject: this.client_reply_subject } : {}),
-        message,
+        message: command_or_message_or_method,
       });
-    };
+      return;
+    }
+    if (typeof command_or_message_or_method === "string") {
+      return super.send(
+        command_or_message_or_method,
+        params as ProtocolPayload,
+        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+        options,
+      );
+    }
+    return super.send(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
   }
 
   update(config: UpstreamTransportConfig = {}) {

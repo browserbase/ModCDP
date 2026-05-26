@@ -1,4 +1,9 @@
+import type { WebSocket as WsSocket, WebSocketServer as WsServer } from "ws";
+import type { z } from "zod";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import type { TargetRoute } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
 export const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
@@ -14,13 +19,8 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "reversews" as const;
   readonly endpoint_kind = "modcdp_server" as const;
   private endpoint_url: string;
-  private server: unknown = null;
-  private socket: {
-    readyState: number;
-    OPEN: number;
-    send: (data: string) => void;
-    close: (...args: unknown[]) => void;
-  } | null = null;
+  private reversews_listener: WsServer | null = null;
+  private socket: WsSocket | null = null;
   private peer_waiters = new Set<{
     resolve: () => void;
     reject: (error: Error) => void;
@@ -47,12 +47,54 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
       upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.wait_timeout_ms = upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.endpoint_url = endpointFromBind(this.upstream_reversews_bind);
-    this.send_command = (message) => {
+  }
+
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params?: z.input<Params>,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+    options: { timeout_ms?: number | null } = {},
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.socket || this.socket.readyState !== this.socket.OPEN) {
         throw new Error(`No reverse ModCDP extension peer is connected at ${this.endpoint_url}.`);
       }
-      this.socket.send(JSON.stringify(message));
-    };
+      this.socket.send(JSON.stringify(command_or_message_or_method));
+      return;
+    }
+    if (typeof command_or_message_or_method === "string") {
+      return super.send(
+        command_or_message_or_method,
+        params as ProtocolPayload,
+        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+        options,
+      );
+    }
+    return super.send(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
   }
 
   update(config: UpstreamTransportConfig = {}) {
@@ -76,7 +118,7 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     const { WebSocketServer } = await import("ws");
     const { host, port } = parseHostPort(this.endpoint_url, "127.0.0.1", 29292);
     const server = new WebSocketServer({ host, port });
-    this.server = server;
+    this.reversews_listener = server;
     server.on("connection", (socket) => this.accept(socket));
     await new Promise<void>((resolve, reject) => {
       server.once("listening", () => resolve());
@@ -107,11 +149,8 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     } catch {}
     this.socket = null;
     this.peer_info = null;
-    const server = this.server as {
-      close?: (callback: () => void) => void;
-    } | null;
-    if (server?.close) await new Promise<void>((resolve) => server.close?.(() => resolve()));
-    this.server = null;
+    if (this.reversews_listener) await new Promise<void>((resolve) => this.reversews_listener?.close(() => resolve()));
+    this.reversews_listener = null;
     for (const waiter of this.peer_waiters) {
       clearTimeout(waiter.timeout);
       waiter.reject(new Error(`Reverse websocket transport at ${this.endpoint_url} closed before a peer connected.`));
@@ -119,7 +158,7 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     this.peer_waiters.clear();
   }
 
-  private accept(socket: any) {
+  private accept(socket: WsSocket) {
     const fail = (message: string) => {
       try {
         socket.close(1008, message.slice(0, 120));
