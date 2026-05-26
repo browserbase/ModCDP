@@ -143,12 +143,20 @@ export const ModCDPAddMiddlewareParamsSchema = z.object({
 });
 export type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
 
-export const ModCDPLauncherOptionsSchema = z.object({}).passthrough();
+export const ModCDPLauncherOptionsSchema = z
+  .object({
+    launcher_mode: z.enum(["local", "remote", "bb", "none"]).optional(),
+    launcher_executable_path: z.string().nullable().optional(),
+    launcher_user_data_dir: z.string().nullable().optional(),
+    launcher_options: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
 export type ModCDPLauncherOptions = z.infer<typeof ModCDPLauncherOptionsSchema>;
 
 export const ModCDPUpstreamOptionsSchema = z
   .object({
     upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats"]).optional(),
+    upstream_cdp_url: z.string().nullable().optional(),
     upstream_nats_url: z.string().nullable().optional(),
     upstream_nats_subject_prefix: z.string().nullable().optional(),
     upstream_nats_wait_timeout_ms: z.number().positive().optional(),
@@ -158,6 +166,7 @@ export const ModCDPUpstreamOptionsSchema = z
     upstream_nativemessaging_manifests: z.array(z.string()).nullable().optional(),
     upstream_nativemessaging_host_name: z.string().nullable().optional(),
     upstream_nativemessaging_wait_timeout_ms: z.number().positive().optional(),
+    upstream_ws_connect_error_settle_timeout_ms: z.number().positive().optional(),
   })
   .passthrough();
 export type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;

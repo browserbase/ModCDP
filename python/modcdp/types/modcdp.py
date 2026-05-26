@@ -15,6 +15,8 @@ ProtocolResult: TypeAlias = dict[str, JsonValue]
 ProtocolPayload: TypeAlias = dict[str, JsonValue]
 MessageParams: TypeAlias = Mapping[str, object]
 ModCDPRoutes: TypeAlias = dict[str, str]
+ModCDPLauncherMode: TypeAlias = Literal["local", "remote", "bb", "none"]
+ModCDPUpstreamMode: TypeAlias = Literal["ws", "pipe", "nativemessaging", "reversews", "nats"]
 
 
 class _ModCDPAddCustomCommandRequired(TypedDict):
@@ -109,6 +111,53 @@ class ModCDPTopology(TypedDict):
     roots: dict[str, ModCDPTopologyDomRoot]
     targets: dict[str, ModCDPTopologyTarget]
     contexts: dict[str, ModCDPTopologyExecutionContext]
+
+
+class ModCDPLauncherConfig(TypedDict, total=False):
+    launcher_mode: ModCDPLauncherMode
+    launcher_executable_path: str | None
+    launcher_user_data_dir: str | None
+    launcher_options: dict[str, JsonValue]
+
+
+class ModCDPUpstreamConfig(TypedDict, total=False):
+    upstream_mode: ModCDPUpstreamMode
+    upstream_cdp_url: str | None
+    upstream_nats_url: str | None
+    upstream_nats_subject_prefix: str | None
+    upstream_nats_wait_timeout_ms: int
+    upstream_reversews_bind: str | None
+    upstream_reversews_wait_timeout_ms: int
+    upstream_nativemessaging_manifest: str | None
+    upstream_nativemessaging_manifests: list[str] | None
+    upstream_nativemessaging_host_name: str | None
+    upstream_nativemessaging_wait_timeout_ms: int
+    upstream_ws_connect_error_settle_timeout_ms: int
+
+
+class ModCDPInjectorConfig(TypedDict, total=False):
+    injector_mode: Literal["auto", "discover", "inject", "borrow", "none"]
+    injector_extension_path: str | None
+    injector_extension_id: str | None
+    injector_service_worker_url_includes: list[str]
+    injector_service_worker_url_suffixes: list[str]
+    injector_trust_service_worker_target: bool
+    injector_require_service_worker_target: bool
+    injector_service_worker_ready_expression: str | None
+    injector_execution_context_timeout_ms: int
+    injector_service_worker_probe_timeout_ms: int
+    injector_service_worker_ready_timeout_ms: int
+    injector_service_worker_poll_interval_ms: int
+    injector_target_session_poll_interval_ms: int
+
+
+class ModCDPClientConfig(TypedDict, total=False):
+    client_routes: ModCDPRoutes
+    client_hydrate_aliases: bool
+    client_mirror_upstream_events: bool
+    client_cdp_send_timeout_ms: int
+    client_event_wait_timeout_ms: int
+    client_heartbeat_interval_ms: int
 
 
 class ModCDPConnectTiming(TypedDict):
