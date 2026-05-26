@@ -398,7 +398,7 @@ type ModCDPClient struct {
 	eventSchemas             map[string]map[string]any
 	schemaMu                 sync.RWMutex
 	handlersMu               sync.Mutex
-	autoSessions             *AutoSessionRouter
+	router                   *AutoSessionRouter
 	ExtensionID              string
 	ExtTargetID              string
 	ExtSessionID             string
@@ -558,7 +558,7 @@ func New(opts Options) *ModCDPClient {
 		eventSchemas:            map[string]map[string]any{},
 	}
 	client.Mod = ModDomain{client: client}
-	client.autoSessions = NewAutoSessionRouter(
+	client.router = NewAutoSessionRouter(
 		func(method string, params map[string]any, sessionID string) (map[string]any, error) {
 			return client.sendMessage(method, params, sessionID)
 		},
@@ -632,7 +632,7 @@ func (c *ModCDPClient) Connect() error {
 		c.Close()
 		return err
 	}
-	extExecutionContextID, err := c.autoSessions.WaitForExecutionContext(c.ExtSessionID, c.Injector.InjectorExecutionContextTimeoutMS)
+	extExecutionContextID, err := c.router.WaitForExecutionContext(c.ExtSessionID, c.Injector.InjectorExecutionContextTimeoutMS)
 	if err != nil {
 		c.Close()
 		return err
@@ -1539,10 +1539,10 @@ func (c *ModCDPClient) baseExtensionInjectorConfig(send SendCDP) ExtensionInject
 	}
 	return ExtensionInjectorConfig{
 		Send:                    send,
-		SessionId_from_targetId: c.autoSessions.SessionId_from_targetId,
+		SessionId_from_targetId: c.router.SessionId_from_targetId,
 		EnsureSessionForTarget:  ensureSessionForTarget,
 		WaitForExecutionContext: func(sessionID string, timeoutMS int) int {
-			contextID, _ := c.autoSessions.WaitForExecutionContext(sessionID, timeoutMS)
+			contextID, _ := c.router.WaitForExecutionContext(sessionID, timeoutMS)
 			return contextID
 		},
 		InjectorExtensionPath:                c.Injector.InjectorExtensionPath,
@@ -1621,7 +1621,7 @@ func (c *ModCDPClient) sendRaw(command translate.RawCommand) (any, error) {
 		if step.Method == "Runtime.callFunctionOn" {
 			if _, exists := params["executionContextId"]; !exists {
 				if c.ExtExecutionContextID == 0 {
-					contextID, err := c.autoSessions.WaitForExecutionContext(c.ExtSessionID, c.Injector.InjectorExecutionContextTimeoutMS)
+					contextID, err := c.router.WaitForExecutionContext(c.ExtSessionID, c.Injector.InjectorExecutionContextTimeoutMS)
 					if err != nil {
 						return nil, err
 					}
@@ -1833,7 +1833,7 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	method, _ := msg["method"].(string)
 	sessionID, _ := msg["sessionId"].(string)
 	params, _ := msg["params"].(map[string]any)
-	c.autoSessions.RecordProtocolEvent(method, params, sessionID)
+	c.router.RecordProtocolEvent(method, params, sessionID)
 	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
 		bindingName, _ := params["name"].(string)
 		if event, data, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
@@ -1904,22 +1904,22 @@ func (c *ModCDPClient) trustServiceWorkerTarget() bool {
 }
 
 func (c *ModCDPClient) ensureSessionForTarget(targetID string, timeout time.Duration, allowAttach bool) string {
-	sessionID := c.autoSessions.SessionId_from_targetId[targetID]
+	sessionID := c.router.SessionId_from_targetId[targetID]
 	if sessionID != "" {
 		return sessionID
 	}
 	if allowAttach {
-		attachedSessionID := c.autoSessions.AttachToTarget(targetID)
+		attachedSessionID := c.router.AttachToTarget(targetID)
 		if attachedSessionID != "" {
 			return attachedSessionID
 		}
 	}
 	if timeout <= 0 {
-		return c.autoSessions.SessionId_from_targetId[targetID]
+		return c.router.SessionId_from_targetId[targetID]
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline.Add(time.Millisecond)) {
-		sessionID := c.autoSessions.SessionId_from_targetId[targetID]
+		sessionID := c.router.SessionId_from_targetId[targetID]
 		if sessionID != "" {
 			return sessionID
 		}

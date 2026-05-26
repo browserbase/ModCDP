@@ -352,7 +352,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self._handlers: dict[str, list[Handler]] = {}
         self._handler_wrappers: dict[tuple[str, Handler], Handler] = {}
         self._lock = threading.Lock()
-        self.auto_sessions = AutoSessionRouter(
+        self.router = AutoSessionRouter(
             lambda method, params=None, session_id=None: self._send_message(method, params or {}, session_id),
             lambda: self.injector["injector_execution_context_timeout_ms"],
         )
@@ -415,7 +415,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self.ext_target_id = ext["target_id"]
         self.ext_session_id = ext["session_id"]
         self._send_message("Runtime.enable", {}, self.ext_session_id)
-        self.ext_execution_context_id = self.auto_sessions.waitForExecutionContext(
+        self.ext_execution_context_id = self.router.waitForExecutionContext(
             self.ext_session_id,
             self.injector["injector_execution_context_timeout_ms"],
         )
@@ -721,18 +721,18 @@ class ModCDPClient(CDPSurfaceMixin):
         self._heartbeat_thread = None
 
     def _ensureSessionForTarget(self, target_id: str, timeout: float = 0, allow_attach: bool = False) -> str | None:
-        session_id = self.auto_sessions.sessionId_from_targetId.get(target_id)
+        session_id = self.router.sessionId_from_targetId.get(target_id)
         if session_id:
             return session_id
         if allow_attach:
-            attached_session_id = self.auto_sessions.attachToTarget(target_id)
+            attached_session_id = self.router.attachToTarget(target_id)
             if attached_session_id:
                 return attached_session_id
         if timeout <= 0:
-            return self.auto_sessions.sessionId_from_targetId.get(target_id)
+            return self.router.sessionId_from_targetId.get(target_id)
         deadline = time.time() + timeout
         while time.time() <= deadline:
-            session_id = self.auto_sessions.sessionId_from_targetId.get(target_id)
+            session_id = self.router.sessionId_from_targetId.get(target_id)
             if session_id:
                 return session_id
             time.sleep(self.injector["injector_target_session_poll_interval_ms"] / 1000)
@@ -915,9 +915,9 @@ class ModCDPClient(CDPSurfaceMixin):
 
         return {
             "send": send_cdp if send is not None else None,
-            "sessionId_from_targetId": self.auto_sessions.sessionId_from_targetId,
+            "sessionId_from_targetId": self.router.sessionId_from_targetId,
             "ensureSessionForTarget": ensure_session_for_target if send is not None else None,
-            "waitForExecutionContext": self.auto_sessions.waitForExecutionContext,
+            "waitForExecutionContext": self.router.waitForExecutionContext,
             "injector_extension_path": cast(str | None, self.injector.get("injector_extension_path")),
             "injector_extension_id": cast(str | None, self.injector.get("injector_extension_id")),
             "injector_service_worker_url_includes": cast(list[str], self.injector["injector_service_worker_url_includes"]),
@@ -964,7 +964,7 @@ class ModCDPClient(CDPSurfaceMixin):
             params = dict(step.get("params") or {})
             if step["method"] == "Runtime.callFunctionOn" and "executionContextId" not in params:
                 if self.ext_execution_context_id is None:
-                    self.ext_execution_context_id = self.auto_sessions.waitForExecutionContext(
+                    self.ext_execution_context_id = self.router.waitForExecutionContext(
                         self.ext_session_id,
                         self.injector["injector_execution_context_timeout_ms"],
                     )
@@ -1234,7 +1234,7 @@ class ModCDPClient(CDPSurfaceMixin):
         params = cast(ProtocolParams, raw_params) if isinstance(raw_params, Mapping) else {}
         if isinstance(method, str):
             session_id = msg.get("sessionId")
-            self.auto_sessions.recordProtocolEvent(method, params, session_id if isinstance(session_id, str) else None)
+            self.router.recordProtocolEvent(method, params, session_id if isinstance(session_id, str) else None)
         if method and self.ext_session_id is not None and msg.get("sessionId") == self.ext_session_id:
             session_id = msg.get("sessionId")
             u = unwrap_event_if_needed(
