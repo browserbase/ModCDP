@@ -13,13 +13,13 @@ EXTENSION_PATH = ROOT / "dist" / "extension"
 
 class PipeUpstreamTransportTests(unittest.TestCase):
     def test_constructor_update_launcher_config_and_unconnected_errors_match_transport_surface(self) -> None:
-        transport = PipeUpstreamTransport({"cdp_url": "pipe://constructor"})
+        transport = PipeUpstreamTransport()
         self.assertEqual(transport.mode, "pipe")
         self.assertEqual(transport.endpoint_kind, "raw_cdp")
-        self.assertEqual(transport.url, "pipe://constructor")
+        self.assertIsNone(transport.url)
         self.assertEqual(transport.getLauncherConfig(), {"remote_debugging": "pipe"})
-        self.assertIs(transport.update({"cdp_url": "pipe://1234"}), transport)
-        self.assertEqual(transport.url, "pipe://1234")
+        self.assertIs(transport.update({"cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"}), transport)
+        self.assertIsNone(transport.url)
         with self.assertRaisesRegex(RuntimeError, r"upstream\.upstream_mode=pipe requires"):
             transport.connect()
         with self.assertRaisesRegex(RuntimeError, "CDP pipe is not connected"):
@@ -32,7 +32,7 @@ class PipeUpstreamTransportTests(unittest.TestCase):
         pipe_read_writer = os.fdopen(read_writer_fd, "wb", buffering=0)
         pipe_write_reader = os.fdopen(write_reader_fd, "rb", buffering=0)
         pipe_write = os.fdopen(write_fd, "wb", buffering=0)
-        transport = PipeUpstreamTransport({"pipe_read": pipe_read, "pipe_write": pipe_write, "cdp_url": "pipe://test"})
+        transport = PipeUpstreamTransport({"pipe_read": pipe_read, "pipe_write": pipe_write})
         closed: list[Exception] = []
         transport.onClose(lambda error: closed.append(error))
 
@@ -47,7 +47,7 @@ class PipeUpstreamTransportTests(unittest.TestCase):
             transport.close()
             pipe_write_reader.close()
 
-    def test_launches_real_browser_and_uses_pid_scoped_pipe_url(self) -> None:
+    def test_launches_real_browser_without_a_cdp_url(self) -> None:
         cdp = ModCDPClient(
             launcher={"launcher_mode": "local", "launcher_options": {"headless": True}},
             upstream={"upstream_mode": "pipe"},
@@ -64,8 +64,8 @@ class PipeUpstreamTransportTests(unittest.TestCase):
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "pipe")
             self.assertEqual(cdp.upstream_endpoint_kind, "raw_cdp")
-            self.assertRegex(cdp.cdp_url or "", r"^pipe://\d+$")
-            self.assertEqual(cdp.transport.url if cdp.transport else None, cdp.cdp_url)
+            self.assertIsNone(cdp.cdp_url)
+            self.assertIsNone(cdp.transport.url if cdp.transport else None)
             cdp.Mod.addCustomCommand(
                 "Custom.runtimeReadyState",
                 expression="async () => await cdp.send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true })",

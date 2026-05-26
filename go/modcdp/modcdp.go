@@ -78,6 +78,5 @@ const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
 const DefaultUpstreamReverseWSBind = transport.DefaultUpstreamReverseWSBind
 const DefaultUpstreamReverseWSWaitTimeoutMS = transport.DefaultUpstreamReverseWSWaitTimeoutMS
 const DefaultUpstreamNATSWaitTimeoutMS = transport.DefaultUpstreamNATSWaitTimeoutMS
-const DefaultUpstreamNativeMessagingWaitTimeoutMS = transport.DefaultUpstreamNativeMessagingWaitTimeoutMS
 
 var DefaultModCDPServiceWorkerURLSuffixes = injector.DefaultModCDPServiceWorkerURLSuffixes

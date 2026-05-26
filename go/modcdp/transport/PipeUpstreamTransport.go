@@ -10,7 +10,6 @@ import (
 
 type PipeUpstreamTransport struct {
 	UpstreamTransport
-	URL       string
 	PipeRead  *os.File
 	PipeWrite *os.File
 	writeMu   sync.Mutex
@@ -21,15 +20,10 @@ type PipeUpstreamTransport struct {
 type PipeUpstreamTransportOptions struct {
 	PipeRead  *os.File `json:"-"`
 	PipeWrite *os.File `json:"-"`
-	CDPURL    string   `json:"cdp_url,omitempty"`
 }
 
 func NewPipeUpstreamTransport(options PipeUpstreamTransportOptions) *PipeUpstreamTransport {
-	cdpURL := options.CDPURL
-	if cdpURL == "" {
-		cdpURL = "pipe://unknown"
-	}
-	return &PipeUpstreamTransport{URL: cdpURL, PipeRead: options.PipeRead, PipeWrite: options.PipeWrite}
+	return &PipeUpstreamTransport{PipeRead: options.PipeRead, PipeWrite: options.PipeWrite}
 }
 
 func (t *PipeUpstreamTransport) Update(config map[string]any) {
@@ -41,9 +35,6 @@ func (t *PipeUpstreamTransport) Update(config map[string]any) {
 	}
 	if pipeWrite, _ := config["pipe_write"].(*os.File); pipeWrite != nil {
 		t.PipeWrite = pipeWrite
-	}
-	if cdpURL, _ := config["cdp_url"].(string); cdpURL != "" {
-		t.URL = cdpURL
 	}
 }
 

@@ -16,7 +16,6 @@ class PipeUpstreamTransport(UpstreamTransport):
         options = options or {}
         self.pipe_read = options.get("pipe_read")
         self.pipe_write = options.get("pipe_write")
-        self.url = str(options.get("cdp_url") or "pipe://unknown")
         self._thread: threading.Thread | None = None
         self._connected = False
         self._closed = False
@@ -25,7 +24,6 @@ class PipeUpstreamTransport(UpstreamTransport):
         config = config or {}
         self.pipe_read = config.get("pipe_read") or self.pipe_read
         self.pipe_write = config.get("pipe_write") or self.pipe_write
-        self.url = str(config.get("cdp_url") or self.url)
         return self
 
     def getLauncherConfig(self) -> dict[str, Any]:

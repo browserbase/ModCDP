@@ -15,16 +15,13 @@ export class PipeUpstreamTransport extends UpstreamTransport {
   constructor({
     pipe_read = null,
     pipe_write = null,
-    cdp_url = "pipe://unknown",
   }: {
     pipe_read?: NodeJS.ReadableStream | null;
     pipe_write?: NodeJS.WritableStream | null;
-    cdp_url?: string | null;
   } = {}) {
     super();
     this.pipe_read = pipe_read;
     this.pipe_write = pipe_write;
-    this.upstream_cdp_url = cdp_url ?? "pipe://unknown";
   }
 
   override send(message: CdpCommandMessage): void;
@@ -76,7 +73,6 @@ export class PipeUpstreamTransport extends UpstreamTransport {
   update(config: UpstreamTransportConfig = {}) {
     this.pipe_read = config.pipe_read ?? this.pipe_read;
     this.pipe_write = config.pipe_write ?? this.pipe_write;
-    this.upstream_cdp_url = config.cdp_url ?? this.upstream_cdp_url;
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
   }

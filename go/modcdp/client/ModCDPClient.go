@@ -114,7 +114,6 @@ const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
 const DefaultUpstreamReverseWSBind = transportpkg.DefaultUpstreamReverseWSBind
 const DefaultUpstreamReverseWSWaitTimeoutMS = transportpkg.DefaultUpstreamReverseWSWaitTimeoutMS
 const DefaultUpstreamNATSWaitTimeoutMS = transportpkg.DefaultUpstreamNATSWaitTimeoutMS
-const DefaultUpstreamNativeMessagingWaitTimeoutMS = transportpkg.DefaultUpstreamNativeMessagingWaitTimeoutMS
 const UpstreamEndpointKindRawCDP = transportpkg.UpstreamEndpointKindRawCDP
 const UpstreamEndpointKindModCDPServer = transportpkg.UpstreamEndpointKindModCDPServer
 
@@ -221,18 +220,15 @@ type LauncherConfig struct {
 }
 
 type UpstreamConfig struct {
-	UpstreamMode                          string   `json:"upstream_mode,omitempty"`
-	UpstreamCDPURL                        string   `json:"upstream_cdp_url,omitempty"`
-	UpstreamNATSURL                       string   `json:"upstream_nats_url,omitempty"`
-	UpstreamNATSSubjectPrefix             string   `json:"upstream_nats_subject_prefix,omitempty"`
-	UpstreamNATSWaitTimeoutMS             int      `json:"upstream_nats_wait_timeout_ms,omitempty"`
-	UpstreamReverseWSBind                 string   `json:"upstream_reversews_bind,omitempty"`
-	UpstreamReverseWSWaitTimeoutMS        int      `json:"upstream_reversews_wait_timeout_ms,omitempty"`
-	UpstreamNativeMessagingManifest       string   `json:"upstream_nativemessaging_manifest,omitempty"`
-	UpstreamNativeMessagingManifests      []string `json:"upstream_nativemessaging_manifests,omitempty"`
-	UpstreamNativeMessagingHostName       string   `json:"upstream_nativemessaging_host_name,omitempty"`
-	UpstreamNativeMessagingWaitTimeoutMS  int      `json:"upstream_nativemessaging_wait_timeout_ms,omitempty"`
-	UpstreamWSConnectErrorSettleTimeoutMS int      `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
+	UpstreamMode                          string `json:"upstream_mode,omitempty"`
+	UpstreamCDPURL                        string `json:"upstream_cdp_url,omitempty"`
+	UpstreamNATSURL                       string `json:"upstream_nats_url,omitempty"`
+	UpstreamNATSSubjectPrefix             string `json:"upstream_nats_subject_prefix,omitempty"`
+	UpstreamNATSWaitTimeoutMS             int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
+	UpstreamReverseWSBind                 string `json:"upstream_reversews_bind,omitempty"`
+	UpstreamReverseWSWaitTimeoutMS        int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
+	UpstreamNativeMessagingHostName       string `json:"upstream_nativemessaging_host_name,omitempty"`
+	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
 }
 
 type InjectorConfig struct {
@@ -536,9 +532,6 @@ func New(opts Options) *ModCDPClient {
 	if opts.Upstream.UpstreamReverseWSWaitTimeoutMS == 0 {
 		opts.Upstream.UpstreamReverseWSWaitTimeoutMS = DefaultUpstreamReverseWSWaitTimeoutMS
 	}
-	if opts.Upstream.UpstreamNativeMessagingWaitTimeoutMS == 0 {
-		opts.Upstream.UpstreamNativeMessagingWaitTimeoutMS = DefaultUpstreamNativeMessagingWaitTimeoutMS
-	}
 	client := &ModCDPClient{
 		Launcher:                opts.Launcher,
 		Upstream:                opts.Upstream,
@@ -792,7 +785,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 
 	c.transport = transport
 	transportURL := transportURL(transport)
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindRawCDP {
+	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindRawCDP && c.Upstream.UpstreamMode == "ws" {
 		c.CDPURL = firstNonEmptyString(transportURL, launchedCDPURL)
 	} else {
 		c.CDPURL = launchedCDPURL
@@ -804,8 +797,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 
 	serverConfig := map[string]any{}
 	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer &&
-		launchedCDPURL != "" &&
-		!strings.HasPrefix(launchedCDPURL, "pipe://") {
+		launchedCDPURL != "" {
 		serverConfig["server_loopback_cdp_url"] = launchedCDPURL
 	}
 	for key, value := range launcher.GetServerConfig() {
@@ -854,17 +846,14 @@ func (c *ModCDPClient) ensureModCDPServerConfigured() error {
 
 func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	return map[string]any{
-		"cdp_url":                                  c.Upstream.UpstreamCDPURL,
-		"upstream_nats_url":                        c.Upstream.UpstreamNATSURL,
-		"upstream_nats_subject_prefix":             c.Upstream.UpstreamNATSSubjectPrefix,
-		"upstream_nats_wait_timeout_ms":            c.Upstream.UpstreamNATSWaitTimeoutMS,
-		"upstream_reversews_bind":                  c.Upstream.UpstreamReverseWSBind,
-		"upstream_reversews_wait_timeout_ms":       c.Upstream.UpstreamReverseWSWaitTimeoutMS,
-		"upstream_nativemessaging_manifest":        c.Upstream.UpstreamNativeMessagingManifest,
-		"upstream_nativemessaging_manifests":       c.Upstream.UpstreamNativeMessagingManifests,
-		"upstream_nativemessaging_host_name":       c.Upstream.UpstreamNativeMessagingHostName,
-		"upstream_nativemessaging_wait_timeout_ms": c.Upstream.UpstreamNativeMessagingWaitTimeoutMS,
-		"injector_extension_id":                    c.Injector.InjectorExtensionID,
+		"cdp_url":                            c.Upstream.UpstreamCDPURL,
+		"upstream_nats_url":                  c.Upstream.UpstreamNATSURL,
+		"upstream_nats_subject_prefix":       c.Upstream.UpstreamNATSSubjectPrefix,
+		"upstream_nats_wait_timeout_ms":      c.Upstream.UpstreamNATSWaitTimeoutMS,
+		"upstream_reversews_bind":            c.Upstream.UpstreamReverseWSBind,
+		"upstream_reversews_wait_timeout_ms": c.Upstream.UpstreamReverseWSWaitTimeoutMS,
+		"upstream_nativemessaging_host_name": c.Upstream.UpstreamNativeMessagingHostName,
+		"injector_extension_id":              c.Injector.InjectorExtensionID,
 	}
 }
 
@@ -885,8 +874,6 @@ func (c *ModCDPClient) initializeRawCDPTransport() error {
 func transportURL(transport upstreamTransportClient) string {
 	switch typed := transport.(type) {
 	case *WebSocketUpstreamTransport:
-		return typed.URL
-	case *PipeUpstreamTransport:
 		return typed.URL
 	default:
 		return ""
@@ -1476,7 +1463,9 @@ func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 	case "reversews":
 		return NewReverseWebSocketUpstreamTransport(ReverseWebSocketUpstreamTransportOptions{})
 	case "nativemessaging":
-		return NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{})
+		return NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{
+			UpstreamNativeMessagingHostName: c.Upstream.UpstreamNativeMessagingHostName,
+		})
 	case "nats":
 		return NewNatsUpstreamTransport(NatsUpstreamTransportOptions{})
 	default:

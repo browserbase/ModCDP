@@ -29,10 +29,7 @@ export type UpstreamTransportConfig = {
   user_data_dir?: string | null;
   pipe_read?: NodeJS.ReadableStream | null;
   pipe_write?: NodeJS.WritableStream | null;
-  upstream_nativemessaging_manifest?: string | null;
-  upstream_nativemessaging_manifests?: string[] | null;
   upstream_nativemessaging_host_name?: string | null;
-  upstream_nativemessaging_wait_timeout_ms?: number | null;
   injector_extension_id?: string | null;
   upstream_nats_url?: string | null;
   upstream_nats_subject_prefix?: string | null;
@@ -63,10 +60,7 @@ export class UpstreamTransport {
   upstream_nats_wait_timeout_ms?: number | null = null;
   upstream_reversews_bind?: string | null = null;
   upstream_reversews_wait_timeout_ms?: number | null = null;
-  upstream_nativemessaging_manifest?: string | null = null;
-  upstream_nativemessaging_manifests?: string[] | null = null;
   upstream_nativemessaging_host_name?: string | null = null;
-  upstream_nativemessaging_wait_timeout_ms?: number | null = null;
   upstream_ws_connect_error_settle_timeout_ms?: number | null = null;
   cdp_send_timeout_ms = 10_000;
   private next_id = 1;

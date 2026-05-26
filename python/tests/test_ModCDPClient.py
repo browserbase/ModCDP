@@ -36,10 +36,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "upstream_cdp_url": "http://127.0.0.1:9222",
                 "upstream_nats_wait_timeout_ms": 345,
                 "upstream_reversews_wait_timeout_ms": 456,
-                "upstream_nativemessaging_manifest": "/tmp/native-host.json",
-                "upstream_nativemessaging_manifests": ["/tmp/native-host-extra.json"],
                 "upstream_nativemessaging_host_name": "com.modcdp.custom",
-                "upstream_nativemessaging_wait_timeout_ms": 567,
                 "upstream_ws_connect_error_settle_timeout_ms": 321,
             },
             injector={
@@ -77,10 +74,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp._launch_options().get("user_data_dir"), "/tmp/profile")
         self.assertEqual(cdp.upstream["upstream_nats_wait_timeout_ms"], 345)
         self.assertEqual(cdp.upstream["upstream_reversews_wait_timeout_ms"], 456)
-        self.assertEqual(cdp.upstream["upstream_nativemessaging_manifest"], "/tmp/native-host.json")
-        self.assertEqual(cdp.upstream["upstream_nativemessaging_manifests"], ["/tmp/native-host-extra.json"])
         self.assertEqual(cdp.upstream["upstream_nativemessaging_host_name"], "com.modcdp.custom")
-        self.assertEqual(cdp.upstream["upstream_nativemessaging_wait_timeout_ms"], 567)
         self.assertEqual(cdp.upstream["upstream_ws_connect_error_settle_timeout_ms"], 321)
         self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 4321)
         self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 5432)
@@ -111,7 +105,6 @@ class ModCDPClientTests(unittest.TestCase):
             upstream={
                 "upstream_nats_wait_timeout_ms": 0,
                 "upstream_reversews_wait_timeout_ms": 0,
-                "upstream_nativemessaging_wait_timeout_ms": 0,
                 "upstream_ws_connect_error_settle_timeout_ms": 0,
             },
             injector={
@@ -129,7 +122,6 @@ class ModCDPClientTests(unittest.TestCase):
 
         self.assertEqual(cdp.upstream["upstream_nats_wait_timeout_ms"], 0)
         self.assertEqual(cdp.upstream["upstream_reversews_wait_timeout_ms"], 0)
-        self.assertEqual(cdp.upstream["upstream_nativemessaging_wait_timeout_ms"], 0)
         self.assertEqual(cdp.upstream["upstream_ws_connect_error_settle_timeout_ms"], 0)
         self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 0)
         self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 0)

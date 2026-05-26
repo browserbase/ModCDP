@@ -98,8 +98,6 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
     upstream: ProtocolPayload = {"upstream_mode": upstream_mode, "upstream_cdp_url": cdp_url}
     if upstream_mode == "reversews":
         upstream["upstream_reversews_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
-    if upstream_mode == "nativemessaging":
-        upstream["upstream_nativemessaging_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
     if upstream_mode == "nats":
         upstream["upstream_nats_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
     if mode == "direct":

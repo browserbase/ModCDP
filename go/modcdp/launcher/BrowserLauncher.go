@@ -82,7 +82,7 @@ func WebsocketURLFor(endpoint string) (string, error) {
 }
 
 type LaunchedBrowser struct {
-	// CDPURL is the effective CDP endpoint for the selected transport; launchers resolve HTTP discovery endpoints to ws:// before returning when they can.
+	// CDPURL is the browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
 	CDPURL                string   `json:"cdp_url,omitempty"`
 	LoopbackCDPURL        string   `json:"loopback_cdp_url,omitempty"`
 	Close                 func()   `json:"-"`

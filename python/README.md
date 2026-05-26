@@ -143,7 +143,7 @@ pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url
 
 The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client='{"client_routes": {...}}'`, and `--server='{"server_routes": {...}}'` option groups as `ModCDPClient`. `--launcher-options='{...}'` passes launcher-owned options such as `headless` and `sandbox`; `--client-routes='{...}'` and `--server-routes='{...}'` are route-only shorthands. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
 
-Native messaging mode creates the local native host wrapper and browser manifest on each run. The fixed extension auto-dials the default `com.modcdp.bridge` host, so the 1:1 automatic path does not require preinstalling a host binary at a fixed path. `--upstream-nativemessaging-manifest`, `--upstream-nativemessaging-manifests`, and `--upstream-nativemessaging-host-name` are for custom browser profiles, externally configured extensions, or isolated transport-level tests; the default auto-injected extension expects `com.modcdp.bridge`.
+Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host.
 
 ### Reverse proxy mode
 

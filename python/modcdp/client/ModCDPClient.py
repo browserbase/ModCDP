@@ -39,7 +39,7 @@ from ..injector.LocalBrowserLaunchExtensionInjector import LocalBrowserLaunchExt
 from ..launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from ..launcher.NoopBrowserLauncher import NoopBrowserLauncher
 from ..launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
-from ..transport.NativeMessagingUpstreamTransport import DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS, NativeMessagingUpstreamTransport
+from ..transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
 from ..transport.NatsUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NatsUpstreamTransport
 from ..transport.PipeUpstreamTransport import PipeUpstreamTransport
 from ..transport.ReverseWebSocketUpstreamTransport import (
@@ -242,19 +242,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "upstream_reversews_wait_timeout_ms": int(
                 _defaulted(upstream_input.get("upstream_reversews_wait_timeout_ms"), DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS)
             ),
-            "upstream_nativemessaging_manifest": upstream_input.get("upstream_nativemessaging_manifest"),
-            "upstream_nativemessaging_manifests": list(
-                cast(Sequence[str], upstream_input.get("upstream_nativemessaging_manifests") or [])
-            )
-            if upstream_input.get("upstream_nativemessaging_manifests") is not None
-            else None,
             "upstream_nativemessaging_host_name": upstream_input.get("upstream_nativemessaging_host_name"),
-            "upstream_nativemessaging_wait_timeout_ms": int(
-                _defaulted(
-                    upstream_input.get("upstream_nativemessaging_wait_timeout_ms"),
-                    DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS,
-                )
-            ),
             "upstream_ws_connect_error_settle_timeout_ms": int(
                 _defaulted(
                     upstream_input.get("upstream_ws_connect_error_settle_timeout_ms"),
@@ -801,14 +789,14 @@ class ModCDPClient(CDPSurfaceMixin):
         self.transport = transport
         self.cdp_url = cast(
             str | None,
-            (transport.url or launched_cdp_url) if transport.endpoint_kind == "raw_cdp" else launched_cdp_url,
+            (transport.url or launched_cdp_url) if transport.endpoint_kind == "raw_cdp" and transport.mode == "ws" else launched_cdp_url,
         )
         if transport.mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream["upstream_cdp_url"] = transport.url
         server_config = (
             {"server_loopback_cdp_url": launched_cdp_url}
-            if transport.endpoint_kind == "modcdp_server" and launched_cdp_url and not launched_cdp_url.startswith("pipe://")
+            if transport.endpoint_kind == "modcdp_server" and launched_cdp_url
             else {}
         )
         transport_server_config = transport.getServerConfig()
@@ -835,10 +823,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "upstream_nats_wait_timeout_ms": self.upstream.get("upstream_nats_wait_timeout_ms"),
             "upstream_reversews_bind": self.upstream.get("upstream_reversews_bind"),
             "upstream_reversews_wait_timeout_ms": self.upstream.get("upstream_reversews_wait_timeout_ms"),
-            "upstream_nativemessaging_manifest": self.upstream.get("upstream_nativemessaging_manifest"),
-            "upstream_nativemessaging_manifests": self.upstream.get("upstream_nativemessaging_manifests"),
             "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
-            "upstream_nativemessaging_wait_timeout_ms": self.upstream.get("upstream_nativemessaging_wait_timeout_ms"),
             "injector_extension_id": self.injector.get("injector_extension_id"),
         }
 
@@ -859,7 +844,9 @@ class ModCDPClient(CDPSurfaceMixin):
         if mode == "reversews":
             return ReverseWebSocketUpstreamTransport()
         if mode == "nativemessaging":
-            return NativeMessagingUpstreamTransport()
+            return NativeMessagingUpstreamTransport({
+                "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
+            })
         if mode == "nats":
             return NatsUpstreamTransport()
         raise RuntimeError(f"unknown upstream.upstream_mode={mode}")

@@ -82,7 +82,7 @@ class LocalBrowserLauncherTests(unittest.TestCase):
             raise AssertionError("expected launcher to return pipe handles")
 
         try:
-            self.assertRegex(chrome["cdp_url"] or "", r"^pipe://\d+$")
+            self.assertIsNone(chrome["cdp_url"])
             self.assertNotIn("loopback_cdp_url", chrome)
             pipe_write.write(json.dumps({"id": 10, "method": "Browser.getVersion", "params": {}}).encode() + b"\0")
             pipe_write.flush()
@@ -107,7 +107,7 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         ws = create_connection(loopback_cdp_url, timeout=10)
 
         try:
-            self.assertRegex(chrome["cdp_url"] or "", r"^pipe://\d+$")
+            self.assertIsNone(chrome["cdp_url"])
             self.assertRegex(loopback_cdp_url, r"^ws://127\.0\.0\.1:\d+/")
             ws.send(json.dumps({"id": 1, "method": "Browser.getVersion", "params": {}}))
             version = json.loads(ws.recv())

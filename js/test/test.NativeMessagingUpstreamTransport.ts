@@ -1,320 +1,61 @@
 import assert from "node:assert/strict";
-import { once } from "node:events";
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import net from "node:net";
-import { homedir, platform, tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { test } from "vitest";
+import { describe, test } from "vitest";
 
-import { NativeMessagingUpstreamTransport } from "../src/transport/NativeMessagingUpstreamTransport.js";
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import {
+  defaultNativeMessagingManifestPaths,
+  NativeMessagingUpstreamTransport,
+} from "../src/transport/NativeMessagingUpstreamTransport.js";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
-const NATIVE_MESSAGING_TEST_BROWSER_PATH = extensionLaunchFlagTestBrowserPath();
-const upstreamNativeMessagingHostName = (label: string) => `com.modcdp.test.${label}.${process.pid}`;
-
-test("nativemessaging upstream config owns manifest, host, wait timeout, loopback, and injector config", async () => {
-  const transport = new NativeMessagingUpstreamTransport({
-    upstream_nativemessaging_manifest: "/tmp/modcdp-native-host.json",
-    upstream_nativemessaging_manifests: ["/tmp/modcdp-native-host-extra.json"],
-    upstream_nativemessaging_host_name: "com.modcdp.test",
-    injector_extension_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    upstream_nativemessaging_wait_timeout_ms: 10,
-  });
-  assert.deepEqual(transport.getInjectorConfig(), {
-    upstream_nativemessaging_host_name: "com.modcdp.test",
-  });
-  assert.deepEqual(transport.getServerConfig(), {});
-  assert.equal(
-    transport.update({
-      cdp_url: "ws://127.0.0.1:9222/devtools/browser/test",
-      upstream_nativemessaging_manifests: [],
-      upstream_nativemessaging_host_name: "com.modcdp.updated",
-      upstream_nativemessaging_wait_timeout_ms: 5,
-    }),
-    transport,
-  );
-  assert.deepEqual(transport.getServerConfig(), {
-    server_loopback_cdp_url: "ws://127.0.0.1:9222/devtools/browser/test",
-  });
-  assert.deepEqual(transport.getInjectorConfig(), {
-    upstream_nativemessaging_host_name: "com.modcdp.updated",
-  });
-  assert.equal(
-    (transport as unknown as { include_default_manifest_paths: boolean }).include_default_manifest_paths,
-    false,
-  );
-  transport.update({ upstream_nativemessaging_manifest: null });
-  assert.equal(
-    (transport as unknown as { include_default_manifest_paths: boolean }).include_default_manifest_paths,
-    true,
-  );
-  transport.update({ user_data_dir: "/tmp/modcdp-profile-one" });
-  transport.update({ user_data_dir: "/tmp/modcdp-profile-one" });
-  transport.update({ user_data_dir: "/tmp/modcdp-profile-two" });
-  assert.deepEqual(
-    (transport as unknown as { upstream_nativemessaging_manifests: string[] }).upstream_nativemessaging_manifests,
-    [
-      path.join("/tmp/modcdp-profile-two", "NativeMessagingHosts", "com.modcdp.updated.json"),
-      path.join("/tmp/modcdp-profile-two", "Default", "NativeMessagingHosts", "com.modcdp.updated.json"),
-    ],
-  );
-  assert.throws(() => transport.send({ id: 1, method: "Browser.getVersion" }), /No native messaging peer is connected/);
-  await assert.rejects(
-    () => transport.waitForPeer(),
-    /Timed out waiting 5ms for native messaging host com\.modcdp\.updated/,
-  );
-});
-
-test("nativemessaging upstream close rejects pending peer waits", async () => {
-  const transport = new NativeMessagingUpstreamTransport({
-    upstream_nativemessaging_host_name: "com.modcdp.close",
-    upstream_nativemessaging_wait_timeout_ms: 5_000,
-  });
-  const pending = transport.waitForPeer();
-
-  await transport.close();
-
-  await assert.rejects(
-    () => pending,
-    /Native messaging transport for com\.modcdp\.close closed before a peer connected/,
-  );
-});
-
-test("nativemessaging upstream close resets peer wait state", async () => {
-  const upstream_nativemessaging_host_name = upstreamNativeMessagingHostName("close-reset");
-  const transport = new NativeMessagingUpstreamTransport({
-    upstream_nativemessaging_host_name,
-    upstream_nativemessaging_wait_timeout_ms: 5,
-  });
-  await transport.connect();
-  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
-  const peer = net.createConnection({ host: "127.0.0.1", port });
-  await once(peer, "connect");
-
-  try {
-    await transport.waitForPeer();
-    await transport.close();
-
-    await assert.rejects(() => transport.waitForPeer(), {
-      message: `Timed out waiting 5ms for native messaging host ${upstream_nativemessaging_host_name}.`,
+describe.sequential("NativeMessagingUpstreamTransport", () => {
+  test("nativemessaging upstream config owns host and injector config", async () => {
+    const transport = new NativeMessagingUpstreamTransport({
+      upstream_nativemessaging_host_name: "com.modcdp.test",
     });
-  } finally {
-    peer.destroy();
-    await transport.close();
-  }
-});
-
-test("nativemessaging upstream waits again after a peer disconnects", async () => {
-  const upstream_nativemessaging_host_name = upstreamNativeMessagingHostName("disconnect-reset");
-  const transport = new NativeMessagingUpstreamTransport({
-    upstream_nativemessaging_host_name,
-    upstream_nativemessaging_wait_timeout_ms: 5,
-  });
-  await transport.connect();
-  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
-  const peer = net.createConnection({ host: "127.0.0.1", port });
-  await once(peer, "connect");
-
-  try {
-    await transport.waitForPeer();
-    peer.destroy();
-    await waitFor(() => (transport as unknown as { socket: unknown | null }).socket === null);
-
-    await assert.rejects(() => transport.waitForPeer(), {
-      message: `Timed out waiting 5ms for native messaging host ${upstream_nativemessaging_host_name}.`,
+    assert.deepEqual(transport.getInjectorConfig(), {
+      upstream_nativemessaging_host_name: "com.modcdp.test",
     });
-  } finally {
-    peer.destroy();
-    await transport.close();
-  }
-});
-
-test("nativemessaging upstream accepts a replacement peer after disconnect", async () => {
-  const upstream_nativemessaging_host_name = upstreamNativeMessagingHostName("replacement");
-  const transport = new NativeMessagingUpstreamTransport({
-    upstream_nativemessaging_host_name,
-    upstream_nativemessaging_wait_timeout_ms: 500,
+    assert.deepEqual(transport.getServerConfig(), {});
+    assert.equal(transport.upstream_nativemessaging_url, "native://com.modcdp.test");
+    assert.deepEqual(defaultNativeMessagingManifestPaths("com.modcdp.test", "/tmp/modcdp-home"), [
+      ...defaultManifestPathsForPlatform("com.modcdp.test", "/tmp/modcdp-home"),
+    ]);
   });
-  await transport.connect();
-  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
-  const first_peer = net.createConnection({ host: "127.0.0.1", port });
-  await once(first_peer, "connect");
 
-  try {
-    await transport.waitForPeer();
-    first_peer.destroy();
-    await waitFor(() => (transport as unknown as { socket: unknown | null }).socket === null);
+  test("nativemessaging upstream connects to native messaging stdio directly", async () => {
+    const transport = new NativeMessagingUpstreamTransport();
 
-    const second_peer = net.createConnection({ host: "127.0.0.1", port });
-    await once(second_peer, "connect");
     try {
+      await transport.connect();
       await transport.waitForPeer();
+      await transport.close();
     } finally {
-      second_peer.destroy();
+      await transport.close();
     }
-  } finally {
-    first_peer.destroy();
-    await transport.close();
-  }
+  });
 });
 
-test("nativemessaging upstream installs the launch-profile native host manifest and connects to a real extension", async () => {
-  const upstream_nativemessaging_host_name = "com.modcdp.bridge";
-  const profile_dir = await mkdtemp(path.join(tmpdir(), "modcdp.native."));
-  const native_client = new ModCDPClient({
-    launcher: {
-      launcher_mode: "local",
-      launcher_options: {
-        headless: true,
-        user_data_dir: profile_dir,
-        cleanup_user_data_dir: true,
-        // Native messaging is browser -> client only. After explicit CHROME_PATH
-        // and CI /usr/bin/chromium, this test uses Chrome for Testing because
-        // Canary rejects --load-extension in this local test path.
-        executable_path: NATIVE_MESSAGING_TEST_BROWSER_PATH,
-      },
-    },
-    upstream: {
-      upstream_mode: "nativemessaging",
-      upstream_nativemessaging_host_name: upstream_nativemessaging_host_name,
-    },
-    injector: {
-      injector_mode: "auto",
-      injector_extension_path: EXTENSION_PATH,
-      injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
-      injector_trust_service_worker_target: true,
-    },
-    server: {
-      server_routes: { "*.*": "loopback_cdp" },
-    },
-  });
-
-  try {
-    await native_client.connect();
-    assert.equal(native_client.upstream?.upstream_mode, "nativemessaging");
-    assert.equal(native_client.upstream_endpoint_kind, "modcdp_server");
-    const upstream_transport = native_client.upstream as NativeMessagingUpstreamTransport;
-    assert.match(upstream_transport.upstream_nativemessaging_url, /^native:\/\/.+@127\.0\.0\.1:\d+$/);
-    assert.equal(
-      upstream_transport.upstream_nativemessaging_url.startsWith(`native://${upstream_nativemessaging_host_name}@`),
-      true,
-    );
-    assert.equal(
-      existsSync(
-        path.join(
-          native_client._launched?.profile_dir ?? "",
-          "NativeMessagingHosts",
-          `${upstream_nativemessaging_host_name}.json`,
-        ),
-      ),
-      true,
-    );
-    const version = (await native_client.send("Browser.getVersion")) as Record<string, unknown>;
-    assert.equal(typeof version.product, "string");
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
-    const second_version = (await native_client.send("Browser.getVersion")) as Record<string, unknown>;
-    assert.equal(typeof second_version.product, "string");
-  } finally {
-    await native_client.close();
-    await rm(profile_dir, { recursive: true, force: true });
+function defaultManifestPathsForPlatform(upstream_nativemessaging_host_name: string, home: string) {
+  if (process.platform === "darwin") {
+    return [
+      `${home}/Library/Application Support/Google/Chrome/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/Library/Application Support/Google/Chrome Canary/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/Library/Application Support/Google/ChromeForTesting/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/Library/Application Support/Google Chrome for Testing/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/Library/Application Support/Google Chrome SxS/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/Library/Application Support/Chromium/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+    ];
   }
-}, 90_000);
-
-async function waitFor(predicate: () => boolean, timeout_ms = 2_000) {
-  const deadline = Date.now() + timeout_ms;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+  if (process.platform === "linux") {
+    return [
+      `${home}/.config/google-chrome/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/.config/google-chrome-for-testing/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/.config/chromium/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+      `${home}/.config/chromium-browser/NativeMessagingHosts/${upstream_nativemessaging_host_name}.json`,
+    ];
   }
-  throw new Error("Timed out waiting for condition");
-}
-
-function extensionLaunchFlagTestBrowserPath() {
-  const explicit_candidates = [process.env.CHROME_PATH, platform() === "linux" ? "/usr/bin/chromium" : null].filter(
-    (candidate): candidate is string => Boolean(candidate),
-  );
-  for (const candidate of explicit_candidates) {
-    if (existsSync(candidate)) return candidate;
+  if (process.platform === "win32") {
+    return [path.join(home, ".modcdp", "native-messaging", `${upstream_nativemessaging_host_name}.json`)];
   }
-  const home = homedir();
-  const patterns =
-    platform() === "darwin"
-      ? [
-          path.join(
-            home,
-            "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-          ),
-          path.join(home, "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium"),
-          path.join(
-            home,
-            "Library/Caches/puppeteer/chrome/mac*-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-          ),
-        ]
-      : platform() === "win32"
-        ? [
-            path.join(
-              process.env.LOCALAPPDATA || path.join(home, "AppData/Local"),
-              "ms-playwright/chromium-*/chrome-win*/chrome.exe",
-            ),
-            path.join(home, ".cache/puppeteer/chrome/win*-*/chrome-win*/chrome.exe"),
-          ]
-        : [
-            path.join(home, ".cache/ms-playwright/chromium-*/chrome-linux*/chrome"),
-            "/opt/pw-browsers/chromium-*/chrome-linux*/chrome",
-            path.join(home, ".cache/puppeteer/chrome/linux-*/chrome-linux*/chrome"),
-          ];
-  const candidates = newestFirst(patterns.flatMap(expandGlob));
-  if (candidates[0]) return candidates[0];
-  throw new Error("Native messaging tests require CHROME_PATH, /usr/bin/chromium, or Chrome for Testing.");
-}
-
-function expandGlob(pattern: string) {
-  const normalized = path.normalize(pattern);
-  const { root } = path.parse(normalized);
-  const parts = normalized.slice(root.length).split(path.sep).filter(Boolean);
-  let candidates = [root || "."];
-  for (const part of parts) {
-    const has_wildcard = part.includes("*");
-    const matcher = has_wildcard ? wildcardToRegExp(part) : null;
-    const next: string[] = [];
-    for (const base of candidates) {
-      if (!existsSync(base)) continue;
-      if (!has_wildcard) {
-        const candidate = path.join(base, part);
-        if (existsSync(candidate)) next.push(candidate);
-        continue;
-      }
-      for (const child of readdirSync(base)) {
-        if (matcher!.test(child)) next.push(path.join(base, child));
-      }
-    }
-    candidates = next;
-  }
-  return candidates.filter((candidate) => existsSync(candidate));
-}
-
-function wildcardToRegExp(value: string) {
-  return new RegExp(`^${value.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
-}
-
-function newestFirst(candidates: string[]) {
-  return [...new Set(candidates)].sort((a, b) => {
-    const left = scorePath(a);
-    const right = scorePath(b);
-    return right.version - left.version || right.mtime - left.mtime || a.localeCompare(b);
-  });
-}
-
-function scorePath(candidate: string) {
-  const numbers = candidate.match(/\d+/g)?.map(Number) ?? [];
-  const version = numbers.length > 0 ? Math.max(...numbers) : 0;
-  let mtime = 0;
-  try {
-    mtime = statSync(candidate).mtimeMs;
-  } catch {}
-  return { version, mtime };
+  throw new Error("Native messaging host manifest path discovery is not supported on this platform.");
 }

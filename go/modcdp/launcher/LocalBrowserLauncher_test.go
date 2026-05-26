@@ -149,8 +149,8 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverRemoteDebuggingPipe(t *testi
 		t.Fatal("expected launcher to retain launched browser")
 	}
 	transportConfig := launcher.GetTransportConfig()
-	if transportConfig["cdp_url"] != chrome.CDPURL {
-		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["cdp_url"], chrome.CDPURL)
+	if transportConfig["cdp_url"] != "" {
+		t.Fatalf("transport cdp_url = %v", transportConfig["cdp_url"])
 	}
 	if transportConfig["pipe_read"] != chrome.PipeRead {
 		t.Fatal("expected transport pipe_read to use launched pipe")
@@ -158,7 +158,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverRemoteDebuggingPipe(t *testi
 	if transportConfig["pipe_write"] != chrome.PipeWrite {
 		t.Fatal("expected transport pipe_write to use launched pipe")
 	}
-	if !strings.HasPrefix(chrome.CDPURL, "pipe://") {
+	if chrome.CDPURL != "" {
 		t.Fatalf("CDPURL = %q", chrome.CDPURL)
 	}
 	if chrome.LoopbackCDPURL != "" {
@@ -195,7 +195,7 @@ func TestLocalBrowserLauncherLaunchesPipeBrowserWithAuxiliaryLoopbackOnlyWhenReq
 		t.Fatal(err)
 	}
 	defer chrome.Close()
-	if !strings.HasPrefix(chrome.CDPURL, "pipe://") {
+	if chrome.CDPURL != "" {
 		t.Fatalf("CDPURL = %q", chrome.CDPURL)
 	}
 	if !strings.HasPrefix(chrome.LoopbackCDPURL, "ws://127.0.0.1:") {

@@ -5,23 +5,16 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/transport"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 	"time"
 )
 
 func TestPipeUpstreamTransportConstructorUpdateLauncherConfigAndUnconnectedErrorsMatchTransportSurface(t *testing.T) {
-	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{CDPURL: "pipe://constructor"})
-	if transport.URL != "pipe://constructor" {
-		t.Fatalf("URL = %q", transport.URL)
-	}
+	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{})
 	if launcherConfig := transport.GetLauncherConfig(); launcherConfig.RemoteDebugging != "pipe" {
 		t.Fatalf("launcher config = %#v", launcherConfig)
 	}
-	transport.Update(map[string]any{"cdp_url": "pipe://1234"})
-	if transport.URL != "pipe://1234" {
-		t.Fatalf("URL after update = %q", transport.URL)
-	}
+	transport.Update(map[string]any{"cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"})
 	if err := transport.Connect(); err == nil {
 		t.Fatal("expected Connect to require pipe handles")
 	}
@@ -47,7 +40,6 @@ func TestPipeUpstreamTransportResetsConnectionStateAfterPipeCloses(t *testing.T)
 	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{
 		PipeRead:  pipeRead,
 		PipeWrite: pipeWrite,
-		CDPURL:    "pipe://test",
 	})
 	closed := make(chan error, 1)
 	transport.OnClose(func(err error) { closed <- err })
@@ -68,7 +60,7 @@ func TestPipeUpstreamTransportResetsConnectionStateAfterPipeCloses(t *testing.T)
 	}
 }
 
-func TestPipeUpstreamTransportLaunchesRealBrowserAndUsesPIDScopedPipeURL(t *testing.T) {
+func TestPipeUpstreamTransportLaunchesRealBrowserWithoutCDPURL(t *testing.T) {
 	extensionPath, err := filepath.Abs("../../../dist/extension")
 	if err != nil {
 		t.Fatal(err)
@@ -99,15 +91,11 @@ func TestPipeUpstreamTransportLaunchesRealBrowserAndUsesPIDScopedPipeURL(t *test
 	if cdp.Transport() == nil {
 		t.Fatal("expected pipe transport")
 	}
-	if !regexp.MustCompile(`^pipe://\d+$`).MatchString(cdp.CDPURL) {
+	if cdp.CDPURL != "" {
 		t.Fatalf("CDPURL = %q", cdp.CDPURL)
 	}
-	pipeTransport, ok := cdp.Transport().(*PipeUpstreamTransport)
-	if !ok {
+	if _, ok := cdp.Transport().(*PipeUpstreamTransport); !ok {
 		t.Fatalf("transport = %T", cdp.Transport())
-	}
-	if pipeTransport.URL != cdp.CDPURL {
-		t.Fatalf("pipe transport URL = %q, CDPURL = %q", pipeTransport.URL, cdp.CDPURL)
 	}
 	if _, err := cdp.Mod.AddCustomCommand(modcdp.CustomCommand{
 		Name:       "Custom.runtimeReadyState",

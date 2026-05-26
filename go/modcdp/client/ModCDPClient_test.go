@@ -38,10 +38,7 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 			UpstreamCDPURL:                        "http://127.0.0.1:9222",
 			UpstreamNATSWaitTimeoutMS:             345,
 			UpstreamReverseWSWaitTimeoutMS:        456,
-			UpstreamNativeMessagingManifest:       "/tmp/native-host.json",
-			UpstreamNativeMessagingManifests:      []string{"/tmp/native-host-extra.json"},
 			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
-			UpstreamNativeMessagingWaitTimeoutMS:  567,
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
 		Injector: InjectorConfig{
@@ -89,17 +86,8 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Upstream.UpstreamNATSWaitTimeoutMS != 345 {
 		t.Fatalf("Upstream.UpstreamNATSWaitTimeoutMS = %d", cdp.Upstream.UpstreamNATSWaitTimeoutMS)
 	}
-	if cdp.Upstream.UpstreamNativeMessagingManifest != "/tmp/native-host.json" {
-		t.Fatalf("Upstream.UpstreamNativeMessagingManifest = %q", cdp.Upstream.UpstreamNativeMessagingManifest)
-	}
-	if len(cdp.Upstream.UpstreamNativeMessagingManifests) != 1 || cdp.Upstream.UpstreamNativeMessagingManifests[0] != "/tmp/native-host-extra.json" {
-		t.Fatalf("Upstream.UpstreamNativeMessagingManifests = %#v", cdp.Upstream.UpstreamNativeMessagingManifests)
-	}
 	if cdp.Upstream.UpstreamNativeMessagingHostName != "com.modcdp.custom" {
 		t.Fatalf("Upstream.UpstreamNativeMessagingHostName = %q", cdp.Upstream.UpstreamNativeMessagingHostName)
-	}
-	if cdp.Upstream.UpstreamNativeMessagingWaitTimeoutMS != 567 {
-		t.Fatalf("Upstream.UpstreamNativeMessagingWaitTimeoutMS = %d", cdp.Upstream.UpstreamNativeMessagingWaitTimeoutMS)
 	}
 	if cdp.Injector.InjectorExecutionContextTimeoutMS != 4321 {
 		t.Fatalf("Injector.InjectorExecutionContextTimeoutMS = %d", cdp.Injector.InjectorExecutionContextTimeoutMS)
@@ -278,10 +266,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 			UpstreamNATSSubjectPrefix:             "modcdp.test",
 			UpstreamNATSWaitTimeoutMS:             789,
 			UpstreamReverseWSWaitTimeoutMS:        1_234,
-			UpstreamNativeMessagingManifest:       "/tmp/native.json",
-			UpstreamNativeMessagingManifests:      []string{"/tmp/native-extra.json"},
 			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
-			UpstreamNativeMessagingWaitTimeoutMS:  2_345,
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
 		Injector: InjectorConfig{
@@ -310,7 +295,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	raw := string(encoded)
 	for _, wrong := range []string{
 		"Launcher", "ExecutablePath", "RemoteDebugging", "BrowserbaseAPIKey",
-		"Upstream", "UpstreamNATSSubjectPrefix", "UpstreamNATSWaitTimeoutMS", "UpstreamReverseWSWaitTimeoutMS", "UpstreamNativeMessagingHostName", "UpstreamNativeMessagingWaitTimeoutMS",
+		"Upstream", "UpstreamNATSSubjectPrefix", "UpstreamNATSWaitTimeoutMS", "UpstreamReverseWSWaitTimeoutMS", "UpstreamNativeMessagingHostName",
 		"Injector", "InjectorServiceWorkerURLSuffixes", "InjectorTrustServiceWorkerTarget",
 		"Client", "HydrateAliases", "CustomCommands",
 	} {
@@ -332,10 +317,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 		`"upstream_nats_subject_prefix"`,
 		`"upstream_nats_wait_timeout_ms"`,
 		`"upstream_reversews_wait_timeout_ms"`,
-		`"upstream_nativemessaging_manifest"`,
-		`"upstream_nativemessaging_manifests"`,
 		`"upstream_nativemessaging_host_name"`,
-		`"upstream_nativemessaging_wait_timeout_ms"`,
 		`"injector"`,
 		`"injector_mode"`,
 		`"injector_service_worker_url_suffixes"`,

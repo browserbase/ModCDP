@@ -120,7 +120,7 @@ class LocalBrowserLauncher(BrowserLauncher):
                 _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir)
                 raise
             launched: LaunchedBrowser = {
-                "cdp_url": f"pipe://{process.pid}",
+                "cdp_url": None,
                 "profile_dir": profile_dir,
                 "pipe_read": pipe_read,
                 "pipe_write": pipe_write,

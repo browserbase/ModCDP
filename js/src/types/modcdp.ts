@@ -154,10 +154,7 @@ export const ModCDPUpstreamOptionsSchema = z
     upstream_nats_wait_timeout_ms: z.number().positive().optional(),
     upstream_reversews_bind: z.string().nullable().optional(),
     upstream_reversews_wait_timeout_ms: z.number().positive().optional(),
-    upstream_nativemessaging_manifest: z.string().nullable().optional(),
-    upstream_nativemessaging_manifests: z.array(z.string()).nullable().optional(),
     upstream_nativemessaging_host_name: z.string().nullable().optional(),
-    upstream_nativemessaging_wait_timeout_ms: z.number().positive().optional(),
   })
   .passthrough();
 export type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;

@@ -112,9 +112,6 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     ...(upstream_mode === "reversews"
       ? { upstream_reversews_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS }
       : {}),
-    ...(upstream_mode === "nativemessaging"
-      ? { upstream_nativemessaging_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS }
-      : {}),
     ...(upstream_mode === "nats" ? { upstream_nats_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS } : {}),
   };
   const injector = {

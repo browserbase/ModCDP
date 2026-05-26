@@ -99,7 +99,7 @@ describe("LocalBrowserLauncher", () => {
 
       try {
         expect(chrome.port).toBeUndefined();
-        expect(chrome.cdp_url).toEqual(expect.stringMatching(/^pipe:\/\/\d+/));
+        expect(chrome.cdp_url).toBeNull();
         expect(chrome.loopback_cdp_url).toBeUndefined();
         expect(chrome.pipe_read).toBeTruthy();
         expect(chrome.pipe_write).toBeTruthy();
@@ -131,7 +131,7 @@ describe("LocalBrowserLauncher", () => {
       let cdp: CdpSocket | null = null;
 
       try {
-        expect(chrome.cdp_url).toEqual(expect.stringMatching(/^pipe:\/\/\d+/));
+        expect(chrome.cdp_url).toBeNull();
         expect(chrome.port).toEqual(expect.any(Number));
         expect(chrome.loopback_cdp_url).toEqual(expect.stringMatching(/^ws:\/\/127\.0\.0\.1:\d+\//));
         cdp = await CdpSocket.connect(chrome.loopback_cdp_url!);

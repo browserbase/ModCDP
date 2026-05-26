@@ -37,9 +37,9 @@ class BrowserLaunchOptions(TypedDict, total=False):
 
 
 class LaunchedBrowser(TypedDict):
-    # Effective CDP endpoint for the selected transport; launchers resolve HTTP discovery endpoints to ws:// before returning when they can.
+    # Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
     cdp_url: str | None
-    # Extension-dialable loopback CDP endpoint when it differs from cdp_url, for example pipe:// primary transport.
+    # Extension-dialable loopback CDP endpoint when it differs from cdp_url.
     loopback_cdp_url: NotRequired[str | None]
     close: Callable[[], Any]
     profile_dir: NotRequired[str | None]

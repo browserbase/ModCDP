@@ -819,10 +819,7 @@ async function handleClientManagedConnection(
       upstream_nats_url: upstream.upstream_nats_url,
       upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix,
       upstream_nats_wait_timeout_ms: upstream.upstream_nats_wait_timeout_ms,
-      upstream_nativemessaging_manifest: upstream.upstream_nativemessaging_manifest,
-      upstream_nativemessaging_manifests: upstream.upstream_nativemessaging_manifests,
       upstream_nativemessaging_host_name: upstream.upstream_nativemessaging_host_name,
-      upstream_nativemessaging_wait_timeout_ms: upstream.upstream_nativemessaging_wait_timeout_ms,
       upstream_ws_connect_error_settle_timeout_ms: upstream.upstream_ws_connect_error_settle_timeout_ms,
     },
     injector: proxyInjectorOptions(injector, "none"),
@@ -1217,26 +1214,11 @@ export function runProxyCli(args = process.argv.slice(2)) {
         argv["upstream-reversews-wait-timeout-ms"] !== "true"
           ? Number(argv["upstream-reversews-wait-timeout-ms"])
           : null,
-      upstream_nativemessaging_manifest:
-        typeof argv["upstream-nativemessaging-manifest"] === "string" &&
-        argv["upstream-nativemessaging-manifest"] !== "true"
-          ? String(argv["upstream-nativemessaging-manifest"])
-          : null,
-      upstream_nativemessaging_manifests:
-        typeof argv["upstream-nativemessaging-manifests"] === "string" &&
-        argv["upstream-nativemessaging-manifests"] !== "true"
-          ? parseStringList(argv["upstream-nativemessaging-manifests"])
-          : null,
       upstream_nativemessaging_host_name:
         typeof argv["upstream-nativemessaging-host-name"] === "string" &&
         argv["upstream-nativemessaging-host-name"] !== "true"
           ? String(argv["upstream-nativemessaging-host-name"])
           : null,
-      upstream_nativemessaging_wait_timeout_ms:
-        typeof argv["upstream-nativemessaging-wait-timeout-ms"] === "string" &&
-        argv["upstream-nativemessaging-wait-timeout-ms"] !== "true"
-          ? Number(argv["upstream-nativemessaging-wait-timeout-ms"])
-          : undefined,
     },
     injector: {
       injector_mode: String(argv["injector-mode"] || "auto") as InjectorOptions["injector_mode"],

@@ -222,7 +222,6 @@ func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, 
 			}
 		}
 		launched := &LaunchedBrowser{
-			CDPURL:         fmt.Sprintf("pipe://%d", cmd.Process.Pid),
 			LoopbackCDPURL: loopbackCDPURL,
 			Close:          close,
 			ProfileDir:     profileDir,

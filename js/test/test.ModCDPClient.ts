@@ -31,10 +31,7 @@ test("ModCDPClient normalizes nested config owners", () => {
       upstream_cdp_url: "http://127.0.0.1:9222",
       upstream_nats_wait_timeout_ms: 345,
       upstream_reversews_wait_timeout_ms: 456,
-      upstream_nativemessaging_manifest: "/tmp/native-host.json",
-      upstream_nativemessaging_manifests: ["/tmp/native-host-extra.json"],
       upstream_nativemessaging_host_name: "com.modcdp.custom",
-      upstream_nativemessaging_wait_timeout_ms: 567,
       upstream_ws_connect_error_settle_timeout_ms: 321,
     },
     injector: {
@@ -74,10 +71,7 @@ test("ModCDPClient normalizes nested config owners", () => {
   assert.equal(cdp._launcherOptions().user_data_dir, "/tmp/profile");
   assert.equal(cdp.upstream.upstream_nats_wait_timeout_ms, 345);
   assert.equal(cdp.upstream.upstream_reversews_wait_timeout_ms, 456);
-  assert.equal(cdp.upstream.upstream_nativemessaging_manifest, "/tmp/native-host.json");
-  assert.deepEqual(cdp.upstream.upstream_nativemessaging_manifests, ["/tmp/native-host-extra.json"]);
   assert.equal(cdp.upstream.upstream_nativemessaging_host_name, "com.modcdp.custom");
-  assert.equal(cdp.upstream.upstream_nativemessaging_wait_timeout_ms, 567);
   assert.equal(cdp.upstream.upstream_ws_connect_error_settle_timeout_ms, 321);
   assert.equal(cdp.injector.injector_execution_context_timeout_ms, 4321);
   assert.equal(cdp.injector.injector_service_worker_probe_timeout_ms, 5432);

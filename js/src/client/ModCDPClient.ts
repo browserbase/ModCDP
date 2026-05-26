@@ -71,7 +71,6 @@ export const DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250;
 export const DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = ["/modcdp/service_worker.js"];
 export const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
 export const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
-export const DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS = 10_000;
 export const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
 
 export type LauncherMode = "local" | "remote" | "bb" | "none";
@@ -90,10 +89,7 @@ export type UpstreamOptions = {
   upstream_nats_wait_timeout_ms?: number;
   upstream_reversews_bind?: string | null;
   upstream_reversews_wait_timeout_ms?: number;
-  upstream_nativemessaging_manifest?: string | null;
-  upstream_nativemessaging_manifests?: string[] | null;
   upstream_nativemessaging_host_name?: string | null;
-  upstream_nativemessaging_wait_timeout_ms?: number;
   upstream_ws_connect_error_settle_timeout_ms?: number;
 };
 export type InjectorOptions = {
@@ -343,7 +339,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
         this.upstream = new WebSocketUpstreamTransport({ cdp_url: upstream.upstream_cdp_url ?? null });
         break;
       case "pipe":
-        this.upstream = new PipeUpstreamTransport({ cdp_url: upstream.upstream_cdp_url ?? null });
+        this.upstream = new PipeUpstreamTransport();
         break;
       case "reversews":
         this.upstream = new ReverseWebSocketUpstreamTransport({
@@ -354,11 +350,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
         break;
       case "nativemessaging":
         this.upstream = new NativeMessagingUpstreamTransport({
-          upstream_nativemessaging_manifest: upstream.upstream_nativemessaging_manifest ?? null,
-          upstream_nativemessaging_manifests: upstream.upstream_nativemessaging_manifests ?? null,
           upstream_nativemessaging_host_name: upstream.upstream_nativemessaging_host_name ?? null,
-          upstream_nativemessaging_wait_timeout_ms:
-            upstream.upstream_nativemessaging_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS,
         });
         break;
       case "nats":
@@ -376,14 +368,8 @@ export class ModCDPClient extends ModCDPEventEmitter {
       upstream.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
     this.upstream.upstream_reversews_wait_timeout_ms =
       upstream.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
-    if (upstream.upstream_nativemessaging_manifest !== undefined)
-      this.upstream.upstream_nativemessaging_manifest = upstream.upstream_nativemessaging_manifest;
-    if (upstream.upstream_nativemessaging_manifests !== undefined)
-      this.upstream.upstream_nativemessaging_manifests = upstream.upstream_nativemessaging_manifests ?? [];
     if (upstream.upstream_nativemessaging_host_name)
       this.upstream.upstream_nativemessaging_host_name = upstream.upstream_nativemessaging_host_name;
-    this.upstream.upstream_nativemessaging_wait_timeout_ms =
-      upstream.upstream_nativemessaging_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS;
     this.upstream.upstream_ws_connect_error_settle_timeout_ms =
       upstream.upstream_ws_connect_error_settle_timeout_ms ?? DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
     this.injector = {
@@ -835,14 +821,14 @@ export class ModCDPClient extends ModCDPEventEmitter {
     if (transport.endpoint_kind === "raw_cdp") await transport.connect();
 
     this.cdp_url =
-      transport.endpoint_kind === "raw_cdp"
+      transport.endpoint_kind === "raw_cdp" && transport.upstream_mode === "ws"
         ? ((transport.upstream_cdp_url || launched_cdp_url) ?? null)
         : launched_cdp_url;
     // For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
     if (transport.upstream_mode === "ws" && transport.upstream_cdp_url)
       this.upstream.upstream_cdp_url = transport.upstream_cdp_url;
     const server_config = {
-      ...(transport.endpoint_kind === "modcdp_server" && launched_cdp_url && !launched_cdp_url.startsWith("pipe://")
+      ...(transport.endpoint_kind === "modcdp_server" && launched_cdp_url
         ? { server_loopback_cdp_url: launched_cdp_url }
         : {}),
       ...launcher.getServerConfig(),
@@ -906,10 +892,7 @@ export class ModCDPClient extends ModCDPEventEmitter {
       upstream_nats_wait_timeout_ms: this.upstream.upstream_nats_wait_timeout_ms,
       upstream_reversews_bind: this.upstream.upstream_reversews_bind,
       upstream_reversews_wait_timeout_ms: this.upstream.upstream_reversews_wait_timeout_ms,
-      upstream_nativemessaging_manifest: this.upstream.upstream_nativemessaging_manifest,
-      upstream_nativemessaging_manifests: this.upstream.upstream_nativemessaging_manifests,
       upstream_nativemessaging_host_name: this.upstream.upstream_nativemessaging_host_name,
-      upstream_nativemessaging_wait_timeout_ms: this.upstream.upstream_nativemessaging_wait_timeout_ms,
       injector_extension_id: this.injector.injector_extension_id,
     };
   }

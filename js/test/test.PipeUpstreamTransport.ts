@@ -11,13 +11,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
 test("pipe upstream constructor, update, launcher config, and unconnected errors match the transport surface", async () => {
-  const transport = new PipeUpstreamTransport({ cdp_url: "pipe://constructor" });
+  const transport = new PipeUpstreamTransport();
   assert.equal(transport.upstream_mode, "pipe");
   assert.equal(transport.endpoint_kind, "raw_cdp");
-  assert.equal(transport.upstream_cdp_url, "pipe://constructor");
+  assert.equal(transport.upstream_cdp_url, null);
   assert.deepEqual(transport.getLauncherConfig(), { remote_debugging: "pipe" });
-  assert.equal(transport.update({ cdp_url: "pipe://1234" }), transport);
-  assert.equal(transport.upstream_cdp_url, "pipe://1234");
+  assert.equal(transport.update({ cdp_url: "ws://127.0.0.1:9222/devtools/browser/ignored" }), transport);
+  assert.equal(transport.upstream_cdp_url, null);
   await assert.rejects(() => transport.connect(), /upstream\.upstream_mode=pipe requires/);
   assert.throws(() => transport.send({ id: 1, method: "Runtime.evaluate" }), /CDP pipe is not connected/);
 });
@@ -26,7 +26,7 @@ test("pipe upstream resets connection state after pipe end and errors", async ()
   for (const event_name of ["end", "read_error", "write_error"] as const) {
     const pipe_read = new PassThrough();
     const pipe_write = new PassThrough();
-    const transport = new PipeUpstreamTransport({ pipe_read, pipe_write, cdp_url: "pipe://test" });
+    const transport = new PipeUpstreamTransport({ pipe_read, pipe_write });
     const closed: Error[] = [];
     transport.onClose((error) => closed.push(error));
 
@@ -46,7 +46,7 @@ test("pipe upstream resets connection state after pipe end and errors", async ()
   }
 });
 
-test("pipe upstream launches a real browser and uses a pid-scoped pipe URL", async () => {
+test("pipe upstream launches a real browser without a CDP URL", async () => {
   const cdp = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
@@ -66,8 +66,8 @@ test("pipe upstream launches a real browser and uses a pid-scoped pipe URL", asy
     await cdp.connect();
     assert.equal(cdp.upstream?.upstream_mode, "pipe");
     assert.equal(cdp.upstream_endpoint_kind, "raw_cdp");
-    assert.match(cdp.cdp_url ?? "", /^pipe:\/\/\d+$/);
-    assert.equal(cdp.upstream?.upstream_cdp_url, cdp.cdp_url);
+    assert.equal(cdp.cdp_url, null);
+    assert.equal(cdp.upstream?.upstream_cdp_url, null);
     await cdp.Mod.addCustomCommand("Custom.runtimeReadyState", {
       expression:
         "async () => await cdp.send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true })",

@@ -400,7 +400,7 @@ export class LocalBrowserLauncher extends BrowserLauncher {
       this.launched = {
         proc,
         ...(loopback == null ? {} : { port: loopback.port }),
-        cdp_url: `pipe://${proc.pid}`,
+        cdp_url: null,
         ...(loopback == null ? {} : { loopback_cdp_url: loopback.cdp_url }),
         pipe_read,
         pipe_write,
