@@ -122,8 +122,8 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Client.ClientEventWaitTimeoutMS != 2345 {
 		t.Fatalf("Client.ClientEventWaitTimeoutMS = %d", cdp.Client.ClientEventWaitTimeoutMS)
 	}
-	if cdp.UpstreamEndpointKind != UpstreamEndpointKindRawCDP {
-		t.Fatalf("UpstreamEndpointKind = %q", cdp.UpstreamEndpointKind)
+	if endpointKindForUpstream(cdp.Upstream.UpstreamMode) != UpstreamEndpointKindRawCDP {
+		t.Fatalf("endpoint kind = %q", endpointKindForUpstream(cdp.Upstream.UpstreamMode))
 	}
 
 	params := cdp.serverConfigureParams(nil, nil, nil)
@@ -383,8 +383,8 @@ func TestModCDPClientAllowsDisabledServerWithModCDPServerUpstreams(t *testing.T)
 		if cdp.Server != nil {
 			t.Fatalf("%s Server = %#v", mode, cdp.Server)
 		}
-		if cdp.UpstreamEndpointKind != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s UpstreamEndpointKind = %q", mode, cdp.UpstreamEndpointKind)
+		if endpointKindForUpstream(cdp.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
+			t.Fatalf("%s endpoint kind = %q", mode, endpointKindForUpstream(cdp.Upstream.UpstreamMode))
 		}
 	}
 }
@@ -413,9 +413,6 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 		if endpointKindForUpstream(launched.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
 			t.Fatalf("%s launched endpoint kind = %q", mode, endpointKindForUpstream(launched.Upstream.UpstreamMode))
 		}
-		if launched.UpstreamEndpointKind != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s launched UpstreamEndpointKind = %q", mode, launched.UpstreamEndpointKind)
-		}
 		if launched.Injector.InjectorMode != "auto" {
 			t.Fatalf("%s launched Injector.InjectorMode = %q", mode, launched.Injector.InjectorMode)
 		}
@@ -428,9 +425,6 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 		}
 		if endpointKindForUpstream(attachOnly.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
 			t.Fatalf("%s attach-only endpoint kind = %q", mode, endpointKindForUpstream(attachOnly.Upstream.UpstreamMode))
-		}
-		if attachOnly.UpstreamEndpointKind != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s attach-only UpstreamEndpointKind = %q", mode, attachOnly.UpstreamEndpointKind)
 		}
 		if attachOnly.Injector.InjectorMode != "none" {
 			t.Fatalf("%s attach-only Injector.InjectorMode = %q", mode, attachOnly.Injector.InjectorMode)

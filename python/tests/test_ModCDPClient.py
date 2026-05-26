@@ -14,6 +14,7 @@ from websocket import create_connection
 
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
+from modcdp.transport.UpstreamTransport import endpoint_kind_for_upstream
 from modcdp.types import JsonValue
 from tests.test_ReverseWebSocketUpstreamTransport import reversews_test_browser_path
 
@@ -165,12 +166,12 @@ class ModCDPClientTests(unittest.TestCase):
         for mode in ("nativemessaging", "reversews", "nats"):
             launched = ModCDPClient(launcher={"launcher_mode": "local"}, upstream={"upstream_mode": mode})
             self.assertEqual(launched.launcher["launcher_mode"], "local")
-            self.assertEqual(launched.upstream_endpoint_kind, "modcdp_server")
+            self.assertEqual(endpoint_kind_for_upstream(str(launched.upstream["upstream_mode"])), "modcdp_server")
             self.assertEqual(launched.injector["injector_mode"], "auto")
 
             attach_only = ModCDPClient(upstream={"upstream_mode": mode})
             self.assertEqual(attach_only.launcher["launcher_mode"], "none")
-            self.assertEqual(attach_only.upstream_endpoint_kind, "modcdp_server")
+            self.assertEqual(endpoint_kind_for_upstream(str(attach_only.upstream["upstream_mode"])), "modcdp_server")
             self.assertEqual(attach_only.injector["injector_mode"], "none")
 
     def test_orders_local_auto_injection_as_launch_flag_then_load_unpacked_fallback(self) -> None:

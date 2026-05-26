@@ -233,7 +233,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       true,
     );
     assert.equal(cdp.client.client_routes["*.*"], "direct_cdp");
-    assert.equal(cdp.upstream_endpoint_kind, "raw_cdp");
+    assert.equal(cdp.upstream.endpoint_kind, "raw_cdp");
     assert.match(cdp.cdp_url ?? "", /^ws:\/\//);
     const service_worker_url = await cdp.Mod.evaluate({
       expression: "chrome.runtime.getURL('modcdp/service_worker.js')",
@@ -420,12 +420,12 @@ test("ModCDPClient defaults launched ModCDP-server upstreams to extension auto",
       upstream: { upstream_mode: mode },
     });
     assert.equal(launched.launcher.launcher_mode, "local");
-    assert.equal(launched.upstream_endpoint_kind, "modcdp_server");
+    assert.equal(launched.upstream.endpoint_kind, "modcdp_server");
     assert.equal(launched.injector.injector_mode, "auto");
 
     const attach_only = new ModCDPClient({ upstream: { upstream_mode: mode } });
     assert.equal(attach_only.launcher.launcher_mode, "none");
-    assert.equal(attach_only.upstream_endpoint_kind, "modcdp_server");
+    assert.equal(attach_only.upstream.endpoint_kind, "modcdp_server");
     assert.equal(attach_only.injector.injector_mode, "none");
   }
 });

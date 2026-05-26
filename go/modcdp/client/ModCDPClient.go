@@ -380,7 +380,6 @@ type ModCDPClient struct {
 	CustomCommands           []CustomCommand
 	CustomEvents             []CustomEvent
 	CustomMiddlewares        []CustomMiddleware
-	UpstreamEndpointKind     UpstreamEndpointKind
 	CDPURL                   string
 	transport                upstreamTransportClient
 	mu                       sync.Mutex
@@ -541,7 +540,6 @@ func New(opts Options) *ModCDPClient {
 		CustomCommands:          opts.CustomCommands,
 		CustomEvents:            opts.CustomEvents,
 		CustomMiddlewares:       opts.CustomMiddlewares,
-		UpstreamEndpointKind:    upstreamEndpointKind,
 		pending:                 map[int64]chan map[string]any{},
 		handlers:                map[string][]handlerEntry{},
 		cdpHandlers:             map[string][]func(CDPEvent){},

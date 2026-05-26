@@ -47,7 +47,7 @@ from ..transport.ReverseWebSocketUpstreamTransport import (
     DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
     ReverseWebSocketUpstreamTransport,
 )
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamTransport, endpoint_kind_for_upstream
 from ..transport.WebSocketUpstreamTransport import WebSocketUpstreamTransport
 from ..translate.translate import (
     CUSTOM_EVENT_BINDING_NAME,
@@ -250,9 +250,9 @@ class ModCDPClient(CDPSurfaceMixin):
                 )
             ),
         }
-        self.upstream_endpoint_kind = "raw_cdp" if self.upstream["upstream_mode"] in ("ws", "pipe") else "modcdp_server"
+        endpoint_kind = endpoint_kind_for_upstream(upstream_mode)
         launcher_mode = launcher_input.get("launcher_mode") or (
-            "none" if self.upstream_endpoint_kind == "modcdp_server" else "remote" if self.upstream.get("upstream_cdp_url") else "local"
+            "none" if endpoint_kind == "modcdp_server" else "remote" if self.upstream.get("upstream_cdp_url") else "local"
         )
         self.launcher: dict[str, Any] = {
             "launcher_mode": launcher_mode,
@@ -261,7 +261,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "launcher_options": dict(cast(Mapping[str, Any], launcher_input.get("launcher_options") or {})),
         }
         injector_mode = injector_input.get("injector_mode") or (
-            "auto" if self.upstream_endpoint_kind == "raw_cdp" or launcher_mode != "none" else "none"
+            "auto" if endpoint_kind == "raw_cdp" or launcher_mode != "none" else "none"
         )
         raw_service_worker_url_suffixes = injector_input.get("injector_service_worker_url_suffixes")
         self.injector: dict[str, Any] = {
@@ -311,12 +311,12 @@ class ModCDPClient(CDPSurfaceMixin):
         }
         self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_cdp_url"))
         if server is DEFAULT_SERVER:
-            self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if self.upstream_endpoint_kind == "modcdp_server" else {}
+            self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if endpoint_kind == "modcdp_server" else {}
         elif server is None:
             self.server = None
         elif isinstance(server, Mapping):
             self.server = cast(ModCDPServerConfig, {
-                **({"server_routes": {"*.*": "chrome_debugger"}} if self.upstream_endpoint_kind == "modcdp_server" else {}),
+                **({"server_routes": {"*.*": "chrome_debugger"}} if endpoint_kind == "modcdp_server" else {}),
                 **dict(server),
             })
         else:
@@ -373,7 +373,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self.transport.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
         self.transport.onClose(lambda error: self._handle_transport_close(error))
 
-        if self.upstream_endpoint_kind == "modcdp_server":
+        if self.transport.endpoint_kind == "modcdp_server":
             self.transport.waitForPeer()
             if self.server is not None:
                 self._send_message("Mod.configure", cast(ProtocolParams, self._server_configure_params()))
@@ -383,7 +383,7 @@ class ModCDPClient(CDPSurfaceMixin):
             self.connect_timing = cast(ModCDPConnectTiming, {
                 "started_at": connect_started_at,
                 "upstream_mode": self.upstream.get("upstream_mode"),
-                "upstream_endpoint_kind": self.upstream_endpoint_kind,
+                "upstream_endpoint_kind": self.transport.endpoint_kind,
                 "transport_started_at": transport_started_at,
                 "transport_connected_at": transport_connected_at,
                 "transport_duration_ms": transport_connected_at - transport_started_at,
@@ -424,7 +424,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self.connect_timing = cast(ModCDPConnectTiming, {
             "started_at": connect_started_at,
             "upstream_mode": self.upstream.get("upstream_mode"),
-            "upstream_endpoint_kind": self.upstream_endpoint_kind,
+            "upstream_endpoint_kind": self.transport.endpoint_kind,
             "transport_started_at": transport_started_at,
             "transport_connected_at": transport_connected_at,
             "transport_duration_ms": transport_connected_at - transport_started_at,
@@ -462,7 +462,8 @@ class ModCDPClient(CDPSurfaceMixin):
             command_params = self._custom_command_wire_params(command_params)
         elif method == "Mod.addCustomEvent":
             self._register_custom_event(command_params)
-            if self.ext_session_id is None and self.upstream_endpoint_kind != "modcdp_server":
+            endpoint_kind = self.transport.endpoint_kind if self.transport is not None else endpoint_kind_for_upstream(str(self.upstream["upstream_mode"]))
+            if self.ext_session_id is None and endpoint_kind != "modcdp_server":
                 completed_at = int(time.time() * 1000)
                 self.last_command_timing = {
                     "method": method,
@@ -478,7 +479,8 @@ class ModCDPClient(CDPSurfaceMixin):
         if method not in {"Mod.addCustomCommand", "Mod.addCustomEvent"} and should_validate_params:
             command_params = self._validate_command_params(method, command_params)
 
-        if self.upstream_endpoint_kind == "modcdp_server":
+        endpoint_kind = self.transport.endpoint_kind if self.transport is not None else endpoint_kind_for_upstream(str(self.upstream["upstream_mode"]))
+        if endpoint_kind == "modcdp_server":
             result = self._send_message(method, command_params)
             if should_validate_result and method != "Mod.addCustomCommand":
                 result = self._validate_command_result(method, result)

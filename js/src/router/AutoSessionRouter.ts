@@ -350,6 +350,15 @@ export class AutoSessionRouter {
     if (explicitTargetId) return explicitTargetId;
     const targetInfos = await this.upstream.getTargets();
     for (const targetInfo of targetInfos) this.recordTarget(targetInfo);
+    const tabId = params.debuggee?.tabId ?? params.tabId ?? null;
+    if (typeof tabId === "number" && globalThis.chrome?.tabs?.get) {
+      const tab = await globalThis.chrome.tabs.get(tabId);
+      const tabUrl = tab.url || tab.pendingUrl || null;
+      if (tabUrl) {
+        const targetId = targetInfos.find((target) => target.type === "page" && target.url === tabUrl)?.targetId;
+        if (targetId) return targetId;
+      }
+    }
     return (
       targetInfos.find((target) => target.type === "page" && !target.url.startsWith("devtools://"))?.targetId ?? null
     );

@@ -63,7 +63,7 @@ class PipeUpstreamTransportTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "pipe")
-            self.assertEqual(cdp.upstream_endpoint_kind, "raw_cdp")
+            self.assertEqual(cdp.transport.endpoint_kind if cdp.transport else None, "raw_cdp")
             self.assertIsNone(cdp.cdp_url)
             self.assertIsNone(cdp.transport.url if cdp.transport else None)
             cdp.Mod.addCustomCommand(

@@ -51,7 +51,6 @@ export { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUps
 export { NatsUpstreamTransport } from "./transport/NatsUpstreamTransport.js";
 export { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
 export { ChromeDebuggerTransport } from "./transport/ChromeDebuggerTransport.js";
-export { LoopbackCdpTransport } from "./transport/LoopbackCdpTransport.js";
 export { ReverseWSDownstreamTransport } from "./transport/ReverseWSDownstreamTransport.js";
 export { NativeHostDownstreamTransport } from "./transport/NativeHostDownstreamTransport.js";
 export { NATSDownstreamTransport } from "./transport/NATSDownstreamTransport.js";
@@ -78,7 +77,6 @@ export * as nativeMessagingUpstreamTransport from "./transport/NativeMessagingUp
 export * as natsUpstreamTransport from "./transport/NatsUpstreamTransport.js";
 export * as pipeUpstreamTransport from "./transport/PipeUpstreamTransport.js";
 export * as chromeDebuggerTransport from "./transport/ChromeDebuggerTransport.js";
-export * as loopbackCdpTransport from "./transport/LoopbackCdpTransport.js";
 export * as reverseWSDownstreamTransport from "./transport/ReverseWSDownstreamTransport.js";
 export * as nativeHostDownstreamTransport from "./transport/NativeHostDownstreamTransport.js";
 export * as natsDownstreamTransport from "./transport/NATSDownstreamTransport.js";

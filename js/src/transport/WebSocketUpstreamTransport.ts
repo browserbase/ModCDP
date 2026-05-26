@@ -2,15 +2,32 @@ import { resolveCdpWebSocketUrl } from "../launcher/BrowserLauncher.js";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import {
+  UpstreamTransport,
+  type TargetRoute,
+  type UpstreamEndpointKind,
+  type UpstreamMode,
+  type UpstreamTransportConfig,
+} from "./UpstreamTransport.js";
+
+type WebSocketUpstreamTransportMode = Extract<UpstreamMode, "ws" | "loopback_cdp">;
 
 export class WebSocketUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "ws" as const;
-  readonly endpoint_kind = "raw_cdp" as const;
+  override readonly upstream_mode: WebSocketUpstreamTransportMode = "ws";
+  override readonly endpoint_kind: UpstreamEndpointKind = "raw_cdp";
   ws: WebSocket | null = null;
+  private connect_promise: Promise<void> | null = null;
 
-  constructor({ cdp_url = null }: { cdp_url?: string | null } = {}) {
+  constructor({
+    cdp_url = null,
+    upstream_mode = "ws",
+  }: {
+    cdp_url?: string | null;
+    upstream_mode?: WebSocketUpstreamTransportMode;
+  } = {}) {
     super();
+    this.upstream_mode = upstream_mode;
+    this.endpoint_kind = upstream_mode === "loopback_cdp" ? "browser_targets" : "raw_cdp";
     this.upstream_cdp_url = cdp_url ?? "";
   }
 
@@ -46,17 +63,23 @@ export class WebSocketUpstreamTransport extends UpstreamTransport {
       return;
     }
     if (typeof command_or_message_or_method === "string") {
-      return super.send(
-        command_or_message_or_method,
-        params as ProtocolPayload,
-        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
-        options,
+      return this.connect().then(
+        () =>
+          super.send(
+            command_or_message_or_method,
+            params as ProtocolPayload,
+            typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+            options,
+          ) as Promise<ProtocolResult>,
       );
     }
-    return super.send(
-      command_or_message_or_method,
-      params as z.input<Params>,
-      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    return this.connect().then(
+      () =>
+        super.send(
+          command_or_message_or_method,
+          params as z.input<Params>,
+          route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+        ) as Promise<z.output<Result>>,
     );
   }
 
@@ -71,31 +94,51 @@ export class WebSocketUpstreamTransport extends UpstreamTransport {
   }
 
   async connect() {
+    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.connect_promise) return await this.connect_promise;
     if (!this.upstream_cdp_url)
-      throw new Error("upstream.upstream_mode=ws requires upstream_cdp_url or launcher-provided cdp_url.");
-    // cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
-    this.upstream_cdp_url = await resolveCdpWebSocketUrl(this.upstream_cdp_url, "upstream_cdp_url");
-    const ws = new WebSocket(this.upstream_cdp_url);
-    this.ws = ws;
-    ws.addEventListener("message", (event) => this.parseAndEmitRecv(event.data));
-    ws.addEventListener("close", () => this.emitClose(new Error("CDP websocket closed")));
-    ws.addEventListener("error", () => this.emitClose(new Error("CDP websocket error")));
-    await new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        ws.removeEventListener("open", onOpen);
-        ws.removeEventListener("error", onError);
-      };
-      const onOpen = () => {
-        cleanup();
-        resolve();
-      };
-      const onError = () => {
-        cleanup();
-        reject(new Error("CDP websocket error"));
-      };
-      ws.addEventListener("open", onOpen);
-      ws.addEventListener("error", onError);
-    });
+      throw new Error(
+        `upstream.upstream_mode=${this.upstream_mode} requires upstream_cdp_url or launcher-provided cdp_url.`,
+      );
+    this.connect_promise = (async () => {
+      // cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
+      this.upstream_cdp_url = await resolveCdpWebSocketUrl(this.upstream_cdp_url!, "upstream_cdp_url");
+      const ws = new WebSocket(this.upstream_cdp_url);
+      this.ws = ws;
+      ws.addEventListener("message", (event) => this.parseAndEmitRecv(event.data));
+      ws.addEventListener("close", () => {
+        if (this.ws === ws) this.ws = null;
+        this.connect_promise = null;
+        this.emitClose(new Error("CDP websocket closed"));
+      });
+      ws.addEventListener("error", () => {
+        if (this.ws === ws) this.ws = null;
+        this.connect_promise = null;
+        this.emitClose(new Error("CDP websocket error"));
+      });
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          ws.removeEventListener("open", onOpen);
+          ws.removeEventListener("error", onError);
+        };
+        const onOpen = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new Error("CDP websocket error"));
+        };
+        ws.addEventListener("open", onOpen);
+        ws.addEventListener("error", onError);
+      });
+    })();
+    try {
+      await this.connect_promise;
+    } catch (error) {
+      this.connect_promise = null;
+      throw error;
+    }
   }
 
   async close() {
@@ -103,5 +146,6 @@ export class WebSocketUpstreamTransport extends UpstreamTransport {
       this.ws?.close();
     } catch {}
     this.ws = null;
+    this.connect_promise = null;
   }
 }

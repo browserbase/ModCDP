@@ -10,9 +10,9 @@ import { commands as nativeCommandSchemas, events as nativeEventSchemas } from "
 import * as Browser from "../types/generated/zod/Browser.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import { ModCDPClient } from "../client/ModCDPClient.js";
+import { resolveCdpWebSocketUrl } from "../launcher/BrowserLauncher.js";
 import { ProtocolPayloadSchema, normalizeModCDPPayloadSchema } from "../types/modcdp.js";
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
-import { LoopbackCdpTransport } from "../transport/LoopbackCdpTransport.js";
 import { DownstreamTransportCollection } from "../transport/DownstreamTransportCollection.js";
 import { NativeHostDownstreamTransport } from "../transport/NativeHostDownstreamTransport.js";
 import { NATSDownstreamTransport } from "../transport/NATSDownstreamTransport.js";
@@ -528,7 +528,9 @@ export function installModCDPServer(
         server_close_browser_on_downstream_disconnect = this.close_browser_on_downstream_disconnect,
       } = server;
       const { custom_commands = [], custom_events = [], custom_middlewares = [] } = params;
-      this.loopback_cdp_url = await LoopbackCdpTransport.resolveEndpoint(server_loopback_cdp_url);
+      this.loopback_cdp_url = server_loopback_cdp_url
+        ? await resolveCdpWebSocketUrl(server_loopback_cdp_url, "server_loopback_cdp_url")
+        : null;
       this.browser_token = server_browser_token;
       this.cdp_send_timeout_ms = server_cdp_send_timeout_ms;
       this.loopback_execution_context_timeout_ms = server_loopback_execution_context_timeout_ms;
@@ -755,18 +757,65 @@ export function installModCDPServer(
       verified: boolean;
       version?: unknown;
     }> {
-      const transport = new LoopbackCdpTransport({
-        loopback_cdp_url: ModCDPServer.loopback_cdp_url,
-        cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
-        loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
-        ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
+      if (!this.browser_token) return { loopback_cdp_url: null, verified: false };
+
+      const previous_loopback_cdp_url = this.loopback_cdp_url;
+      const service_worker_url = currentServiceWorkerUrl();
+      const loopback_cdp_url = await resolveCdpWebSocketUrl("http://127.0.0.1:9222", "server_loopback_cdp_url").catch(
+        () => null,
+      );
+      if (!loopback_cdp_url) return { loopback_cdp_url: null, verified: false };
+
+      const client = new ModCDPClient({
+        launcher: { launcher_mode: "none" },
+        injector: {
+          injector_mode: "none",
+          injector_execution_context_timeout_ms: this.loopback_execution_context_timeout_ms,
+        },
+        upstream: {
+          upstream_mode: "loopback_cdp",
+          upstream_cdp_url: loopback_cdp_url,
+          upstream_ws_connect_error_settle_timeout_ms: this.ws_connect_error_settle_timeout_ms,
+        },
+        client: {
+          client_hydrate_aliases: false,
+          client_cdp_send_timeout_ms: this.cdp_send_timeout_ms,
+        },
+        server: null,
       });
-      const result = await transport.discoverLoopbackCDP({
-        browserToken: this.browser_token,
-        serviceWorkerUrl: currentServiceWorkerUrl(),
-      });
-      this.loopback_cdp_url = result.loopback_cdp_url;
-      return result;
+      try {
+        await client.connect();
+        const service_worker_target = (await client.upstream.getTargets()).find(
+          (target) => target.type === "service_worker" && target.url === service_worker_url,
+        );
+        if (!service_worker_target) {
+          this.loopback_cdp_url = previous_loopback_cdp_url;
+          return { loopback_cdp_url: null, verified: false };
+        }
+        const route = await client.router.ensureRouteForTarget(service_worker_target.targetId);
+        const execution_context_ready = client.router.waitForExecutionContext(route.sessionId, {
+          timeout_ms: this.loopback_execution_context_timeout_ms,
+        });
+        await client.upstream.send(Runtime.EnableCommand, {}, route);
+        const executionContextId = await execution_context_ready;
+        const result = await client.upstream.send(
+          Runtime.CallFunctionOnCommand,
+          {
+            functionDeclaration: `function() { return globalThis.ModCDP?.browser_token === ${JSON.stringify(this.browser_token)}; }`,
+            executionContextId,
+            returnByValue: true,
+          },
+          route,
+        );
+        if (result.result?.value !== true) {
+          this.loopback_cdp_url = previous_loopback_cdp_url;
+          return { loopback_cdp_url: null, verified: false };
+        }
+        this.loopback_cdp_url = loopback_cdp_url;
+        return { loopback_cdp_url, verified: true };
+      } finally {
+        await client.close();
+      }
     },
   };
 

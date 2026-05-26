@@ -40,7 +40,7 @@ test("ws upstream launches a real browser and speaks raw CDP", async () => {
   try {
     await cdp.connect();
     assert.equal(cdp.upstream?.upstream_mode, "ws");
-    assert.equal(cdp.upstream_endpoint_kind, "raw_cdp");
+    assert.equal(cdp.upstream.endpoint_kind, "raw_cdp");
     assert.equal(cdp.connect_timing?.upstream_mode, "ws");
     assert.equal(cdp.connect_timing?.upstream_endpoint_kind, "raw_cdp");
     const connect_timing = cdp.connect_timing as

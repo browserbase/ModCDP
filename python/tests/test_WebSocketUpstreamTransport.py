@@ -79,7 +79,7 @@ class WebSocketUpstreamTransportTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "ws")
-            self.assertEqual(cdp.upstream_endpoint_kind, "raw_cdp")
+            self.assertEqual(cdp.transport.endpoint_kind if cdp.transport else None, "raw_cdp")
             timing = cdp.connect_timing
             self.assertIsNotNone(timing)
             if timing is None:

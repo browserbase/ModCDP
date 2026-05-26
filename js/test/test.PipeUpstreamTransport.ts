@@ -65,7 +65,7 @@ test("pipe upstream launches a real browser without a CDP URL", async () => {
   try {
     await cdp.connect();
     assert.equal(cdp.upstream?.upstream_mode, "pipe");
-    assert.equal(cdp.upstream_endpoint_kind, "raw_cdp");
+    assert.equal(cdp.upstream.endpoint_kind, "raw_cdp");
     assert.equal(cdp.cdp_url, null);
     assert.equal(cdp.upstream?.upstream_cdp_url, null);
     await cdp.Mod.addCustomCommand("Custom.runtimeReadyState", {

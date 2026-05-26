@@ -93,10 +93,6 @@
       "types": "./dist/js/src/transport/ChromeDebuggerTransport.d.ts",
       "import": "./dist/js/src/transport/ChromeDebuggerTransport.js"
     },
-    "./transport/LoopbackCdpTransport.js": {
-      "types": "./dist/js/src/transport/LoopbackCdpTransport.d.ts",
-      "import": "./dist/js/src/transport/LoopbackCdpTransport.js"
-    },
     "./transport/ReverseWSDownstreamTransport.js": {
       "types": "./dist/js/src/transport/ReverseWSDownstreamTransport.d.ts",
       "import": "./dist/js/src/transport/ReverseWSDownstreamTransport.js"
