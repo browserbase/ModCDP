@@ -47,7 +47,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
       upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.wait_timeout_ms = upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.endpoint_url = endpointFromBind(this.upstream_reversews_bind);
-    this.upstream_cdp_url = this.endpoint_url;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -102,7 +101,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     if (config.upstream_reversews_bind) {
       this.upstream_reversews_bind = config.upstream_reversews_bind;
       this.endpoint_url = endpointFromBind(config.upstream_reversews_bind);
-      this.upstream_cdp_url = this.endpoint_url;
     }
     if (typeof config.upstream_reversews_wait_timeout_ms === "number") {
       this.upstream_reversews_wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;

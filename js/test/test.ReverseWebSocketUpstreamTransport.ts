@@ -158,7 +158,7 @@ test("reversews upstream accepts a real extension reverse connection and routes 
     await cdp.connect();
     assert.equal(cdp.upstream?.upstream_mode, "reversews");
     assert.equal(cdp.upstream_endpoint_kind, "modcdp_server");
-    assert.equal(cdp.upstream?.upstream_cdp_url, "ws://127.0.0.1:29292");
+    assert.equal((cdp.upstream as ReverseWebSocketUpstreamTransport).upstream_reversews_url, "ws://127.0.0.1:29292");
     assert.equal(
       (cdp.upstream as ReverseWebSocketUpstreamTransport).peer_info?.extension_id,
       "mdedooklbnfejodmnhmkdpkaedafkehf",
