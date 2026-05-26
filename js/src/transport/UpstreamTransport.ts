@@ -7,7 +7,6 @@ import type {
   CdpDebuggeeCommandParams,
   CdpEventMessage,
   CdpResponseMessage,
-  ModCDPServerOptions,
   ProtocolPayload,
   ProtocolResult,
 } from "../types/modcdp.js";
@@ -19,9 +18,7 @@ export type UpstreamMode =
   | "nativemessaging"
   | "reversews"
   | "nats"
-  | "loopback_cdp"
   | "chrome_debugger";
-export type UpstreamEndpointKind = "raw_cdp" | "modcdp_server" | "browser_targets";
 export type UpstreamOptions = {
   upstream_mode?: UpstreamMode;
   upstream_cdp_url?: string | null;
@@ -34,7 +31,7 @@ export type UpstreamOptions = {
   upstream_ws_connect_error_settle_timeout_ms?: number;
 };
 export type UpstreamTransportConfig = {
-  cdp_url?: string | null;
+  upstream_cdp_url?: string | null;
   user_data_dir?: string | null;
   pipe_read?: NodeJS.ReadableStream | null;
   pipe_write?: NodeJS.WritableStream | null;
@@ -62,7 +59,6 @@ export type UpstreamEventListener = (
 
 export class UpstreamTransport {
   readonly upstream_mode: UpstreamMode = "ws";
-  readonly endpoint_kind: UpstreamEndpointKind = "raw_cdp";
   upstream_cdp_url?: string | null = null;
   upstream_nats_url?: string | null = null;
   upstream_nats_subject_prefix?: string | null = null;
@@ -92,18 +88,6 @@ export class UpstreamTransport {
 
   update(_config: UpstreamTransportConfig = {}) {
     return this;
-  }
-
-  getLauncherConfig(): {} {
-    return {};
-  }
-
-  getInjectorConfig(): {} {
-    return {};
-  }
-
-  getServerConfig(): Partial<ModCDPServerOptions> {
-    return {};
   }
 
   async close() {}
@@ -280,10 +264,4 @@ export function parseHostPort(value: string, defaultHost: string, defaultPort: n
   const port = Number(parsed.port || defaultPort);
   if (!Number.isInteger(port) || port <= 0 || port > 65_535) throw new Error(`Invalid host:port ${value}`);
   return { host, port };
-}
-
-export function endpointKindForUpstream(mode: UpstreamMode): UpstreamEndpointKind {
-  if (mode === "ws" || mode === "pipe") return "raw_cdp";
-  if (mode === "loopback_cdp" || mode === "chrome_debugger") return "browser_targets";
-  return "modcdp_server";
 }

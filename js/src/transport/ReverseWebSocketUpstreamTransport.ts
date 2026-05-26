@@ -2,7 +2,7 @@ import type { WebSocket as WsSocket, WebSocketServer as WsServer } from "ws";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { parseHostPort, UpstreamTransport, type UpstreamOptions, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
@@ -17,7 +17,6 @@ type ReverseHello = {
 
 export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "reversews" as const;
-  readonly endpoint_kind = "modcdp_server" as const;
   private endpoint_url: string;
   private reversews_listener: WsServer | null = null;
   private socket: WsSocket | null = null;
@@ -38,7 +37,7 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
   }: {
     upstream_reversews_bind?: string | null;
     upstream_reversews_wait_timeout_ms?: number | null;
-  } = {}) {
+  } & UpstreamOptions = {}) {
     super();
     this.upstream_reversews_bind = upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND;
     this.upstream_reversews_wait_timeout_ms =
@@ -104,10 +103,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
-  }
-
-  getInjectorConfig() {
-    return {};
   }
 
   async connect() {

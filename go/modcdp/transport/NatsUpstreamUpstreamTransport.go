@@ -20,7 +20,7 @@ const DefaultUpstreamNATSURL = "ws://127.0.0.1:4223"
 const DefaultUpstreamNATSSubjectPrefix = "modcdp.default"
 const DefaultUpstreamNATSWaitTimeoutMS = 10_000
 
-type NatsUpstreamTransport struct {
+type NatsUpstreamUpstreamTransport struct {
 	UpstreamTransport
 	URL                       string
 	UpstreamNATSSubjectPrefix string
@@ -38,21 +38,21 @@ type NatsUpstreamTransport struct {
 	stateMu                   sync.Mutex
 }
 
-type NatsUpstreamTransportOptions struct {
+type NatsUpstreamUpstreamTransportOptions struct {
 	UpstreamNATSURL           string `json:"upstream_nats_url,omitempty"`
 	UpstreamNATSSubjectPrefix string `json:"upstream_nats_subject_prefix,omitempty"`
 	UpstreamNATSRole          string `json:"upstream_nats_role,omitempty"`
 	UpstreamNATSWaitTimeoutMS int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
 }
 
-func NewNatsUpstreamTransport(options NatsUpstreamTransportOptions) *NatsUpstreamTransport {
+func NewNatsUpstreamUpstreamTransport(options NatsUpstreamUpstreamTransportOptions) *NatsUpstreamUpstreamTransport {
 	normalizedURL, subjectPrefix := normalizeUpstreamNATSURL(firstNonEmptyString(options.UpstreamNATSURL, DefaultUpstreamNATSURL), options.UpstreamNATSSubjectPrefix)
 	role := firstNonEmptyString(options.UpstreamNATSRole, "client")
 	waitTimeoutMS := options.UpstreamNATSWaitTimeoutMS
 	if waitTimeoutMS == 0 {
 		waitTimeoutMS = DefaultUpstreamNATSWaitTimeoutMS
 	}
-	return &NatsUpstreamTransport{
+	return &NatsUpstreamUpstreamTransport{
 		URL:                       normalizedURL,
 		UpstreamNATSSubjectPrefix: subjectPrefix,
 		UpstreamNATSRole:          role,
@@ -62,7 +62,7 @@ func NewNatsUpstreamTransport(options NatsUpstreamTransportOptions) *NatsUpstrea
 	}
 }
 
-func (t *NatsUpstreamTransport) Update(config map[string]any) {
+func (t *NatsUpstreamUpstreamTransport) Update(config map[string]any) {
 	if config == nil {
 		return
 	}
@@ -79,11 +79,11 @@ func (t *NatsUpstreamTransport) Update(config map[string]any) {
 	}
 }
 
-func (t *NatsUpstreamTransport) GetInjectorConfig() ExtensionInjectorConfig {
+func (t *NatsUpstreamUpstreamTransport) GetInjectorConfig() ExtensionInjectorConfig {
 	return ExtensionInjectorConfig{UpstreamNATSURL: t.URL, UpstreamNATSSubjectPrefix: t.UpstreamNATSSubjectPrefix}
 }
 
-func (t *NatsUpstreamTransport) Connect() error {
+func (t *NatsUpstreamUpstreamTransport) Connect() error {
 	t.stateMu.Lock()
 	if t.connected {
 		t.stateMu.Unlock()
@@ -157,7 +157,7 @@ func (t *NatsUpstreamTransport) Connect() error {
 	return nil
 }
 
-func (t *NatsUpstreamTransport) Send(message map[string]any) error {
+func (t *NatsUpstreamUpstreamTransport) Send(message map[string]any) error {
 	t.stateMu.Lock()
 	connected := t.connected
 	t.stateMu.Unlock()
@@ -167,7 +167,7 @@ func (t *NatsUpstreamTransport) Send(message map[string]any) error {
 	return t.publish(t.outgoingSubject(), map[string]any{"type": "modcdp.nats.message", "message": message})
 }
 
-func (t *NatsUpstreamTransport) WaitForPeer() error {
+func (t *NatsUpstreamUpstreamTransport) WaitForPeer() error {
 	t.stateMu.Lock()
 	closeCh := t.closeCh
 	peerCh := t.peerCh
@@ -182,7 +182,7 @@ func (t *NatsUpstreamTransport) WaitForPeer() error {
 	}
 }
 
-func (t *NatsUpstreamTransport) Close() error {
+func (t *NatsUpstreamUpstreamTransport) Close() error {
 	t.stateMu.Lock()
 	t.connected = false
 	closeCh := t.closeCh
@@ -203,13 +203,13 @@ func (t *NatsUpstreamTransport) Close() error {
 	return nil
 }
 
-func (t *NatsUpstreamTransport) currentConn() net.Conn {
+func (t *NatsUpstreamUpstreamTransport) currentConn() net.Conn {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 	return t.Conn
 }
 
-func (t *NatsUpstreamTransport) cleanupFailedConnect(conn net.Conn) {
+func (t *NatsUpstreamUpstreamTransport) cleanupFailedConnect(conn net.Conn) {
 	if conn != nil {
 		_ = conn.Close()
 	}
@@ -232,11 +232,11 @@ func natsClosed(closeCh chan struct{}) bool {
 	}
 }
 
-func (t *NatsUpstreamTransport) subscribe() error {
+func (t *NatsUpstreamUpstreamTransport) subscribe() error {
 	return t.writeProtocol("SUB " + t.incomingSubject() + " 1\r\n")
 }
 
-func (t *NatsUpstreamTransport) publish(subject string, message map[string]any) error {
+func (t *NatsUpstreamUpstreamTransport) publish(subject string, message map[string]any) error {
 	body, err := json.Marshal(message)
 	if err != nil {
 		return err
@@ -244,7 +244,7 @@ func (t *NatsUpstreamTransport) publish(subject string, message map[string]any) 
 	return t.writeProtocol(fmt.Sprintf("PUB %s %d\r\n%s\r\n", subject, len(body), string(body)))
 }
 
-func (t *NatsUpstreamTransport) writeProtocol(data string) error {
+func (t *NatsUpstreamUpstreamTransport) writeProtocol(data string) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 	conn := t.Conn
@@ -258,21 +258,21 @@ func (t *NatsUpstreamTransport) writeProtocol(data string) error {
 	return err
 }
 
-func (t *NatsUpstreamTransport) incomingSubject() string {
+func (t *NatsUpstreamUpstreamTransport) incomingSubject() string {
 	if t.UpstreamNATSRole == "client" {
 		return t.UpstreamNATSSubjectPrefix + ".browser_to_client"
 	}
 	return t.UpstreamNATSSubjectPrefix + ".client_to_browser"
 }
 
-func (t *NatsUpstreamTransport) outgoingSubject() string {
+func (t *NatsUpstreamUpstreamTransport) outgoingSubject() string {
 	if t.UpstreamNATSRole == "client" {
 		return t.UpstreamNATSSubjectPrefix + ".client_to_browser"
 	}
 	return t.UpstreamNATSSubjectPrefix + ".browser_to_client"
 }
 
-func (t *NatsUpstreamTransport) readWebSocketLoop(conn net.Conn, closeCh chan struct{}) {
+func (t *NatsUpstreamUpstreamTransport) readWebSocketLoop(conn net.Conn, closeCh chan struct{}) {
 	for !natsClosed(closeCh) {
 		data, _, err := wsutil.ReadServerData(conn)
 		if err != nil {
@@ -287,7 +287,7 @@ func (t *NatsUpstreamTransport) readWebSocketLoop(conn net.Conn, closeCh chan st
 	}
 }
 
-func (t *NatsUpstreamTransport) readTCPLoop(conn net.Conn, closeCh chan struct{}) {
+func (t *NatsUpstreamUpstreamTransport) readTCPLoop(conn net.Conn, closeCh chan struct{}) {
 	chunk := make([]byte, 65536)
 	for !natsClosed(closeCh) {
 		n, err := conn.Read(chunk)
@@ -303,7 +303,7 @@ func (t *NatsUpstreamTransport) readTCPLoop(conn net.Conn, closeCh chan struct{}
 	}
 }
 
-func (t *NatsUpstreamTransport) consumeProtocol(buffer string) string {
+func (t *NatsUpstreamUpstreamTransport) consumeProtocol(buffer string) string {
 	for {
 		lineEnd := strings.Index(buffer, "\r\n")
 		if lineEnd < 0 {
@@ -333,7 +333,7 @@ func (t *NatsUpstreamTransport) consumeProtocol(buffer string) string {
 	}
 }
 
-func (t *NatsUpstreamTransport) handlePayload(payload string) {
+func (t *NatsUpstreamUpstreamTransport) handlePayload(payload string) {
 	var parsed any
 	if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
 		return
@@ -354,7 +354,7 @@ func (t *NatsUpstreamTransport) handlePayload(payload string) {
 	}
 }
 
-func (t *NatsUpstreamTransport) HandlePayload(payload string) {
+func (t *NatsUpstreamUpstreamTransport) HandlePayload(payload string) {
 	t.handlePayload(payload)
 }
 

@@ -3,7 +3,7 @@ import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { CdpCommandMessage, CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamOptions } from "./UpstreamTransport.js";
 
 const target_auto_attach_params = {
   autoAttach: true,
@@ -29,9 +29,8 @@ const target_auto_attach_params = {
  * 4. chrome.debugger events update debugger-local session maps and dispatch to
  *    typed `on(event, listener)` subscriptions.
  */
-export class ChromeDebuggerTransport extends UpstreamTransport {
+export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "chrome_debugger" as const;
-  readonly endpoint_kind = "browser_targets" as const;
 
   // JSON(debuggee) values attached in this service worker. Updated by
   // attachDebuggee/onDetach; read before attach to avoid duplicate native
@@ -55,6 +54,10 @@ export class ChromeDebuggerTransport extends UpstreamTransport {
   // True once chrome.debugger.onEvent/onDetach listeners are installed in this
   // service worker. Updated by installEventListener; read by getTargets.
   private event_listener_installed = false;
+
+  constructor(_options: UpstreamOptions = {}) {
+    super();
+  }
 
   /** Install chrome.debugger listeners for this service-worker lifetime. */
   override async connect() {

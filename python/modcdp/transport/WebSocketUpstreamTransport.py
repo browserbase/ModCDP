@@ -12,7 +12,6 @@ from ..transport.UpstreamTransport import UpstreamTransport
 
 class WebSocketUpstreamTransport(UpstreamTransport):
     mode = "ws"
-    endpoint_kind = "raw_cdp"
 
     def __init__(self, options: dict[str, Any] | None = None) -> None:
         super().__init__()
@@ -29,12 +28,9 @@ class WebSocketUpstreamTransport(UpstreamTransport):
             self.url = str(cdp_url)
         return self
 
-    def getServerConfig(self) -> dict[str, Any]:
-        return {"server_loopback_cdp_url": self.url} if self.url else {}
-
     def connect(self) -> None:
         if not self.url:
-            raise RuntimeError("upstream.upstream_mode=ws requires upstream.upstream_cdp_url or launcher-provided cdp_url.")
+            raise RuntimeError("WebSocketUpstreamTransport requires upstream_cdp_url or launcher-provided cdp_url.")
         # cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
         self.url = resolveCdpWebSocketUrl(self.url, "upstream_cdp_url")
         self._generation += 1

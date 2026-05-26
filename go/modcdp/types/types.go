@@ -14,6 +14,7 @@ type LaunchOptions struct {
 	ChromeReadyTimeoutMS           int            `json:"chrome_ready_timeout_ms,omitempty"`
 	ChromeReadyPollIntervalMS      int            `json:"chrome_ready_poll_interval_ms,omitempty"`
 	CDPURL                         string         `json:"cdp_url,omitempty"`
+	RemoteCDPURL                   string         `json:"remote_cdp_url,omitempty"`
 	BrowserbaseAPIKey              string         `json:"browserbase_api_key,omitempty"`
 	BrowserbaseBaseURL             string         `json:"browserbase_base_url,omitempty"`
 	BrowserbaseSessionID           string         `json:"browserbase_session_id,omitempty"`

@@ -56,12 +56,10 @@ class WebSocketUpstreamTransportTests(unittest.TestCase):
     def test_constructor_update_and_server_config_match_ts_shape(self) -> None:
         transport = WebSocketUpstreamTransport()
         self.assertEqual(transport.url, "")
-        self.assertEqual(transport.getServerConfig(), {})
         self.assertIs(transport.update({"cdp_url": "ws://127.0.0.1:1/devtools/browser/test"}), transport)
         self.assertEqual(transport.url, "ws://127.0.0.1:1/devtools/browser/test")
-        self.assertEqual(transport.getServerConfig(), {"server_loopback_cdp_url": "ws://127.0.0.1:1/devtools/browser/test"})
         unconfigured = WebSocketUpstreamTransport()
-        with self.assertRaisesRegex(RuntimeError, r"upstream\.upstream_mode=ws requires"):
+        with self.assertRaisesRegex(RuntimeError, "WebSocketUpstreamTransport requires"):
             unconfigured.connect()
         with self.assertRaisesRegex(RuntimeError, "CDP websocket is not connected"):
             unconfigured.send({"id": 1, "method": "Browser.getVersion"})
@@ -79,13 +77,11 @@ class WebSocketUpstreamTransportTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "ws")
-            self.assertEqual(cdp.transport.endpoint_kind if cdp.transport else None, "raw_cdp")
             timing = cdp.connect_timing
             self.assertIsNotNone(timing)
             if timing is None:
                 raise AssertionError("expected connect timing")
             self.assertEqual(timing["upstream_mode"], "ws")
-            self.assertEqual(timing["upstream_endpoint_kind"], "raw_cdp")
             self.assertGreaterEqual(timing["transport_connected_at"], timing["transport_started_at"])
             self.assertEqual(
                 timing["transport_duration_ms"],

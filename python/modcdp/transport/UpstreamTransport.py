@@ -6,12 +6,10 @@ from typing import Any, Literal, TypedDict
 
 
 UpstreamMode = Literal["ws", "pipe", "nativemessaging", "reversews", "nats"]
-UpstreamEndpointKind = Literal["raw_cdp", "modcdp_server"]
 
 
 class UpstreamTransport:
     mode: UpstreamMode
-    endpoint_kind: UpstreamEndpointKind
     url: str | None = None
 
     def __init__(self) -> None:
@@ -92,7 +90,3 @@ class UpstreamTransport:
                 self._emit_recv(parsed)
         except Exception:
             return
-
-
-def endpoint_kind_for_upstream(mode: str) -> UpstreamEndpointKind:
-    return "raw_cdp" if mode in ("ws", "pipe") else "modcdp_server"

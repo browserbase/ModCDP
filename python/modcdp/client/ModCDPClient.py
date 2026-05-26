@@ -40,14 +40,14 @@ from ..launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from ..launcher.NoopBrowserLauncher import NoopBrowserLauncher
 from ..launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 from ..transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from ..transport.NatsUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NatsUpstreamTransport
+from ..transport.NatsUpstreamUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NatsUpstreamUpstreamTransport
 from ..transport.PipeUpstreamTransport import PipeUpstreamTransport
 from ..transport.ReverseWebSocketUpstreamTransport import (
     DEFAULT_UPSTREAM_REVERSEWS_BIND,
     DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
     ReverseWebSocketUpstreamTransport,
 )
-from ..transport.UpstreamTransport import UpstreamTransport, endpoint_kind_for_upstream
+from ..transport.UpstreamTransport import UpstreamTransport
 from ..transport.WebSocketUpstreamTransport import WebSocketUpstreamTransport
 from ..translate.translate import (
     CUSTOM_EVENT_BINDING_NAME,
@@ -57,7 +57,7 @@ from ..translate.translate import (
     unwrap_event_if_needed,
     unwrap_response_if_needed,
 )
-from ..launcher.BrowserLauncher import BrowserLaunchOptions
+from ..launcher.BrowserLauncher import LauncherOptions
 from ..types.modcdp import (
     ModCDPAddCustomCommandParams,
     ModCDPAddCustomEventObjectParams,
@@ -250,9 +250,10 @@ class ModCDPClient(CDPSurfaceMixin):
                 )
             ),
         }
-        endpoint_kind = endpoint_kind_for_upstream(upstream_mode)
         launcher_mode = launcher_input.get("launcher_mode") or (
-            "none" if endpoint_kind == "modcdp_server" else "remote" if self.upstream.get("upstream_cdp_url") else "local"
+            "remote" if upstream_mode in ("ws", "pipe") and self.upstream.get("upstream_cdp_url")
+            else "local" if upstream_mode in ("ws", "pipe")
+            else "none"
         )
         self.launcher: dict[str, Any] = {
             "launcher_mode": launcher_mode,
@@ -261,7 +262,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "launcher_options": dict(cast(Mapping[str, Any], launcher_input.get("launcher_options") or {})),
         }
         injector_mode = injector_input.get("injector_mode") or (
-            "auto" if endpoint_kind == "raw_cdp" or launcher_mode != "none" else "none"
+            "auto" if upstream_mode in ("ws", "pipe") or launcher_mode != "none" else "none"
         )
         raw_service_worker_url_suffixes = injector_input.get("injector_service_worker_url_suffixes")
         self.injector: dict[str, Any] = {
@@ -311,12 +312,12 @@ class ModCDPClient(CDPSurfaceMixin):
         }
         self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_cdp_url"))
         if server is DEFAULT_SERVER:
-            self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if endpoint_kind == "modcdp_server" else {}
+            self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}
         elif server is None:
             self.server = None
         elif isinstance(server, Mapping):
             self.server = cast(ModCDPServerConfig, {
-                **({"server_routes": {"*.*": "chrome_debugger"}} if endpoint_kind == "modcdp_server" else {}),
+                **({"server_routes": {"*.*": "chrome_debugger"}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}),
                 **dict(server),
             })
         else:
@@ -373,7 +374,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self.transport.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
         self.transport.onClose(lambda error: self._handle_transport_close(error))
 
-        if self.transport.endpoint_kind == "modcdp_server":
+        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
             self.transport.waitForPeer()
             if self.server is not None:
                 self._send_message("Mod.configure", cast(ProtocolParams, self._server_configure_params()))
@@ -383,7 +384,6 @@ class ModCDPClient(CDPSurfaceMixin):
             self.connect_timing = cast(ModCDPConnectTiming, {
                 "started_at": connect_started_at,
                 "upstream_mode": self.upstream.get("upstream_mode"),
-                "upstream_endpoint_kind": self.transport.endpoint_kind,
                 "transport_started_at": transport_started_at,
                 "transport_connected_at": transport_connected_at,
                 "transport_duration_ms": transport_connected_at - transport_started_at,
@@ -424,7 +424,6 @@ class ModCDPClient(CDPSurfaceMixin):
         self.connect_timing = cast(ModCDPConnectTiming, {
             "started_at": connect_started_at,
             "upstream_mode": self.upstream.get("upstream_mode"),
-            "upstream_endpoint_kind": self.transport.endpoint_kind,
             "transport_started_at": transport_started_at,
             "transport_connected_at": transport_connected_at,
             "transport_duration_ms": transport_connected_at - transport_started_at,
@@ -462,8 +461,7 @@ class ModCDPClient(CDPSurfaceMixin):
             command_params = self._custom_command_wire_params(command_params)
         elif method == "Mod.addCustomEvent":
             self._register_custom_event(command_params)
-            endpoint_kind = self.transport.endpoint_kind if self.transport is not None else endpoint_kind_for_upstream(str(self.upstream["upstream_mode"]))
-            if self.ext_session_id is None and endpoint_kind != "modcdp_server":
+            if self.ext_session_id is None and self.upstream["upstream_mode"] not in ("nativemessaging", "reversews", "nats"):
                 completed_at = int(time.time() * 1000)
                 self.last_command_timing = {
                     "method": method,
@@ -479,8 +477,7 @@ class ModCDPClient(CDPSurfaceMixin):
         if method not in {"Mod.addCustomCommand", "Mod.addCustomEvent"} and should_validate_params:
             command_params = self._validate_command_params(method, command_params)
 
-        endpoint_kind = self.transport.endpoint_kind if self.transport is not None else endpoint_kind_for_upstream(str(self.upstream["upstream_mode"]))
-        if endpoint_kind == "modcdp_server":
+        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
             result = self._send_message(method, command_params)
             if should_validate_result and method != "Mod.addCustomCommand":
                 result = self._validate_command_result(method, result)
@@ -732,19 +729,21 @@ class ModCDPClient(CDPSurfaceMixin):
         if self.launcher.get("launcher_mode") == "local":
             return LocalBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "remote":
-            return RemoteBrowserLauncher(self._launch_options(), self.cdp_url)
+            return RemoteBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "bb":
             return BrowserbaseBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "none":
             return NoopBrowserLauncher(self._launch_options())
         raise RuntimeError(f"unknown launcher.launcher_mode={self.launcher.get('launcher_mode')}")
 
-    def _launch_options(self) -> BrowserLaunchOptions:
-        launch_options = cast(BrowserLaunchOptions, dict(cast(Mapping[str, Any], self.launcher.get("launcher_options") or {})))
+    def _launch_options(self) -> LauncherOptions:
+        launch_options = cast(LauncherOptions, dict(cast(Mapping[str, Any], self.launcher.get("launcher_options") or {})))
         if self.launcher.get("launcher_executable_path"):
             launch_options["executable_path"] = cast(str, self.launcher["launcher_executable_path"])
         if self.launcher.get("launcher_user_data_dir"):
             launch_options["user_data_dir"] = cast(str, self.launcher["launcher_user_data_dir"])
+        if self.upstream.get("upstream_cdp_url"):
+            launch_options["remote_cdp_url"] = cast(str, self.upstream["upstream_cdp_url"])
         return launch_options
 
     def _connect_upstream_transport(self) -> None:
@@ -770,11 +769,11 @@ class ModCDPClient(CDPSurfaceMixin):
             launcher.update(injector.getLauncherConfig())
         for injector in injectors:
             transport.update(injector.getTransportConfig())
-        launcher.update(cast(BrowserLaunchOptions, transport.getLauncherConfig()))
+        launcher.update(cast(LauncherOptions, transport.getLauncherConfig()))
         launcher.update({"loopback_cdp": self._server_needs_loopback_cdp()})
         transport.update(launcher.getTransportConfig())
 
-        if transport.endpoint_kind == "modcdp_server":
+        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
             transport.connect()
         if self.launcher.get("launcher_mode") != "none":
             launched = launcher.launch()
@@ -785,22 +784,20 @@ class ModCDPClient(CDPSurfaceMixin):
             for injector in injectors:
                 transport.update(injector.getTransportConfig())
         launched_cdp_url = cast(str | None, self._launched_browser.get("cdp_url")) if self._launched_browser else None
-        if transport.endpoint_kind == "raw_cdp":
+        if self.upstream["upstream_mode"] in ("ws", "pipe"):
             transport.connect()
 
         self.transport = transport
         self.cdp_url = cast(
             str | None,
-            (transport.url or launched_cdp_url) if transport.endpoint_kind == "raw_cdp" and transport.mode == "ws" else launched_cdp_url,
+            (transport.url or launched_cdp_url) if self.upstream["upstream_mode"] == "ws" else launched_cdp_url,
         )
         if transport.mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream["upstream_cdp_url"] = transport.url
-        server_config = (
-            {"server_loopback_cdp_url": launched_cdp_url}
-            if transport.endpoint_kind == "modcdp_server" and launched_cdp_url
-            else {}
-        )
+        server_config = {"server_loopback_cdp_url": transport.url} if self.upstream["upstream_mode"] == "ws" and transport.url else {}
+        if self.upstream["upstream_mode"] not in ("ws", "pipe") and launched_cdp_url:
+            server_config["server_loopback_cdp_url"] = launched_cdp_url
         transport_server_config = transport.getServerConfig()
         server_config.update(launcher.getServerConfig())
         server_config.update(transport_server_config)
@@ -850,7 +847,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
             })
         if mode == "nats":
-            return NatsUpstreamTransport()
+            return NatsUpstreamUpstreamTransport(self.upstream)
         raise RuntimeError(f"unknown upstream.upstream_mode={mode}")
 
     def _extension_injectors_for_config(self) -> list[ExtensionInjector]:

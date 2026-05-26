@@ -24,7 +24,7 @@ func TestWebSocketUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(
 	if transport.GetServerConfig()["server_loopback_cdp_url"] != "ws://127.0.0.1:1/devtools/browser/test" {
 		t.Fatalf("server config = %#v", transport.GetServerConfig())
 	}
-	if err := NewWebSocketUpstreamTransport(WebSocketUpstreamTransportOptions{}).Connect(); err == nil || !strings.Contains(err.Error(), "upstream.upstream_mode=ws requires") {
+	if err := NewWebSocketUpstreamTransport(WebSocketUpstreamTransportOptions{}).Connect(); err == nil || !strings.Contains(err.Error(), "WebSocketUpstreamTransport requires") {
 		t.Fatalf("connect error = %v", err)
 	}
 	if err := NewWebSocketUpstreamTransport(WebSocketUpstreamTransportOptions{}).Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
@@ -53,9 +53,6 @@ func TestWebSocketUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing
 	}
 	if cdp.ConnectTiming["upstream_mode"] != "ws" {
 		t.Fatalf("upstream_mode = %v", cdp.ConnectTiming["upstream_mode"])
-	}
-	if cdp.ConnectTiming["upstream_endpoint_kind"] != UpstreamEndpointKindRawCDP {
-		t.Fatalf("upstream_endpoint_kind = %v", cdp.ConnectTiming["upstream_endpoint_kind"])
 	}
 	transportStartedAt, ok := cdp.ConnectTiming["transport_started_at"].(int64)
 	if !ok {

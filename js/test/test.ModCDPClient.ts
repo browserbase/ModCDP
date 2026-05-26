@@ -29,9 +29,6 @@ test("ModCDPClient normalizes nested config owners", () => {
     upstream: {
       upstream_mode: "ws",
       upstream_cdp_url: "http://127.0.0.1:9222",
-      upstream_nats_wait_timeout_ms: 345,
-      upstream_reversews_wait_timeout_ms: 456,
-      upstream_nativemessaging_host_name: "com.modcdp.custom",
       upstream_ws_connect_error_settle_timeout_ms: 321,
     },
     injector: {
@@ -66,12 +63,9 @@ test("ModCDPClient normalizes nested config owners", () => {
     },
   });
 
-  assert.deepEqual(cdp.launcher.launcher_options, { headless: true });
-  assert.equal(cdp._launcherOptions().executable_path, "/tmp/chrome");
-  assert.equal(cdp._launcherOptions().user_data_dir, "/tmp/profile");
-  assert.equal(cdp.upstream.upstream_nats_wait_timeout_ms, 345);
-  assert.equal(cdp.upstream.upstream_reversews_wait_timeout_ms, 456);
-  assert.equal(cdp.upstream.upstream_nativemessaging_host_name, "com.modcdp.custom");
+  assert.equal(cdp.launcher.headless, true);
+  assert.equal(cdp.launcher.executable_path, "/tmp/chrome");
+  assert.equal(cdp.launcher.user_data_dir, "/tmp/profile");
   assert.equal(cdp.upstream.upstream_ws_connect_error_settle_timeout_ms, 321);
   assert.equal(cdp.injector.injector_execution_context_timeout_ms, 4321);
   assert.equal(cdp.injector.injector_service_worker_probe_timeout_ms, 5432);
@@ -224,7 +218,6 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
     await cdp.connect();
     assert.equal(cdp.launcher.launcher_mode, "local");
     assert.equal(cdp.upstream.upstream_mode, "ws");
-    assert.equal(cdp.upstream.upstream_reversews_wait_timeout_ms, 10_000);
     assert.equal(cdp.injector.injector_mode, "auto");
     assert.equal(
       ["discovered", "local_launch", "extensions_load_unpacked", "borrowed"].includes(
@@ -233,8 +226,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       true,
     );
     assert.equal(cdp.client.client_routes["*.*"], "direct_cdp");
-    assert.equal(cdp.upstream.endpoint_kind, "raw_cdp");
-    assert.match(cdp.cdp_url ?? "", /^ws:\/\//);
+    assert.match(cdp.upstream.upstream_cdp_url ?? "", /^ws:\/\//);
     const service_worker_url = await cdp.Mod.evaluate({
       expression: "chrome.runtime.getURL('modcdp/service_worker.js')",
     });
@@ -420,12 +412,10 @@ test("ModCDPClient defaults launched ModCDP-server upstreams to extension auto",
       upstream: { upstream_mode: mode },
     });
     assert.equal(launched.launcher.launcher_mode, "local");
-    assert.equal(launched.upstream.endpoint_kind, "modcdp_server");
     assert.equal(launched.injector.injector_mode, "auto");
 
     const attach_only = new ModCDPClient({ upstream: { upstream_mode: mode } });
     assert.equal(attach_only.launcher.launcher_mode, "none");
-    assert.equal(attach_only.upstream.endpoint_kind, "modcdp_server");
     assert.equal(attach_only.injector.injector_mode, "none");
   }
 });
@@ -455,11 +445,11 @@ test("ModCDPClient rejects unknown component modes at their owning factory bound
       }),
     /unknown upstream\.upstream_mode=bogus/,
   );
-  await assert.rejects(
+  assert.throws(
     () =>
       new ModCDPClient({
         launcher: { launcher_mode: "bogus" as any },
-      })._browserLauncher(),
+      }),
     /unknown launcher\.launcher_mode=bogus/,
   );
   await assert.rejects(

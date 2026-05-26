@@ -21,7 +21,6 @@ test("reversews upstream config owns bind updates and wait timeout", async () =>
     upstream_reversews_wait_timeout_ms: 10,
   });
   assert.equal(transport.upstream_reversews_url, "ws://127.0.0.1:29292");
-  assert.deepEqual(transport.getInjectorConfig(), {});
   assert.equal(
     transport.update({
       upstream_reversews_bind: "127.0.0.1:29293",
@@ -30,7 +29,6 @@ test("reversews upstream config owns bind updates and wait timeout", async () =>
     transport,
   );
   assert.equal(transport.upstream_reversews_url, "ws://127.0.0.1:29293");
-  assert.deepEqual(transport.getInjectorConfig(), {});
   assert.throws(
     () => transport.send({ id: 1, method: "Browser.getVersion" }),
     /No reverse ModCDP extension peer is connected/,
@@ -157,7 +155,6 @@ test("reversews upstream accepts a real extension reverse connection and routes 
   try {
     await cdp.connect();
     assert.equal(cdp.upstream?.upstream_mode, "reversews");
-    assert.equal(cdp.upstream.endpoint_kind, "modcdp_server");
     assert.equal((cdp.upstream as ReverseWebSocketUpstreamTransport).upstream_reversews_url, "ws://127.0.0.1:29292");
     assert.equal(
       (cdp.upstream as ReverseWebSocketUpstreamTransport).peer_info?.extension_id,

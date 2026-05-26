@@ -35,16 +35,9 @@ func (t *WebSocketUpstreamTransport) Update(config map[string]any) {
 	}
 }
 
-func (t *WebSocketUpstreamTransport) GetServerConfig() map[string]any {
-	if t.URL == "" {
-		return map[string]any{}
-	}
-	return map[string]any{"server_loopback_cdp_url": t.URL}
-}
-
 func (t *WebSocketUpstreamTransport) Connect() error {
 	if t.URL == "" {
-		return fmt.Errorf("upstream.upstream_mode=ws requires upstream.upstream_cdp_url or launcher-provided cdp_url")
+		return fmt.Errorf("WebSocketUpstreamTransport requires upstream_cdp_url or launcher-provided cdp_url")
 	}
 	// URL may start as an HTTP cdp_url; from here on it is the resolved WebSocket CDP endpoint.
 	resolvedURL, err := websocketURLFor(t.URL)

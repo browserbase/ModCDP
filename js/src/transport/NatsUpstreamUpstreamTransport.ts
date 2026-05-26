@@ -1,14 +1,14 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamOptions, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
 export const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
 export const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
 
 type NatsRole = "client" | "browser";
-type NatsOptions = {
+type NatsOptions = UpstreamOptions & {
   upstream_nats_url?: string | null;
   upstream_nats_subject_prefix?: string | null;
   upstream_nats_role?: NatsRole;
@@ -27,9 +27,8 @@ type NatsSocket = WebSocket | NatsTcpSocket;
 const node_net_module_path = "node:" + "net";
 const node_tls_module_path = "node:" + "tls";
 
-export class NatsUpstreamTransport extends UpstreamTransport {
+export class NatsUpstreamUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nats" as const;
-  readonly endpoint_kind = "modcdp_server" as const;
   private upstream_nats_role: NatsRole;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
@@ -124,13 +123,6 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     }
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
-  }
-
-  getInjectorConfig() {
-    return {
-      upstream_nats_url: this.upstream_nats_url,
-      upstream_nats_subject_prefix: this.upstream_nats_subject_prefix,
-    };
   }
 
   async connect() {

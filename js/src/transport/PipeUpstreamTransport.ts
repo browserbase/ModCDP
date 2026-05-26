@@ -1,11 +1,10 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamOptions, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export class PipeUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "pipe" as const;
-  readonly endpoint_kind = "raw_cdp" as const;
   private buffer = "";
   private connected = false;
 
@@ -18,7 +17,7 @@ export class PipeUpstreamTransport extends UpstreamTransport {
   }: {
     pipe_read?: NodeJS.ReadableStream | null;
     pipe_write?: NodeJS.WritableStream | null;
-  } = {}) {
+  } & UpstreamOptions = {}) {
     super();
     this.pipe_read = pipe_read;
     this.pipe_write = pipe_write;
@@ -75,10 +74,6 @@ export class PipeUpstreamTransport extends UpstreamTransport {
     this.pipe_write = config.pipe_write ?? this.pipe_write;
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
-  }
-
-  getLauncherConfig() {
-    return { remote_debugging: "pipe" as const };
   }
 
   async connect() {

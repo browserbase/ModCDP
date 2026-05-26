@@ -343,13 +343,20 @@ export function installModCDPServer(
   function setupServerClient(name?: BrowserTargetUpstreamMode): ModCDPClient {
     const selected_name =
       name ??
-      (ModCDPServer.client?.upstream.upstream_mode === "loopback_cdp" ||
-      ModCDPServer.client?.upstream.upstream_mode === "chrome_debugger"
-        ? ModCDPServer.client.upstream.upstream_mode
-        : ModCDPServer.loopback_cdp_url
+      (ModCDPServer.client?.upstream.upstream_mode === "chrome_debugger"
+        ? "chrome_debugger"
+        : ModCDPServer.client?.upstream.upstream_mode === "ws" && ModCDPServer.client.upstream.upstream_cdp_url
           ? "loopback_cdp"
-          : "chrome_debugger");
-    if (ModCDPServer.client?.upstream.upstream_mode === selected_name) return ModCDPServer.client;
+          : ModCDPServer.loopback_cdp_url
+            ? "loopback_cdp"
+            : "chrome_debugger");
+    if (
+      (selected_name === "chrome_debugger" && ModCDPServer.client?.upstream.upstream_mode === "chrome_debugger") ||
+      (selected_name === "loopback_cdp" &&
+        ModCDPServer.client?.upstream.upstream_mode === "ws" &&
+        ModCDPServer.client.upstream.upstream_cdp_url === ModCDPServer.loopback_cdp_url)
+    )
+      return ModCDPServer.client;
 
     active_server_client_subscription?.remove();
     const client = new ModCDPClient({
@@ -361,7 +368,7 @@ export function installModCDPServer(
       upstream:
         selected_name === "loopback_cdp"
           ? {
-              upstream_mode: "loopback_cdp",
+              upstream_mode: "ws",
               upstream_cdp_url: ModCDPServer.loopback_cdp_url,
               upstream_ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
             }
@@ -773,7 +780,7 @@ export function installModCDPServer(
           injector_execution_context_timeout_ms: this.loopback_execution_context_timeout_ms,
         },
         upstream: {
-          upstream_mode: "loopback_cdp",
+          upstream_mode: "ws",
           upstream_cdp_url: loopback_cdp_url,
           upstream_ws_connect_error_settle_timeout_ms: this.ws_connect_error_settle_timeout_ms,
         },

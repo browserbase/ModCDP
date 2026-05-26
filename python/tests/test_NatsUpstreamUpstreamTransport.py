@@ -11,15 +11,15 @@ from queue import Queue
 
 from websocket import create_connection
 
-from modcdp.transport.NatsUpstreamTransport import NatsUpstreamTransport
+from modcdp.transport.NatsUpstreamUpstreamTransport import NatsUpstreamUpstreamTransport
 
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-class NatsUpstreamTransportTests(unittest.TestCase):
+class NatsUpstreamUpstreamTransportTests(unittest.TestCase):
     def test_config_owns_url_nats_subject_prefix_wait_timeout_and_injector_config(self) -> None:
-        transport = NatsUpstreamTransport({"upstream_nats_url": "ws://127.0.0.1:4223", "upstream_nats_subject_prefix": "modcdp.one"})
+        transport = NatsUpstreamUpstreamTransport({"upstream_nats_url": "ws://127.0.0.1:4223", "upstream_nats_subject_prefix": "modcdp.one"})
         self.assertEqual(transport.url, "ws://127.0.0.1:4223/")
         self.assertEqual(transport.upstream_nats_subject_prefix, "modcdp.one")
         self.assertEqual(
@@ -43,7 +43,7 @@ class NatsUpstreamTransportTests(unittest.TestCase):
             transport.waitForPeer()
 
     def test_close_rejects_pending_peer_waits(self) -> None:
-        transport = NatsUpstreamTransport(
+        transport = NatsUpstreamUpstreamTransport(
             {
                 "upstream_nats_url": "ws://127.0.0.1:4223",
                 "upstream_nats_subject_prefix": "modcdp.close",
@@ -71,7 +71,7 @@ class NatsUpstreamTransportTests(unittest.TestCase):
         self.assertRegex(str(error), r"NATS transport for modcdp\.close closed before a peer connected")
 
     def test_close_resets_peer_wait_state(self) -> None:
-        transport = NatsUpstreamTransport({"upstream_nats_wait_timeout_ms": 5})
+        transport = NatsUpstreamUpstreamTransport({"upstream_nats_wait_timeout_ms": 5})
         transport._handle_payload('{"type":"modcdp.nats.hello","role":"browser","version":1}')
 
         transport.waitForPeer()
@@ -82,7 +82,7 @@ class NatsUpstreamTransportTests(unittest.TestCase):
 
     def test_reconnect_after_close_resets_closed_state_with_real_nats_server(self) -> None:
         nats = _start_nats_server()
-        transport = NatsUpstreamTransport({"upstream_nats_url": nats["url"], "upstream_nats_subject_prefix": f"modcdp.reconnect.{int(time.time() * 1000)}"})
+        transport = NatsUpstreamUpstreamTransport({"upstream_nats_url": nats["url"], "upstream_nats_subject_prefix": f"modcdp.reconnect.{int(time.time() * 1000)}"})
 
         try:
             transport.connect()

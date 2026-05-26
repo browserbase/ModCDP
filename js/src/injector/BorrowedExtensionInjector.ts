@@ -21,11 +21,11 @@ const bootstrap_modcdp_server_expression = `
 
 export class BorrowedExtensionInjector extends ExtensionInjector {
   async inject() {
-    const deadline = Date.now() + (this.options.injector_service_worker_ready_timeout_ms ?? 60_000);
+    const deadline = Date.now() + (this.injector_service_worker_ready_timeout_ms ?? 60_000);
     do {
       const borrowed = await this.borrowVisibleServiceWorkers();
       if (borrowed) return borrowed;
-      await new Promise((resolve) => setTimeout(resolve, this.options.injector_service_worker_poll_interval_ms ?? 100));
+      await new Promise((resolve) => setTimeout(resolve, this.injector_service_worker_poll_interval_ms ?? 100));
     } while (Date.now() < deadline);
     return null;
   }
@@ -37,9 +37,9 @@ export class BorrowedExtensionInjector extends ExtensionInjector {
       return target.type === "service_worker" && target_url.startsWith("chrome-extension://");
     });
     const has_configured_matcher =
-      Boolean(this.options.injector_extension_id) ||
-      (this.options.injector_service_worker_url_includes?.length ?? 0) > 0 ||
-      (this.options.injector_service_worker_url_suffixes?.length ?? 0) > 0;
+      Boolean(this.injector_extension_id) ||
+      (this.injector_service_worker_url_includes?.length ?? 0) > 0 ||
+      (this.injector_service_worker_url_suffixes?.length ?? 0) > 0;
     const candidates = has_configured_matcher
       ? visible_service_workers.filter((target) => this.serviceWorkerTargetMatches(target))
       : visible_service_workers;
@@ -56,7 +56,7 @@ export class BorrowedExtensionInjector extends ExtensionInjector {
   private async bootstrapTarget(target: TargetInfo): Promise<ExtensionInjectionResult | null> {
     const session_id = await this.ensureSessionForTarget(
       target.targetId,
-      this.options.injector_service_worker_probe_timeout_ms,
+      this.injector_service_worker_probe_timeout_ms,
       true,
     );
     if (session_id == null) return null;

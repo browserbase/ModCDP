@@ -14,7 +14,6 @@ from websocket import create_connection
 
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
-from modcdp.transport.UpstreamTransport import endpoint_kind_for_upstream
 from modcdp.types import JsonValue
 from tests.test_ReverseWebSocketUpstreamTransport import reversews_test_browser_path
 
@@ -35,9 +34,6 @@ class ModCDPClientTests(unittest.TestCase):
             upstream={
                 "upstream_mode": "ws",
                 "upstream_cdp_url": "http://127.0.0.1:9222",
-                "upstream_nats_wait_timeout_ms": 345,
-                "upstream_reversews_wait_timeout_ms": 456,
-                "upstream_nativemessaging_host_name": "com.modcdp.custom",
                 "upstream_ws_connect_error_settle_timeout_ms": 321,
             },
             injector={
@@ -73,9 +69,6 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp.launcher["launcher_options"], {"headless": True})
         self.assertEqual(cdp._launch_options().get("executable_path"), "/tmp/chrome")
         self.assertEqual(cdp._launch_options().get("user_data_dir"), "/tmp/profile")
-        self.assertEqual(cdp.upstream["upstream_nats_wait_timeout_ms"], 345)
-        self.assertEqual(cdp.upstream["upstream_reversews_wait_timeout_ms"], 456)
-        self.assertEqual(cdp.upstream["upstream_nativemessaging_host_name"], "com.modcdp.custom")
         self.assertEqual(cdp.upstream["upstream_ws_connect_error_settle_timeout_ms"], 321)
         self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 4321)
         self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 5432)
@@ -166,12 +159,10 @@ class ModCDPClientTests(unittest.TestCase):
         for mode in ("nativemessaging", "reversews", "nats"):
             launched = ModCDPClient(launcher={"launcher_mode": "local"}, upstream={"upstream_mode": mode})
             self.assertEqual(launched.launcher["launcher_mode"], "local")
-            self.assertEqual(endpoint_kind_for_upstream(str(launched.upstream["upstream_mode"])), "modcdp_server")
             self.assertEqual(launched.injector["injector_mode"], "auto")
 
             attach_only = ModCDPClient(upstream={"upstream_mode": mode})
             self.assertEqual(attach_only.launcher["launcher_mode"], "none")
-            self.assertEqual(endpoint_kind_for_upstream(str(attach_only.upstream["upstream_mode"])), "modcdp_server")
             self.assertEqual(attach_only.injector["injector_mode"], "none")
 
     def test_orders_local_auto_injection_as_launch_flag_then_load_unpacked_fallback(self) -> None:

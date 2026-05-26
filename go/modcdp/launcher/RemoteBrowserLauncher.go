@@ -4,18 +4,14 @@ import "fmt"
 
 type RemoteBrowserLauncher struct {
 	BrowserLauncher
-	CDPURL string
 }
 
-func NewRemoteBrowserLauncher(options LaunchOptions, cdpURL string) *RemoteBrowserLauncher {
-	if cdpURL != "" {
-		options.CDPURL = cdpURL
-	}
-	return &RemoteBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options), CDPURL: cdpURL}
+func NewRemoteBrowserLauncher(options LaunchOptions) *RemoteBrowserLauncher {
+	return &RemoteBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
 }
 
 func (l *RemoteBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
-	cdpURL := firstString(options.CDPURL, l.Options.CDPURL, l.CDPURL)
+	cdpURL := firstString(options.CDPURL, options.RemoteCDPURL, l.Options.CDPURL, l.Options.RemoteCDPURL)
 	if cdpURL == "" {
 		return nil, fmt.Errorf("launcher.launcher_mode=remote requires upstream.upstream_cdp_url")
 	}

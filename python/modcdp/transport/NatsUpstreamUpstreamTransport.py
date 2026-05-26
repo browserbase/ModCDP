@@ -19,9 +19,8 @@ DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default"
 DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000
 
 
-class NatsUpstreamTransport(UpstreamTransport):
+class NatsUpstreamUpstreamTransport(UpstreamTransport):
     mode = "nats"
-    endpoint_kind = "modcdp_server"
 
     def __init__(
         self,
@@ -45,7 +44,7 @@ class NatsUpstreamTransport(UpstreamTransport):
         self.write_lock = threading.Lock()
         self.buffer = ""
 
-    def update(self, config: dict[str, Any] | None = None) -> "NatsUpstreamTransport":
+    def update(self, config: dict[str, Any] | None = None) -> "NatsUpstreamUpstreamTransport":
         config = config or {}
         upstream_nats_url = config.get("upstream_nats_url")
         upstream_nats_subject_prefix = config.get("upstream_nats_subject_prefix")

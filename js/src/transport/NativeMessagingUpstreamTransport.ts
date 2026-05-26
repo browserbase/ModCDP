@@ -1,17 +1,16 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamOptions, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
 
-type NativeMessagingOptions = {
+type NativeMessagingOptions = UpstreamOptions & {
   upstream_nativemessaging_host_name?: string | null;
 };
 
 export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nativemessaging" as const;
-  readonly endpoint_kind = "modcdp_server" as const;
   declare upstream_nativemessaging_host_name: string;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
@@ -74,12 +73,6 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   update(config: UpstreamTransportConfig = {}) {
     if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
-  }
-
-  getInjectorConfig() {
-    return {
-      upstream_nativemessaging_host_name: this.upstream_nativemessaging_host_name,
-    };
   }
 
   async connect() {

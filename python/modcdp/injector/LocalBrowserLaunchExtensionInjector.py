@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 
-from ..launcher.BrowserLauncher import BrowserLaunchOptions
+from ..launcher.BrowserLauncher import LauncherOptions
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
@@ -29,7 +29,7 @@ class LocalBrowserLaunchExtensionInjector(ExtensionInjector):
         self._resolveExtensionId()
         super().prepare()
 
-    def getLauncherConfig(self) -> BrowserLaunchOptions:
+    def getLauncherConfig(self) -> LauncherOptions:
         if not self.unpacked_extension_path:
             return {}
         return {"extra_args": [f"--load-extension={self.unpacked_extension_path}"]}

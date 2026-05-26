@@ -9,7 +9,12 @@ from typing import Any, TypedDict, cast
 from typing_extensions import NotRequired
 
 
-class BrowserLaunchOptions(TypedDict, total=False):
+class LauncherOptions(TypedDict, total=False):
+    launcher_mode: str
+    launcher_executable_path: str | None
+    launcher_user_data_dir: str | None
+    remote_cdp_url: str | None
+    launcher_options: dict[str, Any]
     executable_path: str | None
     port: int | None
     user_data_dir: str | None
@@ -58,14 +63,14 @@ CDP_URL_SCHEME_RE = re.compile(r"^[a-z][a-z\d+\-.]*://", re.I)
 class BrowserLauncher:
     launched: LaunchedBrowser | None
 
-    def __init__(self, options: BrowserLaunchOptions | None = None) -> None:
-        self.options = cast(BrowserLaunchOptions, dict(options or {}))
+    def __init__(self, options: LauncherOptions | None = None) -> None:
+        self.options = cast(LauncherOptions, dict(options or {}))
         self.launched = None
 
-    def update(self, config: BrowserLaunchOptions | None = None) -> "BrowserLauncher":
-        config = cast(BrowserLaunchOptions, dict(config or {}))
+    def update(self, config: LauncherOptions | None = None) -> "BrowserLauncher":
+        config = cast(LauncherOptions, dict(config or {}))
         self.options = cast(
-            BrowserLaunchOptions,
+            LauncherOptions,
             {
                 **self.options,
                 **config,
@@ -98,7 +103,7 @@ class BrowserLauncher:
             "injector_extension_id": self.options.get("injector_extension_id"),
         }
 
-    def launch(self, options: BrowserLaunchOptions | None = None) -> LaunchedBrowser:
+    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")
 
 

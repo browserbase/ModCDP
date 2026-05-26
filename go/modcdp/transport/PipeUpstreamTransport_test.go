@@ -85,9 +85,6 @@ func TestPipeUpstreamTransportLaunchesRealBrowserWithoutCDPURL(t *testing.T) {
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	if cdp.ConnectTiming["upstream_endpoint_kind"] != UpstreamEndpointKindRawCDP {
-		t.Fatalf("upstream_endpoint_kind = %v", cdp.ConnectTiming["upstream_endpoint_kind"])
-	}
 	if cdp.Transport() == nil {
 		t.Fatal("expected pipe transport")
 	}

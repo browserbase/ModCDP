@@ -27,13 +27,13 @@ describe("RemoteBrowserLauncher", () => {
       try {
         const http_endpoint = `http://127.0.0.1:${local.port}`;
         const bare_endpoint = `127.0.0.1:${local.port}`;
-        const fromHttp = await new RemoteBrowserLauncher({}, http_endpoint).launch();
+        const fromHttp = await new RemoteBrowserLauncher({ remote_cdp_url: http_endpoint }).launch();
         expect(fromHttp.cdp_url).toBe(local.cdp_url);
         cdp = await CdpSocket.connect(fromHttp.cdp_url!);
         await expectCdpBrowserSurface(cdp);
         await fromHttp.close();
 
-        const fromBare = await new RemoteBrowserLauncher({}, bare_endpoint).launch();
+        const fromBare = await new RemoteBrowserLauncher({ remote_cdp_url: bare_endpoint }).launch();
         expect(fromBare.cdp_url).toBe(local.cdp_url);
         await fromBare.close();
 

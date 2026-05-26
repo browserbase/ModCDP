@@ -249,9 +249,6 @@ func TestReverseWebSocketUpstreamTransportAcceptsRealExtensionReverseConnectionA
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	if cdp.ConnectTiming["upstream_endpoint_kind"] != UpstreamEndpointKindModCDPServer {
-		t.Fatalf("upstream_endpoint_kind = %v", cdp.ConnectTiming["upstream_endpoint_kind"])
-	}
 	if cdp.Transport() == nil {
 		t.Fatal("expected reverse transport to be connected")
 	}

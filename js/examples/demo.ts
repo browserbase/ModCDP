@@ -239,7 +239,7 @@ async function main() {
 
   try {
     await cdp.connect();
-    console.log("upstream cdp:", cdp.cdp_url);
+    console.log("upstream cdp:", cdp.upstream.upstream_cdp_url);
     console.log("connected; ext", cdp.extension_id, "session", cdp.ext_session_id);
     console.log("connect timing    ->", cdp.connect_timing);
 

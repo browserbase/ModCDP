@@ -42,7 +42,6 @@ func websocketURLFor(endpoint string) (string, error) {
 }
 
 type UpstreamMode string
-type UpstreamEndpointKind string
 
 const (
 	UpstreamModeWS              UpstreamMode = "ws"
@@ -50,9 +49,6 @@ const (
 	UpstreamModeNativeMessaging UpstreamMode = "nativemessaging"
 	UpstreamModeReverseWS       UpstreamMode = "reversews"
 	UpstreamModeNATS            UpstreamMode = "nats"
-
-	UpstreamEndpointKindRawCDP       UpstreamEndpointKind = "raw_cdp"
-	UpstreamEndpointKindModCDPServer UpstreamEndpointKind = "modcdp_server"
 )
 
 type UpstreamTransport struct {
@@ -175,13 +171,6 @@ func (e *UpstreamTransport) WaitForPeer() error {
 
 func (e *UpstreamTransport) PeerGeneration() int64 {
 	return 0
-}
-
-func EndpointKindForUpstream(mode string) UpstreamEndpointKind {
-	if mode == "ws" || mode == "pipe" {
-		return UpstreamEndpointKindRawCDP
-	}
-	return UpstreamEndpointKindModCDPServer
 }
 
 func intFromConfig(value any) (int, bool) {

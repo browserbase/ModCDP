@@ -9,7 +9,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from ..launcher.BrowserLauncher import BrowserLaunchOptions
+from ..launcher.BrowserLauncher import LauncherOptions
 from ..injector.ExtensionInjector import DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS, ExtensionInjector, ExtensionInjectionResult, defaultModCDPExtensionPath
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
@@ -40,7 +40,7 @@ class BBBrowserExtensionInjector(ExtensionInjector):
             self.close()
             raise
 
-    def getLauncherConfig(self) -> BrowserLaunchOptions:
+    def getLauncherConfig(self) -> LauncherOptions:
         if not self.extension_id:
             return {}
         return {"injector_extension_id": self.extension_id}

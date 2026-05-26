@@ -2,10 +2,9 @@ export * from "./client/ModCDPClient.js";
 export { ModCDPServer } from "./server/ModCDPServer.js";
 export { BrowserLauncher, resolveCdpWebSocketUrl } from "./launcher/BrowserLauncher.js";
 export type {
-  BrowserLaunchOptions,
+  LauncherOptions,
   LaunchedBrowser,
   LauncherMode,
-  LauncherOptions,
 } from "./launcher/BrowserLauncher.js";
 export { LocalBrowserLauncher } from "./launcher/LocalBrowserLauncher.js";
 export { RemoteBrowserLauncher } from "./launcher/RemoteBrowserLauncher.js";
@@ -30,9 +29,8 @@ export { ExtensionsLoadUnpackedInjector } from "./injector/ExtensionsLoadUnpacke
 export { DiscoveredExtensionInjector } from "./injector/DiscoveredExtensionInjector.js";
 export { BorrowedExtensionInjector } from "./injector/BorrowedExtensionInjector.js";
 export { BBBrowserExtensionInjector } from "./injector/BBBrowserExtensionInjector.js";
-export { UpstreamTransport, endpointKindForUpstream, parseHostPort } from "./transport/UpstreamTransport.js";
+export { UpstreamTransport, parseHostPort } from "./transport/UpstreamTransport.js";
 export type {
-  UpstreamEndpointKind,
   UpstreamMode,
   UpstreamOptions,
   UpstreamTransportConfig,
@@ -48,9 +46,9 @@ export type { TargetRoute, UpstreamEventListener } from "./transport/UpstreamTra
 export { WebSocketUpstreamTransport } from "./transport/WebSocketUpstreamTransport.js";
 export { ReverseWebSocketUpstreamTransport } from "./transport/ReverseWebSocketUpstreamTransport.js";
 export { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUpstreamTransport.js";
-export { NatsUpstreamTransport } from "./transport/NatsUpstreamTransport.js";
+export { NatsUpstreamUpstreamTransport } from "./transport/NatsUpstreamUpstreamTransport.js";
 export { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
-export { ChromeDebuggerTransport } from "./transport/ChromeDebuggerTransport.js";
+export { ChromeDebuggerUpstreamTransport } from "./transport/ChromeDebuggerUpstreamTransport.js";
 export { ReverseWSDownstreamTransport } from "./transport/ReverseWSDownstreamTransport.js";
 export { NativeHostDownstreamTransport } from "./transport/NativeHostDownstreamTransport.js";
 export { NATSDownstreamTransport } from "./transport/NATSDownstreamTransport.js";
@@ -74,9 +72,9 @@ export * as downstreamTransportCollection from "./transport/DownstreamTransportC
 export * as webSocketUpstreamTransport from "./transport/WebSocketUpstreamTransport.js";
 export * as reverseWebSocketUpstreamTransport from "./transport/ReverseWebSocketUpstreamTransport.js";
 export * as nativeMessagingUpstreamTransport from "./transport/NativeMessagingUpstreamTransport.js";
-export * as natsUpstreamTransport from "./transport/NatsUpstreamTransport.js";
+export * as natsUpstreamUpstreamTransport from "./transport/NatsUpstreamUpstreamTransport.js";
 export * as pipeUpstreamTransport from "./transport/PipeUpstreamTransport.js";
-export * as chromeDebuggerTransport from "./transport/ChromeDebuggerTransport.js";
+export * as chromeDebuggerUpstreamTransport from "./transport/ChromeDebuggerUpstreamTransport.js";
 export * as reverseWSDownstreamTransport from "./transport/ReverseWSDownstreamTransport.js";
 export * as nativeHostDownstreamTransport from "./transport/NativeHostDownstreamTransport.js";
 export * as natsDownstreamTransport from "./transport/NATSDownstreamTransport.js";

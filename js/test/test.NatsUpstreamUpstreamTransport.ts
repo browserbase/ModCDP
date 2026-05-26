@@ -8,19 +8,15 @@ import { getBinaryPath } from "@eplightning/nats-server";
 import { test } from "vitest";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
-import { NatsUpstreamTransport } from "../src/transport/NatsUpstreamTransport.js";
+import { NatsUpstreamUpstreamTransport } from "../src/transport/NatsUpstreamUpstreamTransport.js";
 
 test("nats upstream config owns url, subject prefix, wait timeout, and injector config", async () => {
-  const transport = new NatsUpstreamTransport({
+  const transport = new NatsUpstreamUpstreamTransport({
     upstream_nats_url: "ws://127.0.0.1:4223",
     upstream_nats_subject_prefix: "modcdp.one",
   });
   assert.equal(transport.upstream_nats_url, "ws://127.0.0.1:4223/");
   assert.equal(transport.upstream_nats_subject_prefix, "modcdp.one");
-  assert.deepEqual(transport.getInjectorConfig(), {
-    upstream_nats_url: "ws://127.0.0.1:4223/",
-    upstream_nats_subject_prefix: "modcdp.one",
-  });
   assert.equal(
     transport.update({
       upstream_nats_url: "nats://127.0.0.1:4222",
@@ -36,7 +32,7 @@ test("nats upstream config owns url, subject prefix, wait timeout, and injector 
 });
 
 test("nats upstream close rejects pending peer waits", async () => {
-  const transport = new NatsUpstreamTransport({
+  const transport = new NatsUpstreamUpstreamTransport({
     upstream_nats_url: "ws://127.0.0.1:4223",
     upstream_nats_subject_prefix: "modcdp.close",
     upstream_nats_wait_timeout_ms: 5_000,
@@ -49,7 +45,7 @@ test("nats upstream close rejects pending peer waits", async () => {
 });
 
 test("nats upstream close resets peer wait state", async () => {
-  const transport = new NatsUpstreamTransport({
+  const transport = new NatsUpstreamUpstreamTransport({
     upstream_nats_wait_timeout_ms: 5,
   });
   (transport as unknown as { handlePayload: (payload: string) => void }).handlePayload(
@@ -64,7 +60,7 @@ test("nats upstream close resets peer wait state", async () => {
 
 test("nats upstream reconnects after close against a real NATS server", async () => {
   const nats = await startNatsServer();
-  const transport = new NatsUpstreamTransport({
+  const transport = new NatsUpstreamUpstreamTransport({
     upstream_nats_url: nats.url,
     upstream_nats_subject_prefix: `modcdp.reconnect.${Date.now()}`,
   });

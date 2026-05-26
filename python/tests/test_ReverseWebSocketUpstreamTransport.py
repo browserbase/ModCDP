@@ -166,7 +166,6 @@ class ReverseWebSocketUpstreamTransportTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "reversews")
-            self.assertEqual(cdp.transport.endpoint_kind if cdp.transport else None, "modcdp_server")
             self.assertIsInstance(cdp.transport, ReverseWebSocketUpstreamTransport)
             transport = cast(ReverseWebSocketUpstreamTransport, cdp.transport)
             self.assertEqual(transport.url, "ws://127.0.0.1:29292")

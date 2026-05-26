@@ -9,7 +9,6 @@ from ..transport.UpstreamTransport import UpstreamTransport
 
 class PipeUpstreamTransport(UpstreamTransport):
     mode = "pipe"
-    endpoint_kind = "raw_cdp"
 
     def __init__(self, options: dict[str, Any] | None = None) -> None:
         super().__init__()

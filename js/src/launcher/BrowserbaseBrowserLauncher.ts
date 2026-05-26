@@ -1,4 +1,4 @@
-import { BrowserLauncher, type BrowserLaunchOptions, type LaunchedBrowser } from "./BrowserLauncher.js";
+import { BrowserLauncher, type LauncherOptions, type LaunchedBrowser } from "./BrowserLauncher.js";
 
 const DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com";
 const DEFAULT_BROWSERBASE_VIEWPORT = { width: 1288, height: 711 };
@@ -90,9 +90,8 @@ async function closeBrowserCDP(cdp_url: string | undefined) {
 }
 
 export class BrowserbaseBrowserLauncher extends BrowserLauncher {
-  async launch(options: BrowserLaunchOptions = {}): Promise<LaunchedBrowser> {
-    const merged = { ...this.options, ...options };
-    const browserbase_api_key = firstString(merged.browserbase_api_key, process.env.BROWSERBASE_API_KEY);
+  async launch(options: LauncherOptions = {}): Promise<LaunchedBrowser> {
+    const browserbase_api_key = firstString(options.browserbase_api_key, this.browserbase_api_key, process.env.BROWSERBASE_API_KEY);
     if (!browserbase_api_key) {
       throw new Error(
         "launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_options.browserbase_api_key.",
@@ -100,10 +99,12 @@ export class BrowserbaseBrowserLauncher extends BrowserLauncher {
     }
 
     const base_url =
-      firstString(merged.browserbase_base_url, process.env.BROWSERBASE_BASE_URL) ?? DEFAULT_BROWSERBASE_BASE_URL;
-    const resume_session_id = firstString(merged.browserbase_session_id);
-    const keep_alive = firstBoolean(merged.browserbase_keep_alive) ?? false;
-    const close_session_on_close = firstBoolean(merged.browserbase_close_session_on_close) ?? !keep_alive;
+      firstString(options.browserbase_base_url, this.browserbase_base_url, process.env.BROWSERBASE_BASE_URL) ??
+      DEFAULT_BROWSERBASE_BASE_URL;
+    const resume_session_id = firstString(options.browserbase_session_id, this.browserbase_session_id);
+    const keep_alive = firstBoolean(options.browserbase_keep_alive, this.browserbase_keep_alive) ?? false;
+    const close_session_on_close =
+      firstBoolean(options.browserbase_close_session_on_close, this.browserbase_close_session_on_close) ?? !keep_alive;
 
     let created_session = false;
     let session: BrowserbaseSession;
@@ -115,27 +116,28 @@ export class BrowserbaseBrowserLauncher extends BrowserLauncher {
         pathname: `/v1/sessions/${resume_session_id}`,
       });
     } else {
-      const session_create_params = objectValue(merged.browserbase_session_create_params);
+      const session_create_params = objectValue(options.browserbase_session_create_params ?? this.browserbase_session_create_params);
       const browser_settings = {
         ...objectValue(session_create_params.browserSettings),
-        ...objectValue(merged.browserbase_browser_settings),
+        ...objectValue(options.browserbase_browser_settings ?? this.browserbase_browser_settings),
       };
       const user_metadata = {
         ...objectValue(session_create_params.userMetadata),
-        ...objectValue(merged.browserbase_user_metadata),
+        ...objectValue(options.browserbase_user_metadata ?? this.browserbase_user_metadata),
       };
       const extension_id = firstString(
-        merged.injector_extension_id,
+        options.injector_extension_id,
+        this.injector_extension_id,
         session_create_params.extensionId,
         objectValue(session_create_params.browserSettings).extensionId,
       );
       const body = {
         ...session_create_params,
         ...(keep_alive ? { keepAlive: true } : {}),
-        ...(firstString(merged.region, session_create_params.region)
-          ? { region: firstString(merged.region, session_create_params.region) }
+        ...(firstString(options.region, this.region, session_create_params.region)
+          ? { region: firstString(options.region, this.region, session_create_params.region) }
           : {}),
-        ...(typeof merged.timeout === "number" ? { timeout: merged.timeout } : {}),
+        ...(typeof (options.timeout ?? this.timeout) === "number" ? { timeout: options.timeout ?? this.timeout } : {}),
         ...(extension_id ? { extensionId: extension_id } : {}),
         browserSettings: {
           ...browser_settings,

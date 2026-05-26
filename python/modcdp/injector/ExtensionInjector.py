@@ -16,7 +16,7 @@ from typing import Any, TypedDict, cast
 
 from typing_extensions import NotRequired
 
-from ..launcher.BrowserLauncher import BrowserLaunchOptions
+from ..launcher.BrowserLauncher import LauncherOptions
 from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
 
 EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
@@ -178,7 +178,7 @@ class ExtensionInjector:
     def getInjectorConfig(self) -> ExtensionInjectorConfig:
         return cast(ExtensionInjectorConfig, dict(self.options))
 
-    def getLauncherConfig(self) -> BrowserLaunchOptions:
+    def getLauncherConfig(self) -> LauncherOptions:
         return {}
 
     def getTransportConfig(self) -> dict[str, Any]:

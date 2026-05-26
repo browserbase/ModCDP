@@ -18,16 +18,12 @@ describe("BrowserLauncher", () => {
       extra_args: ["--load-extension=/tmp/two", "--window-size=900,700"],
     });
 
-    expect(launcher.options.args).toEqual(["--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"]);
-    expect(launcher.options.extra_args).toEqual(["--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"]);
-    expect(launcher.getTransportConfig()).toMatchObject({
-      cdp_url: "ws://127.0.0.1:9222/devtools/browser/updated",
-      user_data_dir: "/tmp/modcdp-browser-launcher",
-    });
-    expect(launcher.getInjectorConfig()).toMatchObject({
-      injector_browserbase_api_key: "test-key",
-      injector_extension_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    });
+    expect(launcher.args).toEqual(["--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"]);
+    expect(launcher.extra_args).toEqual(["--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"]);
+    expect(launcher.cdp_url).toEqual("ws://127.0.0.1:9222/devtools/browser/updated");
+    expect(launcher.user_data_dir).toEqual("/tmp/modcdp-browser-launcher");
+    expect(launcher.browserbase_api_key).toEqual("test-key");
+    expect(launcher.injector_extension_id).toEqual("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     await expect(launcher.launch()).rejects.toThrow("BrowserLauncher.launch is not implemented.");
   });
 });

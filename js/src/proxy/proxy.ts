@@ -867,7 +867,7 @@ function wireClientManagedConnection(
         : (msg.params ?? {});
     const command_promise = ROUTE_TO_SW_RE.test(msg.method)
       ? cdp.send(msg.method, service_worker_params)
-      : cdp.sendRaw(msg.method, msg.params ?? {}, msg.sessionId ?? null);
+      : cdp.upstream.send(msg.method, msg.params ?? {}, msg.sessionId ?? null);
     void command_promise
       .then((result) =>
         sendRawClientMessage(client, {

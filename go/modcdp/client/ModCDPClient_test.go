@@ -80,15 +80,6 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 321 {
 		t.Fatalf("Upstream.UpstreamWSConnectErrorSettleTimeoutMS = %d", cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS)
 	}
-	if cdp.Upstream.UpstreamReverseWSWaitTimeoutMS != 456 {
-		t.Fatalf("Upstream.UpstreamReverseWSWaitTimeoutMS = %d", cdp.Upstream.UpstreamReverseWSWaitTimeoutMS)
-	}
-	if cdp.Upstream.UpstreamNATSWaitTimeoutMS != 345 {
-		t.Fatalf("Upstream.UpstreamNATSWaitTimeoutMS = %d", cdp.Upstream.UpstreamNATSWaitTimeoutMS)
-	}
-	if cdp.Upstream.UpstreamNativeMessagingHostName != "com.modcdp.custom" {
-		t.Fatalf("Upstream.UpstreamNativeMessagingHostName = %q", cdp.Upstream.UpstreamNativeMessagingHostName)
-	}
 	if cdp.Injector.InjectorExecutionContextTimeoutMS != 4321 {
 		t.Fatalf("Injector.InjectorExecutionContextTimeoutMS = %d", cdp.Injector.InjectorExecutionContextTimeoutMS)
 	}
@@ -122,10 +113,6 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Client.ClientEventWaitTimeoutMS != 2345 {
 		t.Fatalf("Client.ClientEventWaitTimeoutMS = %d", cdp.Client.ClientEventWaitTimeoutMS)
 	}
-	if endpointKindForUpstream(cdp.Upstream.UpstreamMode) != UpstreamEndpointKindRawCDP {
-		t.Fatalf("endpoint kind = %q", endpointKindForUpstream(cdp.Upstream.UpstreamMode))
-	}
-
 	params := cdp.serverConfigureParams(nil, nil, nil)
 	clientConfig := params["client"].(map[string]any)
 	routes := clientConfig["client_routes"].(map[string]string)
@@ -383,9 +370,6 @@ func TestModCDPClientAllowsDisabledServerWithModCDPServerUpstreams(t *testing.T)
 		if cdp.Server != nil {
 			t.Fatalf("%s Server = %#v", mode, cdp.Server)
 		}
-		if endpointKindForUpstream(cdp.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s endpoint kind = %q", mode, endpointKindForUpstream(cdp.Upstream.UpstreamMode))
-		}
 	}
 }
 
@@ -410,9 +394,6 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 		if launched.Launcher.LauncherMode != "local" {
 			t.Fatalf("%s launched Launcher.LauncherMode = %q", mode, launched.Launcher.LauncherMode)
 		}
-		if endpointKindForUpstream(launched.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s launched endpoint kind = %q", mode, endpointKindForUpstream(launched.Upstream.UpstreamMode))
-		}
 		if launched.Injector.InjectorMode != "auto" {
 			t.Fatalf("%s launched Injector.InjectorMode = %q", mode, launched.Injector.InjectorMode)
 		}
@@ -422,9 +403,6 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 		})
 		if attachOnly.Launcher.LauncherMode != "none" {
 			t.Fatalf("%s attach-only Launcher.LauncherMode = %q", mode, attachOnly.Launcher.LauncherMode)
-		}
-		if endpointKindForUpstream(attachOnly.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
-			t.Fatalf("%s attach-only endpoint kind = %q", mode, endpointKindForUpstream(attachOnly.Upstream.UpstreamMode))
 		}
 		if attachOnly.Injector.InjectorMode != "none" {
 			t.Fatalf("%s attach-only Injector.InjectorMode = %q", mode, attachOnly.Injector.InjectorMode)

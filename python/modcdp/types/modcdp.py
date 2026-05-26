@@ -114,7 +114,6 @@ class ModCDPTopology(TypedDict):
 class ModCDPConnectTiming(TypedDict):
     started_at: int
     upstream_mode: str | None
-    upstream_endpoint_kind: Literal["raw_cdp", "modcdp_server"]
     transport_started_at: int
     transport_connected_at: int
     transport_duration_ms: int

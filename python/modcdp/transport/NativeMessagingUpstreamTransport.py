@@ -15,7 +15,6 @@ DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge"
 
 class NativeMessagingUpstreamTransport(UpstreamTransport):
     mode = "nativemessaging"
-    endpoint_kind = "modcdp_server"
 
     def __init__(self, options: Mapping[str, Any] | None = None) -> None:
         super().__init__()

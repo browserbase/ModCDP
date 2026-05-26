@@ -78,7 +78,6 @@ type LocalBrowserLaunchExtensionInjector = injector.LocalBrowserLaunchExtensionI
 type ExtensionsLoadUnpackedInjector = injector.ExtensionsLoadUnpackedInjector
 type BorrowedExtensionInjector = injector.BorrowedExtensionInjector
 type UpstreamMode = transportpkg.UpstreamMode
-type UpstreamEndpointKind = transportpkg.UpstreamEndpointKind
 type UpstreamTransport = transportpkg.UpstreamTransport
 type WebSocketUpstreamTransport = transportpkg.WebSocketUpstreamTransport
 type WebSocketUpstreamTransportOptions = transportpkg.WebSocketUpstreamTransportOptions
@@ -88,8 +87,8 @@ type ReverseWebSocketUpstreamTransport = transportpkg.ReverseWebSocketUpstreamTr
 type ReverseWebSocketUpstreamTransportOptions = transportpkg.ReverseWebSocketUpstreamTransportOptions
 type NativeMessagingUpstreamTransport = transportpkg.NativeMessagingUpstreamTransport
 type NativeMessagingUpstreamTransportOptions = transportpkg.NativeMessagingUpstreamTransportOptions
-type NatsUpstreamTransport = transportpkg.NatsUpstreamTransport
-type NatsUpstreamTransportOptions = transportpkg.NatsUpstreamTransportOptions
+type NatsUpstreamUpstreamTransport = transportpkg.NatsUpstreamUpstreamTransport
+type NatsUpstreamUpstreamTransportOptions = transportpkg.NatsUpstreamUpstreamTransportOptions
 type AutoSessionRouter = router.AutoSessionRouter
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
@@ -105,7 +104,7 @@ var NewWebSocketUpstreamTransport = transportpkg.NewWebSocketUpstreamTransport
 var NewPipeUpstreamTransport = transportpkg.NewPipeUpstreamTransport
 var NewReverseWebSocketUpstreamTransport = transportpkg.NewReverseWebSocketUpstreamTransport
 var NewNativeMessagingUpstreamTransport = transportpkg.NewNativeMessagingUpstreamTransport
-var NewNatsUpstreamTransport = transportpkg.NewNatsUpstreamTransport
+var NewNatsUpstreamUpstreamTransport = transportpkg.NewNatsUpstreamUpstreamTransport
 var NewAutoSessionRouter = router.NewAutoSessionRouter
 
 var DefaultModCDPServiceWorkerURLSuffixes = injector.DefaultModCDPServiceWorkerURLSuffixes
@@ -114,10 +113,6 @@ const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
 const DefaultUpstreamReverseWSBind = transportpkg.DefaultUpstreamReverseWSBind
 const DefaultUpstreamReverseWSWaitTimeoutMS = transportpkg.DefaultUpstreamReverseWSWaitTimeoutMS
 const DefaultUpstreamNATSWaitTimeoutMS = transportpkg.DefaultUpstreamNATSWaitTimeoutMS
-const UpstreamEndpointKindRawCDP = transportpkg.UpstreamEndpointKindRawCDP
-const UpstreamEndpointKindModCDPServer = transportpkg.UpstreamEndpointKindModCDPServer
-
-var endpointKindForUpstream = transportpkg.EndpointKindForUpstream
 
 func firstNonEmptyString(values ...string) string {
 	for _, value := range values {
@@ -443,21 +438,17 @@ func New(opts Options) *ModCDPClient {
 	if opts.Upstream.UpstreamMode == "" {
 		opts.Upstream.UpstreamMode = "ws"
 	}
-	upstreamEndpointKind := UpstreamEndpointKindModCDPServer
-	if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" {
-		upstreamEndpointKind = UpstreamEndpointKindRawCDP
-	}
 	if opts.Launcher.LauncherMode == "" {
-		if upstreamEndpointKind == UpstreamEndpointKindModCDPServer {
-			opts.Launcher.LauncherMode = "none"
-		} else if opts.Upstream.UpstreamCDPURL != "" {
+		if opts.Upstream.UpstreamMode == "ws" && opts.Upstream.UpstreamCDPURL != "" {
 			opts.Launcher.LauncherMode = "remote"
-		} else {
+		} else if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" {
 			opts.Launcher.LauncherMode = "local"
+		} else {
+			opts.Launcher.LauncherMode = "none"
 		}
 	}
 	if opts.Injector.InjectorMode == "" {
-		if upstreamEndpointKind == UpstreamEndpointKindRawCDP || opts.Launcher.LauncherMode != "none" {
+		if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" || opts.Launcher.LauncherMode != "none" {
 			opts.Injector.InjectorMode = "auto"
 		} else {
 			opts.Injector.InjectorMode = "none"
@@ -468,6 +459,9 @@ func New(opts Options) *ModCDPClient {
 	}
 	if opts.Launcher.LauncherUserDataDir != "" {
 		opts.Launcher.LauncherOptions.UserDataDir = opts.Launcher.LauncherUserDataDir
+	}
+	if opts.Upstream.UpstreamCDPURL != "" {
+		opts.Launcher.LauncherOptions.RemoteCDPURL = opts.Upstream.UpstreamCDPURL
 	}
 	if opts.Client.ClientRoutes == nil {
 		opts.Client.ClientRoutes = translate.DefaultClientRoutes()
@@ -489,7 +483,7 @@ func New(opts Options) *ModCDPClient {
 	if opts.Server == nil && !opts.serverConfigured {
 		opts.Server = &ServerConfig{}
 	}
-	if upstreamEndpointKind == UpstreamEndpointKindModCDPServer && opts.Server != nil && opts.Server.ServerRoutes == nil {
+	if opts.Upstream.UpstreamMode != "ws" && opts.Upstream.UpstreamMode != "pipe" && opts.Server != nil && opts.Server.ServerRoutes == nil {
 		opts.Server.ServerRoutes = map[string]string{"*.*": "chrome_debugger"}
 	}
 	if opts.Injector.InjectorServiceWorkerURLSuffixes == nil {
@@ -578,7 +572,7 @@ func (c *ModCDPClient) Connect() error {
 		c.stopHeartbeat()
 		c.rejectAll(err)
 	})
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer {
+	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
 		if err := c.transport.WaitForPeer(); err != nil {
 			c.Close()
 			return err
@@ -596,7 +590,6 @@ func (c *ModCDPClient) Connect() error {
 		c.ConnectTiming = map[string]any{
 			"started_at":             connectStartedAt,
 			"upstream_mode":          c.Upstream.UpstreamMode,
-			"upstream_endpoint_kind": transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode),
 			"transport_started_at":   transportStartedAt,
 			"transport_connected_at": transportConnectedAt,
 			"transport_duration_ms":  transportConnectedAt - transportStartedAt,
@@ -692,7 +685,6 @@ func (c *ModCDPClient) Connect() error {
 	c.ConnectTiming = map[string]any{
 		"started_at":             connectStartedAt,
 		"upstream_mode":          c.Upstream.UpstreamMode,
-		"upstream_endpoint_kind": transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode),
 		"transport_started_at":   transportStartedAt,
 		"transport_connected_at": transportConnectedAt,
 		"transport_duration_ms":  transportConnectedAt - transportStartedAt,
@@ -751,7 +743,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	launcher.Update(LaunchOptions{LoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
 	transport.Update(launcher.GetTransportConfig())
 
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer {
+	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
 		if err := transport.Connect(); err != nil {
 			return err
 		}
@@ -775,7 +767,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	if c.launchedBrowser != nil {
 		launchedCDPURL = c.launchedBrowser.CDPURL
 	}
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindRawCDP {
+	if c.Upstream.UpstreamMode == "ws" || c.Upstream.UpstreamMode == "pipe" {
 		if err := transport.Connect(); err != nil {
 			return err
 		}
@@ -783,7 +775,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 
 	c.transport = transport
 	transportURL := transportURL(transport)
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindRawCDP && c.Upstream.UpstreamMode == "ws" {
+	if c.Upstream.UpstreamMode == "ws" {
 		c.CDPURL = firstNonEmptyString(transportURL, launchedCDPURL)
 	} else {
 		c.CDPURL = launchedCDPURL
@@ -794,8 +786,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	}
 
 	serverConfig := map[string]any{}
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer &&
-		launchedCDPURL != "" {
+	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" && launchedCDPURL != "" {
 		serverConfig["server_loopback_cdp_url"] = launchedCDPURL
 	}
 	for key, value := range launcher.GetServerConfig() {
@@ -1260,7 +1251,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		if err != nil {
 			return nil, err
 		}
-		if c.ExtSessionID == "" && transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) != UpstreamEndpointKindModCDPServer {
+		if c.ExtSessionID == "" && (c.Upstream.UpstreamMode == "ws" || c.Upstream.UpstreamMode == "pipe") {
 			completedAt := time.Now().UnixMilli()
 			c.LastCommandTiming = map[string]any{
 				"method":       method,
@@ -1277,7 +1268,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 			return nil, err
 		}
 	}
-	if transportpkg.EndpointKindForUpstream(c.Upstream.UpstreamMode) == UpstreamEndpointKindModCDPServer {
+	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
 		if method != "Mod.configure" {
 			if err := c.ensureModCDPServerConfigured(); err != nil {
 				return nil, err
@@ -1442,7 +1433,7 @@ func (c *ModCDPClient) browserLauncher() browserLauncherClient {
 	case "local":
 		return NewLocalBrowserLauncher(c.Launcher.LauncherOptions)
 	case "remote":
-		return NewRemoteBrowserLauncher(c.Launcher.LauncherOptions, c.Upstream.UpstreamCDPURL)
+		return NewRemoteBrowserLauncher(c.Launcher.LauncherOptions)
 	case "bb":
 		return NewBrowserbaseBrowserLauncher(c.Launcher.LauncherOptions)
 	case "none":
@@ -1465,7 +1456,11 @@ func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 			UpstreamNativeMessagingHostName: c.Upstream.UpstreamNativeMessagingHostName,
 		})
 	case "nats":
-		return NewNatsUpstreamTransport(NatsUpstreamTransportOptions{})
+		return NewNatsUpstreamUpstreamTransport(NatsUpstreamUpstreamTransportOptions{
+			UpstreamNATSURL:           c.Upstream.UpstreamNATSURL,
+			UpstreamNATSSubjectPrefix: c.Upstream.UpstreamNATSSubjectPrefix,
+			UpstreamNATSWaitTimeoutMS: c.Upstream.UpstreamNATSWaitTimeoutMS,
+		})
 	default:
 		return nil
 	}

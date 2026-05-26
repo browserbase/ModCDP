@@ -15,7 +15,6 @@ class PipeUpstreamTransportTests(unittest.TestCase):
     def test_constructor_update_launcher_config_and_unconnected_errors_match_transport_surface(self) -> None:
         transport = PipeUpstreamTransport()
         self.assertEqual(transport.mode, "pipe")
-        self.assertEqual(transport.endpoint_kind, "raw_cdp")
         self.assertIsNone(transport.url)
         self.assertEqual(transport.getLauncherConfig(), {"remote_debugging": "pipe"})
         self.assertIs(transport.update({"cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"}), transport)
@@ -63,7 +62,6 @@ class PipeUpstreamTransportTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.transport.mode if cdp.transport else None, "pipe")
-            self.assertEqual(cdp.transport.endpoint_kind if cdp.transport else None, "raw_cdp")
             self.assertIsNone(cdp.cdp_url)
             self.assertIsNone(cdp.transport.url if cdp.transport else None)
             cdp.Mod.addCustomCommand(

@@ -77,10 +77,8 @@ test("LocalBrowserLaunchExtensionInjector prepares an unpacked extension directo
     assert.equal(typeof unpacked_extension_path, "string");
     assert.notEqual(unpacked_extension_path, EXTENSION_PATH);
     assert.equal(existsSync(path.join(unpacked_extension_path!, "manifest.json")), true);
-    assert.deepEqual(injector.getLauncherConfig(), {
-      extra_args: [`--load-extension=${unpacked_extension_path}`],
-    });
-    assert.equal(injector.options.injector_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
+    assert.deepEqual(injector.extra_args, [`--load-extension=${unpacked_extension_path}`]);
+    assert.equal(injector.injector_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
   } finally {
     await injector.close();
   }
@@ -96,10 +94,8 @@ test("LocalBrowserLaunchExtensionInjector prepares the default extension zip for
     assert.equal(typeof unpacked_extension_path, "string");
     assert.match(unpacked_extension_path!, /modcdp-extension-/);
     assert.equal(existsSync(path.join(unpacked_extension_path!, "manifest.json")), true);
-    assert.deepEqual(injector.getLauncherConfig(), {
-      extra_args: [`--load-extension=${unpacked_extension_path}`],
-    });
-    assert.equal(injector.options.injector_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
+    assert.deepEqual(injector.extra_args, [`--load-extension=${unpacked_extension_path}`]);
+    assert.equal(injector.injector_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
   } finally {
     await injector.close();
   }

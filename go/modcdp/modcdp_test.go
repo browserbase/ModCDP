@@ -6,7 +6,7 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	if NewLocalBrowserLauncher(LaunchOptions{}) == nil {
 		t.Fatal("NewLocalBrowserLauncher returned nil")
 	}
-	if NewRemoteBrowserLauncher(LaunchOptions{}, "ws://127.0.0.1:9222/devtools/browser/test") == nil {
+	if NewRemoteBrowserLauncher(LaunchOptions{RemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/test"}) == nil {
 		t.Fatal("NewRemoteBrowserLauncher returned nil")
 	}
 	if NewBrowserbaseBrowserLauncher(LaunchOptions{}) == nil {
@@ -36,14 +36,11 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	if NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{}) == nil {
 		t.Fatal("NewNativeMessagingUpstreamTransport returned nil")
 	}
-	if NewNatsUpstreamTransport(NatsUpstreamTransportOptions{}) == nil {
-		t.Fatal("NewNatsUpstreamTransport returned nil")
+	if NewNatsUpstreamUpstreamTransport(NatsUpstreamUpstreamTransportOptions{}) == nil {
+		t.Fatal("NewNatsUpstreamUpstreamTransport returned nil")
 	}
 
 	if UpstreamModeWS != "ws" || UpstreamModePipe != "pipe" || UpstreamModeNativeMessaging != "nativemessaging" || UpstreamModeReverseWS != "reversews" || UpstreamModeNATS != "nats" {
 		t.Fatal("upstream mode constants drifted")
-	}
-	if UpstreamEndpointKindRawCDP != "raw_cdp" || UpstreamEndpointKindModCDPServer != "modcdp_server" {
-		t.Fatal("upstream endpoint kind constants drifted")
 	}
 }

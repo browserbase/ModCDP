@@ -14,26 +14,11 @@ func (t *testUpstreamTransport) emit(message map[string]any) {
 	t.EmitRecv(message)
 }
 
-func TestUpstreamTransportSharedConfigEndpointClassificationAndRecvCallbacks(t *testing.T) {
+func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	transport := &UpstreamTransport{}
 	received := []map[string]any{}
 	stop := transport.OnRecv(func(message map[string]any) { received = append(received, message) })
 
-	if EndpointKindForUpstream("ws") != UpstreamEndpointKindRawCDP {
-		t.Fatal("ws endpoint kind mismatch")
-	}
-	if EndpointKindForUpstream("pipe") != UpstreamEndpointKindRawCDP {
-		t.Fatal("pipe endpoint kind mismatch")
-	}
-	if EndpointKindForUpstream("nativemessaging") != UpstreamEndpointKindModCDPServer {
-		t.Fatal("native endpoint kind mismatch")
-	}
-	if EndpointKindForUpstream("reversews") != UpstreamEndpointKindModCDPServer {
-		t.Fatal("reverse endpoint kind mismatch")
-	}
-	if EndpointKindForUpstream("nats") != UpstreamEndpointKindModCDPServer {
-		t.Fatal("nats endpoint kind mismatch")
-	}
 	transport.Update(nil)
 	if len(transport.GetLauncherConfig().ExtraArgs) != 0 {
 		t.Fatal("expected empty launcher config")

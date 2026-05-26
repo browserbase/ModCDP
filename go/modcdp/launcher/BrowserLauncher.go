@@ -177,6 +177,9 @@ func mergeLaunchOptions(existing LaunchOptions, incoming LaunchOptions) LaunchOp
 	if incoming.CDPURL != "" {
 		merged.CDPURL = incoming.CDPURL
 	}
+	if incoming.RemoteCDPURL != "" {
+		merged.RemoteCDPURL = incoming.RemoteCDPURL
+	}
 	if incoming.BrowserbaseAPIKey != "" {
 		merged.BrowserbaseAPIKey = incoming.BrowserbaseAPIKey
 	}

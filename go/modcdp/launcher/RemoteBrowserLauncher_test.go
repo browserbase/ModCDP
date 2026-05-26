@@ -6,7 +6,7 @@ import (
 )
 
 func TestRemoteBrowserLauncherRequiresUpstreamCDPURL(t *testing.T) {
-	_, err := NewRemoteBrowserLauncher(LaunchOptions{}, "").Launch(LaunchOptions{})
+	_, err := NewRemoteBrowserLauncher(LaunchOptions{}).Launch(LaunchOptions{})
 	if err == nil || err.Error() != "launcher.launcher_mode=remote requires upstream.upstream_cdp_url" {
 		t.Fatalf("Launch error = %v", err)
 	}
@@ -26,7 +26,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	}
 	defer local.Close()
 
-	httpLauncher := NewRemoteBrowserLauncher(LaunchOptions{}, fmt.Sprintf("http://127.0.0.1:%d", port))
+	httpLauncher := NewRemoteBrowserLauncher(LaunchOptions{RemoteCDPURL: fmt.Sprintf("http://127.0.0.1:%d", port)})
 	fromHTTP, err := httpLauncher.Launch(LaunchOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +46,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	expectCDPBrowserSurface(t, conn)
 	fromHTTP.Close()
 
-	hostPortLauncher := NewRemoteBrowserLauncher(LaunchOptions{}, fmt.Sprintf("127.0.0.1:%d", port))
+	hostPortLauncher := NewRemoteBrowserLauncher(LaunchOptions{RemoteCDPURL: fmt.Sprintf("127.0.0.1:%d", port)})
 	fromHostPort, err := hostPortLauncher.Launch(LaunchOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	}
 	fromHostPort.Close()
 
-	optionsLauncher := NewRemoteBrowserLauncher(LaunchOptions{CDPURL: local.CDPURL}, "")
+	optionsLauncher := NewRemoteBrowserLauncher(LaunchOptions{CDPURL: local.CDPURL})
 	fromOptions, err := optionsLauncher.Launch(LaunchOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	}
 	fromOptions.Close()
 
-	wsLauncher := NewRemoteBrowserLauncher(LaunchOptions{}, "")
+	wsLauncher := NewRemoteBrowserLauncher(LaunchOptions{})
 	fromWS, err := wsLauncher.Launch(LaunchOptions{CDPURL: local.CDPURL})
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	expectCDPBrowserSurface(t, conn)
 	fromWS.Close()
 
-	overrideLauncher := NewRemoteBrowserLauncher(LaunchOptions{CDPURL: "127.0.0.1:1"}, "127.0.0.1:2")
+	overrideLauncher := NewRemoteBrowserLauncher(LaunchOptions{RemoteCDPURL: "127.0.0.1:1"})
 	fromCallTimeOverride, err := overrideLauncher.Launch(LaunchOptions{CDPURL: local.CDPURL})
 	if err != nil {
 		t.Fatal(err)

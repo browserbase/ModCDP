@@ -34,7 +34,7 @@ test("BorrowedExtensionInjector bootstraps ModCDP inside a live extension servic
 
   try {
     await owner.connect();
-    cdp.upstream.upstream_cdp_url = owner.cdp_url;
+    cdp.upstream.upstream_cdp_url = owner.upstream.upstream_cdp_url;
     await cdp.connect();
     assert.equal(cdp.connect_timing?.injector_source, "borrowed");
     assert.equal(cdp.extension_id, "mdedooklbnfejodmnhmkdpkaedafkehf");

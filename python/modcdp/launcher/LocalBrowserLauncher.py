@@ -18,7 +18,7 @@ from typing import Protocol, cast
 from ..launcher.BrowserLauncher import (
     DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
     DEFAULT_CHROME_READY_TIMEOUT_MS,
-    BrowserLaunchOptions,
+    LauncherOptions,
     BrowserLauncher,
     LaunchedBrowser,
 )
@@ -38,8 +38,8 @@ class LocalBrowserLauncher(BrowserLauncher):
     def freePort() -> int:
         return _free_port()
 
-    def launch(self, options: BrowserLaunchOptions | None = None) -> LaunchedBrowser:
-        merged = cast(BrowserLaunchOptions, {**self.options, **dict(options or {})})
+    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
+        merged = cast(LauncherOptions, {**self.options, **dict(options or {})})
         executable_path = self.findChromeBinary(merged.get("executable_path"))
         use_pipe = merged.get("remote_debugging") == "pipe"
         use_loopback_cdp = (not use_pipe) or bool(merged.get("loopback_cdp")) or merged.get("port") is not None

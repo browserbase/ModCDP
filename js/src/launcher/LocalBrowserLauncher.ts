@@ -11,7 +11,7 @@ import {
   DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
   DEFAULT_CHROME_READY_TIMEOUT_MS,
   resolveCdpWebSocketUrl,
-  type BrowserLaunchOptions,
+  type LauncherOptions,
   type LaunchedBrowser,
 } from "./BrowserLauncher.js";
 
@@ -309,21 +309,19 @@ export class LocalBrowserLauncher extends BrowserLauncher {
     return port;
   }
 
-  async launch(options: BrowserLaunchOptions = {}): Promise<LaunchedBrowser> {
-    const {
-      executable_path,
-      port,
-      user_data_dir,
-      headless = process.platform === "linux" && !process.env.DISPLAY,
-      sandbox = process.platform !== "linux",
-      args = [],
-      extra_args = [],
-      remote_debugging = "port",
-      loopback_cdp = false,
-      cleanup_user_data_dir = false,
-      chrome_ready_timeout_ms = DEFAULT_CHROME_READY_TIMEOUT_MS,
-      chrome_ready_poll_interval_ms = DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
-    } = { ...this.options, ...options };
+  async launch(options: LauncherOptions = {}): Promise<LaunchedBrowser> {
+    const executable_path = options.executable_path ?? this.executable_path;
+    const port = options.port ?? this.port;
+    const user_data_dir = options.user_data_dir ?? this.user_data_dir;
+    const headless = options.headless ?? this.headless ?? (process.platform === "linux" && !process.env.DISPLAY);
+    const sandbox = options.sandbox ?? this.sandbox ?? process.platform !== "linux";
+    const args = options.args ?? this.args ?? [];
+    const extra_args = options.extra_args ?? this.extra_args ?? [];
+    const remote_debugging = options.remote_debugging ?? this.remote_debugging ?? "port";
+    const loopback_cdp = options.loopback_cdp ?? this.loopback_cdp ?? false;
+    const cleanup_user_data_dir = options.cleanup_user_data_dir ?? this.cleanup_user_data_dir ?? false;
+    const chrome_ready_timeout_ms = options.chrome_ready_timeout_ms ?? this.chrome_ready_timeout_ms;
+    const chrome_ready_poll_interval_ms = options.chrome_ready_poll_interval_ms ?? this.chrome_ready_poll_interval_ms;
     const exe = LocalBrowserLauncher.findChromeBinary(executable_path);
     const usePipe = remote_debugging === "pipe";
     const useLoopbackCdp = !usePipe || loopback_cdp || port != null;

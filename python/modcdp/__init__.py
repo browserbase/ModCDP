@@ -10,7 +10,7 @@ from .injector.LocalBrowserLaunchExtensionInjector import LocalBrowserLaunchExte
 from .launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from .client.ModCDPClient import ModCDPClient
 from .transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from .transport.NatsUpstreamTransport import NatsUpstreamTransport
+from .transport.NatsUpstreamUpstreamTransport import NatsUpstreamUpstreamTransport
 from .launcher.NoopBrowserLauncher import NoopBrowserLauncher
 from .transport.PipeUpstreamTransport import PipeUpstreamTransport
 from .launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
@@ -33,7 +33,7 @@ __all__ = [
     "LocalBrowserLauncher",
     "ModCDPClient",
     "NativeMessagingUpstreamTransport",
-    "NatsUpstreamTransport",
+    "NatsUpstreamUpstreamTransport",
     "NoopBrowserLauncher",
     "PipeUpstreamTransport",
     "RemoteBrowserLauncher",

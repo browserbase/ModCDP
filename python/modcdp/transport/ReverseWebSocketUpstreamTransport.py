@@ -20,7 +20,6 @@ _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 class ReverseWebSocketUpstreamTransport(UpstreamTransport):
     mode = "reversews"
-    endpoint_kind = "modcdp_server"
 
     def __init__(self, options: dict[str, Any] | None = None) -> None:
         super().__init__()

@@ -1,5 +1,5 @@
 from .NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from .NatsUpstreamTransport import NatsUpstreamTransport
+from .NatsUpstreamUpstreamTransport import NatsUpstreamUpstreamTransport
 from .PipeUpstreamTransport import PipeUpstreamTransport
 from .ReverseWebSocketUpstreamTransport import ReverseWebSocketUpstreamTransport
 from .UpstreamTransport import UpstreamTransport

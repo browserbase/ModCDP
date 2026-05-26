@@ -84,7 +84,7 @@ test(
     await owner.connect();
     const cdp = new ModCDPClient({
       launcher: { launcher_mode: "remote" },
-      upstream: { upstream_mode: "ws", upstream_cdp_url: owner.cdp_url },
+      upstream: { upstream_mode: "ws", upstream_cdp_url: owner.upstream.upstream_cdp_url },
       injector: {
         injector_mode: "discover",
         injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
@@ -98,20 +98,20 @@ test(
         },
       },
       server: {
-        server_loopback_cdp_url: owner.cdp_url,
+        server_loopback_cdp_url: owner.upstream.upstream_cdp_url,
         server_routes: { "*.*": "loopback_cdp" },
       },
     });
 
     try {
       await cdp.connect();
-      assert.equal(cdp.cdp_url, owner.cdp_url);
-      assert.equal(cdp.server.server_loopback_cdp_url, owner.cdp_url);
+      assert.equal(cdp.upstream.upstream_cdp_url, owner.upstream.upstream_cdp_url);
+      assert.equal(cdp.server.server_loopback_cdp_url, owner.upstream.upstream_cdp_url);
 
-      const rawTargets = await cdp.send("Target.getTargets");
+      const rawTargets = (await cdp.send("Target.getTargets")) as { targetInfos: { type?: string; tabId?: number }[] };
       assert.ok(rawTargets.targetInfos?.length > 0, "expected raw Target.getTargets targetInfos");
       assert.equal(
-        rawTargets.targetInfos.some((targetInfo) => Object.hasOwn(targetInfo, "tabId")),
+        rawTargets.targetInfos.some((targetInfo) => targetInfo.tabId != null),
         false,
         "raw CDP TargetInfo should not already contain tabId",
       );
@@ -125,7 +125,9 @@ test(
         phase: cdp.RESPONSE,
         expression: addTabIdMiddleware,
       });
-      const middlewareTargets = await cdp.send("Target.getTargets");
+      const middlewareTargets = (await cdp.send("Target.getTargets")) as {
+        targetInfos: { type?: string; tabId?: number }[];
+      };
       assert.ok(
         middlewareTargets.targetInfos.some(
           (targetInfo) => targetInfo.type === "page" && Number.isInteger(targetInfo.tabId),
@@ -144,10 +146,12 @@ test(
         expression: getTargetsOverride,
       });
 
-      const enrichedTargets = await cdp.send("Target.getTargets");
+      const enrichedTargets = (await cdp.send("Target.getTargets")) as {
+        targetInfos: { type?: string; tabId?: number }[];
+      };
       assert.ok(enrichedTargets.targetInfos?.length > 0, "expected enriched Target.getTargets targetInfos");
       assert.equal(
-        enrichedTargets.targetInfos.every((targetInfo) => Object.hasOwn(targetInfo, "tabId")),
+        enrichedTargets.targetInfos.every((targetInfo) => targetInfo.tabId != null),
         true,
         "every routed TargetInfo should include a tabId property",
       );
@@ -174,7 +178,7 @@ test(
 
       const transformedEvents: cdp.types.ts.Target.TargetCreatedEvent[] = [];
       cdp.on(cdp.Target.targetCreated, (params) => {
-        if (!Object.hasOwn(params.targetInfo || {}, "tabId")) return;
+        if (params.targetInfo.tabId == null) return;
         transformedEvents.push(params);
       });
 
@@ -192,7 +196,7 @@ test(
       }
 
       assert.ok(
-        transformedEvents.some((event) => Object.hasOwn(event.targetInfo, "tabId")),
+        transformedEvents.some((event) => event.targetInfo.tabId != null),
         "transformed event targetInfo should include tabId",
       );
     } finally {

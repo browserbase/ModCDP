@@ -16,8 +16,8 @@ test("ExtensionInjector owns shared injector config", async () => {
   });
 
   try {
-    assert.deepEqual(injector.getTransportConfig(), { injector_extension_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
-    assert.deepEqual(injector.getLauncherConfig(), {});
+    assert.equal(injector.injector_extension_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    assert.deepEqual(injector.extra_args, []);
     assert.equal(
       injector.matches({
         type: "service_worker",

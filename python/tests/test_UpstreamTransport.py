@@ -2,28 +2,22 @@ from __future__ import annotations
 
 import unittest
 
-from modcdp.transport.UpstreamTransport import UpstreamTransport, endpoint_kind_for_upstream
+from modcdp.transport.UpstreamTransport import UpstreamTransport
 
 
 class TestTransport(UpstreamTransport):
     mode = "ws"
-    endpoint_kind = "raw_cdp"
 
     def emit(self, value: str) -> None:
         self._parse_and_emit_recv(value)
 
 
 class UpstreamTransportTests(unittest.TestCase):
-    def test_shared_transport_config_endpoint_classification_and_recv_callbacks(self) -> None:
+    def test_shared_transport_config_and_recv_callbacks(self) -> None:
         transport = UpstreamTransport()
         received = []
         stop = transport.onRecv(lambda message: received.append(message))
 
-        self.assertEqual(endpoint_kind_for_upstream("ws"), "raw_cdp")
-        self.assertEqual(endpoint_kind_for_upstream("pipe"), "raw_cdp")
-        self.assertEqual(endpoint_kind_for_upstream("nativemessaging"), "modcdp_server")
-        self.assertEqual(endpoint_kind_for_upstream("reversews"), "modcdp_server")
-        self.assertEqual(endpoint_kind_for_upstream("nats"), "modcdp_server")
         self.assertIs(transport.update(), transport)
         self.assertEqual(transport.getLauncherConfig(), {})
         self.assertEqual(transport.getInjectorConfig(), {})

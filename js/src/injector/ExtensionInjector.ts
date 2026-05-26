@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { BrowserLaunchOptions } from "../launcher/BrowserLauncher.js";
-import type { UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
 import type { ProtocolParams, ProtocolResult } from "../types/modcdp.js";
 import { commands as RuntimeCommands } from "../types/generated/zod/Runtime.js";
 import { commands as TargetCommands } from "../types/generated/zod/Target.js";
@@ -40,6 +38,7 @@ export type InjectorOptions = {
 };
 
 export type ExtensionInjectorConfig = {
+  injector_mode?: InjectorMode;
   send?: SendCDP | null;
   sessionId_from_targetId?: Map<string, string> | null;
   ensureSessionForTarget?: (
@@ -161,60 +160,111 @@ async function extractZip(zip_path: string, destination: string) {
 }
 
 export class ExtensionInjector {
-  options: ExtensionInjectorConfig;
+  injector_mode: InjectorMode;
+  send: SendCDP;
+  sessionId_from_targetId: Map<string, string> | null;
+  ensureSessionForTarget: (
+    target_id: string,
+    timeout_ms: number,
+    allow_attach: boolean,
+  ) => Promise<string | null | undefined>;
+  waitForExecutionContext: ((session_id: string, timeout_ms: number) => Promise<number>) | null;
+  injector_extension_path: string | null;
+  injector_extension_id: string | null;
+  injector_service_worker_url_includes: string[];
+  injector_service_worker_url_suffixes: string[];
+  injector_trust_service_worker_target: boolean;
+  injector_require_service_worker_target: boolean;
+  injector_service_worker_ready_expression: string | null;
+  injector_cdp_send_timeout_ms: number;
+  injector_execution_context_timeout_ms: number;
+  injector_service_worker_probe_timeout_ms: number;
+  injector_service_worker_ready_timeout_ms: number;
+  injector_service_worker_poll_interval_ms: number;
+  injector_target_session_poll_interval_ms: number;
+  injector_browserbase_api_key: string | null;
+  injector_browserbase_base_url: string | null;
+  upstream_nativemessaging_host_name: string | null;
+  upstream_nats_url: string | null;
+  upstream_nats_subject_prefix: string | null;
+  extra_args: string[];
   protected unusable_target_ids = new Set<string>();
   last_error: Error | null = null;
 
   constructor(options: ExtensionInjectorConfig = {}) {
-    this.options = {
-      send: null,
-      sessionId_from_targetId: null,
-      ensureSessionForTarget: null,
-      waitForExecutionContext: null,
-      injector_extension_path: null,
-      injector_extension_id: null,
-      injector_service_worker_url_includes: [],
-      injector_service_worker_url_suffixes: [],
-      injector_trust_service_worker_target: false,
-      injector_require_service_worker_target: false,
-      injector_service_worker_ready_expression: null,
-      injector_cdp_send_timeout_ms: DEFAULT_CDP_SEND_TIMEOUT_MS,
-      injector_execution_context_timeout_ms: DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
-      injector_service_worker_probe_timeout_ms: DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
-      injector_service_worker_ready_timeout_ms: DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
-      injector_service_worker_poll_interval_ms: DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
-      injector_target_session_poll_interval_ms: DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS,
-      injector_browserbase_api_key: null,
-      injector_browserbase_base_url: null,
-      upstream_nativemessaging_host_name: null,
-      upstream_nats_url: null,
-      upstream_nats_subject_prefix: null,
-      ...options,
-    };
+    this.injector_mode = options.injector_mode ?? "none";
+    this.send =
+      options.send ??
+      (async () => {
+        throw new Error(`${this.constructor.name} requires a CDP send function.`);
+      });
+    this.sessionId_from_targetId = options.sessionId_from_targetId ?? null;
+    this.ensureSessionForTarget = options.ensureSessionForTarget ?? (async () => null);
+    this.waitForExecutionContext = options.waitForExecutionContext ?? null;
+    this.injector_extension_path = options.injector_extension_path ?? null;
+    this.injector_extension_id = options.injector_extension_id ?? null;
+    this.injector_service_worker_url_includes = options.injector_service_worker_url_includes ?? [];
+    this.injector_service_worker_url_suffixes =
+      options.injector_service_worker_url_suffixes ?? DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES;
+    this.injector_trust_service_worker_target = options.injector_trust_service_worker_target ?? false;
+    this.injector_require_service_worker_target = options.injector_require_service_worker_target ?? false;
+    this.injector_service_worker_ready_expression = options.injector_service_worker_ready_expression ?? null;
+    this.injector_cdp_send_timeout_ms = options.injector_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS;
+    this.injector_execution_context_timeout_ms =
+      options.injector_execution_context_timeout_ms ?? DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS;
+    this.injector_service_worker_probe_timeout_ms =
+      options.injector_service_worker_probe_timeout_ms ?? DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS;
+    this.injector_service_worker_ready_timeout_ms =
+      options.injector_service_worker_ready_timeout_ms ?? DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS;
+    this.injector_service_worker_poll_interval_ms =
+      options.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS;
+    this.injector_target_session_poll_interval_ms =
+      options.injector_target_session_poll_interval_ms ?? DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS;
+    this.injector_browserbase_api_key = options.injector_browserbase_api_key ?? null;
+    this.injector_browserbase_base_url = options.injector_browserbase_base_url ?? null;
+    this.upstream_nativemessaging_host_name = options.upstream_nativemessaging_host_name ?? null;
+    this.upstream_nats_url = options.upstream_nats_url ?? null;
+    this.upstream_nats_subject_prefix = options.upstream_nats_subject_prefix ?? null;
+    this.extra_args = [];
   }
 
   update(config: ExtensionInjectorConfig = {}) {
-    this.options = {
-      ...this.options,
-      ...config,
-      injector_service_worker_url_includes:
-        config.injector_service_worker_url_includes ?? this.options.injector_service_worker_url_includes ?? [],
-      injector_service_worker_url_suffixes:
-        config.injector_service_worker_url_suffixes ?? this.options.injector_service_worker_url_suffixes ?? [],
-    };
+    this.injector_mode = config.injector_mode ?? this.injector_mode;
+    this.send = config.send ?? this.send;
+    this.sessionId_from_targetId = config.sessionId_from_targetId ?? this.sessionId_from_targetId;
+    this.ensureSessionForTarget = config.ensureSessionForTarget ?? this.ensureSessionForTarget;
+    this.waitForExecutionContext = config.waitForExecutionContext ?? this.waitForExecutionContext;
+    this.injector_extension_path = config.injector_extension_path ?? this.injector_extension_path;
+    this.injector_extension_id = config.injector_extension_id ?? this.injector_extension_id;
+    this.injector_service_worker_url_includes =
+      config.injector_service_worker_url_includes ?? this.injector_service_worker_url_includes;
+    this.injector_service_worker_url_suffixes =
+      config.injector_service_worker_url_suffixes ?? this.injector_service_worker_url_suffixes;
+    this.injector_trust_service_worker_target =
+      config.injector_trust_service_worker_target ?? this.injector_trust_service_worker_target;
+    this.injector_require_service_worker_target =
+      config.injector_require_service_worker_target ?? this.injector_require_service_worker_target;
+    this.injector_service_worker_ready_expression =
+      config.injector_service_worker_ready_expression ?? this.injector_service_worker_ready_expression;
+    this.injector_cdp_send_timeout_ms =
+      config.injector_cdp_send_timeout_ms ?? this.injector_cdp_send_timeout_ms;
+    this.injector_execution_context_timeout_ms =
+      config.injector_execution_context_timeout_ms ?? this.injector_execution_context_timeout_ms;
+    this.injector_service_worker_probe_timeout_ms =
+      config.injector_service_worker_probe_timeout_ms ?? this.injector_service_worker_probe_timeout_ms;
+    this.injector_service_worker_ready_timeout_ms =
+      config.injector_service_worker_ready_timeout_ms ?? this.injector_service_worker_ready_timeout_ms;
+    this.injector_service_worker_poll_interval_ms =
+      config.injector_service_worker_poll_interval_ms ?? this.injector_service_worker_poll_interval_ms;
+    this.injector_target_session_poll_interval_ms =
+      config.injector_target_session_poll_interval_ms ?? this.injector_target_session_poll_interval_ms;
+    this.injector_browserbase_api_key = config.injector_browserbase_api_key ?? this.injector_browserbase_api_key;
+    this.injector_browserbase_base_url = config.injector_browserbase_base_url ?? this.injector_browserbase_base_url;
+    this.upstream_nativemessaging_host_name =
+      config.upstream_nativemessaging_host_name ?? this.upstream_nativemessaging_host_name;
+    this.upstream_nats_url = config.upstream_nats_url ?? this.upstream_nats_url;
+    this.upstream_nats_subject_prefix = config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix;
     return this;
-  }
-
-  getInjectorConfig(): ExtensionInjectorConfig {
-    return { ...this.options };
-  }
-
-  getLauncherConfig(): BrowserLaunchOptions {
-    return {};
-  }
-
-  getTransportConfig(): UpstreamTransportConfig {
-    return this.options.injector_extension_id ? { injector_extension_id: this.options.injector_extension_id } : {};
   }
 
   async prepare() {}
@@ -225,14 +275,8 @@ export class ExtensionInjector {
     throw new Error(`${this.constructor.name}.inject is not implemented.`);
   }
 
-  protected get send(): SendCDP {
-    if (typeof this.options.send !== "function")
-      throw new Error(`${this.constructor.name} requires a CDP send function.`);
-    return this.options.send;
-  }
-
   protected readyExpression() {
-    const expression = this.options.injector_service_worker_ready_expression;
+    const expression = this.injector_service_worker_ready_expression;
     return expression == null || expression.length === 0
       ? MODCDP_READY_EXPRESSION
       : `(${MODCDP_READY_EXPRESSION}) && Boolean(${expression})`;
@@ -242,7 +286,7 @@ export class ExtensionInjector {
     method: string,
     params: ProtocolParams = {},
     session_id: string | null = null,
-    timeout_ms = this.options.injector_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS,
+    timeout_ms = this.injector_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS,
   ) {
     let timeout: ReturnType<typeof setTimeout> | null = null;
     return Promise.race([
@@ -255,12 +299,6 @@ export class ExtensionInjector {
     });
   }
 
-  protected async ensureSessionForTarget(target_id: string, timeout_ms = 0, allow_attach = false) {
-    const session_id = this.options.sessionId_from_targetId?.get(target_id);
-    if (typeof session_id === "string" && session_id.length > 0) return session_id;
-    return (await this.options.ensureSessionForTarget?.(target_id, timeout_ms, allow_attach)) ?? null;
-  }
-
   protected async targetInfos() {
     return TargetCommands["Target.getTargets"].result.parse(await this.send("Target.getTargets")).targetInfos;
   }
@@ -271,7 +309,11 @@ export class ExtensionInjector {
     { allow_attach = false }: { allow_attach?: boolean } = {},
   ): Promise<ExtensionInjectionResult | null> {
     if (this.unusable_target_ids.has(target.targetId)) return null;
-    const session_id = await this.ensureSessionForTarget(target.targetId, session_timeout_ms, allow_attach);
+    const mapped_session_id = this.sessionId_from_targetId?.get(target.targetId);
+    const session_id =
+      typeof mapped_session_id === "string" && mapped_session_id.length > 0
+        ? mapped_session_id
+        : ((await this.ensureSessionForTarget(target.targetId, session_timeout_ms, allow_attach)) ?? null);
     if (session_id == null) return null;
     await this.sendWithTimeout("Runtime.enable", {}, session_id);
     const probe = RuntimeCommands["Runtime.evaluate"].result.parse(
@@ -296,25 +338,25 @@ export class ExtensionInjector {
 
   protected async discoverReadyServiceWorker({ matched_only = false }: { matched_only?: boolean } = {}) {
     const target_infos = await this.targetInfos();
-    if (this.options.injector_trust_service_worker_target) {
+    if (this.injector_trust_service_worker_target) {
       const trusted_target = target_infos.find((candidate) => this.serviceWorkerTargetMatches(candidate)) as
         | TargetInfo
         | undefined;
       if (trusted_target) {
-        const probed = await this.probeTarget(trusted_target, this.options.injector_service_worker_probe_timeout_ms, {
+        const probed = await this.probeTarget(trusted_target, this.injector_service_worker_probe_timeout_ms, {
           allow_attach: true,
         });
         if (probed) return { ...probed, source: "trusted" };
       }
     }
-    if (this.options.injector_trust_service_worker_target || matched_only) return null;
+    if (this.injector_trust_service_worker_target || matched_only) return null;
     for (const candidate of target_infos) {
       if (candidate.type !== "service_worker") continue;
       if (!candidate.url.startsWith("chrome-extension://")) continue;
       try {
         const probed = await this.probeTarget(
           candidate as TargetInfo,
-          this.options.injector_service_worker_probe_timeout_ms,
+          this.injector_service_worker_probe_timeout_ms,
         );
         if (probed) return probed;
       } catch {
@@ -334,7 +376,7 @@ export class ExtensionInjector {
         matched_only,
       });
       if (discovered) return discovered;
-      await delay(this.options.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS);
+      await delay(this.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS);
     }
     return null;
   }
@@ -343,14 +385,14 @@ export class ExtensionInjector {
     const url = candidate.url ?? "";
     if (candidate.type !== "service_worker") return false;
     if (!url.startsWith("chrome-extension://")) return false;
-    const has_extension_id = Boolean(this.options.injector_extension_id);
+    const has_extension_id = Boolean(this.injector_extension_id);
     if (
-      this.options.injector_extension_id &&
-      !url.startsWith(`chrome-extension://${this.options.injector_extension_id}/`)
+      this.injector_extension_id &&
+      !url.startsWith(`chrome-extension://${this.injector_extension_id}/`)
     )
       return false;
-    const includes = this.options.injector_service_worker_url_includes ?? [];
-    const suffixes = this.options.injector_service_worker_url_suffixes ?? [];
+    const includes = this.injector_service_worker_url_includes ?? [];
+    const suffixes = this.injector_service_worker_url_suffixes ?? [];
     if (includes.length > 0 && !includes.every((part) => url.includes(part))) return false;
     if (suffixes.length > 0 && !suffixes.some((suffix) => url.endsWith(suffix))) return false;
     return has_extension_id || includes.length > 0 || suffixes.length > 0;

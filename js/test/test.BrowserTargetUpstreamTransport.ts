@@ -26,14 +26,14 @@ test("loopback browser-target upstream routes commands, events, and topology thr
 
   const cdp = new ModCDPClient({
     launcher: { launcher_mode: "remote" },
-    upstream: { upstream_mode: "ws", upstream_cdp_url: owner.cdp_url },
+    upstream: { upstream_mode: "ws", upstream_cdp_url: owner.upstream.upstream_cdp_url },
     injector: {
       injector_mode: "discover",
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
     server: {
-      server_loopback_cdp_url: owner.cdp_url,
+      server_loopback_cdp_url: owner.upstream.upstream_cdp_url,
       server_routes: { "*.*": "loopback_cdp" },
     },
   });
@@ -79,7 +79,7 @@ test("chrome.debugger browser-target upstream routes commands, events, and topol
 
   const cdp = new ModCDPClient({
     launcher: { launcher_mode: "remote" },
-    upstream: { upstream_mode: "ws", upstream_cdp_url: owner.cdp_url },
+    upstream: { upstream_mode: "ws", upstream_cdp_url: owner.upstream.upstream_cdp_url },
     injector: {
       injector_mode: "discover",
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
