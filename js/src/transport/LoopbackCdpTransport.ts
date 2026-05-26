@@ -1,9 +1,10 @@
 import type { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
-import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
 import {
+  type CdpCommandMessage,
   CdpEventMessageSchema,
   CdpResponseMessageSchema,
   type CdpDebuggeeCommandParams,
@@ -11,7 +12,7 @@ import {
   type ProtocolPayload,
   type ProtocolResult,
 } from "../types/modcdp.js";
-import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
 
 type LoopbackCdpTransportOptions = {
   loopback_cdp_url: string | null;
@@ -27,7 +28,7 @@ const target_auto_attach_params = {
 } satisfies cdp.types.ts.Target.SetAutoAttachParams;
 
 /**
- * Owns server upstream traffic sent through a loopback CDP WebSocket.
+ * Owns browser-target upstream traffic sent through a loopback CDP WebSocket.
  *
  * This class owns loopback socket lifecycle, request id tracking, pending
  * request rejection, loopback event listener dispatch, loopback execution
@@ -45,7 +46,10 @@ const target_auto_attach_params = {
  * 4. Socket error/close clears loopback execution-context facts and rejects
  *    pending CDP requests owned by this transport.
  */
-export class LoopbackCdpTransport implements ServerUpstreamTransport {
+export class LoopbackCdpTransport extends UpstreamTransport {
+  readonly upstream_mode = "loopback_cdp" as const;
+  readonly endpoint_kind = "browser_targets" as const;
+
   // Monotonic WebSocket request id for loopback CDP messages. Written only by
   // sendToLoopback; read only when matching WebSocket responses.
   private next_loopback_id = 1;
@@ -79,17 +83,9 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     { resolve: (value: ProtocolResult) => void; reject: (error: Error) => void }
   >();
 
-  // Typed upstream event schema -> subscribers. Written by on; read by
-  // emitLoopbackUpstreamEvent from the WebSocket message handler.
-  private readonly event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<ServerUpstreamEventListener>>();
-
   // Current loopback CDP endpoint owned by this transport instance. Written by
   // discoverLoopbackCDP while probing; read by all loopback CDP sends.
   private loopback_cdp_url: string | null;
-
-  // Request timeout for loopback CDP sends. Set at construction from server
-  // config; read by sendToLoopback.
-  private readonly cdp_send_timeout_ms: number;
 
   // Runtime.executionContextCreated wait timeout for discovery. Set at
   // construction from server config; read by waitForLoopbackExecutionContext.
@@ -100,6 +96,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
   private readonly ws_connect_error_settle_timeout_ms: number;
 
   constructor(options: LoopbackCdpTransportOptions) {
+    super();
     this.loopback_cdp_url = options.loopback_cdp_url;
     this.cdp_send_timeout_ms = options.cdp_send_timeout_ms;
     this.loopback_execution_context_timeout_ms = options.loopback_execution_context_timeout_ms;
@@ -125,28 +122,9 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     return webSocketDebuggerUrl;
   }
 
-  /** Register a typed listener for one native CDP event schema. */
-  on<Event extends CdpNamedSchema<z.ZodType>>(
-    event: Event,
-    listener: (
-      payload: z.output<Event>,
-      targetId: cdp.types.ts.Target.TargetID | null,
-      sessionId: cdp.types.ts.Target.SessionID | null,
-    ) => void,
-  ) {
-    const typed_listener: ServerUpstreamEventListener = (payload, targetId, sessionId) => {
-      listener(event.parse(payload), targetId, sessionId);
-    };
-    const listeners = this.event_listeners.get(event);
-    if (listeners) listeners.add(typed_listener);
-    else this.event_listeners.set(event, new Set([typed_listener]));
-    return {
-      remove: () => {
-        const current_listeners = this.event_listeners.get(event);
-        current_listeners?.delete(typed_listener);
-        if (current_listeners?.size === 0) this.event_listeners.delete(event);
-      },
-    };
+  /** Resolve the configured endpoint before the first routed command. */
+  override async connect() {
+    this.loopback_cdp_url = await LoopbackCdpTransport.resolveEndpoint(this.loopback_cdp_url);
   }
 
   /** Return current browser targets through the loopback CDP endpoint. */
@@ -186,15 +164,64 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     await this.send(Target.DetachFromTargetCommand, { sessionId });
   }
 
-  /** Send one typed CDP command through loopback CDP, optionally scoped to a target route. */
-  async send<
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
     Params extends z.ZodType<Record<string, unknown>>,
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
     command: CdpCommandSchema<Params, Result, Name>,
     params?: z.input<Params>,
-    route: TargetRoute | undefined = undefined,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+    options: { timeout_ms?: number | null } = {},
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+      void this.sendToLoopback(
+        command_or_message_or_method.method,
+        (command_or_message_or_method.params ?? {}) as ProtocolParams,
+        command_or_message_or_method.sessionId ?? null,
+        options.timeout_ms ?? this.cdp_send_timeout_ms,
+      );
+      return;
+    }
+    if (typeof command_or_message_or_method === "string") {
+      return this.sendToLoopback(
+        command_or_message_or_method,
+        params as ProtocolParams,
+        typeof route_or_sessionId === "string" ? route_or_sessionId : null,
+        options.timeout_ms ?? this.cdp_send_timeout_ms,
+      );
+    }
+    return this.sendCommand(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
+  }
+
+  private async sendCommand<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params: z.input<Params>,
+    route?: TargetRoute,
   ): Promise<z.output<Result>> {
     await this.initializeLoopbackCDP();
     if (!route) return command.result.parse(await this.sendToLoopback(command.id, command.params.parse(params)));
@@ -290,10 +317,7 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     payload: ProtocolPayload,
     sessionId: cdp.types.ts.Target.SessionID | null,
   ) {
-    for (const [event, listeners] of this.event_listeners) {
-      if (event.id !== method) continue;
-      for (const listener of listeners) listener(payload, null, sessionId);
-    }
+    this.emitUpstreamEvent(method, payload, null, sessionId);
   }
 
   private async loopbackWS(endpoint: string): Promise<WebSocket> {
@@ -389,7 +413,12 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     });
   }
 
-  private async sendToLoopback(method: string, params: ProtocolParams = {}, sessionId: string | null = null) {
+  private async sendToLoopback(
+    method: string,
+    params: ProtocolParams = {},
+    sessionId: string | null = null,
+    timeout_ms = this.cdp_send_timeout_ms,
+  ) {
     const endpoint = this.loopback_cdp_url;
     if (!endpoint) throw new Error(`No loopback_cdp_url configured for ${method}.`);
     const ws = await this.loopbackWS(endpoint);
@@ -409,8 +438,8 @@ export class LoopbackCdpTransport implements ServerUpstreamTransport {
     return new Promise<ProtocolResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         if (!this.loopback_pending.delete(id)) return;
-        reject(new Error(`${method} timed out after ${this.cdp_send_timeout_ms}ms`));
-      }, this.cdp_send_timeout_ms);
+        reject(new Error(`${method} timed out after ${timeout_ms}ms`));
+      }, timeout_ms);
       this.loopback_pending.set(id, {
         resolve: (value) => {
           clearTimeout(timeout);

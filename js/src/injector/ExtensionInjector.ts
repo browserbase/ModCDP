@@ -22,6 +22,23 @@ export const DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20;
 export type SendCDP = (method: string, params?: ProtocolParams, session_id?: string | null) => Promise<ProtocolResult>;
 export type TargetInfo = { targetId: string; type?: string; url?: string };
 
+export type InjectorMode = "auto" | "discover" | "inject" | "borrow" | "none";
+export type InjectorOptions = {
+  injector_mode?: InjectorMode;
+  injector_extension_path?: string | null;
+  injector_extension_id?: string | null;
+  injector_service_worker_url_includes?: string[];
+  injector_service_worker_url_suffixes?: string[] | null;
+  injector_trust_service_worker_target?: boolean;
+  injector_require_service_worker_target?: boolean;
+  injector_service_worker_ready_expression?: string | null;
+  injector_execution_context_timeout_ms?: number;
+  injector_service_worker_probe_timeout_ms?: number;
+  injector_service_worker_ready_timeout_ms?: number;
+  injector_service_worker_poll_interval_ms?: number;
+  injector_target_session_poll_interval_ms?: number;
+};
+
 export type ExtensionInjectorConfig = {
   send?: SendCDP | null;
   sessionId_from_targetId?: Map<string, string> | null;

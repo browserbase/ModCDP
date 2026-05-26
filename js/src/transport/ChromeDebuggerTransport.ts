@@ -1,9 +1,9 @@
 import type { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
-import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
+import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
-import type { CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import type { ServerUpstreamEventListener, ServerUpstreamTransport, TargetRoute } from "./ServerUpstreamTransport.js";
+import type { CdpCommandMessage, CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
 
 const target_auto_attach_params = {
   autoAttach: true,
@@ -12,7 +12,7 @@ const target_auto_attach_params = {
 } satisfies cdp.types.ts.Target.SetAutoAttachParams;
 
 /**
- * Owns server upstream traffic sent through chrome.debugger.
+ * Owns browser-target upstream traffic sent through chrome.debugger.
  *
  * This class owns chrome.debugger debuggee selection, attach lifecycle,
  * chrome.debugger event normalization, and target/session bookkeeping needed by
@@ -29,15 +29,14 @@ const target_auto_attach_params = {
  * 4. chrome.debugger events update debugger-local session maps and dispatch to
  *    typed `on(event, listener)` subscriptions.
  */
-export class ChromeDebuggerTransport implements ServerUpstreamTransport {
+export class ChromeDebuggerTransport extends UpstreamTransport {
+  readonly upstream_mode = "chrome_debugger" as const;
+  readonly endpoint_kind = "browser_targets" as const;
+
   // JSON(debuggee) values attached in this service worker. Updated by
   // attachDebuggee/onDetach; read before attach to avoid duplicate native
   // chrome.debugger.attach calls.
   private readonly attached_debuggees = new Set<string>();
-
-  // Normalized CDP event listeners registered by AutoSessionRouter and the
-  // server event publisher. Updated by on; read from installEventListener.
-  private readonly event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<ServerUpstreamEventListener>>();
 
   // Native Target.SessionID -> TargetID from debugger Target.attachedToTarget
   // events. Updated by installEventListener; read when sending a command that
@@ -57,28 +56,9 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
   // service worker. Updated by installEventListener; read by getTargets.
   private event_listener_installed = false;
 
-  /** Register a typed listener for one native CDP event schema. */
-  on<Event extends CdpNamedSchema<z.ZodType>>(
-    event: Event,
-    listener: (
-      payload: z.output<Event>,
-      targetId: cdp.types.ts.Target.TargetID | null,
-      sessionId: cdp.types.ts.Target.SessionID | null,
-    ) => void,
-  ) {
-    const typed_listener: ServerUpstreamEventListener = (payload, targetId, sessionId) => {
-      listener(event.parse(payload), targetId, sessionId);
-    };
-    const listeners = this.event_listeners.get(event);
-    if (listeners) listeners.add(typed_listener);
-    else this.event_listeners.set(event, new Set([typed_listener]));
-    return {
-      remove: () => {
-        const current_listeners = this.event_listeners.get(event);
-        current_listeners?.delete(typed_listener);
-        if (current_listeners?.size === 0) this.event_listeners.delete(event);
-      },
-    };
+  /** Install chrome.debugger listeners for this service-worker lifetime. */
+  override async connect() {
+    this.installEventListener();
   }
 
   /** Return current browser targets through chrome.debugger target discovery. */
@@ -135,15 +115,52 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
     this.targetId_from_sessionId.delete(sessionId);
   }
 
-  /** Send one typed CDP command through chrome.debugger, optionally scoped to a target route. */
-  async send<
+  override send(message: CdpCommandMessage): void;
+  override send(
+    method: string,
+    params?: ProtocolPayload,
+    sessionId?: string | null,
+    options?: { timeout_ms?: number | null },
+  ): Promise<ProtocolResult>;
+  override send<
     Params extends z.ZodType<Record<string, unknown>>,
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
     command: CdpCommandSchema<Params, Result, Name>,
     params?: z.input<Params>,
-    route: TargetRoute | undefined = undefined,
+    route?: TargetRoute,
+  ): Promise<z.output<Result>>;
+  override send<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    params: ProtocolPayload | z.input<Params> = {},
+    route_or_sessionId: TargetRoute | string | null = null,
+  ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+      throw new Error("chrome_debugger does not support raw CDP command messages.");
+    }
+    if (typeof command_or_message_or_method === "string") {
+      throw new Error("chrome_debugger raw string sends must go through ModCDPClient.router.");
+    }
+    return this.sendCommand(
+      command_or_message_or_method,
+      params as z.input<Params>,
+      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+    );
+  }
+
+  private async sendCommand<
+    Params extends z.ZodType<Record<string, unknown>>,
+    Result extends z.ZodType<Record<string, unknown>>,
+    Name extends string,
+  >(
+    command: CdpCommandSchema<Params, Result, Name>,
+    params: z.input<Params>,
+    route?: TargetRoute,
   ): Promise<z.output<Result>> {
     if (command.id === Target.GetTargetsCommand.id)
       return command.result.parse({ targetInfos: await this.getTargets() });
@@ -218,10 +235,7 @@ export class ChromeDebuggerTransport implements ServerUpstreamTransport {
         const detached = Target.DetachedFromTargetEvent.parse(payload);
         this.targetId_from_sessionId.delete(detached.sessionId);
       }
-      for (const [event, listeners] of this.event_listeners) {
-        if (event.id !== method) continue;
-        for (const listener of listeners) listener(payload, sourceTargetId, cdpSessionId);
-      }
+      this.emitUpstreamEvent(method, payload, sourceTargetId, cdpSessionId);
     });
     chrome_api.debugger.onDetach?.addListener?.((source) => {
       this.attached_debuggees.delete(JSON.stringify(this.compactDebuggee(source)));

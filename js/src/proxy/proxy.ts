@@ -30,13 +30,10 @@ import type { RawData } from "ws";
 import type { WebSocket } from "ws";
 
 import { ModCDPClient } from "../client/ModCDPClient.js";
-import type {
-  ClientConfigOptions,
-  InjectorOptions,
-  LauncherMode,
-  LauncherOptions,
-  UpstreamOptions,
-} from "../client/ModCDPClient.js";
+import type { ClientConfigOptions } from "../client/ModCDPClient.js";
+import type { InjectorOptions } from "../injector/ExtensionInjector.js";
+import type { LauncherMode, LauncherOptions } from "../launcher/BrowserLauncher.js";
+import type { UpstreamOptions } from "../transport/UpstreamTransport.js";
 import {
   UPSTREAM_EVENT_BINDING_NAME,
   wrapModCDPEvaluate,

@@ -1,6 +1,3 @@
-import net from "node:net";
-import tls from "node:tls";
-import { randomUUID } from "node:crypto";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
@@ -18,7 +15,17 @@ type NatsOptions = {
   upstream_nats_wait_timeout_ms?: number;
 };
 
-type NatsSocket = WebSocket | net.Socket | tls.TLSSocket;
+type NatsTcpSocket = {
+  write(data: string): void;
+  destroy(): void;
+  on(event: "data", listener: (chunk: Buffer | string) => void): void;
+  on(event: "close" | "error", listener: () => void): void;
+  once(event: "connect", listener: () => void): void;
+  once(event: "error", listener: (error: Error) => void): void;
+};
+type NatsSocket = WebSocket | NatsTcpSocket;
+const node_net_module_path = "node:" + "net";
+const node_tls_module_path = "node:" + "tls";
 
 export class NatsUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nats" as const;
@@ -47,7 +54,7 @@ export class NatsUpstreamTransport extends UpstreamTransport {
     this.upstream_nats_subject_prefix = upstream_nats_subject_prefix;
     this.upstream_nats_role = options.upstream_nats_role ?? "client";
     this.upstream_nats_wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
-    this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
+    this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -108,7 +115,7 @@ export class NatsUpstreamTransport extends UpstreamTransport {
       );
       this.upstream_nats_url = normalized.url;
       this.upstream_nats_subject_prefix = normalized.upstream_nats_subject_prefix;
-      this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
+      this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
     }
     if (config.upstream_nats_role === "client" || config.upstream_nats_role === "browser")
       this.upstream_nats_role = config.upstream_nats_role;
@@ -210,7 +217,9 @@ export class NatsUpstreamTransport extends UpstreamTransport {
   private async connectTcp(url: URL) {
     const port = Number(url.port || (url.protocol === "tls:" ? 4222 : 4222));
     const host = url.hostname || "127.0.0.1";
-    const socket = url.protocol === "tls:" ? tls.connect({ host, port }) : net.connect({ host, port });
+    const node_transport =
+      url.protocol === "tls:" ? await import(node_tls_module_path) : await import(node_net_module_path);
+    const socket = node_transport.connect({ host, port }) as NatsTcpSocket;
     this.socket = socket;
     socket.on("data", (chunk) => this.readTcp(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     socket.on("close", () => this.emitClose(new Error("NATS socket closed")));

@@ -7,12 +7,10 @@ import type {
   CdpDebuggeeCommandParams,
   CdpEventMessage,
   CdpResponseMessage,
+  ModCDPServerOptions,
   ProtocolPayload,
   ProtocolResult,
 } from "../types/modcdp.js";
-import type { ModCDPServerOptions } from "../types/modcdp.js";
-import type { BrowserLaunchOptions } from "../launcher/BrowserLauncher.js";
-import type { ExtensionInjectorConfig } from "../injector/ExtensionInjector.js";
 import { CdpEventMessageSchema, CdpResponseMessageSchema } from "../types/modcdp.js";
 
 export type UpstreamMode =
@@ -24,6 +22,17 @@ export type UpstreamMode =
   | "loopback_cdp"
   | "chrome_debugger";
 export type UpstreamEndpointKind = "raw_cdp" | "modcdp_server" | "browser_targets";
+export type UpstreamOptions = {
+  upstream_mode?: UpstreamMode;
+  upstream_cdp_url?: string | null;
+  upstream_nats_url?: string | null;
+  upstream_nats_subject_prefix?: string | null;
+  upstream_nats_wait_timeout_ms?: number;
+  upstream_reversews_bind?: string | null;
+  upstream_reversews_wait_timeout_ms?: number;
+  upstream_nativemessaging_host_name?: string | null;
+  upstream_ws_connect_error_settle_timeout_ms?: number;
+};
 export type UpstreamTransportConfig = {
   cdp_url?: string | null;
   user_data_dir?: string | null;
@@ -85,11 +94,11 @@ export class UpstreamTransport {
     return this;
   }
 
-  getLauncherConfig(): BrowserLaunchOptions {
+  getLauncherConfig(): {} {
     return {};
   }
 
-  getInjectorConfig(): ExtensionInjectorConfig {
+  getInjectorConfig(): {} {
     return {};
   }
 
@@ -246,11 +255,20 @@ export class UpstreamTransport {
     }
     const event = CdpEventMessageSchema.parse(parsed);
     const payload = (event.params ?? {}) as ProtocolPayload;
-    for (const [upstream_event, listeners] of this.event_listeners) {
-      if (upstream_event.id !== event.method) continue;
-      for (const listener of listeners) listener(payload, null, event.sessionId ?? null);
-    }
+    this.emitUpstreamEvent(event.method, payload, null, event.sessionId ?? null);
     this.emitRecv(event);
+  }
+
+  protected emitUpstreamEvent(
+    method: string,
+    payload: ProtocolPayload,
+    targetId: cdp.types.ts.Target.TargetID | null,
+    sessionId: cdp.types.ts.Target.SessionID | null,
+  ) {
+    for (const [upstream_event, listeners] of this.event_listeners) {
+      if (upstream_event.id !== method) continue;
+      for (const listener of listeners) listener(payload, targetId, sessionId);
+    }
   }
 
   async waitForPeer() {}

@@ -6,7 +6,7 @@ const started_at = new Date().toISOString();
 
 function startConfiguredTransports() {
   void ModCDPServer.ensureOffscreenKeepAlive();
-  ModCDPServer.startDownstreamTransports();
+  ModCDPServer.downstream.startDefault();
 }
 
 startConfiguredTransports();
@@ -33,7 +33,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
         loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
         ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
-        downstream_transports: ModCDPServer.downstreamTransports(),
+        downstream_transports: ModCDPServer.downstream.status(),
       },
     },
   });

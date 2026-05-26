@@ -2,6 +2,14 @@ import type { ExtensionInjectorConfig } from "../injector/ExtensionInjector.js";
 import type { ModCDPServerOptions } from "../types/modcdp.js";
 import type { UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
 
+export type LauncherMode = "local" | "remote" | "bb" | "none";
+export type LauncherOptions = {
+  launcher_mode?: LauncherMode;
+  launcher_executable_path?: string | null;
+  launcher_user_data_dir?: string | null;
+  launcher_options?: Record<string, unknown>;
+};
+
 export type BrowserLaunchOptions = {
   executable_path?: string | null;
   port?: number | null;

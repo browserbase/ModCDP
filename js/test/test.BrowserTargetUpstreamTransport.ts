@@ -8,7 +8,7 @@ import { ModCDPClient } from "../src/client/ModCDPClient.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
-test("loopback server upstream routes commands, events, and topology through one transport", async () => {
+test("loopback browser-target upstream routes commands, events, and topology through one transport", async () => {
   const owner = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
@@ -61,7 +61,7 @@ test("loopback server upstream routes commands, events, and topology through one
   }
 }, 90_000);
 
-test("chrome.debugger server upstream routes commands, events, and topology through one transport", async () => {
+test("chrome.debugger browser-target upstream routes commands, events, and topology through one transport", async () => {
   const owner = new ModCDPClient({
     launcher: {
       launcher_mode: "local",

@@ -1,7 +1,12 @@
 export * from "./client/ModCDPClient.js";
 export { ModCDPServer } from "./server/ModCDPServer.js";
 export { BrowserLauncher, resolveCdpWebSocketUrl } from "./launcher/BrowserLauncher.js";
-export type { BrowserLaunchOptions, LaunchedBrowser } from "./launcher/BrowserLauncher.js";
+export type {
+  BrowserLaunchOptions,
+  LaunchedBrowser,
+  LauncherMode,
+  LauncherOptions,
+} from "./launcher/BrowserLauncher.js";
 export { LocalBrowserLauncher } from "./launcher/LocalBrowserLauncher.js";
 export { RemoteBrowserLauncher } from "./launcher/RemoteBrowserLauncher.js";
 export { BrowserbaseBrowserLauncher } from "./launcher/BrowserbaseBrowserLauncher.js";
@@ -15,6 +20,8 @@ export {
 export type {
   ExtensionInjectionResult,
   ExtensionInjectorConfig,
+  InjectorMode,
+  InjectorOptions,
   SendCDP,
   TargetInfo,
 } from "./injector/ExtensionInjector.js";
@@ -24,18 +31,27 @@ export { DiscoveredExtensionInjector } from "./injector/DiscoveredExtensionInjec
 export { BorrowedExtensionInjector } from "./injector/BorrowedExtensionInjector.js";
 export { BBBrowserExtensionInjector } from "./injector/BBBrowserExtensionInjector.js";
 export { UpstreamTransport, endpointKindForUpstream, parseHostPort } from "./transport/UpstreamTransport.js";
-export type { UpstreamEndpointKind, UpstreamMode, UpstreamTransportConfig } from "./transport/UpstreamTransport.js";
+export type {
+  UpstreamEndpointKind,
+  UpstreamMode,
+  UpstreamOptions,
+  UpstreamTransportConfig,
+} from "./transport/UpstreamTransport.js";
 export { DownstreamTransport } from "./transport/DownstreamTransport.js";
+export { DownstreamTransportCollection } from "./transport/DownstreamTransportCollection.js";
 export type {
   DownstreamRequestHandler,
   DownstreamTransportName,
   DownstreamTransportStatus,
 } from "./transport/DownstreamTransport.js";
+export type { TargetRoute, UpstreamEventListener } from "./transport/UpstreamTransport.js";
 export { WebSocketUpstreamTransport } from "./transport/WebSocketUpstreamTransport.js";
 export { ReverseWebSocketUpstreamTransport } from "./transport/ReverseWebSocketUpstreamTransport.js";
 export { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUpstreamTransport.js";
 export { NatsUpstreamTransport } from "./transport/NatsUpstreamTransport.js";
 export { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
+export { ChromeDebuggerTransport } from "./transport/ChromeDebuggerTransport.js";
+export { LoopbackCdpTransport } from "./transport/LoopbackCdpTransport.js";
 export { ReverseWSDownstreamTransport } from "./transport/ReverseWSDownstreamTransport.js";
 export { NativeHostDownstreamTransport } from "./transport/NativeHostDownstreamTransport.js";
 export { NATSDownstreamTransport } from "./transport/NATSDownstreamTransport.js";
@@ -55,11 +71,14 @@ export * as borrowedExtensionInjector from "./injector/BorrowedExtensionInjector
 export * as bbBrowserExtensionInjector from "./injector/BBBrowserExtensionInjector.js";
 export * as upstreamTransport from "./transport/UpstreamTransport.js";
 export * as downstreamTransport from "./transport/DownstreamTransport.js";
+export * as downstreamTransportCollection from "./transport/DownstreamTransportCollection.js";
 export * as webSocketUpstreamTransport from "./transport/WebSocketUpstreamTransport.js";
 export * as reverseWebSocketUpstreamTransport from "./transport/ReverseWebSocketUpstreamTransport.js";
 export * as nativeMessagingUpstreamTransport from "./transport/NativeMessagingUpstreamTransport.js";
 export * as natsUpstreamTransport from "./transport/NatsUpstreamTransport.js";
 export * as pipeUpstreamTransport from "./transport/PipeUpstreamTransport.js";
+export * as chromeDebuggerTransport from "./transport/ChromeDebuggerTransport.js";
+export * as loopbackCdpTransport from "./transport/LoopbackCdpTransport.js";
 export * as reverseWSDownstreamTransport from "./transport/ReverseWSDownstreamTransport.js";
 export * as nativeHostDownstreamTransport from "./transport/NativeHostDownstreamTransport.js";
 export * as natsDownstreamTransport from "./transport/NATSDownstreamTransport.js";

@@ -5,7 +5,7 @@ import * as DOM from "../types/generated/zod/DOM.js";
 import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
-import type { ServerUpstreamTransport, TargetRoute } from "../server/ServerUpstreamTransport.js";
+import type { TargetRoute, UpstreamTransport } from "../transport/UpstreamTransport.js";
 import {
   CdpDebuggeeCommandParamsSchema,
   type CdpDebuggeeCommandParams,
@@ -53,7 +53,7 @@ const targetAutoAttachParams = {
  * contexts, and builds Mod.getTopology output. It does not know how commands
  * are physically delivered. Loopback WebSocket request ids, chrome.debugger
  * debuggee selection, native event source normalization, and upstream setup all
- * live behind the ServerUpstreamTransport interface.
+ * live behind the UpstreamTransport interface.
  *
  * State machine:
  * 1. Target records arrive from Target.getTargets or target-info events.
@@ -92,7 +92,7 @@ export class AutoSessionRouter {
 
   // Semantic upstream selected by the owner. The router calls methods on this
   // object but never mutates transport-owned private state.
-  private readonly upstream: ServerUpstreamTransport;
+  private readonly upstream: UpstreamTransport;
 
   // Timeout in milliseconds for Runtime.executionContextCreated waits. Set once
   // by the owner when constructing the router; read when installing a new
@@ -103,7 +103,7 @@ export class AutoSessionRouter {
     upstream,
     loopback_execution_context_timeout_ms,
   }: {
-    upstream: ServerUpstreamTransport;
+    upstream: UpstreamTransport;
     loopback_execution_context_timeout_ms: number;
   }) {
     this.upstream = upstream;
