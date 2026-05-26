@@ -1,6 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
-import type { CdpCommandMessage } from "../types/modcdp.js";
+import { randomUUID } from "node:crypto";
 import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
@@ -18,16 +18,15 @@ type NatsOptions = {
 type NatsSocket = WebSocket | net.Socket | tls.TLSSocket;
 
 export class NatsUpstreamTransport extends UpstreamTransport {
-  readonly mode = "nats" as const;
+  readonly upstream_mode = "nats" as const;
   readonly endpoint_kind = "modcdp_server" as const;
-  declare url: string;
-  upstream_nats_subject_prefix: string;
   private upstream_nats_role: NatsRole;
   private wait_timeout_ms: number;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
   private ws_buffer = "";
-  private sid = "1";
+  private next_sid = 1;
+  private client_reply_subject: string;
   private connected = false;
   private peer_seen = false;
   private peer_waiters = new Set<{
@@ -42,56 +41,62 @@ export class NatsUpstreamTransport extends UpstreamTransport {
       options.upstream_nats_url ?? DEFAULT_UPSTREAM_NATS_URL,
       options.upstream_nats_subject_prefix,
     );
-    this.url = url;
+    this.upstream_nats_url = url;
     this.upstream_nats_subject_prefix = upstream_nats_subject_prefix;
     this.upstream_nats_role = options.upstream_nats_role ?? "client";
     this.wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
+    this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
+    this.send_command = (message) => {
+      if (!this.connected || !this.socket) throw new Error("NATS transport is not connected.");
+      this.publish(this.outgoingSubject(), {
+        type: "modcdp.nats.message",
+        ...(this.upstream_nats_role === "client" ? { reply_subject: this.client_reply_subject } : {}),
+        message,
+      });
+    };
   }
 
   update(config: UpstreamTransportConfig = {}) {
     if (config.upstream_nats_url || config.upstream_nats_subject_prefix) {
       const normalized = normalizeNatsUrl(
-        config.upstream_nats_url ?? this.url,
+        config.upstream_nats_url ?? this.upstream_nats_url ?? DEFAULT_UPSTREAM_NATS_URL,
         config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix,
       );
-      this.url = normalized.url;
+      this.upstream_nats_url = normalized.url;
       this.upstream_nats_subject_prefix = normalized.upstream_nats_subject_prefix;
+      this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${randomUUID().replaceAll("-", "")}`;
     }
     if (config.upstream_nats_role === "client" || config.upstream_nats_role === "browser")
       this.upstream_nats_role = config.upstream_nats_role;
     if (typeof config.upstream_nats_wait_timeout_ms === "number")
       this.wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
+    if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
   }
 
   getInjectorConfig() {
     return {
-      upstream_nats_url: this.url,
+      upstream_nats_url: this.upstream_nats_url,
       upstream_nats_subject_prefix: this.upstream_nats_subject_prefix,
     };
   }
 
   async connect() {
     if (this.connected) return;
-    const parsed = new URL(this.url);
+    if (!this.upstream_nats_url) throw new Error("upstream.upstream_mode=nats requires upstream_nats_url.");
+    const parsed = new URL(this.upstream_nats_url);
     if (parsed.protocol === "ws:" || parsed.protocol === "wss:") await this.connectWebSocket(parsed);
     else if (parsed.protocol === "nats:" || parsed.protocol === "tls:") await this.connectTcp(parsed);
     else
-      throw new Error(`upstream.upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got ${this.url}.`);
+      throw new Error(
+        `upstream.upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got ${this.upstream_nats_url}.`,
+      );
     this.connected = true;
     this.subscribe();
     this.publish(this.outgoingSubject(), {
       type: "modcdp.nats.hello",
       role: this.upstream_nats_role,
       version: 1,
-    });
-  }
-
-  send(message: CdpCommandMessage) {
-    if (!this.connected || !this.socket) throw new Error("NATS transport is not connected.");
-    this.publish(this.outgoingSubject(), {
-      type: "modcdp.nats.message",
-      message,
     });
   }
 
@@ -174,7 +179,10 @@ export class NatsUpstreamTransport extends UpstreamTransport {
   }
 
   private subscribe() {
-    this.writeProtocol(`SUB ${this.incomingSubject()} ${this.sid}\r\n`);
+    this.writeProtocol(`SUB ${this.incomingSubject()} ${this.next_sid++}\r\n`);
+    if (this.upstream_nats_role === "client") {
+      this.writeProtocol(`SUB ${this.client_reply_subject} ${this.next_sid++}\r\n`);
+    }
   }
 
   private publish(subject: string, message: unknown) {

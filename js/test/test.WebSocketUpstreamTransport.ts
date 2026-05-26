@@ -12,10 +12,10 @@ const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
 test("ws upstream constructor, update, server config, and unconnected errors match the transport surface", async () => {
   const transport = new WebSocketUpstreamTransport();
-  assert.equal(transport.url, "");
+  assert.equal(transport.upstream_cdp_url, "");
   assert.deepEqual(transport.getServerConfig(), {});
   assert.equal(transport.update({ cdp_url: "ws://127.0.0.1:1/devtools/browser/test" }), transport);
-  assert.equal(transport.url, "ws://127.0.0.1:1/devtools/browser/test");
+  assert.equal(transport.upstream_cdp_url, "ws://127.0.0.1:1/devtools/browser/test");
   assert.deepEqual(transport.getServerConfig(), { server_loopback_cdp_url: "ws://127.0.0.1:1/devtools/browser/test" });
   const unconfigured = new WebSocketUpstreamTransport();
   await assert.rejects(() => unconfigured.connect(), /upstream\.upstream_mode=ws requires/);
@@ -39,7 +39,7 @@ test("ws upstream launches a real browser and speaks raw CDP", async () => {
 
   try {
     await cdp.connect();
-    assert.equal(cdp.transport?.mode, "ws");
+    assert.equal(cdp.upstream?.upstream_mode, "ws");
     assert.equal(cdp.upstream_endpoint_kind, "raw_cdp");
     assert.equal(cdp.connect_timing?.upstream_mode, "ws");
     assert.equal(cdp.connect_timing?.upstream_endpoint_kind, "raw_cdp");
@@ -91,7 +91,7 @@ test("ws upstream resolves a bare host:port CDP endpoint to the browser websocke
       });
     });
     await transport.connect();
-    assert.match(transport.url ?? "", /^ws:\/\//);
+    assert.match(transport.upstream_cdp_url ?? "", /^ws:\/\//);
     transport.send({ id: 1, method: "Browser.getVersion", params: {} });
     const message = await response;
     assert.equal(typeof (message.result as Record<string, unknown>).product, "string");

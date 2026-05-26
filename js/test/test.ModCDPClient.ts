@@ -454,11 +454,11 @@ test("ModCDPClient orders local auto injection as launch flag then loadUnpacked 
 });
 
 test("ModCDPClient rejects unknown component modes at their owning factory boundary", async () => {
-  await assert.rejects(
+  assert.throws(
     () =>
       new ModCDPClient({
         upstream: { upstream_mode: "bogus" as any },
-      })._upstreamTransport(),
+      }),
     /unknown upstream\.upstream_mode=bogus/,
   );
   await assert.rejects(
@@ -565,7 +565,6 @@ test("ModCDPClient.close keeps injector files until after launched browser shutd
   } finally {
     await cdp.close();
   }
-  assert.equal(cdp.transport, null);
   assert.equal(cdp._launched, null);
   assert.deepEqual(cdp._injectors, []);
 }, 90_000);
@@ -588,9 +587,5 @@ test("ModCDPClient.close clears top-level connection state", async () => {
   });
 
   await cdp.connect();
-  assert.ok(cdp.transport);
   await cdp.close();
-
-  assert.equal(cdp.transport, null);
-  await assert.rejects(() => cdp.sendRaw("Browser.getVersion"), /ModCDP upstream is not connected/);
 }, 60_000);

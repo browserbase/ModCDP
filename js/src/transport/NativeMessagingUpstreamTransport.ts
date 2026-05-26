@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import type { CdpCommandMessage } from "../types/modcdp.js";
 import { DEFAULT_MODCDP_EXTENSION_ID } from "../injector/ExtensionInjector.js";
 import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
@@ -18,9 +17,9 @@ type NativeMessagingOptions = {
 };
 
 export class NativeMessagingUpstreamTransport extends UpstreamTransport {
-  readonly mode = "nativemessaging" as const;
+  readonly upstream_mode = "nativemessaging" as const;
   readonly endpoint_kind = "modcdp_server" as const;
-  url = "";
+  upstream_nativemessaging_url = "";
   private server: any = null;
   private socket: any = null;
   private peer_waiters = new Set<{
@@ -29,10 +28,9 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     timeout: ReturnType<typeof setTimeout>;
   }>();
   private wait_timeout_ms: number;
-  private upstream_nativemessaging_manifest: string | null;
-  private upstream_nativemessaging_manifests: string[];
+  declare upstream_nativemessaging_manifest: string | null;
+  declare upstream_nativemessaging_manifests: string[];
   private include_default_manifest_paths: boolean;
-  private upstream_nativemessaging_host_name: string;
   private extension_id: string;
   private user_data_dir: string | null = null;
   private bound_port: number | null = null;
@@ -54,6 +52,11 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
     this.extension_id = injector_extension_id || DEFAULT_MODCDP_EXTENSION_ID;
     this.wait_timeout_ms = upstream_nativemessaging_wait_timeout_ms;
+    this.send_command = (message) => {
+      if (!this.socket || this.socket.destroyed)
+        throw new Error(`No native messaging peer is connected for ${this.upstream_nativemessaging_host_name}.`);
+      writeLengthPrefixedJSON(this.socket, message);
+    };
   }
 
   update(config: UpstreamTransportConfig = {}) {
@@ -74,6 +77,7 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     }
     if (typeof config.upstream_nativemessaging_wait_timeout_ms === "number")
       this.wait_timeout_ms = config.upstream_nativemessaging_wait_timeout_ms;
+    if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     if (config.injector_extension_id) {
       this.extension_id = config.injector_extension_id;
       should_install_native_host = true;
@@ -111,15 +115,9 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     });
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Native messaging bridge did not bind a TCP port.");
-    this.url = `native://${this.upstream_nativemessaging_host_name}@127.0.0.1:${address.port}`;
+    this.upstream_nativemessaging_url = `native://${this.upstream_nativemessaging_host_name}@127.0.0.1:${address.port}`;
     this.bound_port = address.port;
     this.installNativeHost(address.port);
-  }
-
-  send(message: CdpCommandMessage) {
-    if (!this.socket || this.socket.destroyed)
-      throw new Error(`No native messaging peer is connected for ${this.upstream_nativemessaging_host_name}.`);
-    writeLengthPrefixedJSON(this.socket, message);
   }
 
   async waitForPeer() {

@@ -15,7 +15,7 @@ test("nats upstream config owns url, subject prefix, wait timeout, and injector 
     upstream_nats_url: "ws://127.0.0.1:4223",
     upstream_nats_subject_prefix: "modcdp.one",
   });
-  assert.equal(transport.url, "ws://127.0.0.1:4223/");
+  assert.equal(transport.upstream_nats_url, "ws://127.0.0.1:4223/");
   assert.equal(transport.upstream_nats_subject_prefix, "modcdp.one");
   assert.deepEqual(transport.getInjectorConfig(), {
     upstream_nats_url: "ws://127.0.0.1:4223/",
@@ -30,7 +30,7 @@ test("nats upstream config owns url, subject prefix, wait timeout, and injector 
     }),
     transport,
   );
-  assert.equal(transport.url, "nats://127.0.0.1:4222");
+  assert.equal(transport.upstream_nats_url, "nats://127.0.0.1:4222");
   assert.equal(transport.upstream_nats_subject_prefix, "modcdp.two");
   await assert.rejects(() => transport.waitForPeer(), /Timed out waiting 5ms for NATS ModCDP peer/);
 });

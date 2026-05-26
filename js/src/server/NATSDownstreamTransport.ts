@@ -2,9 +2,10 @@ import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
   type CdpEventMessage,
+  type CdpResponseMessage,
   type ModCDPConfigureParams,
 } from "../types/modcdp.js";
-import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
+import { DownstreamTransport } from "../transport/DownstreamTransport.js";
 
 export const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
@@ -30,12 +31,8 @@ export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
  * 5. `error`/`close` drops the socket and schedules reconnect while an endpoint
  *    is still configured.
  */
-export class NATSDownstreamTransport implements ServerDownstreamTransport {
+export class NATSDownstreamTransport extends DownstreamTransport {
   readonly name = "nats";
-
-  // Server-owned command executor. Read by NATS payload handling; this class
-  // never interprets routes, custom commands, or middleware itself.
-  private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the NATS WebSocket opens.
   private readonly ensureOffscreenKeepAlive: () => unknown;
@@ -61,14 +58,13 @@ export class NATSDownstreamTransport implements ServerDownstreamTransport {
   // and replaced by consumeProtocol.
   private buffer = "";
 
-  constructor({
-    handleCommand,
-    ensureOffscreenKeepAlive,
-  }: {
-    handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    ensureOffscreenKeepAlive: () => unknown;
-  }) {
-    this.handleCommand = handleCommand;
+  // Request object -> transport-native NATS reply subject. Written by
+  // handlePayload and read by sendResponse so responses route to the requesting
+  // SDK client instead of being broadcast on the event subject.
+  private readonly reply_subject_from_request = new WeakMap<CdpCommandMessage, string>();
+
+  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
+    super();
     this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
@@ -135,14 +131,27 @@ export class NATSDownstreamTransport implements ServerDownstreamTransport {
     return { upstream_nats_url, upstream_nats_subject_prefix, stopped: true, reason };
   }
 
-  /** Publish one CDP event message to the NATS browser-to-client subject. */
-  emit(message: CdpEventMessage) {
+  /** Publish one CDP response to the transport-native NATS reply subject. */
+  sendResponse(request: CdpCommandMessage, response: CdpResponseMessage) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
+    const reply_subject = this.reply_subject_from_request.get(request);
+    if (!reply_subject) throw new Error(`NATS downstream request ${request.id} did not include a reply_subject.`);
+    this.publish(reply_subject, {
+      type: "modcdp.nats.message",
+      message: response,
+    });
+    this.reply_subject_from_request.delete(request);
+    return true;
+  }
+
+  /** Publish one CDP event message to the NATS browser-to-client subject. */
+  sendEvent(message: CdpEventMessage) {
+    if (this.socket?.readyState !== WebSocket.OPEN) return 0;
     this.publish(`${this.subject_prefix}.browser_to_client`, {
       type: "modcdp.nats.message",
       message,
     });
-    return true;
+    return 1;
   }
 
   /** Return generic status without exposing NATS lifecycle to ModCDPServer. */
@@ -261,7 +270,10 @@ export class NATSDownstreamTransport implements ServerDownstreamTransport {
     } catch {
       return;
     }
-    const record = parsed && typeof parsed === "object" ? (parsed as { type?: unknown; message?: unknown }) : null;
+    const record =
+      parsed && typeof parsed === "object"
+        ? (parsed as { type?: unknown; message?: unknown; reply_subject?: unknown })
+        : null;
     if (record?.type === "modcdp.nats.hello") {
       this.publish(`${this.subject_prefix}.browser_to_client`, {
         type: "modcdp.nats.hello",
@@ -271,30 +283,12 @@ export class NATSDownstreamTransport implements ServerDownstreamTransport {
       });
       return;
     }
-    let message: CdpCommandMessage;
-    try {
-      message = CdpCommandMessageSchema.parse(record?.type === "modcdp.nats.message" ? record.message : parsed);
-    } catch {
-      return;
+    const message = CdpCommandMessageSchema.parse(record?.type === "modcdp.nats.message" ? record.message : parsed);
+    if (typeof record?.reply_subject !== "string" || record.reply_subject.length === 0) {
+      throw new Error(`NATS downstream command ${message.id} is missing reply_subject.`);
     }
-    try {
-      const result = await this.handleCommand(message);
-      this.publish(`${this.subject_prefix}.browser_to_client`, {
-        type: "modcdp.nats.message",
-        message: { id: message.id, result },
-      });
-    } catch (error) {
-      this.publish(`${this.subject_prefix}.browser_to_client`, {
-        type: "modcdp.nats.message",
-        message: {
-          id: message.id,
-          error: {
-            code: -32000,
-            message: error instanceof Error ? error.message : String(error),
-          },
-        },
-      });
-    }
+    this.reply_subject_from_request.set(message, record.reply_subject);
+    await this.handleRequest(message);
   }
 
   private connectOptions() {

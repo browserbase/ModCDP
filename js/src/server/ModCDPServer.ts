@@ -17,12 +17,13 @@ import { NativeHostDownstreamTransport } from "./NativeHostDownstreamTransport.j
 import { NATSDownstreamTransport } from "./NATSDownstreamTransport.js";
 import { ReverseWSDownstreamTransport } from "./ReverseWSDownstreamTransport.js";
 import type {
-  ServerDownstreamTransport,
-  ServerDownstreamTransportName,
-  ServerDownstreamTransportStatus,
-} from "./ServerDownstreamTransport.js";
+  DownstreamTransport,
+  DownstreamTransportName,
+  DownstreamTransportStatus,
+} from "../transport/DownstreamTransport.js";
 import type {
   CdpEventMessage,
+  CdpResponseMessage,
   ModCDPConfigureParams,
   ModCDPCustomCommandRegistration,
   ModCDPCustomEventRegistration,
@@ -82,9 +83,9 @@ export type ModCDPServerInstance = {
   types: (typeof import("../types/generated/zod.js"))["types"] | null;
   commands: (typeof import("../types/generated/zod.js"))["commands"] | null;
   events: (typeof import("../types/generated/zod.js"))["events"] | null;
-  startDownstreamTransports(): Record<ServerDownstreamTransportName, ProtocolPayload>;
-  stopDownstreamTransports(reason?: string): Record<ServerDownstreamTransportName, ProtocolPayload>;
-  downstreamTransports(): Record<ServerDownstreamTransportName, ServerDownstreamTransportStatus>;
+  startDownstreamTransports(): Record<DownstreamTransportName, ProtocolPayload>;
+  stopDownstreamTransports(reason?: string): Record<DownstreamTransportName, ProtocolPayload>;
+  downstreamTransports(): Record<DownstreamTransportName, DownstreamTransportStatus>;
   ensureOffscreenKeepAlive(): Promise<ProtocolResult>;
   loadTypes(): Promise<unknown>;
   configure(params?: ModCDPConfigureParams): Promise<ProtocolResult>;
@@ -233,7 +234,9 @@ export function installModCDPServer(
       params: (payload ?? {}) as CdpEventMessage["params"],
     };
     if (cdpSessionId) message.sessionId = cdpSessionId;
-    const emitted_through_downstream = [...downstream_transports.values()].some((transport) => transport.emit(message));
+    const emitted_through_downstream = [...downstream_transports.values()].some(
+      (transport) => transport.sendEvent(message) > 0,
+    );
 
     const is_custom_event = registryMatch(event_bindings, eventName) != null;
     let emitted_through_binding = false;
@@ -272,7 +275,7 @@ export function installModCDPServer(
     "Custom.*": "service_worker",
     "*.*": "auto",
   } satisfies ModCDPRoutes;
-  let downstream_transports: Map<ServerDownstreamTransportName, ServerDownstreamTransport>;
+  let downstream_transports: Map<DownstreamTransportName, DownstreamTransport>;
   const offscreen_keep_alive_port_name = "ModCDPOffscreenKeepAlive";
   const offscreen_keep_alive_path = "offscreen/keepalive.html";
   let creating_offscreen_keep_alive: Promise<void> | null = null;
@@ -513,7 +516,7 @@ export function installModCDPServer(
     commands: null as (typeof import("../types/generated/zod.js"))["commands"] | null,
     events: null as (typeof import("../types/generated/zod.js"))["events"] | null,
     startDownstreamTransports() {
-      const results: Record<ServerDownstreamTransportName, ProtocolPayload> = {};
+      const results: Record<DownstreamTransportName, ProtocolPayload> = {};
       for (const [name, transport] of downstream_transports) {
         const result = transport.startDefault();
         if (result != null) results[name] = result;
@@ -521,7 +524,7 @@ export function installModCDPServer(
       return results;
     },
     stopDownstreamTransports(reason = "stopped") {
-      const results: Record<ServerDownstreamTransportName, ProtocolPayload> = {};
+      const results: Record<DownstreamTransportName, ProtocolPayload> = {};
       for (const [name, transport] of downstream_transports) {
         const result = transport.stop(reason);
         if (result != null) results[name] = result;
@@ -529,7 +532,7 @@ export function installModCDPServer(
       return results;
     },
     downstreamTransports() {
-      const status: Record<ServerDownstreamTransportName, ServerDownstreamTransportStatus> = {};
+      const status: Record<DownstreamTransportName, DownstreamTransportStatus> = {};
       for (const [name, transport] of downstream_transports) status[name] = transport.status();
       return status;
     },
@@ -806,24 +809,28 @@ export function installModCDPServer(
     },
   };
 
-  downstream_transports = new Map<ServerDownstreamTransportName, ServerDownstreamTransport>();
+  downstream_transports = new Map<DownstreamTransportName, DownstreamTransport>();
   for (const transport of [
-    new ReverseWSDownstreamTransport({
-      ensureOffscreenKeepAlive,
-      handleCommand: (message) =>
-        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-    }),
-    new NativeHostDownstreamTransport({
-      ensureOffscreenKeepAlive,
-      handleCommand: (message) =>
-        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-    }),
-    new NATSDownstreamTransport({
-      ensureOffscreenKeepAlive,
-      handleCommand: (message) =>
-        ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
-    }),
+    new ReverseWSDownstreamTransport({ ensureOffscreenKeepAlive }),
+    new NativeHostDownstreamTransport({ ensureOffscreenKeepAlive }),
+    new NATSDownstreamTransport({ ensureOffscreenKeepAlive }),
   ]) {
+    transport.onRequest(async (message): Promise<CdpResponseMessage> => {
+      try {
+        return {
+          id: message.id,
+          result: await ModCDPServer.handleCommand(message.method, message.params ?? {}, message.sessionId ?? null),
+        };
+      } catch (error) {
+        return {
+          id: message.id,
+          error: {
+            code: -32000,
+            message: errorMessage(error),
+          },
+        };
+      }
+    });
     downstream_transports.set(transport.name, transport);
   }
 

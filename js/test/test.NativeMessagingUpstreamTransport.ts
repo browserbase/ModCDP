@@ -91,7 +91,7 @@ test("nativemessaging upstream close resets peer wait state", async () => {
     upstream_nativemessaging_wait_timeout_ms: 5,
   });
   await transport.connect();
-  const port = Number(new URL(transport.url).port);
+  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
   const peer = net.createConnection({ host: "127.0.0.1", port });
   await once(peer, "connect");
 
@@ -115,7 +115,7 @@ test("nativemessaging upstream waits again after a peer disconnects", async () =
     upstream_nativemessaging_wait_timeout_ms: 5,
   });
   await transport.connect();
-  const port = Number(new URL(transport.url).port);
+  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
   const peer = net.createConnection({ host: "127.0.0.1", port });
   await once(peer, "connect");
 
@@ -140,7 +140,7 @@ test("nativemessaging upstream accepts a replacement peer after disconnect", asy
     upstream_nativemessaging_wait_timeout_ms: 500,
   });
   await transport.connect();
-  const port = Number(new URL(transport.url).port);
+  const port = Number(new URL(transport.upstream_nativemessaging_url).port);
   const first_peer = net.createConnection({ host: "127.0.0.1", port });
   await once(first_peer, "connect");
 
@@ -195,10 +195,14 @@ test("nativemessaging upstream installs the launch-profile native host manifest 
 
   try {
     await native_client.connect();
-    assert.equal(native_client.transport?.mode, "nativemessaging");
+    assert.equal(native_client.upstream?.upstream_mode, "nativemessaging");
     assert.equal(native_client.upstream_endpoint_kind, "modcdp_server");
-    assert.match(native_client.transport?.url ?? "", /^native:\/\/.+@127\.0\.0\.1:\d+$/);
-    assert.equal(native_client.transport?.url?.startsWith(`native://${upstream_nativemessaging_host_name}@`), true);
+    const upstream_transport = native_client.upstream as NativeMessagingUpstreamTransport;
+    assert.match(upstream_transport.upstream_nativemessaging_url, /^native:\/\/.+@127\.0\.0\.1:\d+$/);
+    assert.equal(
+      upstream_transport.upstream_nativemessaging_url.startsWith(`native://${upstream_nativemessaging_host_name}@`),
+      true,
+    );
     assert.equal(
       existsSync(
         path.join(

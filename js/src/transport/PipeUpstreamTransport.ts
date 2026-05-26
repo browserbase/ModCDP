@@ -1,10 +1,8 @@
-import type { CdpCommandMessage } from "../types/modcdp.js";
 import { UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export class PipeUpstreamTransport extends UpstreamTransport {
-  readonly mode = "pipe" as const;
+  readonly upstream_mode = "pipe" as const;
   readonly endpoint_kind = "raw_cdp" as const;
-  declare url: string;
   private buffer = "";
   private connected = false;
 
@@ -23,13 +21,18 @@ export class PipeUpstreamTransport extends UpstreamTransport {
     super();
     this.pipe_read = pipe_read;
     this.pipe_write = pipe_write;
-    this.url = cdp_url ?? "pipe://unknown";
+    this.upstream_cdp_url = cdp_url ?? "pipe://unknown";
+    this.send_command = (message) => {
+      if (!this.pipe_write || !this.connected) throw new Error("CDP pipe is not connected.");
+      this.pipe_write.write(`${JSON.stringify(message)}\0`);
+    };
   }
 
   update(config: UpstreamTransportConfig = {}) {
     this.pipe_read = config.pipe_read ?? this.pipe_read;
     this.pipe_write = config.pipe_write ?? this.pipe_write;
-    this.url = config.cdp_url ?? this.url;
+    this.upstream_cdp_url = config.cdp_url ?? this.upstream_cdp_url;
+    if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
   }
 
@@ -47,11 +50,6 @@ export class PipeUpstreamTransport extends UpstreamTransport {
     this.pipe_read.on("end", () => this.handleClose(new Error("CDP pipe closed")));
     this.pipe_read.on("error", () => this.handleClose(new Error("CDP pipe error")));
     this.pipe_write.on("error", () => this.handleClose(new Error("CDP pipe write error")));
-  }
-
-  send(message: CdpCommandMessage) {
-    if (!this.pipe_write || !this.connected) throw new Error("CDP pipe is not connected.");
-    this.pipe_write.write(`${JSON.stringify(message)}\0`);
   }
 
   async close() {

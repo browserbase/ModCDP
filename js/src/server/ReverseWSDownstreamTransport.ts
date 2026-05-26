@@ -2,9 +2,10 @@ import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
   type CdpEventMessage,
+  type CdpResponseMessage,
   type ModCDPConfigureParams,
 } from "../types/modcdp.js";
-import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
+import { DownstreamTransport } from "../transport/DownstreamTransport.js";
 
 export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 
@@ -29,12 +30,8 @@ export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  *    while an endpoint is still configured.
  * 5. `stop()` clears the endpoint and reconnect timer, then closes the socket.
  */
-export class ReverseWSDownstreamTransport implements ServerDownstreamTransport {
+export class ReverseWSDownstreamTransport extends DownstreamTransport {
   readonly name = "reversews";
-
-  // Server-owned command executor. Read by message handling; this class never
-  // interprets routes, custom commands, or middleware itself.
-  private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the reverse socket opens.
   private readonly ensureOffscreenKeepAlive: () => unknown;
@@ -55,14 +52,12 @@ export class ReverseWSDownstreamTransport implements ServerDownstreamTransport {
   // the timer fires.
   private reconnect_timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor({
-    handleCommand,
-    ensureOffscreenKeepAlive,
-  }: {
-    handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    ensureOffscreenKeepAlive: () => unknown;
-  }) {
-    this.handleCommand = handleCommand;
+  // Request object -> WebSocket that sent it. Written by handleMessage and read
+  // by sendResponse so responses go only to the originating downstream client.
+  private readonly socket_from_request = new WeakMap<CdpCommandMessage, WebSocket>();
+
+  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
+    super();
     this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
@@ -122,11 +117,20 @@ export class ReverseWSDownstreamTransport implements ServerDownstreamTransport {
     return { upstream_reversews_url, stopped: true, reason };
   }
 
-  /** Emit one CDP event message to the connected reversews client. */
-  emit(message: CdpEventMessage) {
-    if (this.socket?.readyState !== WebSocket.OPEN) return false;
-    this.socket.send(JSON.stringify(message));
+  /** Send one CDP response to the reversews client that sent the request. */
+  sendResponse(request: CdpCommandMessage, response: CdpResponseMessage) {
+    const socket = this.socket_from_request.get(request);
+    if (socket?.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(response));
+    this.socket_from_request.delete(request);
     return true;
+  }
+
+  /** Send one CDP event message to the connected reversews client. */
+  sendEvent(message: CdpEventMessage) {
+    if (this.socket?.readyState !== WebSocket.OPEN) return 0;
+    this.socket.send(JSON.stringify(message));
+    return 1;
   }
 
   /** Return generic status without exposing reversews-specific state to ModCDPServer. */
@@ -185,26 +189,8 @@ export class ReverseWSDownstreamTransport implements ServerDownstreamTransport {
   }
 
   private async handleMessage(ws: WebSocket, data: unknown) {
-    let message: CdpCommandMessage;
-    try {
-      message = CdpCommandMessageSchema.parse(JSON.parse(typeof data === "string" ? data : String(data)));
-    } catch {
-      return;
-    }
-
-    try {
-      const result = await this.handleCommand(message);
-      ws.send(JSON.stringify({ id: message.id, result }));
-    } catch (error) {
-      ws.send(
-        JSON.stringify({
-          id: message.id,
-          error: {
-            code: -32000,
-            message: error instanceof Error ? error.message : String(error),
-          },
-        }),
-      );
-    }
+    const message = CdpCommandMessageSchema.parse(JSON.parse(typeof data === "string" ? data : String(data)));
+    this.socket_from_request.set(message, ws);
+    await this.handleRequest(message);
   }
 }

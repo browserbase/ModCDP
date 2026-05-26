@@ -2,9 +2,10 @@ import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
   type CdpEventMessage,
+  type CdpResponseMessage,
   type ModCDPConfigureParams,
 } from "../types/modcdp.js";
-import type { ServerDownstreamTransport } from "./ServerDownstreamTransport.js";
+import { DownstreamTransport } from "../transport/DownstreamTransport.js";
 
 export const DEFAULT_NATIVE_BRIDGE_HOST_NAME = "com.modcdp.bridge";
 export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
@@ -29,12 +30,8 @@ export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  * 4. `onDisconnect` clears the active port, stores the browser-provided error,
  *    and schedules reconnect while a host is still configured.
  */
-export class NativeHostDownstreamTransport implements ServerDownstreamTransport {
+export class NativeHostDownstreamTransport extends DownstreamTransport {
   readonly name = "native";
-
-  // Server-owned command executor. Read by port message handling; this class
-  // never interprets routes, custom commands, or middleware itself.
-  private readonly handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
 
   // Server-owned keepalive hook. Called after the native port connects.
   private readonly ensureOffscreenKeepAlive: () => unknown;
@@ -61,14 +58,12 @@ export class NativeHostDownstreamTransport implements ServerDownstreamTransport 
   // server status surface.
   last_error: string | null = null;
 
-  constructor({
-    handleCommand,
-    ensureOffscreenKeepAlive,
-  }: {
-    handleCommand: (message: CdpCommandMessage) => Promise<unknown>;
-    ensureOffscreenKeepAlive: () => unknown;
-  }) {
-    this.handleCommand = handleCommand;
+  // Request object -> native port that sent it. Written by handleMessage and
+  // read by sendResponse so responses go only to the originating downstream client.
+  private readonly port_from_request = new WeakMap<CdpCommandMessage, chrome.runtime.Port>();
+
+  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
+    super();
     this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
   }
 
@@ -119,11 +114,20 @@ export class NativeHostDownstreamTransport implements ServerDownstreamTransport 
     return { upstream_nativemessaging_host_name, stopped: true, reason };
   }
 
-  /** Emit one CDP event message to the connected native host. */
-  emit(message: CdpEventMessage) {
-    if (!this.port) return false;
-    this.port.postMessage(message);
+  /** Send one CDP response to the native host that sent the request. */
+  sendResponse(request: CdpCommandMessage, response: CdpResponseMessage) {
+    const port = this.port_from_request.get(request);
+    if (!port) return false;
+    port.postMessage(response);
+    this.port_from_request.delete(request);
     return true;
+  }
+
+  /** Send one CDP event message to the connected native host. */
+  sendEvent(message: CdpEventMessage) {
+    if (!this.port) return 0;
+    this.port.postMessage(message);
+    return 1;
   }
 
   /** Return generic status without exposing native-host lifecycle to ModCDPServer. */
@@ -190,24 +194,8 @@ export class NativeHostDownstreamTransport implements ServerDownstreamTransport 
   }
 
   private async handleMessage(port: chrome.runtime.Port, data: unknown) {
-    let message: CdpCommandMessage;
-    try {
-      message = CdpCommandMessageSchema.parse(data);
-    } catch {
-      return;
-    }
-
-    try {
-      const result = await this.handleCommand(message);
-      port.postMessage({ id: message.id, result });
-    } catch (error) {
-      port.postMessage({
-        id: message.id,
-        error: {
-          code: -32000,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      });
-    }
+    const message = CdpCommandMessageSchema.parse(data);
+    this.port_from_request.set(message, port);
+    await this.handleRequest(message);
   }
 }

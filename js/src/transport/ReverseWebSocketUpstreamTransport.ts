@@ -1,4 +1,3 @@
-import type { CdpCommandMessage } from "../types/modcdp.js";
 import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 export const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
@@ -12,9 +11,9 @@ type ReverseHello = {
 };
 
 export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
-  readonly mode = "reversews" as const;
+  readonly upstream_mode = "reversews" as const;
   readonly endpoint_kind = "modcdp_server" as const;
-  declare url: string;
+  private endpoint_url: string;
   private server: unknown = null;
   private socket: {
     readyState: number;
@@ -31,6 +30,10 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
 
   private wait_timeout_ms: number;
 
+  get upstream_reversews_url() {
+    return this.endpoint_url;
+  }
+
   constructor({
     upstream_reversews_bind = DEFAULT_UPSTREAM_REVERSEWS_BIND,
     upstream_reversews_wait_timeout_ms = DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
@@ -39,14 +42,29 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     upstream_reversews_wait_timeout_ms?: number | null;
   } = {}) {
     super();
+    this.upstream_reversews_bind = upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND;
+    this.upstream_reversews_wait_timeout_ms =
+      upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
     this.wait_timeout_ms = upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
-    this.setBind(upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND);
+    this.endpoint_url = endpointFromBind(this.upstream_reversews_bind);
+    this.send_command = (message) => {
+      if (!this.socket || this.socket.readyState !== this.socket.OPEN) {
+        throw new Error(`No reverse ModCDP extension peer is connected at ${this.endpoint_url}.`);
+      }
+      this.socket.send(JSON.stringify(message));
+    };
   }
 
   update(config: UpstreamTransportConfig = {}) {
-    if (config.upstream_reversews_bind) this.setBind(config.upstream_reversews_bind);
-    if (typeof config.upstream_reversews_wait_timeout_ms === "number")
+    if (config.upstream_reversews_bind) {
+      this.upstream_reversews_bind = config.upstream_reversews_bind;
+      this.endpoint_url = endpointFromBind(config.upstream_reversews_bind);
+    }
+    if (typeof config.upstream_reversews_wait_timeout_ms === "number") {
+      this.upstream_reversews_wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;
       this.wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;
+    }
+    if (typeof config.cdp_send_timeout_ms === "number") this.cdp_send_timeout_ms = config.cdp_send_timeout_ms;
     return this;
   }
 
@@ -54,14 +72,9 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     return {};
   }
 
-  private setBind(bind: string) {
-    const { host, port } = parseHostPort(bind, "127.0.0.1", 29292);
-    this.url = `ws://${host}:${port}`;
-  }
-
   async connect() {
     const { WebSocketServer } = await import("ws");
-    const { host, port } = parseHostPort(this.url, "127.0.0.1", 29292);
+    const { host, port } = parseHostPort(this.endpoint_url, "127.0.0.1", 29292);
     const server = new WebSocketServer({ host, port });
     this.server = server;
     server.on("connection", (socket) => this.accept(socket));
@@ -69,13 +82,6 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
       server.once("listening", () => resolve());
       server.once("error", reject);
     });
-  }
-
-  send(message: CdpCommandMessage) {
-    if (!this.socket || this.socket.readyState !== this.socket.OPEN) {
-      throw new Error(`No reverse ModCDP extension peer is connected at ${this.url}.`);
-    }
-    this.socket.send(JSON.stringify(message));
   }
 
   async waitForPeer() {
@@ -108,7 +114,7 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
     this.server = null;
     for (const waiter of this.peer_waiters) {
       clearTimeout(waiter.timeout);
-      waiter.reject(new Error(`Reverse websocket transport at ${this.url} closed before a peer connected.`));
+      waiter.reject(new Error(`Reverse websocket transport at ${this.endpoint_url} closed before a peer connected.`));
     }
     this.peer_waiters.clear();
   }
@@ -159,4 +165,9 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
       this.peer_waiters.clear();
     });
   }
+}
+
+function endpointFromBind(bind: string) {
+  const { host, port } = parseHostPort(bind, "127.0.0.1", 29292);
+  return `ws://${host}:${port}`;
 }
