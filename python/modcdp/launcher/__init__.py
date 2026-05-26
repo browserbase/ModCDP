@@ -1,5 +1,5 @@
 from .BrowserLauncher import BrowserLauncher
-from .BrowserbaseBrowserLauncher import BrowserbaseBrowserLauncher
+from .BBBrowserLauncher import BBBrowserLauncher
 from .LocalBrowserLauncher import LocalBrowserLauncher
-from .NoopBrowserLauncher import NoopBrowserLauncher
+from .NoneBrowserLauncher import NoneBrowserLauncher
 from .RemoteBrowserLauncher import RemoteBrowserLauncher

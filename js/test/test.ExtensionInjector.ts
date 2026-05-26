@@ -11,12 +11,12 @@ class ProbeExtensionInjector extends ExtensionInjector {
 
 test("ExtensionInjector owns shared injector config", async () => {
   const injector = new ProbeExtensionInjector({
-    injector_extension_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    injector_service_worker_extension_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
   });
 
   try {
-    assert.equal(injector.injector_extension_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    assert.equal(injector.injector_service_worker_extension_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     assert.deepEqual(injector.extra_args, []);
     assert.equal(
       injector.matches({

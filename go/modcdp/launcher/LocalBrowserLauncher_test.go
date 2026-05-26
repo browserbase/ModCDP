@@ -32,14 +32,14 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndHonorsLaunch
 		t.Fatal(err)
 	}
 	launcher := NewLocalBrowserLauncher(LaunchOptions{
-		Headless:                  &headless,
-		ChromeReadyTimeoutMS:      45_000,
-		ChromeReadyPollIntervalMS: 50,
+		LauncherLocalHeadless:                  &headless,
+		LauncherLocalChromeReadyTimeoutMS:      45_000,
+		LauncherLocalChromeReadyPollIntervalMS: 50,
 	})
 	chrome, err := launcher.Launch(LaunchOptions{
-		Port:        port,
-		UserDataDir: profileDir,
-		ExtraArgs:   []string{"--window-size=900,700"},
+		LauncherLocalCDPListenPort: port,
+		LauncherLocalUserDataDir:   profileDir,
+		LauncherLocalExtraArgs:     []string{"--window-size=900,700"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -61,13 +61,9 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndHonorsLaunch
 		t.Fatalf("ProfileDir = %q, want %q", chrome.ProfileDir, profileDir)
 	}
 	transportConfig := launcher.GetTransportConfig()
-	if transportConfig["cdp_url"] != chrome.CDPURL {
-		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["cdp_url"], chrome.CDPURL)
+	if transportConfig["upstream_ws_cdp_url"] != chrome.CDPURL {
+		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["upstream_ws_cdp_url"], chrome.CDPURL)
 	}
-	if transportConfig["user_data_dir"] != chrome.ProfileDir {
-		t.Fatalf("transport user_data_dir = %v, want %s", transportConfig["user_data_dir"], chrome.ProfileDir)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	conn, _, _, err := ws.Dial(ctx, chrome.CDPURL)
@@ -134,13 +130,13 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndHonorsLaunch
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesRealBrowserOverRemoteDebuggingPipe(t *testing.T) {
+func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *testing.T) {
 	headless := true
 	launcher := NewLocalBrowserLauncher(LaunchOptions{
-		Headless:             &headless,
-		ChromeReadyTimeoutMS: 45_000,
+		LauncherLocalHeadless:             &headless,
+		LauncherLocalChromeReadyTimeoutMS: 45_000,
 	})
-	chrome, err := launcher.Launch(LaunchOptions{RemoteDebugging: "pipe"})
+	chrome, err := launcher.Launch(LaunchOptions{LauncherLocalCDPTransport: "pipe"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,13 +145,13 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverRemoteDebuggingPipe(t *testi
 		t.Fatal("expected launcher to retain launched browser")
 	}
 	transportConfig := launcher.GetTransportConfig()
-	if transportConfig["cdp_url"] != "" {
-		t.Fatalf("transport cdp_url = %v", transportConfig["cdp_url"])
+	if transportConfig["upstream_ws_cdp_url"] != "" {
+		t.Fatalf("transport cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
-	if transportConfig["pipe_read"] != chrome.PipeRead {
+	if transportConfig["upstream_pipe_read"] != chrome.PipeRead {
 		t.Fatal("expected transport pipe_read to use launched pipe")
 	}
-	if transportConfig["pipe_write"] != chrome.PipeWrite {
+	if transportConfig["upstream_pipe_write"] != chrome.PipeWrite {
 		t.Fatal("expected transport pipe_write to use launched pipe")
 	}
 	if chrome.CDPURL != "" {
@@ -188,9 +184,9 @@ func TestLocalBrowserLauncherLaunchesPipeBrowserWithAuxiliaryLoopbackOnlyWhenReq
 	headless := true
 	loopbackCDP := true
 	chrome, err := NewLocalBrowserLauncher(LaunchOptions{
-		Headless:             &headless,
-		ChromeReadyTimeoutMS: 45_000,
-	}).Launch(LaunchOptions{RemoteDebugging: "pipe", LoopbackCDP: &loopbackCDP})
+		LauncherLocalHeadless:             &headless,
+		LauncherLocalChromeReadyTimeoutMS: 45_000,
+	}).Launch(LaunchOptions{LauncherLocalCDPTransport: "pipe", LauncherLocalLoopbackCDP: &loopbackCDP})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,11 +228,11 @@ func TestLocalBrowserLauncherCleansExplicitUserDataDirWhenRequested(t *testing.T
 		t.Fatal(err)
 	}
 	chrome, err := NewLocalBrowserLauncher(LaunchOptions{
-		Headless:             &headless,
-		ChromeReadyTimeoutMS: 45_000,
+		LauncherLocalHeadless:             &headless,
+		LauncherLocalChromeReadyTimeoutMS: 45_000,
 	}).Launch(LaunchOptions{
-		UserDataDir:        profileDir,
-		CleanupUserDataDir: &cleanupUserDataDir,
+		LauncherLocalUserDataDir:        profileDir,
+		LauncherLocalCleanupUserDataDir: &cleanupUserDataDir,
 	})
 	if err != nil {
 		_ = os.RemoveAll(profileDir)

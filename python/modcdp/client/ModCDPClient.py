@@ -25,30 +25,30 @@ from ..router.AutoSessionRouter import AutoSessionRouter
 from ..types.jsonschema import type_adapter_from_json_schema
 from ..types.generated import cdp as generated_cdp
 from ..types.generated.cdp import AwaitableDict, CDPEvent, CDPModel, CDPParams, CDPSurfaceMixin, cdp_event_name, install_cdp_surface
-from ..launcher.BrowserbaseBrowserLauncher import BrowserbaseBrowserLauncher
-from ..injector.BBBrowserExtensionInjector import BBBrowserExtensionInjector
-from ..injector.BorrowedExtensionInjector import BorrowedExtensionInjector
-from ..injector.DiscoveredExtensionInjector import DiscoveredExtensionInjector
+from ..launcher.BBBrowserLauncher import BBBrowserLauncher
+from ..injector.BBExtensionInjector import BBExtensionInjector
+from ..injector.BorrowExtensionInjector import BorrowExtensionInjector
+from ..injector.DiscoverExtensionInjector import DiscoverExtensionInjector
 from ..injector.ExtensionInjector import (
     DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES,
     ExtensionInjector,
-    ExtensionInjectorConfig,
+    InjectorOptions,
 )
-from ..injector.ExtensionsLoadUnpackedInjector import ExtensionsLoadUnpackedInjector
-from ..injector.LocalBrowserLaunchExtensionInjector import LocalBrowserLaunchExtensionInjector
+from ..injector.CDPExtensionInjector import CDPExtensionInjector
+from ..injector.CLIExtensionInjector import CLIExtensionInjector
 from ..launcher.LocalBrowserLauncher import LocalBrowserLauncher
-from ..launcher.NoopBrowserLauncher import NoopBrowserLauncher
+from ..launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from ..launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 from ..transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from ..transport.NatsUpstreamUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NatsUpstreamUpstreamTransport
+from ..transport.NATSUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NATSUpstreamTransport
 from ..transport.PipeUpstreamTransport import PipeUpstreamTransport
-from ..transport.ReverseWebSocketUpstreamTransport import (
+from ..transport.ReverseWSUpstreamTransport import (
     DEFAULT_UPSTREAM_REVERSEWS_BIND,
     DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
-    ReverseWebSocketUpstreamTransport,
+    ReverseWSUpstreamTransport,
 )
 from ..transport.UpstreamTransport import UpstreamTransport
-from ..transport.WebSocketUpstreamTransport import WebSocketUpstreamTransport
+from ..transport.WSUpstreamTransport import WSUpstreamTransport
 from ..translate.translate import (
     CUSTOM_EVENT_BINDING_NAME,
     DEFAULT_CLIENT_ROUTES,
@@ -232,7 +232,7 @@ class ModCDPClient(CDPSurfaceMixin):
         upstream_mode = str(upstream_input.get("upstream_mode") or "ws")
         self.upstream: dict[str, Any] = {
             "upstream_mode": upstream_mode,
-            "upstream_cdp_url": upstream_input.get("upstream_cdp_url"),
+            "upstream_ws_cdp_url": upstream_input.get("upstream_ws_cdp_url"),
             "upstream_nats_url": upstream_input.get("upstream_nats_url"),
             "upstream_nats_subject_prefix": upstream_input.get("upstream_nats_subject_prefix"),
             "upstream_nats_wait_timeout_ms": int(
@@ -251,24 +251,29 @@ class ModCDPClient(CDPSurfaceMixin):
             ),
         }
         launcher_mode = launcher_input.get("launcher_mode") or (
-            "remote" if upstream_mode in ("ws", "pipe") and self.upstream.get("upstream_cdp_url")
+            "remote" if upstream_mode in ("ws", "pipe") and self.upstream.get("upstream_ws_cdp_url")
             else "local" if upstream_mode in ("ws", "pipe")
             else "none"
         )
         self.launcher: dict[str, Any] = {
+            **launcher_input,
             "launcher_mode": launcher_mode,
-            "launcher_executable_path": launcher_input.get("launcher_executable_path"),
-            "launcher_user_data_dir": launcher_input.get("launcher_user_data_dir"),
-            "launcher_options": dict(cast(Mapping[str, Any], launcher_input.get("launcher_options") or {})),
         }
-        injector_mode = injector_input.get("injector_mode") or (
-            "auto" if upstream_mode in ("ws", "pipe") or launcher_mode != "none" else "none"
-        )
+        injector_mode = injector_input.get("injector_mode")
         raw_service_worker_url_suffixes = injector_input.get("injector_service_worker_url_suffixes")
         self.injector: dict[str, Any] = {
             "injector_mode": injector_mode,
-            "injector_extension_path": injector_input.get("injector_extension_path"),
-            "injector_extension_id": injector_input.get("injector_extension_id"),
+            "injector_cli_extension_path": injector_input.get("injector_cli_extension_path"),
+            "injector_cli_extension_id": injector_input.get("injector_cli_extension_id"),
+            "injector_cdp_extension_path": injector_input.get("injector_cdp_extension_path"),
+            "injector_cdp_extension_id": injector_input.get("injector_cdp_extension_id"),
+            "injector_bb_extension_path": injector_input.get("injector_bb_extension_path"),
+            "injector_bb_extension_id": injector_input.get("injector_bb_extension_id"),
+            "injector_discover_extension_path": injector_input.get("injector_discover_extension_path"),
+            "injector_borrow_extension_path": injector_input.get("injector_borrow_extension_path"),
+            "injector_service_worker_extension_id": injector_input.get("injector_service_worker_extension_id"),
+            "injector_bb_api_key": injector_input.get("injector_bb_api_key"),
+            "injector_bb_base_url": injector_input.get("injector_bb_base_url"),
             "injector_service_worker_url_includes": list(cast(Sequence[str], injector_input.get("injector_service_worker_url_includes") or [])),
             "injector_service_worker_url_suffixes": list(
                 cast(
@@ -310,7 +315,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 _defaulted(client_input.get("client_heartbeat_interval_ms"), DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS)
             ),
         }
-        self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_cdp_url"))
+        self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_ws_cdp_url"))
         if server is DEFAULT_SERVER:
             self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}
         elif server is None:
@@ -707,44 +712,19 @@ class ModCDPClient(CDPSurfaceMixin):
             stop.set()
         self._heartbeat_thread = None
 
-    def _ensureSessionForTarget(self, target_id: str, timeout: float = 0, allow_attach: bool = False) -> str | None:
-        session_id = self.router.sessionId_from_targetId.get(target_id)
-        if session_id:
-            return session_id
-        if allow_attach:
-            attached_session_id = self.router.attachToTarget(target_id)
-            if attached_session_id:
-                return attached_session_id
-        if timeout <= 0:
-            return self.router.sessionId_from_targetId.get(target_id)
-        deadline = time.time() + timeout
-        while time.time() <= deadline:
-            session_id = self.router.sessionId_from_targetId.get(target_id)
-            if session_id:
-                return session_id
-            time.sleep(self.injector["injector_target_session_poll_interval_ms"] / 1000)
-        return None
-
     def _browser_launcher(self):
         if self.launcher.get("launcher_mode") == "local":
             return LocalBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "remote":
             return RemoteBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "bb":
-            return BrowserbaseBrowserLauncher(self._launch_options())
+            return BBBrowserLauncher(self._launch_options())
         if self.launcher.get("launcher_mode") == "none":
-            return NoopBrowserLauncher(self._launch_options())
+            return NoneBrowserLauncher(self._launch_options())
         raise RuntimeError(f"unknown launcher.launcher_mode={self.launcher.get('launcher_mode')}")
 
     def _launch_options(self) -> LauncherOptions:
-        launch_options = cast(LauncherOptions, dict(cast(Mapping[str, Any], self.launcher.get("launcher_options") or {})))
-        if self.launcher.get("launcher_executable_path"):
-            launch_options["executable_path"] = cast(str, self.launcher["launcher_executable_path"])
-        if self.launcher.get("launcher_user_data_dir"):
-            launch_options["user_data_dir"] = cast(str, self.launcher["launcher_user_data_dir"])
-        if self.upstream.get("upstream_cdp_url"):
-            launch_options["remote_cdp_url"] = cast(str, self.upstream["upstream_cdp_url"])
-        return launch_options
+        return cast(LauncherOptions, dict(self.launcher))
 
     def _connect_upstream_transport(self) -> None:
         if self.transport is not None:
@@ -760,9 +740,9 @@ class ModCDPClient(CDPSurfaceMixin):
         for injector in injectors:
             injector.update(self._base_extension_injector_config(None))
         for injector in injectors:
-            injector.update(cast(ExtensionInjectorConfig, launcher.getInjectorConfig()))
+            injector.update(cast(InjectorOptions, launcher.getInjectorConfig()))
         for injector in injectors:
-            injector.update(cast(ExtensionInjectorConfig, transport.getInjectorConfig()))
+            injector.update(cast(InjectorOptions, transport.getInjectorConfig()))
         for injector in injectors:
             injector.prepare()
         for injector in injectors:
@@ -770,7 +750,7 @@ class ModCDPClient(CDPSurfaceMixin):
         for injector in injectors:
             transport.update(injector.getTransportConfig())
         launcher.update(cast(LauncherOptions, transport.getLauncherConfig()))
-        launcher.update({"loopback_cdp": self._server_needs_loopback_cdp()})
+        launcher.update({"launcher_local_loopback_cdp": self._server_needs_loopback_cdp()})
         transport.update(launcher.getTransportConfig())
 
         if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
@@ -780,7 +760,7 @@ class ModCDPClient(CDPSurfaceMixin):
             self._launched_browser = launched
             transport.update(launcher.getTransportConfig())
             for injector in injectors:
-                injector.update(cast(ExtensionInjectorConfig, launcher.getInjectorConfig()))
+                injector.update(cast(InjectorOptions, launcher.getInjectorConfig()))
             for injector in injectors:
                 transport.update(injector.getTransportConfig())
         launched_cdp_url = cast(str | None, self._launched_browser.get("cdp_url")) if self._launched_browser else None
@@ -794,7 +774,7 @@ class ModCDPClient(CDPSurfaceMixin):
         )
         if transport.mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
-            self.upstream["upstream_cdp_url"] = transport.url
+            self.upstream["upstream_ws_cdp_url"] = transport.url
         server_config = {"server_loopback_cdp_url": transport.url} if self.upstream["upstream_mode"] == "ws" and transport.url else {}
         if self.upstream["upstream_mode"] not in ("ws", "pipe") and launched_cdp_url:
             server_config["server_loopback_cdp_url"] = launched_cdp_url
@@ -804,7 +784,7 @@ class ModCDPClient(CDPSurfaceMixin):
         if self.server is not None and server_config.get("server_loopback_cdp_url"):
             configured_loopback = self.server.get("server_loopback_cdp_url")
             if "server_loopback_cdp_url" not in self.server or configured_loopback in (
-                initial_transport_config.get("cdp_url"),
+                initial_transport_config.get("upstream_ws_cdp_url"),
                 launched_cdp_url,
             ):
                 self.server = cast(ModCDPServerConfig, {**self.server, **server_config})
@@ -816,14 +796,14 @@ class ModCDPClient(CDPSurfaceMixin):
 
     def _upstream_transport_config(self) -> dict[str, Any]:
         return {
-            "cdp_url": self.upstream.get("upstream_cdp_url"),
+            "upstream_ws_cdp_url": self.upstream.get("upstream_ws_cdp_url"),
             "upstream_nats_url": self.upstream.get("upstream_nats_url"),
             "upstream_nats_subject_prefix": self.upstream.get("upstream_nats_subject_prefix"),
             "upstream_nats_wait_timeout_ms": self.upstream.get("upstream_nats_wait_timeout_ms"),
             "upstream_reversews_bind": self.upstream.get("upstream_reversews_bind"),
             "upstream_reversews_wait_timeout_ms": self.upstream.get("upstream_reversews_wait_timeout_ms"),
             "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
-            "injector_extension_id": self.injector.get("injector_extension_id"),
+            "injector_service_worker_extension_id": self.injector.get("injector_service_worker_extension_id"),
         }
 
     def _initialize_raw_cdp_transport(self) -> None:
@@ -837,42 +817,36 @@ class ModCDPClient(CDPSurfaceMixin):
     def _upstream_transport(self):
         mode = self.upstream.get("upstream_mode")
         if mode == "ws":
-            return WebSocketUpstreamTransport()
+            return WSUpstreamTransport()
         if mode == "pipe":
             return PipeUpstreamTransport()
         if mode == "reversews":
-            return ReverseWebSocketUpstreamTransport()
+            return ReverseWSUpstreamTransport()
         if mode == "nativemessaging":
             return NativeMessagingUpstreamTransport({
                 "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
             })
         if mode == "nats":
-            return NatsUpstreamUpstreamTransport(self.upstream)
+            return NATSUpstreamTransport(self.upstream)
         raise RuntimeError(f"unknown upstream.upstream_mode={mode}")
 
     def _extension_injectors_for_config(self) -> list[ExtensionInjector]:
         mode = self.injector.get("injector_mode")
         if mode == "none":
             return []
-        injectors: list[ExtensionInjector] = []
-        prefer_launch_injection = mode == "auto" and self.launcher.get("launcher_mode") == "local"
-        if mode in ("auto", "discover") and not prefer_launch_injection:
-            injectors.append(DiscoveredExtensionInjector())
-        if mode in ("auto", "inject"):
-            if self.launcher.get("launcher_mode") == "bb":
-                injectors.append(BBBrowserExtensionInjector())
-            if self.launcher.get("launcher_mode") == "local":
-                injectors.append(LocalBrowserLaunchExtensionInjector())
-            injectors.append(ExtensionsLoadUnpackedInjector())
-        if prefer_launch_injection:
-            injectors.append(DiscoveredExtensionInjector())
-        if mode in ("auto", "borrow"):
-            injectors.append(BorrowedExtensionInjector())
-        if not injectors:
-            raise RuntimeError(f"unknown injector.injector_mode={mode}")
-        return injectors
+        if mode == "cli":
+            return [CLIExtensionInjector()]
+        if mode == "cdp":
+            return [CDPExtensionInjector()]
+        if mode == "bb":
+            return [BBExtensionInjector()]
+        if mode == "discover":
+            return [DiscoverExtensionInjector()]
+        if mode == "borrow":
+            return [BorrowExtensionInjector()]
+        raise RuntimeError(f"unknown injector.injector_mode={mode}")
 
-    def _base_extension_injector_config(self, send: Any | None) -> ExtensionInjectorConfig:
+    def _base_extension_injector_config(self, send: Any | None) -> InjectorOptions:
         trust_service_worker_target = (
             self.injector["injector_trust_service_worker_target"]
             or len(self.injector["injector_service_worker_url_includes"]) > 0
@@ -892,20 +866,19 @@ class ModCDPClient(CDPSurfaceMixin):
                 timeout=self.client["client_cdp_send_timeout_ms"] / 1000,
             )
 
-        def ensure_session_for_target(target_id: str, timeout_ms: int, allow_attach: bool) -> str | None:
-            return self._ensureSessionForTarget(
-                target_id,
-                timeout=timeout_ms / 1000,
-                allow_attach=allow_attach,
-            )
-
         return {
             "send": send_cdp if send is not None else None,
-            "sessionId_from_targetId": self.router.sessionId_from_targetId,
-            "ensureSessionForTarget": ensure_session_for_target if send is not None else None,
-            "waitForExecutionContext": self.router.waitForExecutionContext,
-            "injector_extension_path": cast(str | None, self.injector.get("injector_extension_path")),
-            "injector_extension_id": cast(str | None, self.injector.get("injector_extension_id")),
+            "injector_cli_extension_path": cast(str | None, self.injector.get("injector_cli_extension_path")),
+            "injector_cli_extension_id": cast(str | None, self.injector.get("injector_cli_extension_id")),
+            "injector_cdp_extension_path": cast(str | None, self.injector.get("injector_cdp_extension_path")),
+            "injector_cdp_extension_id": cast(str | None, self.injector.get("injector_cdp_extension_id")),
+            "injector_bb_extension_path": cast(str | None, self.injector.get("injector_bb_extension_path")),
+            "injector_bb_extension_id": cast(str | None, self.injector.get("injector_bb_extension_id")),
+            "injector_discover_extension_path": cast(str | None, self.injector.get("injector_discover_extension_path")),
+            "injector_borrow_extension_path": cast(str | None, self.injector.get("injector_borrow_extension_path")),
+            "injector_service_worker_extension_id": cast(str | None, self.injector.get("injector_service_worker_extension_id")),
+            "injector_bb_api_key": cast(str | None, self.injector.get("injector_bb_api_key")),
+            "injector_bb_base_url": cast(str | None, self.injector.get("injector_bb_base_url")),
             "injector_service_worker_url_includes": cast(list[str], self.injector["injector_service_worker_url_includes"]),
             "injector_service_worker_url_suffixes": cast(list[str], self.injector["injector_service_worker_url_suffixes"]),
             "injector_trust_service_worker_target": trust_service_worker_target,

@@ -2,7 +2,6 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPConfigureParams,
   type ProtocolPayload,
 } from "../types/modcdp.js";
 import {
@@ -36,11 +35,6 @@ export class DownstreamTransportCollection {
   onRequest(handler: DownstreamRequestHandler) {
     const subscriptions = [...this.transports.values()].map((transport) => transport.onRequest(handler));
     return { remove: () => subscriptions.every((subscription) => subscription.remove()) };
-  }
-
-  /** Apply Mod.configure to every downstream transport. */
-  configure(params: ModCDPConfigureParams) {
-    for (const transport of this.transports.values()) transport.configure(params);
   }
 
   /** Start every downstream transport default that exists in this service worker. */

@@ -3,7 +3,6 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPConfigureParams,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
@@ -91,11 +90,6 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
     return this.start(DEFAULT_NATIVE_BRIDGE_HOST_NAME, {
       reconnect_interval_ms: DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
     });
-  }
-
-  /** Native host default lifecycle is not configured by Mod.configure. */
-  configure(_params: ModCDPConfigureParams) {
-    return null;
   }
 
   /** Stop reconnecting and disconnect the active native messaging port. */

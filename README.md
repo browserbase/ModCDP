@@ -34,13 +34,13 @@ You can send `Mod.*`, `Custom.*`, etc. through standard Playwright/Puppeteer/oth
 import { ModCDPClient } from "modcdp";
 import { z } from "zod";
 
-const upstream_cdp_url = "http://127.0.0.1:9222"; // host:port, http(s), and ws(s) URLs work
+const upstream_ws_cdp_url = "http://127.0.0.1:9222"; // host:port, http(s), and ws(s) URLs work
 const cdp = new ModCDPClient({
   launcher: { launcher_mode: "remote" },
-  upstream: { upstream_mode: "ws", upstream_cdp_url },
+  upstream: { upstream_mode: "ws", upstream_ws_cdp_url },
   injector: { injector_mode: "auto" },
   client: { client_routes: { "Target.getTargets": "service_worker" } },
-  server: { server_loopback_cdp_url: upstream_cdp_url, server_routes: { "*.*": "loopback_cdp" } },
+  server: { server_loopback_cdp_url: upstream_ws_cdp_url, server_routes: { "*.*": "loopback_cdp" } },
 });
 await cdp.connect();
 
@@ -131,7 +131,7 @@ The Python package is managed with `uv`; `pnpm run demo:python` runs the built d
 Upgrade any vanilla CDP client like Stagehand, Playwright, or Puppeteer transparently with support for `Mod.*` / `Custom.*` commands and events.
 
 ```sh
-pnpm run proxy -- --upstream-mode=ws --upstream-cdp-url=http://127.0.0.1:9222 --port 9223
+pnpm run proxy -- --upstream-mode=ws --upstream-ws-cdp-url=http://127.0.0.1:9222 --port 9223
 pnpm run proxy -- --launcher-mode=local --upstream-mode=pipe --port 9223
 pnpm run proxy -- --launcher-mode=local --upstream-mode=nativemessaging --port 9223
 pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url=ws://127.0.0.1:4223 --port 9223
@@ -215,7 +215,7 @@ dist/                     Built JS output used by the extension and Node CLI scr
 
 ## Requirements
 
-- Stock Google Chrome can be used without relaunch flags: visit `chrome://inspect/#remote-debugging` to expose the current browser at `http://127.0.0.1:9222`, and load/install the ModCDP extension in that profile. Pass that endpoint as `upstream: { upstream_mode: "ws", upstream_cdp_url: "http://127.0.0.1:9222" }`.
+- Stock Google Chrome can be used without relaunch flags: visit `chrome://inspect/#remote-debugging` to expose the current browser at `http://127.0.0.1:9222`, and load/install the ModCDP extension in that profile. Pass that endpoint as `upstream: { upstream_mode: "ws", upstream_ws_cdp_url: "http://127.0.0.1:9222" }`.
 - Automated/test browsers can still preload the extension with `--load-extension=<path>`. `Extensions.loadUnpacked` is used as a fallback when the connected browser exposes it over CDP.
 - Node ≥ 22, Python ≥ 3.11 with `websocket-client`, Go ≥ 1.25 with `gobwas/ws`.
 
@@ -226,7 +226,7 @@ dist/                     Built JS output used by the extension and Node CLI scr
 
 ### Connect
 
-1. Select a `launcher` class and an `upstream` transport. `launcher.launcher_mode="local"` starts a local browser, `launcher.launcher_mode="remote"` uses the supplied `upstream.upstream_cdp_url`, and `launcher.launcher_mode="none"` leaves browser lifecycle outside ModCDP.
+1. Select a `launcher` class and an `upstream` transport. `launcher.launcher_mode="local"` starts a local browser, `launcher.launcher_mode="remote"` uses the supplied `upstream.upstream_ws_cdp_url`, and `launcher.launcher_mode="none"` leaves browser lifecycle outside ModCDP.
 2. The configured extension injector classes try discovery, launch-arg injection, Browserbase upload, `Extensions.loadUnpacked`, or borrowing in the configured order.
 3. Attach a session to that SW target and `Runtime.enable` on it.
 4. Call `globalThis.ModCDP.configure(...)` to push the resolved loopback websocket and any explicit server route overrides into the SW. The clients do this automatically by default.

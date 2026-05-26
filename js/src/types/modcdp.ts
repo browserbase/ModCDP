@@ -35,6 +35,13 @@ export type TargetAttachedToTargetEvent = z.infer<typeof TargetAttachedToTargetE
 export const ModCDPRoutesSchema = z.object({}).catchall(z.string());
 export type ModCDPRoutes = z.infer<typeof ModCDPRoutesSchema>;
 
+export const ModCDPRouterOptionsSchema = z
+  .object({
+    router_routes: ModCDPRoutesSchema.optional(),
+  })
+  .passthrough();
+export type ModCDPRouterOptions = z.infer<typeof ModCDPRouterOptionsSchema>;
+
 export const ModCDPCustomPayloadSchema = z.object({}).passthrough();
 export type ModCDPCustomPayload = z.infer<typeof ModCDPCustomPayloadSchema>;
 
@@ -149,6 +156,7 @@ export type ModCDPLauncherOptions = z.infer<typeof ModCDPLauncherOptionsSchema>;
 export const ModCDPUpstreamOptionsSchema = z
   .object({
     upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats"]).optional(),
+    upstream_ws_cdp_url: z.string().nullable().optional(),
     upstream_nats_url: z.string().nullable().optional(),
     upstream_nats_subject_prefix: z.string().nullable().optional(),
     upstream_nats_wait_timeout_ms: z.number().positive().optional(),
@@ -161,7 +169,6 @@ export type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;
 
 export const ModCDPClientOptionsSchema = z
   .object({
-    client_routes: ModCDPRoutesSchema.optional(),
     client_hydrate_aliases: z.boolean().optional(),
     client_mirror_upstream_events: z.boolean().optional(),
     client_cdp_send_timeout_ms: z.number().positive().optional(),
@@ -174,7 +181,7 @@ export type ModCDPClientOptions = z.infer<typeof ModCDPClientOptionsSchema>;
 export const ModCDPServerOptionsSchema = z
   .object({
     server_loopback_cdp_url: z.string().nullable().optional(),
-    server_routes: ModCDPRoutesSchema.optional(),
+    router: ModCDPRouterOptionsSchema.optional(),
     server_browser_token: z.string().nullable().optional(),
     server_cdp_send_timeout_ms: z.number().positive().optional(),
     server_loopback_execution_context_timeout_ms: z.number().positive().optional(),
@@ -187,7 +194,6 @@ export type ModCDPServerOptions = z.infer<typeof ModCDPServerOptionsSchema>;
 
 export const ModCDPConfigureParamsSchema = z.object({
   launcher: ModCDPLauncherOptionsSchema.optional(),
-  upstream: ModCDPUpstreamOptionsSchema.optional(),
   client: ModCDPClientOptionsSchema.optional(),
   server: ModCDPServerOptionsSchema.optional(),
   custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),

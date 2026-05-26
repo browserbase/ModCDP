@@ -105,17 +105,17 @@ function clientRoutesFor(mode) {
 function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
   const launcher = cdp_url
     ? ({ launcher_mode: "remote" } as const)
-    : ({ launcher_mode: "local", launcher_options: launch_options } as const);
+    : ({ launcher_mode: "local", ...launch_options } as const);
   const upstream = {
     upstream_mode,
-    upstream_cdp_url: cdp_url,
+    upstream_ws_cdp_url: cdp_url,
     ...(upstream_mode === "reversews"
       ? { upstream_reversews_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS }
       : {}),
     ...(upstream_mode === "nats" ? { upstream_nats_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS } : {}),
   };
   const injector = {
-    injector_mode: "auto" as const,
+    injector_mode: cdp_url ? "discover" as const : "cli" as const,
     injector_extension_path: EXTENSION_PATH,
     injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
     injector_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
@@ -125,8 +125,10 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
       launcher,
       upstream,
       injector,
+      router: {
+        router_routes: clientRoutesFor(mode),
+      },
       client: {
-        client_routes: clientRoutesFor(mode),
         client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
       },
     };
@@ -135,12 +137,14 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     launcher,
     upstream,
     injector,
+    router: {
+      router_routes: clientRoutesFor(mode),
+    },
     client: {
-      client_routes: clientRoutesFor(mode),
       client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
     },
     server: {
-      server_routes: serverRoutesFor(mode, upstream_mode),
+      router: { router_routes: serverRoutesFor(mode, upstream_mode) },
       server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
     },
   };
@@ -229,9 +233,9 @@ async function main() {
   } else {
     cdp_url = null;
     launch_options = {
-      chrome_ready_timeout_ms: 60_000,
-      headless: process.platform === "linux" && !process.env.DISPLAY,
-      sandbox: process.platform !== "linux",
+      launcher_local_chrome_ready_timeout_ms: 60_000,
+      launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
+      launcher_local_sandbox: process.platform !== "linux",
     };
   }
 
@@ -239,29 +243,23 @@ async function main() {
 
   try {
     await cdp.connect();
-    console.log("upstream cdp:", cdp.upstream.upstream_cdp_url);
-    console.log("connected; ext", cdp.extension_id, "session", cdp.ext_session_id);
+    console.log("upstream cdp:", cdp.upstream.upstream_ws_cdp_url);
+    console.log("connected; ext", cdp.injector?.extension_id, "session", cdp.injector?.session_id);
     console.log("connect timing    ->", cdp.connect_timing);
 
     const configureResult = assertObject(
       await cdp.Mod.configure({
-        upstream: {
-          upstream_mode,
-        },
-        client: {
-          client_routes: clientRoutesFor(mode),
-        },
         server: {
-          server_routes: serverRoutesFor(mode, upstream_mode),
+          router: { router_routes: serverRoutesFor(mode, upstream_mode) },
           server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
         },
       }),
       "Mod.configure",
     );
-    if (configureResult.routes?.["*.*"] !== serverRoutesFor(mode, upstream_mode)["*.*"]) {
+    if (configureResult.router?.router_routes?.["*.*"] !== serverRoutesFor(mode, upstream_mode)["*.*"]) {
       throw new Error(`unexpected Mod.configure result ${JSON.stringify(configureResult)}`);
     }
-    console.log("Mod.configure    ->", configureResult.routes);
+    console.log("Mod.configure    ->", configureResult.router);
 
     const ping_sent_at = Date.now();
     const pongPromise = waitForEvent(cdp, "Mod.pong", (event) => event?.sent_at === ping_sent_at);
@@ -285,7 +283,7 @@ async function main() {
     };
     if (
       typeof modcdpEval.extension_id !== "string" ||
-      (cdp.extension_id && modcdpEval.extension_id !== cdp.extension_id)
+      (cdp.injector?.extension_id && modcdpEval.extension_id !== cdp.injector.extension_id)
     )
       throw new Error(`unexpected Mod.evaluate result ${JSON.stringify(modcdpEval)}`);
     console.log("Mod.evaluate     ->", modcdpEval);

@@ -3,7 +3,6 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPConfigureParams,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
@@ -93,12 +92,6 @@ export class ReverseWSDownstreamTransport extends DownstreamTransport {
   /** Start the default reversews listener configured into the shipped extension. */
   startDefault() {
     return this.start("ws://127.0.0.1:29292", { reconnect_interval_ms: DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS });
-  }
-
-  /** Keep reversews alive only for reversews clients; other clients use their own downstream. */
-  configure(params: ModCDPConfigureParams) {
-    if (params.upstream?.upstream_mode === "reversews") return null;
-    return this.stop("non-reverse downstream connected");
   }
 
   /** Stop reconnecting and close the active reversews socket. */

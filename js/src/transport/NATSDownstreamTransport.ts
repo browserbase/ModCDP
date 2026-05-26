@@ -3,11 +3,11 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPConfigureParams,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
 export const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+export const DEFAULT_NATS_BRIDGE_URL = "ws://127.0.0.1:4223";
 export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
 
 /**
@@ -100,17 +100,10 @@ export class NATSDownstreamTransport extends DownstreamTransport {
     };
   }
 
-  /** NATS has no built-in extension default; it starts only from Mod.configure. */
+  /** Start the default NATS bridge configured into the shipped extension. */
   startDefault() {
-    return null;
-  }
-
-  /** Start NATS when the downstream client configured the NATS transport. */
-  configure(params: ModCDPConfigureParams) {
-    const upstream = params.upstream ?? {};
-    if (upstream.upstream_mode !== "nats" || !upstream.upstream_nats_url) return null;
-    return this.start(upstream.upstream_nats_url, {
-      upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix ?? DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
+    return this.start(DEFAULT_NATS_BRIDGE_URL, {
+      upstream_nats_subject_prefix: DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
     });
   }
 

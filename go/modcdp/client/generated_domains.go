@@ -1568,8 +1568,8 @@ func (d ExtensionsDomain) TriggerAction(params ExtensionsTriggerActionParams) (E
 	return sendCDPCommand[ExtensionsTriggerActionResult](d.client, "Extensions.triggerAction", params)
 }
 
-func (d ExtensionsDomain) LoadUnpacked(params ExtensionsLoadUnpackedParams) (ExtensionsLoadUnpackedResult, error) {
-	return sendCDPCommand[ExtensionsLoadUnpackedResult](d.client, "Extensions.loadUnpacked", params)
+func (d ExtensionsDomain) LoadUnpacked(params CDPParams) (CDPResult, error) {
+	return sendCDPCommand[CDPResult](d.client, "Extensions.loadUnpacked", params)
 }
 
 func (d ExtensionsDomain) GetExtensions(params ...ExtensionsGetExtensionsParams) (ExtensionsGetExtensionsResult, error) {

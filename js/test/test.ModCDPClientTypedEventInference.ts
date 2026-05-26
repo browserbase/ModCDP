@@ -4,7 +4,12 @@ import { test } from "vitest";
 import { ModCDPClient } from "../src/client/ModCDPClient.js";
 
 test("typed CDP event tokens infer callback payloads without local type aliases", () => {
-  const cdp = new ModCDPClient();
+  const cdp = new ModCDPClient({
+    launcher: { launcher_mode: "none" },
+    upstream: { upstream_mode: "ws" },
+    injector: { injector_mode: "none" },
+    server: null,
+  });
   const seen: string[] = [];
 
   cdp.on(cdp.Target.targetCreated, (event) => {

@@ -11,34 +11,30 @@ from typing_extensions import NotRequired
 
 class LauncherOptions(TypedDict, total=False):
     launcher_mode: str
-    launcher_executable_path: str | None
-    launcher_user_data_dir: str | None
-    remote_cdp_url: str | None
-    launcher_options: dict[str, Any]
-    executable_path: str | None
-    port: int | None
-    user_data_dir: str | None
-    headless: bool
-    sandbox: bool
-    args: list[str]
-    extra_args: list[str]
-    remote_debugging: str
-    loopback_cdp: bool
-    cleanup_user_data_dir: bool
-    chrome_ready_timeout_ms: int
-    chrome_ready_poll_interval_ms: int
-    cdp_url: str | None
-    browserbase_api_key: str | None
-    browserbase_base_url: str | None
-    browserbase_session_id: str | None
-    browserbase_keep_alive: bool
-    browserbase_close_session_on_close: bool
-    region: str | None
-    timeout: int | None
-    injector_extension_id: str | None
-    browserbase_browser_settings: dict[str, Any] | None
-    browserbase_user_metadata: dict[str, Any] | None
-    browserbase_session_create_params: dict[str, Any] | None
+    launcher_local_executable_path: str | None
+    launcher_local_user_data_dir: str | None
+    launcher_local_cdp_listen_port: int | None
+    launcher_remote_cdp_url: str | None
+    launcher_local_headless: bool
+    launcher_local_sandbox: bool
+    launcher_local_args: list[str]
+    launcher_local_extra_args: list[str]
+    launcher_local_cdp_transport: str
+    launcher_local_loopback_cdp: bool
+    launcher_local_cleanup_user_data_dir: bool
+    launcher_local_chrome_ready_timeout_ms: int
+    launcher_local_chrome_ready_poll_interval_ms: int
+    launcher_bb_api_key: str | None
+    launcher_bb_base_url: str | None
+    launcher_bb_session_id: str | None
+    launcher_bb_keep_alive: bool
+    launcher_bb_close_session_on_close: bool
+    launcher_bb_region: str | None
+    launcher_bb_timeout: int | None
+    launcher_bb_extension_id: str | None
+    launcher_bb_browser_settings: dict[str, Any] | None
+    launcher_bb_user_metadata: dict[str, Any] | None
+    launcher_bb_session_create_params: dict[str, Any] | None
 
 
 class LaunchedBrowser(TypedDict):
@@ -53,6 +49,7 @@ class LaunchedBrowser(TypedDict):
     browserbase_session_id: NotRequired[str | None]
     browserbase_session_url: NotRequired[str | None]
     browserbase_debug_url: NotRequired[str | None]
+    cdp_listen_port: NotRequired[int | None]
 
 
 DEFAULT_CHROME_READY_TIMEOUT_MS = 45_000
@@ -74,10 +71,10 @@ class BrowserLauncher:
             {
                 **self.options,
                 **config,
-                **({"args": merge_chrome_args(self.options.get("args"), config["args"])} if "args" in config else {}),
+                **({"launcher_local_args": merge_chrome_args(self.options.get("launcher_local_args"), config["launcher_local_args"])} if "launcher_local_args" in config else {}),
                 **(
-                    {"extra_args": merge_chrome_args(self.options.get("extra_args"), config["extra_args"])}
-                    if "extra_args" in config
+                    {"launcher_local_extra_args": merge_chrome_args(self.options.get("launcher_local_extra_args"), config["launcher_local_extra_args"])}
+                    if "launcher_local_extra_args" in config
                     else {}
                 ),
             },
@@ -86,10 +83,9 @@ class BrowserLauncher:
 
     def getTransportConfig(self) -> dict[str, Any]:
         return {
-            "cdp_url": (self.launched or {}).get("cdp_url") or self.options.get("cdp_url"),
-            "user_data_dir": (self.launched or {}).get("profile_dir") or self.options.get("user_data_dir"),
-            "pipe_read": (self.launched or {}).get("pipe_read"),
-            "pipe_write": (self.launched or {}).get("pipe_write"),
+            "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.options.get("launcher_remote_cdp_url"),
+            "upstream_pipe_read": (self.launched or {}).get("pipe_read"),
+            "upstream_pipe_write": (self.launched or {}).get("pipe_write"),
         }
 
     def getServerConfig(self) -> dict[str, Any]:
@@ -98,9 +94,9 @@ class BrowserLauncher:
 
     def getInjectorConfig(self) -> dict[str, Any]:
         return {
-            "injector_browserbase_api_key": self.options.get("browserbase_api_key"),
-            "injector_browserbase_base_url": self.options.get("browserbase_base_url"),
-            "injector_extension_id": self.options.get("injector_extension_id"),
+            "injector_bb_api_key": self.options.get("launcher_bb_api_key"),
+            "injector_bb_base_url": self.options.get("launcher_bb_base_url"),
+            "injector_bb_extension_id": self.options.get("launcher_bb_extension_id"),
         }
 
     def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
@@ -128,7 +124,7 @@ def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | N
     return merged
 
 
-def resolveCdpWebSocketUrl(endpoint: str, name: str = "cdp_url") -> str:
+def resolveCdpWebSocketUrl(endpoint: str, name: str = "launcher_remote_cdp_url") -> str:
     if endpoint.startswith(("ws://", "wss://")):
         return endpoint
     http_endpoint = endpoint if CDP_URL_SCHEME_RE.match(endpoint) else f"http://{endpoint}"

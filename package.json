@@ -49,13 +49,13 @@
       "types": "./dist/js/src/launcher/RemoteBrowserLauncher.d.ts",
       "import": "./dist/js/src/launcher/RemoteBrowserLauncher.js"
     },
-    "./launcher/BrowserbaseBrowserLauncher.js": {
-      "types": "./dist/js/src/launcher/BrowserbaseBrowserLauncher.d.ts",
-      "import": "./dist/js/src/launcher/BrowserbaseBrowserLauncher.js"
+    "./launcher/BBBrowserLauncher.js": {
+      "types": "./dist/js/src/launcher/BBBrowserLauncher.d.ts",
+      "import": "./dist/js/src/launcher/BBBrowserLauncher.js"
     },
-    "./launcher/NoopBrowserLauncher.js": {
-      "types": "./dist/js/src/launcher/NoopBrowserLauncher.d.ts",
-      "import": "./dist/js/src/launcher/NoopBrowserLauncher.js"
+    "./launcher/NoneBrowserLauncher.js": {
+      "types": "./dist/js/src/launcher/NoneBrowserLauncher.d.ts",
+      "import": "./dist/js/src/launcher/NoneBrowserLauncher.js"
     },
     "./transport/UpstreamTransport.js": {
       "types": "./dist/js/src/transport/UpstreamTransport.d.ts",
@@ -69,13 +69,13 @@
       "types": "./dist/js/src/transport/DownstreamTransportCollection.d.ts",
       "import": "./dist/js/src/transport/DownstreamTransportCollection.js"
     },
-    "./transport/WebSocketUpstreamTransport.js": {
-      "types": "./dist/js/src/transport/WebSocketUpstreamTransport.d.ts",
-      "import": "./dist/js/src/transport/WebSocketUpstreamTransport.js"
+    "./transport/WSUpstreamTransport.js": {
+      "types": "./dist/js/src/transport/WSUpstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/WSUpstreamTransport.js"
     },
-    "./transport/ReverseWebSocketUpstreamTransport.js": {
-      "types": "./dist/js/src/transport/ReverseWebSocketUpstreamTransport.d.ts",
-      "import": "./dist/js/src/transport/ReverseWebSocketUpstreamTransport.js"
+    "./transport/ReverseWSUpstreamTransport.js": {
+      "types": "./dist/js/src/transport/ReverseWSUpstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/ReverseWSUpstreamTransport.js"
     },
     "./transport/NativeMessagingUpstreamTransport.js": {
       "types": "./dist/js/src/transport/NativeMessagingUpstreamTransport.d.ts",
@@ -85,13 +85,13 @@
       "types": "./dist/js/src/transport/PipeUpstreamTransport.d.ts",
       "import": "./dist/js/src/transport/PipeUpstreamTransport.js"
     },
-    "./transport/NatsUpstreamTransport.js": {
-      "types": "./dist/js/src/transport/NatsUpstreamTransport.d.ts",
-      "import": "./dist/js/src/transport/NatsUpstreamTransport.js"
+    "./transport/NATSUpstreamTransport.js": {
+      "types": "./dist/js/src/transport/NATSUpstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/NATSUpstreamTransport.js"
     },
-    "./transport/ChromeDebuggerTransport.js": {
-      "types": "./dist/js/src/transport/ChromeDebuggerTransport.d.ts",
-      "import": "./dist/js/src/transport/ChromeDebuggerTransport.js"
+    "./transport/ChromeDebuggerUpstreamTransport.js": {
+      "types": "./dist/js/src/transport/ChromeDebuggerUpstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/ChromeDebuggerUpstreamTransport.js"
     },
     "./transport/ReverseWSDownstreamTransport.js": {
       "types": "./dist/js/src/transport/ReverseWSDownstreamTransport.d.ts",
@@ -109,25 +109,25 @@
       "types": "./dist/js/src/injector/ExtensionInjector.d.ts",
       "import": "./dist/js/src/injector/ExtensionInjector.js"
     },
-    "./injector/DiscoveredExtensionInjector.js": {
-      "types": "./dist/js/src/injector/DiscoveredExtensionInjector.d.ts",
-      "import": "./dist/js/src/injector/DiscoveredExtensionInjector.js"
+    "./injector/DiscoverExtensionInjector.js": {
+      "types": "./dist/js/src/injector/DiscoverExtensionInjector.d.ts",
+      "import": "./dist/js/src/injector/DiscoverExtensionInjector.js"
     },
-    "./injector/LocalBrowserLaunchExtensionInjector.js": {
-      "types": "./dist/js/src/injector/LocalBrowserLaunchExtensionInjector.d.ts",
-      "import": "./dist/js/src/injector/LocalBrowserLaunchExtensionInjector.js"
+    "./injector/CLIExtensionInjector.js": {
+      "types": "./dist/js/src/injector/CLIExtensionInjector.d.ts",
+      "import": "./dist/js/src/injector/CLIExtensionInjector.js"
     },
-    "./injector/BBBrowserExtensionInjector.js": {
-      "types": "./dist/js/src/injector/BBBrowserExtensionInjector.d.ts",
-      "import": "./dist/js/src/injector/BBBrowserExtensionInjector.js"
+    "./injector/BBExtensionInjector.js": {
+      "types": "./dist/js/src/injector/BBExtensionInjector.d.ts",
+      "import": "./dist/js/src/injector/BBExtensionInjector.js"
     },
-    "./injector/ExtensionsLoadUnpackedInjector.js": {
-      "types": "./dist/js/src/injector/ExtensionsLoadUnpackedInjector.d.ts",
-      "import": "./dist/js/src/injector/ExtensionsLoadUnpackedInjector.js"
+    "./injector/CDPExtensionInjector.js": {
+      "types": "./dist/js/src/injector/CDPExtensionInjector.d.ts",
+      "import": "./dist/js/src/injector/CDPExtensionInjector.js"
     },
-    "./injector/BorrowedExtensionInjector.js": {
-      "types": "./dist/js/src/injector/BorrowedExtensionInjector.d.ts",
-      "import": "./dist/js/src/injector/BorrowedExtensionInjector.js"
+    "./injector/BorrowExtensionInjector.js": {
+      "types": "./dist/js/src/injector/BorrowExtensionInjector.d.ts",
+      "import": "./dist/js/src/injector/BorrowExtensionInjector.js"
     },
     "./router/AutoSessionRouter.js": {
       "types": "./dist/js/src/router/AutoSessionRouter.d.ts",
@@ -172,7 +172,7 @@
     "demo:proxy:puppeteer": "pnpm run build && node dist/js/examples/puppeteer.js",
     "proxy": "pnpm run build && node dist/js/src/proxy/cli.js",
     "test": "pnpm run build && vitest run --fileParallelism=false --maxWorkers=1",
-    "test:launchers": "vitest run js/test/test.LocalBrowserLauncher.ts js/test/test.RemoteBrowserLauncher.ts js/test/test.BrowserbaseBrowserLauncher.ts",
+    "test:launchers": "vitest run js/test/test.LocalBrowserLauncher.ts js/test/test.RemoteBrowserLauncher.ts js/test/test.BBBrowserLauncher.ts",
     "pack:npm": "pnpm run build && npm pack --ignore-scripts",
     "prepare": "pnpm run build"
   },

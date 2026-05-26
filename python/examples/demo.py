@@ -95,14 +95,14 @@ def parse_args(argv):
 
 
 def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
-    upstream: ProtocolPayload = {"upstream_mode": upstream_mode, "upstream_cdp_url": cdp_url}
+    upstream: ProtocolPayload = {"upstream_mode": upstream_mode, "upstream_ws_cdp_url": cdp_url}
     if upstream_mode == "reversews":
         upstream["upstream_reversews_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
     if upstream_mode == "nats":
         upstream["upstream_nats_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
     if mode == "direct":
         return {
-            "launcher": {"launcher_mode": "remote" if cdp_url else "local", "launcher_options": launch_options or {}},
+            "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
             "upstream": upstream,
             "injector": {
                 "injector_mode": "auto",
@@ -116,7 +116,7 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
         "server_loopback_execution_context_timeout_ms": DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
     }
     return {
-        "launcher": {"launcher_mode": "remote" if cdp_url else "local", "launcher_options": launch_options or {}},
+        "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
         "upstream": upstream,
         "injector": {
             "injector_mode": "auto",
@@ -159,12 +159,12 @@ def main():
         else:
             cdp_url = None
             launch_options: dict[str, object] = {
-                "chrome_ready_timeout_ms": 60_000,
-                "headless": sys.platform.startswith("linux") and not os.environ.get("DISPLAY"),
-                "sandbox": not sys.platform.startswith("linux"),
+                "launcher_local_chrome_ready_timeout_ms": 60_000,
+                "launcher_local_headless": sys.platform.startswith("linux") and not os.environ.get("DISPLAY"),
+                "launcher_local_sandbox": not sys.platform.startswith("linux"),
             }
             if os.environ.get("CHROME_PATH"):
-                launch_options["executable_path"] = os.environ["CHROME_PATH"]
+                launch_options["launcher_local_executable_path"] = os.environ["CHROME_PATH"]
 
         cdp = ModCDPClient(**client_options_for(mode, upstream_mode, cdp_url, launch_options))
 

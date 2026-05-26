@@ -2,12 +2,13 @@ package transport_test
 
 import (
 	. "github.com/browserbase/modcdp/go/modcdp/transport"
+	"reflect"
 	"testing"
 )
 
 func TestNativeMessagingUpstreamTransportConnectsToNativeMessagingStdioDirectly(t *testing.T) {
 	transport := NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{})
-	if transport.GetInjectorConfig().UpstreamNativeMessagingHostName != "com.modcdp.bridge" {
+	if !reflect.DeepEqual(transport.GetInjectorConfig(), InjectorOptions{}) {
 		t.Fatalf("injector config = %#v", transport.GetInjectorConfig())
 	}
 	if len(transport.GetServerConfig()) != 0 {

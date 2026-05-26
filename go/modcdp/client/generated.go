@@ -5665,7 +5665,7 @@ type ExtensionsTriggerActionParams struct {
 type ExtensionsTriggerActionResult struct {
 }
 
-type ExtensionsLoadUnpackedParams struct {
+type CDPParams struct {
 	SessionID string `json:"-"`
 	// Absolute file path.
 	Path string `json:"path"`
@@ -5673,7 +5673,7 @@ type ExtensionsLoadUnpackedParams struct {
 	EnableInIncognito *bool `json:"enableInIncognito,omitempty"`
 }
 
-type ExtensionsLoadUnpackedResult struct {
+type CDPResult struct {
 	// Extension id.
 	ID string `json:"id"`
 }

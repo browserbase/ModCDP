@@ -26,25 +26,23 @@ func boolPtr(value bool) *bool {
 func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	cdp := New(Options{
 		Launcher: LauncherConfig{
-			LauncherMode:           "local",
-			LauncherExecutablePath: "/tmp/chrome",
-			LauncherUserDataDir:    "/tmp/profile",
-			LauncherOptions: LaunchOptions{
-				Headless: boolPtr(true),
-			},
+			LauncherMode:                "local",
+			LauncherLocalExecutablePath: "/tmp/chrome",
+			LauncherLocalUserDataDir:    "/tmp/profile",
+			LauncherLocalHeadless:       boolPtr(true),
 		},
 		Upstream: UpstreamConfig{
 			UpstreamMode:                          "ws",
-			UpstreamCDPURL:                        "http://127.0.0.1:9222",
+			UpstreamWSCDPURL:                      "http://127.0.0.1:9222",
 			UpstreamNATSWaitTimeoutMS:             345,
 			UpstreamReverseWSWaitTimeoutMS:        456,
 			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
-		Injector: InjectorConfig{
+		Injector: InjectorOptions{
 			InjectorMode:                        "discover",
-			InjectorExtensionPath:               "/tmp/ext",
-			InjectorExtensionID:                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			InjectorCLIExtensionPath:            "/tmp/ext",
+			InjectorServiceWorkerExtensionID:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			InjectorServiceWorkerURLIncludes:    []string{"modcdp"},
 			InjectorServiceWorkerURLSuffixes:    []string{"/custom/service_worker.js"},
 			InjectorTrustServiceWorkerTarget:    true,
@@ -71,11 +69,11 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 		},
 	})
 
-	if cdp.Launcher.LauncherOptions.ExecutablePath != "/tmp/chrome" {
-		t.Fatalf("Launcher.LauncherOptions.ExecutablePath = %q", cdp.Launcher.LauncherOptions.ExecutablePath)
+	if cdp.Launcher.LauncherLocalExecutablePath != "/tmp/chrome" {
+		t.Fatalf("Launcher.LauncherLocalExecutablePath = %q", cdp.Launcher.LauncherLocalExecutablePath)
 	}
-	if cdp.Launcher.LauncherOptions.UserDataDir != "/tmp/profile" {
-		t.Fatalf("Launcher.LauncherOptions.UserDataDir = %q", cdp.Launcher.LauncherOptions.UserDataDir)
+	if cdp.Launcher.LauncherLocalUserDataDir != "/tmp/profile" {
+		t.Fatalf("Launcher.LauncherLocalUserDataDir = %q", cdp.Launcher.LauncherLocalUserDataDir)
 	}
 	if cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 321 {
 		t.Fatalf("Upstream.UpstreamWSConnectErrorSettleTimeoutMS = %d", cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS)
@@ -238,15 +236,13 @@ func TestModCDPClientEventDispatchSnapshotsHandlersWhenOnceRemovesItself(t *test
 func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	encoded, err := json.Marshal(Options{
 		Launcher: LauncherConfig{
-			LauncherMode:           "local",
-			LauncherExecutablePath: "/tmp/chrome",
-			LauncherUserDataDir:    "/tmp/profile",
-			LauncherOptions: LaunchOptions{
-				RemoteDebugging:                "pipe",
-				ChromeReadyTimeoutMS:           45_000,
-				BrowserbaseAPIKey:              "test-key",
-				BrowserbaseSessionCreateParams: map[string]any{"keepAlive": true},
-			},
+			LauncherMode:                      "local",
+			LauncherLocalExecutablePath:       "/tmp/chrome",
+			LauncherLocalUserDataDir:          "/tmp/profile",
+			LauncherLocalCDPTransport:         "pipe",
+			LauncherLocalChromeReadyTimeoutMS: 45_000,
+			LauncherBBAPIKey:                  "test-key",
+			LauncherBBSessionCreateParams:     map[string]any{"keepAlive": true},
 		},
 		Upstream: UpstreamConfig{
 			UpstreamMode:                          "nativemessaging",
@@ -256,9 +252,9 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
-		Injector: InjectorConfig{
+		Injector: InjectorOptions{
 			InjectorMode:                         "discover",
-			InjectorExtensionID:                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			InjectorServiceWorkerExtensionID:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			InjectorServiceWorkerURLSuffixes:     []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget:     true,
 			InjectorRequireServiceWorkerTarget:   true,
@@ -281,7 +277,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	}
 	raw := string(encoded)
 	for _, wrong := range []string{
-		"Launcher", "ExecutablePath", "RemoteDebugging", "BrowserbaseAPIKey",
+		"Launcher", "ExecutablePath", "LocalCDPTransport", "BrowserbaseAPIKey",
 		"Upstream", "UpstreamNATSSubjectPrefix", "UpstreamNATSWaitTimeoutMS", "UpstreamReverseWSWaitTimeoutMS", "UpstreamNativeMessagingHostName",
 		"Injector", "InjectorServiceWorkerURLSuffixes", "InjectorTrustServiceWorkerTarget",
 		"Client", "HydrateAliases", "CustomCommands",
@@ -293,12 +289,11 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	for _, expected := range []string{
 		`"launcher"`,
 		`"launcher_mode"`,
-		`"launcher_executable_path"`,
-		`"launcher_user_data_dir"`,
-		`"launcher_options"`,
-		`"remote_debugging"`,
-		`"browserbase_api_key"`,
-		`"browserbase_session_create_params"`,
+		`"launcher_local_executable_path"`,
+		`"launcher_local_user_data_dir"`,
+		`"launcher_local_cdp_transport"`,
+		`"launcher_bb_api_key"`,
+		`"launcher_bb_session_create_params"`,
 		`"upstream"`,
 		`"upstream_mode"`,
 		`"upstream_nats_subject_prefix"`,
@@ -338,7 +333,7 @@ func TestModCDPClientOptionsUnmarshalNullServerDisablesServerConfig(t *testing.T
 
 func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.T) {
 	cdp := New(Options{
-		Injector: InjectorConfig{
+		Injector: InjectorOptions{
 			InjectorMode:                     "borrow",
 			InjectorServiceWorkerURLSuffixes: []string{},
 		},
@@ -347,7 +342,7 @@ func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.
 	if len(cdp.Injector.InjectorServiceWorkerURLSuffixes) != 0 {
 		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Injector.InjectorServiceWorkerURLSuffixes)
 	}
-	injectorConfig := cdp.baseExtensionInjectorConfig(nil)
+	injectorConfig := cdp.baseInjectorOptions(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 0 {
 		t.Fatalf("injector InjectorServiceWorkerURLSuffixes = %#v", injectorConfig.InjectorServiceWorkerURLSuffixes)
 	}
@@ -379,13 +374,13 @@ func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.
 	if len(cdp.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Injector.InjectorServiceWorkerURLSuffixes)
 	}
-	injectorConfig := cdp.baseExtensionInjectorConfig(nil)
+	injectorConfig := cdp.baseInjectorOptions(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 1 || injectorConfig.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("injector InjectorServiceWorkerURLSuffixes = %#v", injectorConfig.InjectorServiceWorkerURLSuffixes)
 	}
 }
 
-func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *testing.T) {
+func TestModCDPClientDefaultsUnconfiguredModCDPServerUpstreamsToNoInjector(t *testing.T) {
 	for _, mode := range []string{"nativemessaging", "reversews", "nats"} {
 		launched := New(Options{
 			Launcher: LauncherConfig{LauncherMode: "local"},
@@ -394,7 +389,7 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 		if launched.Launcher.LauncherMode != "local" {
 			t.Fatalf("%s launched Launcher.LauncherMode = %q", mode, launched.Launcher.LauncherMode)
 		}
-		if launched.Injector.InjectorMode != "auto" {
+		if launched.Injector.InjectorMode != "none" {
 			t.Fatalf("%s launched Injector.InjectorMode = %q", mode, launched.Injector.InjectorMode)
 		}
 
@@ -413,29 +408,29 @@ func TestModCDPClientDefaultsLaunchedModCDPServerUpstreamsToExtensionAuto(t *tes
 func TestModCDPClientOrdersLocalAutoInjectionAsLaunchFlagThenLoadUnpackedFallback(t *testing.T) {
 	cdp := New(Options{
 		Launcher: LauncherConfig{LauncherMode: "local"},
-		Injector: InjectorConfig{InjectorMode: "auto"},
+		Injector: InjectorOptions{InjectorMode: "cli"},
 	})
 
 	got := []string{}
 	for _, injector := range cdp.extensionInjectorsForConfig() {
 		switch injector.(type) {
-		case *LocalBrowserLaunchExtensionInjector:
-			got = append(got, "LocalBrowserLaunchExtensionInjector")
-		case *ExtensionsLoadUnpackedInjector:
-			got = append(got, "ExtensionsLoadUnpackedInjector")
-		case *DiscoveredExtensionInjector:
-			got = append(got, "DiscoveredExtensionInjector")
-		case *BorrowedExtensionInjector:
-			got = append(got, "BorrowedExtensionInjector")
+		case *CLIExtensionInjector:
+			got = append(got, "CLIExtensionInjector")
+		case *CDPExtensionInjector:
+			got = append(got, "CDPExtensionInjector")
+		case *DiscoverExtensionInjector:
+			got = append(got, "DiscoverExtensionInjector")
+		case *BorrowExtensionInjector:
+			got = append(got, "BorrowExtensionInjector")
 		default:
 			got = append(got, fmt.Sprintf("%T", injector))
 		}
 	}
 	want := []string{
-		"LocalBrowserLaunchExtensionInjector",
-		"ExtensionsLoadUnpackedInjector",
-		"DiscoveredExtensionInjector",
-		"BorrowedExtensionInjector",
+		"CLIExtensionInjector",
+		"CDPExtensionInjector",
+		"DiscoverExtensionInjector",
+		"BorrowExtensionInjector",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("injector order = %#v", got)
@@ -457,7 +452,7 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 			name: "launch",
 			cdp: New(Options{
 				Launcher: LauncherConfig{LauncherMode: "bogus"},
-				Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
+				Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
 			}),
 			want: "unknown launcher.launcher_mode=bogus",
 		},
@@ -465,8 +460,8 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 			name: "injector",
 			cdp: New(Options{
 				Launcher: LauncherConfig{LauncherMode: "none"},
-				Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
-				Injector: InjectorConfig{InjectorMode: "bogus"},
+				Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
+				Injector: InjectorOptions{InjectorMode: "bogus"},
 			}),
 			want: "unknown injector.injector_mode=bogus",
 		},
@@ -478,27 +473,6 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 	}
 }
 
-func TestModCDPClientOnlyExposesInjectorEnsureAfterCDPSendIsAvailable(t *testing.T) {
-	cdp := New(Options{})
-	disconnectedConfig := cdp.baseExtensionInjectorConfig(nil)
-	if disconnectedConfig.Send != nil {
-		t.Fatalf("disconnected Send = %#v", disconnectedConfig.Send)
-	}
-	if disconnectedConfig.EnsureSessionForTarget != nil {
-		t.Fatalf("disconnected EnsureSessionForTarget = %#v", disconnectedConfig.EnsureSessionForTarget)
-	}
-
-	connectedConfig := cdp.baseExtensionInjectorConfig(func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-		return map[string]any{}, nil
-	})
-	if connectedConfig.Send == nil {
-		t.Fatal("connected Send is nil")
-	}
-	if connectedConfig.EnsureSessionForTarget == nil {
-		t.Fatal("connected EnsureSessionForTarget is nil")
-	}
-}
-
 func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
 	extensionPath, err := filepath.Abs("../../../dist/extension")
@@ -506,16 +480,15 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "local",
-			LauncherOptions: LaunchOptions{
-				Headless:             boolPtr(headless),
-				ChromeReadyTimeoutMS: 60_000,
-			},
+		Launcher: LauncherConfig{
+			LauncherMode:                      "local",
+			LauncherLocalHeadless:             boolPtr(headless),
+			LauncherLocalChromeReadyTimeoutMS: 60_000,
 		},
 		Upstream: UpstreamConfig{UpstreamMode: "ws"},
-		Injector: InjectorConfig{
-			InjectorMode:                        "auto",
-			InjectorExtensionPath:               extensionPath,
+		Injector: InjectorOptions{
+			InjectorMode:                        "cli",
+			InjectorCLIExtensionPath:            extensionPath,
 			InjectorServiceWorkerURLSuffixes:    []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget:    true,
 			InjectorServiceWorkerProbeTimeoutMS: 30_000,
@@ -535,7 +508,7 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 		t.Fatal(err)
 	}
 	switch cdp.ConnectTiming["injector_source"] {
-	case "discovered", "local_launch", "extensions_load_unpacked", "borrowed":
+	case "discover", "cli", "cdp", "borrow":
 	default:
 		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
 	}
@@ -665,12 +638,12 @@ func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) 
 		t.Fatal(err)
 	}
 	chrome, err := NewLocalBrowserLauncher(LaunchOptions{
-		Headless:             &headless,
-		ChromeReadyTimeoutMS: 60_000,
+		LauncherLocalHeadless:             &headless,
+		LauncherLocalChromeReadyTimeoutMS: 60_000,
 		// This test manually supplies --load-extension, so it intentionally uses
 		// the launch-flag browser path instead of relying on the client fallback.
-		ExecutablePath: reverseWSTestBrowserPath(t),
-		ExtraArgs:      []string{"--load-extension=" + extensionPath},
+		LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
+		LauncherLocalExtraArgs:      []string{"--load-extension=" + extensionPath},
 	}).Launch(LaunchOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -685,11 +658,11 @@ func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) 
 	}
 	defer rawConn.Close()
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "remote"},
-		Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamCDPURL: chrome.CDPURL},
-		Injector: InjectorConfig{
-			InjectorMode:                        "auto",
-			InjectorExtensionPath:               extensionPath,
+		Launcher: LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: chrome.CDPURL},
+		Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: chrome.CDPURL},
+		Injector: InjectorOptions{
+			InjectorMode:                        "cli",
+			InjectorCLIExtensionPath:            extensionPath,
 			InjectorServiceWorkerURLSuffixes:    []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget:    true,
 			InjectorServiceWorkerReadyTimeoutMS: 30_000,
@@ -733,21 +706,20 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "local",
-			LauncherOptions: LaunchOptions{
-				Headless: boolPtr(true),
-				// After explicit CHROME_PATH and CI /usr/bin/chromium, this test uses
-				// Chrome for Testing because Canary rejects --load-extension in this
-				// local launch injector path.
-				ExecutablePath: reverseWSTestBrowserPath(t),
-			},
+		Launcher: LauncherConfig{
+			LauncherMode:          "local",
+			LauncherLocalHeadless: boolPtr(true),
+			// After explicit CHROME_PATH and CI /usr/bin/chromium, this test uses
+			// Chrome for Testing because Canary rejects --load-extension in this
+			// local launch injector path.
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamConfig{
 			UpstreamMode: "ws",
 		},
-		Injector: InjectorConfig{
-			InjectorMode:                     "auto",
-			InjectorExtensionPath:            extensionPath,
+		Injector: InjectorOptions{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
@@ -758,14 +730,14 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	var localLaunchInjector *LocalBrowserLaunchExtensionInjector
+	var localLaunchInjector *CLIExtensionInjector
 	for _, injector := range cdp.extensionInjectors {
-		if typed, ok := injector.(*LocalBrowserLaunchExtensionInjector); ok {
+		if typed, ok := injector.(*CLIExtensionInjector); ok {
 			localLaunchInjector = typed
 		}
 	}
 	if localLaunchInjector == nil {
-		t.Fatal("expected LocalBrowserLaunchExtensionInjector")
+		t.Fatal("expected CLIExtensionInjector")
 	}
 	unpackedExtensionPath := localLaunchInjector.UnpackedExtensionPath
 	if unpackedExtensionPath == extensionPath {
@@ -800,14 +772,13 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 
 func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "local",
-			LauncherOptions: LaunchOptions{
-				Headless: boolPtr(true),
-			},
+		Launcher: LauncherConfig{
+			LauncherMode:          "local",
+			LauncherLocalHeadless: boolPtr(true),
 		},
 		Upstream: UpstreamConfig{UpstreamMode: "ws"},
-		Injector: InjectorConfig{
-			InjectorMode:                     "auto",
+		Injector: InjectorOptions{
+			InjectorMode:                     "cli",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
@@ -815,7 +786,7 @@ func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	transport, ok := cdp.transport.(*WebSocketUpstreamTransport)
+	transport, ok := cdp.transport.(*WSUpstreamTransport)
 	if !ok {
 		t.Fatalf("transport = %T", cdp.transport)
 	}

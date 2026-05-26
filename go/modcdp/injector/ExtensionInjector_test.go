@@ -7,9 +7,9 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/injector"
 )
 
-func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
-	injector := NewExtensionInjector(ExtensionInjectorConfig{
-		InjectorExtensionID:              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+func TestExtensionInjectorOwnsSharedInjectorOptions(t *testing.T) {
+	injector := NewExtensionInjector(InjectorOptions{
+		InjectorServiceWorkerExtensionID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 	})
 
@@ -17,7 +17,7 @@ func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
 	if transportConfig["injector_extension_id"] != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
 		t.Fatalf("injector_extension_id = %v", transportConfig["injector_extension_id"])
 	}
-	if len(injector.GetLauncherConfig().ExtraArgs) != 0 {
+	if len(injector.GetLauncherConfig().LauncherLocalExtraArgs) != 0 {
 		t.Fatalf("expected empty launcher config")
 	}
 	if !injector.ServiceWorkerTargetMatches(map[string]any{
@@ -37,7 +37,7 @@ func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
 }
 
 func TestExtensionInjectorBaseInjectReportsTheClassName(t *testing.T) {
-	injector := NewExtensionInjector(ExtensionInjectorConfig{})
+	injector := NewExtensionInjector(InjectorOptions{})
 	if _, err := injector.Inject(); err == nil || !strings.Contains(err.Error(), "ExtensionInjector.Inject is not implemented") {
 		t.Fatalf("Inject error = %v", err)
 	}

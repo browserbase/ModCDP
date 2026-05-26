@@ -33,7 +33,7 @@ const demoExecutionContextTimeoutMS = 60_000
 const reverseTransportWaitTimeoutMS = 60_000
 
 func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
-	upstream := modcdp.UpstreamConfig{UpstreamMode: upstreamMode, UpstreamCDPURL: cdpURL}
+	upstream := modcdp.UpstreamConfig{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
 	if upstreamMode == "reversews" {
 		upstream.UpstreamReverseWSWaitTimeoutMS = reverseTransportWaitTimeoutMS
 	}

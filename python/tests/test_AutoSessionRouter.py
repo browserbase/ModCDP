@@ -14,7 +14,7 @@ from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
 
 class AutoSessionRouterTests(unittest.TestCase):
     def test_tracks_real_target_sessions_and_execution_contexts(self) -> None:
-        chrome = LocalBrowserLauncher({"headless": True}).launch()
+        chrome = LocalBrowserLauncher({"launcher_local_headless": True}).launch()
         ws = create_connection(str(chrome["cdp_url"]), timeout=10)
         lock = threading.Lock()
         next_id = 0

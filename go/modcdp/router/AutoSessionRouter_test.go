@@ -17,7 +17,7 @@ import (
 func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testing.T) {
 	headless := true
 	chrome, err := launcher.NewLocalBrowserLauncher(launcher.LaunchOptions{
-		Headless: &headless,
+		LauncherLocalHeadless: &headless,
 	}).Launch(launcher.LaunchOptions{})
 	if err != nil {
 		t.Fatal(err)

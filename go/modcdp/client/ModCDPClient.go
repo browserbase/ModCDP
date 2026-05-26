@@ -65,46 +65,45 @@ type LaunchedBrowser = launcher.LaunchedBrowser
 type BrowserLauncher = launcher.BrowserLauncher
 type LocalBrowserLauncher = launcher.LocalBrowserLauncher
 type RemoteBrowserLauncher = launcher.RemoteBrowserLauncher
-type BrowserbaseBrowserLauncher = launcher.BrowserbaseBrowserLauncher
-type NoopBrowserLauncher = launcher.NoopBrowserLauncher
-type ExtensionInjectorConfig = types.ExtensionInjectorConfig
+type BBBrowserLauncher = launcher.BBBrowserLauncher
+type NoneBrowserLauncher = launcher.NoneBrowserLauncher
+type InjectorOptions = types.InjectorOptions
 type ExtensionInjectionResult = types.ExtensionInjectionResult
 type SendCDP = types.SendCDP
-type EnsureSessionForTarget = types.EnsureSessionForTarget
 type ExtensionInjector = injector.ExtensionInjector
-type DiscoveredExtensionInjector = injector.DiscoveredExtensionInjector
-type BBBrowserExtensionInjector = injector.BBBrowserExtensionInjector
-type LocalBrowserLaunchExtensionInjector = injector.LocalBrowserLaunchExtensionInjector
-type ExtensionsLoadUnpackedInjector = injector.ExtensionsLoadUnpackedInjector
-type BorrowedExtensionInjector = injector.BorrowedExtensionInjector
+type DiscoverExtensionInjector = injector.DiscoverExtensionInjector
+type BBExtensionInjector = injector.BBExtensionInjector
+type CLIExtensionInjector = injector.CLIExtensionInjector
+type CDPExtensionInjector = injector.CDPExtensionInjector
+type BorrowExtensionInjector = injector.BorrowExtensionInjector
 type UpstreamMode = transportpkg.UpstreamMode
 type UpstreamTransport = transportpkg.UpstreamTransport
-type WebSocketUpstreamTransport = transportpkg.WebSocketUpstreamTransport
-type WebSocketUpstreamTransportOptions = transportpkg.WebSocketUpstreamTransportOptions
+type WSUpstreamTransport = transportpkg.WSUpstreamTransport
+type WSUpstreamTransportOptions = transportpkg.WSUpstreamTransportOptions
 type PipeUpstreamTransport = transportpkg.PipeUpstreamTransport
 type PipeUpstreamTransportOptions = transportpkg.PipeUpstreamTransportOptions
-type ReverseWebSocketUpstreamTransport = transportpkg.ReverseWebSocketUpstreamTransport
-type ReverseWebSocketUpstreamTransportOptions = transportpkg.ReverseWebSocketUpstreamTransportOptions
+type ReverseWSUpstreamTransport = transportpkg.ReverseWSUpstreamTransport
+type ReverseWSUpstreamTransportOptions = transportpkg.ReverseWSUpstreamTransportOptions
 type NativeMessagingUpstreamTransport = transportpkg.NativeMessagingUpstreamTransport
 type NativeMessagingUpstreamTransportOptions = transportpkg.NativeMessagingUpstreamTransportOptions
-type NatsUpstreamUpstreamTransport = transportpkg.NatsUpstreamUpstreamTransport
-type NatsUpstreamUpstreamTransportOptions = transportpkg.NatsUpstreamUpstreamTransportOptions
+type NATSUpstreamTransport = transportpkg.NATSUpstreamTransport
+type NATSUpstreamTransportOptions = transportpkg.NATSUpstreamTransportOptions
 type AutoSessionRouter = router.AutoSessionRouter
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
 var NewRemoteBrowserLauncher = launcher.NewRemoteBrowserLauncher
-var NewBrowserbaseBrowserLauncher = launcher.NewBrowserbaseBrowserLauncher
-var NewNoopBrowserLauncher = launcher.NewNoopBrowserLauncher
-var NewDiscoveredExtensionInjector = injector.NewDiscoveredExtensionInjector
-var NewBBBrowserExtensionInjector = injector.NewBBBrowserExtensionInjector
-var NewLocalBrowserLaunchExtensionInjector = injector.NewLocalBrowserLaunchExtensionInjector
-var NewExtensionsLoadUnpackedInjector = injector.NewExtensionsLoadUnpackedInjector
-var NewBorrowedExtensionInjector = injector.NewBorrowedExtensionInjector
-var NewWebSocketUpstreamTransport = transportpkg.NewWebSocketUpstreamTransport
+var NewBBBrowserLauncher = launcher.NewBBBrowserLauncher
+var NewNoneBrowserLauncher = launcher.NewNoneBrowserLauncher
+var NewDiscoverExtensionInjector = injector.NewDiscoverExtensionInjector
+var NewBBExtensionInjector = injector.NewBBExtensionInjector
+var NewCLIExtensionInjector = injector.NewCLIExtensionInjector
+var NewCDPExtensionInjector = injector.NewCDPExtensionInjector
+var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
+var NewWSUpstreamTransport = transportpkg.NewWSUpstreamTransport
 var NewPipeUpstreamTransport = transportpkg.NewPipeUpstreamTransport
-var NewReverseWebSocketUpstreamTransport = transportpkg.NewReverseWebSocketUpstreamTransport
+var NewReverseWSUpstreamTransport = transportpkg.NewReverseWSUpstreamTransport
 var NewNativeMessagingUpstreamTransport = transportpkg.NewNativeMessagingUpstreamTransport
-var NewNatsUpstreamUpstreamTransport = transportpkg.NewNatsUpstreamUpstreamTransport
+var NewNATSUpstreamTransport = transportpkg.NewNATSUpstreamTransport
 var NewAutoSessionRouter = router.NewAutoSessionRouter
 
 var DefaultModCDPServiceWorkerURLSuffixes = injector.DefaultModCDPServiceWorkerURLSuffixes
@@ -207,16 +206,11 @@ type CustomMiddleware struct {
 	Expression string `json:"expression"`
 }
 
-type LauncherConfig struct {
-	LauncherMode           string        `json:"launcher_mode,omitempty"`
-	LauncherExecutablePath string        `json:"launcher_executable_path,omitempty"`
-	LauncherUserDataDir    string        `json:"launcher_user_data_dir,omitempty"`
-	LauncherOptions        LaunchOptions `json:"launcher_options,omitempty"`
-}
+type LauncherConfig = LaunchOptions
 
 type UpstreamConfig struct {
 	UpstreamMode                          string `json:"upstream_mode,omitempty"`
-	UpstreamCDPURL                        string `json:"upstream_cdp_url,omitempty"`
+	UpstreamWSCDPURL                      string `json:"upstream_ws_cdp_url,omitempty"`
 	UpstreamNATSURL                       string `json:"upstream_nats_url,omitempty"`
 	UpstreamNATSSubjectPrefix             string `json:"upstream_nats_subject_prefix,omitempty"`
 	UpstreamNATSWaitTimeoutMS             int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
@@ -224,22 +218,6 @@ type UpstreamConfig struct {
 	UpstreamReverseWSWaitTimeoutMS        int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
 	UpstreamNativeMessagingHostName       string `json:"upstream_nativemessaging_host_name,omitempty"`
 	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
-}
-
-type InjectorConfig struct {
-	InjectorMode                         string   `json:"injector_mode,omitempty"`
-	InjectorExtensionPath                string   `json:"injector_extension_path,omitempty"`
-	InjectorExtensionID                  string   `json:"injector_extension_id,omitempty"`
-	InjectorServiceWorkerURLIncludes     []string `json:"injector_service_worker_url_includes,omitempty"`
-	InjectorServiceWorkerURLSuffixes     []string `json:"injector_service_worker_url_suffixes,omitempty"`
-	InjectorTrustServiceWorkerTarget     bool     `json:"injector_trust_service_worker_target,omitempty"`
-	InjectorRequireServiceWorkerTarget   bool     `json:"injector_require_service_worker_target,omitempty"`
-	InjectorServiceWorkerReadyExpression string   `json:"injector_service_worker_ready_expression,omitempty"`
-	InjectorExecutionContextTimeoutMS    int      `json:"injector_execution_context_timeout_ms,omitempty"`
-	InjectorServiceWorkerProbeTimeoutMS  int      `json:"injector_service_worker_probe_timeout_ms,omitempty"`
-	InjectorServiceWorkerReadyTimeoutMS  int      `json:"injector_service_worker_ready_timeout_ms,omitempty"`
-	InjectorServiceWorkerPollIntervalMS  int      `json:"injector_service_worker_poll_interval_ms,omitempty"`
-	InjectorTargetSessionPollIntervalMS  int      `json:"injector_target_session_poll_interval_ms,omitempty"`
 }
 
 type ClientConfig struct {
@@ -254,7 +232,7 @@ type ClientConfig struct {
 type Options struct {
 	Launcher          LauncherConfig     `json:"launcher,omitempty"`
 	Upstream          UpstreamConfig     `json:"upstream,omitempty"`
-	Injector          InjectorConfig     `json:"injector,omitempty"`
+	Injector          InjectorOptions    `json:"injector,omitempty"`
 	Client            ClientConfig       `json:"client,omitempty"`
 	Server            *ServerConfig      `json:"server,omitempty"`
 	CustomCommands    []CustomCommand    `json:"custom_commands,omitempty"`
@@ -369,7 +347,7 @@ type ModCDPClient struct {
 
 	Launcher                 LauncherConfig
 	Upstream                 UpstreamConfig
-	Injector                 InjectorConfig
+	Injector                 InjectorOptions
 	Client                   ClientConfig
 	Server                   *ServerConfig
 	CustomCommands           []CustomCommand
@@ -404,7 +382,7 @@ type ModCDPClient struct {
 }
 
 type extensionInjector interface {
-	Update(ExtensionInjectorConfig) *ExtensionInjector
+	Update(InjectorOptions) *ExtensionInjector
 	GetLauncherConfig() LaunchOptions
 	GetTransportConfig() map[string]any
 	Prepare() error
@@ -414,7 +392,7 @@ type extensionInjector interface {
 
 type browserLauncherClient interface {
 	Update(LaunchOptions) *BrowserLauncher
-	GetInjectorConfig() ExtensionInjectorConfig
+	GetInjectorConfig() InjectorOptions
 	GetTransportConfig() map[string]any
 	GetServerConfig() map[string]any
 	Launch(LaunchOptions) (*LaunchedBrowser, error)
@@ -426,7 +404,7 @@ type upstreamTransportClient interface {
 	Close() error
 	Send(map[string]any) error
 	GetLauncherConfig() LaunchOptions
-	GetInjectorConfig() ExtensionInjectorConfig
+	GetInjectorConfig() InjectorOptions
 	GetServerConfig() map[string]any
 	OnRecv(func(map[string]any)) func()
 	OnClose(func(error)) func()
@@ -439,7 +417,7 @@ func New(opts Options) *ModCDPClient {
 		opts.Upstream.UpstreamMode = "ws"
 	}
 	if opts.Launcher.LauncherMode == "" {
-		if opts.Upstream.UpstreamMode == "ws" && opts.Upstream.UpstreamCDPURL != "" {
+		if opts.Upstream.UpstreamMode == "ws" && opts.Upstream.UpstreamWSCDPURL != "" {
 			opts.Launcher.LauncherMode = "remote"
 		} else if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" {
 			opts.Launcher.LauncherMode = "local"
@@ -448,20 +426,7 @@ func New(opts Options) *ModCDPClient {
 		}
 	}
 	if opts.Injector.InjectorMode == "" {
-		if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" || opts.Launcher.LauncherMode != "none" {
-			opts.Injector.InjectorMode = "auto"
-		} else {
-			opts.Injector.InjectorMode = "none"
-		}
-	}
-	if opts.Launcher.LauncherExecutablePath != "" {
-		opts.Launcher.LauncherOptions.ExecutablePath = opts.Launcher.LauncherExecutablePath
-	}
-	if opts.Launcher.LauncherUserDataDir != "" {
-		opts.Launcher.LauncherOptions.UserDataDir = opts.Launcher.LauncherUserDataDir
-	}
-	if opts.Upstream.UpstreamCDPURL != "" {
-		opts.Launcher.LauncherOptions.RemoteCDPURL = opts.Upstream.UpstreamCDPURL
+		opts.Injector.InjectorMode = "none"
 	}
 	if opts.Client.ClientRoutes == nil {
 		opts.Client.ClientRoutes = translate.DefaultClientRoutes()
@@ -718,9 +683,9 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	initialTransportConfig := c.upstreamTransportConfig()
 
 	transport.Update(initialTransportConfig)
-	launcher.Update(c.Launcher.LauncherOptions)
+	launcher.Update(c.Launcher)
 	for _, injector := range injectors {
-		injector.Update(c.baseExtensionInjectorConfig(nil))
+		injector.Update(c.baseInjectorOptions(nil))
 	}
 	for _, injector := range injectors {
 		injector.Update(launcher.GetInjectorConfig())
@@ -740,7 +705,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		transport.Update(injector.GetTransportConfig())
 	}
 	launcher.Update(transport.GetLauncherConfig())
-	launcher.Update(LaunchOptions{LoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
+	launcher.Update(LaunchOptions{LauncherLocalLoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
 	transport.Update(launcher.GetTransportConfig())
 
 	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
@@ -780,9 +745,9 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	} else {
 		c.CDPURL = launchedCDPURL
 	}
-	if wsTransport, ok := transport.(*WebSocketUpstreamTransport); ok && wsTransport.URL != "" {
+	if wsTransport, ok := transport.(*WSUpstreamTransport); ok && wsTransport.URL != "" {
 		// For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
-		c.Upstream.UpstreamCDPURL = wsTransport.URL
+		c.Upstream.UpstreamWSCDPURL = wsTransport.URL
 	}
 
 	serverConfig := map[string]any{}
@@ -797,7 +762,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	}
 	if c.Server != nil {
 		if loopbackCDPURL, _ := serverConfig["server_loopback_cdp_url"].(string); loopbackCDPURL != "" {
-			initialCDPURL, _ := initialTransportConfig["cdp_url"].(string)
+			initialCDPURL, _ := initialTransportConfig["upstream_ws_cdp_url"].(string)
 			if c.Server.ServerLoopbackCDPURL == "" ||
 				c.Server.ServerLoopbackCDPURL == initialCDPURL ||
 				c.Server.ServerLoopbackCDPURL == launchedCDPURL {
@@ -835,14 +800,14 @@ func (c *ModCDPClient) ensureModCDPServerConfigured() error {
 
 func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	return map[string]any{
-		"cdp_url":                            c.Upstream.UpstreamCDPURL,
-		"upstream_nats_url":                  c.Upstream.UpstreamNATSURL,
-		"upstream_nats_subject_prefix":       c.Upstream.UpstreamNATSSubjectPrefix,
-		"upstream_nats_wait_timeout_ms":      c.Upstream.UpstreamNATSWaitTimeoutMS,
-		"upstream_reversews_bind":            c.Upstream.UpstreamReverseWSBind,
-		"upstream_reversews_wait_timeout_ms": c.Upstream.UpstreamReverseWSWaitTimeoutMS,
-		"upstream_nativemessaging_host_name": c.Upstream.UpstreamNativeMessagingHostName,
-		"injector_extension_id":              c.Injector.InjectorExtensionID,
+		"upstream_ws_cdp_url":                  c.Upstream.UpstreamWSCDPURL,
+		"upstream_nats_url":                    c.Upstream.UpstreamNATSURL,
+		"upstream_nats_subject_prefix":         c.Upstream.UpstreamNATSSubjectPrefix,
+		"upstream_nats_wait_timeout_ms":        c.Upstream.UpstreamNATSWaitTimeoutMS,
+		"upstream_reversews_bind":              c.Upstream.UpstreamReverseWSBind,
+		"upstream_reversews_wait_timeout_ms":   c.Upstream.UpstreamReverseWSWaitTimeoutMS,
+		"upstream_nativemessaging_host_name":   c.Upstream.UpstreamNativeMessagingHostName,
+		"injector_service_worker_extension_id": c.Injector.InjectorServiceWorkerExtensionID,
 	}
 }
 
@@ -862,7 +827,7 @@ func (c *ModCDPClient) initializeRawCDPTransport() error {
 
 func transportURL(transport upstreamTransportClient) string {
 	switch typed := transport.(type) {
-	case *WebSocketUpstreamTransport:
+	case *WSUpstreamTransport:
 		return typed.URL
 	default:
 		return ""
@@ -1431,13 +1396,13 @@ func (c *ModCDPClient) LaunchedBrowser() *LaunchedBrowser {
 func (c *ModCDPClient) browserLauncher() browserLauncherClient {
 	switch c.Launcher.LauncherMode {
 	case "local":
-		return NewLocalBrowserLauncher(c.Launcher.LauncherOptions)
+		return NewLocalBrowserLauncher(c.Launcher)
 	case "remote":
-		return NewRemoteBrowserLauncher(c.Launcher.LauncherOptions)
+		return NewRemoteBrowserLauncher(c.Launcher)
 	case "bb":
-		return NewBrowserbaseBrowserLauncher(c.Launcher.LauncherOptions)
+		return NewBBBrowserLauncher(c.Launcher)
 	case "none":
-		return NewNoopBrowserLauncher(c.Launcher.LauncherOptions)
+		return NewNoneBrowserLauncher(c.Launcher)
 	default:
 		return nil
 	}
@@ -1446,17 +1411,17 @@ func (c *ModCDPClient) browserLauncher() browserLauncherClient {
 func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 	switch c.Upstream.UpstreamMode {
 	case "ws":
-		return NewWebSocketUpstreamTransport(WebSocketUpstreamTransportOptions{})
+		return NewWSUpstreamTransport(WSUpstreamTransportOptions{})
 	case "pipe":
 		return NewPipeUpstreamTransport(PipeUpstreamTransportOptions{})
 	case "reversews":
-		return NewReverseWebSocketUpstreamTransport(ReverseWebSocketUpstreamTransportOptions{})
+		return NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{})
 	case "nativemessaging":
 		return NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{
 			UpstreamNativeMessagingHostName: c.Upstream.UpstreamNativeMessagingHostName,
 		})
 	case "nats":
-		return NewNatsUpstreamUpstreamTransport(NatsUpstreamUpstreamTransportOptions{
+		return NewNATSUpstreamTransport(NATSUpstreamTransportOptions{
 			UpstreamNATSURL:           c.Upstream.UpstreamNATSURL,
 			UpstreamNATSSubjectPrefix: c.Upstream.UpstreamNATSSubjectPrefix,
 			UpstreamNATSWaitTimeoutMS: c.Upstream.UpstreamNATSWaitTimeoutMS,
@@ -1470,33 +1435,27 @@ func (c *ModCDPClient) extensionInjectorsForConfig() []extensionInjector {
 	if c.Injector.InjectorMode == "none" {
 		return nil
 	}
-	var injectors []extensionInjector
-	preferLaunchInjection := c.Injector.InjectorMode == "auto" && c.Launcher.LauncherMode == "local"
-	if (c.Injector.InjectorMode == "auto" || c.Injector.InjectorMode == "discover") && !preferLaunchInjection {
-		injector := NewDiscoveredExtensionInjector(ExtensionInjectorConfig{})
-		injectors = append(injectors, &injector)
+	if c.Injector.InjectorMode == "cli" {
+		injector := NewCLIExtensionInjector(InjectorOptions{})
+		return []extensionInjector{&injector}
 	}
-	if c.Injector.InjectorMode == "auto" || c.Injector.InjectorMode == "inject" {
-		if c.Launcher.LauncherMode == "bb" {
-			injector := NewBBBrowserExtensionInjector(ExtensionInjectorConfig{})
-			injectors = append(injectors, &injector)
-		}
-		if c.Launcher.LauncherMode == "local" {
-			injector := NewLocalBrowserLaunchExtensionInjector(ExtensionInjectorConfig{})
-			injectors = append(injectors, &injector)
-		}
-		injector := NewExtensionsLoadUnpackedInjector(ExtensionInjectorConfig{})
-		injectors = append(injectors, &injector)
+	if c.Injector.InjectorMode == "cdp" {
+		injector := NewCDPExtensionInjector(InjectorOptions{})
+		return []extensionInjector{&injector}
 	}
-	if preferLaunchInjection {
-		injector := NewDiscoveredExtensionInjector(ExtensionInjectorConfig{})
-		injectors = append(injectors, &injector)
+	if c.Injector.InjectorMode == "bb" {
+		injector := NewBBExtensionInjector(InjectorOptions{})
+		return []extensionInjector{&injector}
 	}
-	if c.Injector.InjectorMode == "auto" || c.Injector.InjectorMode == "borrow" {
-		injector := NewBorrowedExtensionInjector(ExtensionInjectorConfig{})
-		injectors = append(injectors, &injector)
+	if c.Injector.InjectorMode == "discover" {
+		injector := NewDiscoverExtensionInjector(InjectorOptions{})
+		return []extensionInjector{&injector}
 	}
-	return injectors
+	if c.Injector.InjectorMode == "borrow" {
+		injector := NewBorrowExtensionInjector(InjectorOptions{})
+		return []extensionInjector{&injector}
+	}
+	return nil
 }
 
 func isKnownLaunchMode(mode string) bool {
@@ -1508,27 +1467,22 @@ func isKnownUpstreamMode(mode string) bool {
 }
 
 func isKnownExtensionMode(mode string) bool {
-	return mode == "auto" || mode == "discover" || mode == "inject" || mode == "borrow" || mode == "none"
+	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "discover" || mode == "borrow" || mode == "none"
 }
 
-func (c *ModCDPClient) baseExtensionInjectorConfig(send SendCDP) ExtensionInjectorConfig {
+func (c *ModCDPClient) baseInjectorOptions(send SendCDP) InjectorOptions {
 	trustMatchedServiceWorker := c.trustServiceWorkerTarget()
-	var ensureSessionForTarget EnsureSessionForTarget
-	if send != nil {
-		ensureSessionForTarget = func(targetID string, timeoutMS int, allowAttach bool) string {
-			return c.ensureSessionForTarget(targetID, time.Duration(timeoutMS)*time.Millisecond, allowAttach)
-		}
-	}
-	return ExtensionInjectorConfig{
-		Send:                    send,
-		SessionId_from_targetId: c.router.SessionId_from_targetId,
-		EnsureSessionForTarget:  ensureSessionForTarget,
-		WaitForExecutionContext: func(sessionID string, timeoutMS int) int {
-			contextID, _ := c.router.WaitForExecutionContext(sessionID, timeoutMS)
-			return contextID
-		},
-		InjectorExtensionPath:                c.Injector.InjectorExtensionPath,
-		InjectorExtensionID:                  c.Injector.InjectorExtensionID,
+	return InjectorOptions{
+		Send:                                 send,
+		InjectorCLIExtensionPath:             c.Injector.InjectorCLIExtensionPath,
+		InjectorCLIExtensionID:               c.Injector.InjectorCLIExtensionID,
+		InjectorCDPExtensionPath:             c.Injector.InjectorCDPExtensionPath,
+		InjectorCDPExtensionID:               c.Injector.InjectorCDPExtensionID,
+		InjectorBBExtensionPath:              c.Injector.InjectorBBExtensionPath,
+		InjectorBBExtensionID:                c.Injector.InjectorBBExtensionID,
+		InjectorDiscoverExtensionPath:        c.Injector.InjectorDiscoverExtensionPath,
+		InjectorBorrowExtensionPath:          c.Injector.InjectorBorrowExtensionPath,
+		InjectorServiceWorkerExtensionID:     c.Injector.InjectorServiceWorkerExtensionID,
 		InjectorServiceWorkerURLIncludes:     c.Injector.InjectorServiceWorkerURLIncludes,
 		InjectorServiceWorkerURLSuffixes:     c.Injector.InjectorServiceWorkerURLSuffixes,
 		InjectorTrustServiceWorkerTarget:     trustMatchedServiceWorker,
@@ -1552,7 +1506,7 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 	}
 	var errors []string
 	for _, injector := range injectors {
-		injector.Update(c.baseExtensionInjectorConfig(send))
+		injector.Update(c.baseInjectorOptions(send))
 		if err := injector.Prepare(); err != nil {
 			errors = append(errors, fmt.Sprintf("%T: %v", injector, err))
 			continue
@@ -1883,29 +1837,4 @@ func (c *ModCDPClient) trustServiceWorkerTarget() bool {
 		}
 	}
 	return false
-}
-
-func (c *ModCDPClient) ensureSessionForTarget(targetID string, timeout time.Duration, allowAttach bool) string {
-	sessionID := c.router.SessionId_from_targetId[targetID]
-	if sessionID != "" {
-		return sessionID
-	}
-	if allowAttach {
-		attachedSessionID := c.router.AttachToTarget(targetID)
-		if attachedSessionID != "" {
-			return attachedSessionID
-		}
-	}
-	if timeout <= 0 {
-		return c.router.SessionId_from_targetId[targetID]
-	}
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline.Add(time.Millisecond)) {
-		sessionID := c.router.SessionId_from_targetId[targetID]
-		if sessionID != "" {
-			return sessionID
-		}
-		time.Sleep(time.Duration(c.Injector.InjectorTargetSessionPollIntervalMS) * time.Millisecond)
-	}
-	return ""
 }

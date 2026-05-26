@@ -20,10 +20,10 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	stop := transport.OnRecv(func(message map[string]any) { received = append(received, message) })
 
 	transport.Update(nil)
-	if len(transport.GetLauncherConfig().ExtraArgs) != 0 {
+	if len(transport.GetLauncherConfig().LauncherLocalExtraArgs) != 0 {
 		t.Fatal("expected empty launcher config")
 	}
-	if transport.GetInjectorConfig().InjectorExtensionID != "" {
+	if transport.GetInjectorConfig().InjectorServiceWorkerExtensionID != "" {
 		t.Fatal("expected empty injector config")
 	}
 	if len(transport.GetServerConfig()) != 0 {

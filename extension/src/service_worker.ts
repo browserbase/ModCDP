@@ -27,7 +27,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       },
       server: {
         __ModCDPServerVersion: ModCDPServer.__ModCDPServerVersion,
-        routes: ModCDPServer.routes,
+        router: ModCDPServer.router,
         loopback_cdp_url: ModCDPServer.loopback_cdp_url,
         browser_token: ModCDPServer.browser_token ? "set" : null,
         cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,

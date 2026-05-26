@@ -37,22 +37,22 @@ func (l *LocalBrowserLauncher) FreePort() (int, error) {
 func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
 	options = mergeLaunchOptions(l.Options, options)
 
-	executablePath, err := l.FindChromeBinary(options.ExecutablePath)
+	executablePath, err := l.FindChromeBinary(options.LauncherLocalExecutablePath)
 	if err != nil {
 		return nil, err
 	}
-	chromeReadyTimeoutMS := options.ChromeReadyTimeoutMS
+	chromeReadyTimeoutMS := options.LauncherLocalChromeReadyTimeoutMS
 	if chromeReadyTimeoutMS == 0 {
 		chromeReadyTimeoutMS = DefaultChromeReadyTimeoutMS
 	}
-	chromeReadyPollIntervalMS := options.ChromeReadyPollIntervalMS
+	chromeReadyPollIntervalMS := options.LauncherLocalChromeReadyPollIntervalMS
 	if chromeReadyPollIntervalMS == 0 {
 		chromeReadyPollIntervalMS = DefaultChromeReadyPollIntervalMS
 	}
-	usePipe := options.RemoteDebugging == "pipe"
-	useLoopbackCDP := !usePipe || options.Port != 0 || (options.LoopbackCDP != nil && *options.LoopbackCDP)
-	port := options.Port
-	profileDir := options.UserDataDir
+	usePipe := options.LauncherLocalCDPTransport == "pipe"
+	useLoopbackCDP := !usePipe || options.LauncherLocalCDPListenPort != 0 || (options.LauncherLocalLoopbackCDP != nil && *options.LauncherLocalLoopbackCDP)
+	port := options.LauncherLocalCDPListenPort
+	profileDir := options.LauncherLocalUserDataDir
 	ownsProfileDir := false
 	if profileDir == "" {
 		profileDir, err = os.MkdirTemp("", "modcdp.")
@@ -62,8 +62,8 @@ func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, 
 		ownsProfileDir = true
 	}
 	cleanupProfileDir := ownsProfileDir
-	if options.CleanupUserDataDir != nil {
-		cleanupProfileDir = *options.CleanupUserDataDir
+	if options.LauncherLocalCleanupUserDataDir != nil {
+		cleanupProfileDir = *options.LauncherLocalCleanupUserDataDir
 	}
 	args := []string{
 		"--enable-unsafe-extension-debugging",
@@ -90,21 +90,21 @@ func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, 
 		args = append(args, "--remote-debugging-pipe")
 	}
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
-	if options.Headless != nil {
-		headless = *options.Headless
+	if options.LauncherLocalHeadless != nil {
+		headless = *options.LauncherLocalHeadless
 	}
 	if headless {
 		args = append(args, "--headless=new")
 	}
 	sandbox := runtime.GOOS != "linux"
-	if options.Sandbox != nil {
-		sandbox = *options.Sandbox
+	if options.LauncherLocalSandbox != nil {
+		sandbox = *options.LauncherLocalSandbox
 	}
 	if !sandbox {
 		args = append(args, "--no-sandbox")
 	}
-	args = append(args, options.Args...)
-	args = append(args, options.ExtraArgs...)
+	args = append(args, options.LauncherLocalArgs...)
+	args = append(args, options.LauncherLocalExtraArgs...)
 	args = append(args, "about:blank")
 	cmd := exec.Command(executablePath, args...)
 	if runtime.GOOS != "windows" {
@@ -223,6 +223,7 @@ func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, 
 		}
 		launched := &LaunchedBrowser{
 			LoopbackCDPURL: loopbackCDPURL,
+			CDPListenPort:  port,
 			Close:          close,
 			ProfileDir:     profileDir,
 			PipeRead:       pipeRead,
@@ -263,8 +264,13 @@ func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, 
 				if resolvedCDPURL == "" {
 					resolvedCDPURL = cdpURL
 				}
+				cdpListenPort := port
+				if port == 0 {
+					activePort, _ := strconv.Atoi(strings.TrimPrefix(cdpURL, "http://127.0.0.1:"))
+					cdpListenPort = activePort
+				}
 				// CDPURL is resolved from the HTTP discovery endpoint before returning.
-				launched := &LaunchedBrowser{CDPURL: resolvedCDPURL, LoopbackCDPURL: resolvedCDPURL, Close: close, ProfileDir: profileDir}
+				launched := &LaunchedBrowser{CDPURL: resolvedCDPURL, CDPListenPort: cdpListenPort, LoopbackCDPURL: resolvedCDPURL, Close: close, ProfileDir: profileDir}
 				l.Launched = launched
 				return launched, nil
 			}
@@ -429,7 +435,7 @@ func findChromeBinary(explicit string) (string, error) {
 			tried = append(tried, candidate)
 		}
 	}
-	return "", fmt.Errorf("no Chrome/Chromium binary found. Tried: %s. Set CHROME_PATH or pass Launch.Options.ExecutablePath", strings.Join(tried, ", "))
+	return "", fmt.Errorf("no Chrome/Chromium binary found. Tried: %s. Set CHROME_PATH or pass Launch.Options.LauncherLocalExecutablePath", strings.Join(tried, ", "))
 }
 
 func candidatePaths() []string {

@@ -30,16 +30,16 @@ func (t *PipeUpstreamTransport) Update(config map[string]any) {
 	if config == nil {
 		return
 	}
-	if pipeRead, _ := config["pipe_read"].(*os.File); pipeRead != nil {
+	if pipeRead, _ := config["upstream_pipe_read"].(*os.File); pipeRead != nil {
 		t.PipeRead = pipeRead
 	}
-	if pipeWrite, _ := config["pipe_write"].(*os.File); pipeWrite != nil {
+	if pipeWrite, _ := config["upstream_pipe_write"].(*os.File); pipeWrite != nil {
 		t.PipeWrite = pipeWrite
 	}
 }
 
 func (t *PipeUpstreamTransport) GetLauncherConfig() LaunchOptions {
-	return LaunchOptions{RemoteDebugging: "pipe"}
+	return LaunchOptions{LauncherLocalCDPTransport: "pipe"}
 }
 
 func (t *PipeUpstreamTransport) Connect() error {

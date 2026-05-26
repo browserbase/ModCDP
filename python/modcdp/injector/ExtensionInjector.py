@@ -14,8 +14,6 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Any, TypedDict, cast
 
-from typing_extensions import NotRequired
-
 from ..launcher.BrowserLauncher import LauncherOptions
 from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
 
@@ -33,17 +31,19 @@ DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100
 DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20
 
 SendCDP = Callable[[str, ProtocolParams | None, str | None], ProtocolResult]
-EnsureSessionForTarget = Callable[[str, int, bool], str | None]
-WaitForExecutionContext = Callable[[str, int], int]
 
 
-class ExtensionInjectorConfig(TypedDict, total=False):
+class InjectorOptions(TypedDict, total=False):
     send: SendCDP | None
-    sessionId_from_targetId: dict[str, str] | None
-    ensureSessionForTarget: EnsureSessionForTarget | None
-    waitForExecutionContext: WaitForExecutionContext | None
-    injector_extension_path: str | None
-    injector_extension_id: str | None
+    injector_cli_extension_path: str | None
+    injector_cli_extension_id: str | None
+    injector_cdp_extension_path: str | None
+    injector_cdp_extension_id: str | None
+    injector_bb_extension_path: str | None
+    injector_bb_extension_id: str | None
+    injector_discover_extension_path: str | None
+    injector_borrow_extension_path: str | None
+    injector_service_worker_extension_id: str | None
     injector_service_worker_url_includes: list[str]
     injector_service_worker_url_suffixes: list[str]
     injector_trust_service_worker_target: bool
@@ -55,11 +55,8 @@ class ExtensionInjectorConfig(TypedDict, total=False):
     injector_service_worker_ready_timeout_ms: int
     injector_service_worker_poll_interval_ms: int
     injector_target_session_poll_interval_ms: int
-    injector_browserbase_api_key: str | None
-    injector_browserbase_base_url: str | None
-    upstream_nativemessaging_host_name: str | None
-    upstream_nats_url: str | None
-    upstream_nats_subject_prefix: str | None
+    injector_bb_api_key: str | None
+    injector_bb_base_url: str | None
 
 
 def defaultModCDPExtensionPath() -> str | None:
@@ -122,19 +119,21 @@ class ExtensionInjectionResult(TypedDict):
     target_id: str
     url: str
     session_id: str
-    has_tabs: NotRequired[bool]
-    has_debugger: NotRequired[bool]
 
 
 class ExtensionInjector:
-    def __init__(self, options: ExtensionInjectorConfig | None = None) -> None:
-        self.options = cast(ExtensionInjectorConfig, {
+    def __init__(self, options: InjectorOptions | None = None) -> None:
+        self.options = cast(InjectorOptions, {
             "send": None,
-            "sessionId_from_targetId": None,
-            "ensureSessionForTarget": None,
-            "waitForExecutionContext": None,
-            "injector_extension_path": None,
-            "injector_extension_id": None,
+            "injector_cli_extension_path": None,
+            "injector_cli_extension_id": None,
+            "injector_cdp_extension_path": None,
+            "injector_cdp_extension_id": None,
+            "injector_bb_extension_path": None,
+            "injector_bb_extension_id": None,
+            "injector_discover_extension_path": None,
+            "injector_borrow_extension_path": None,
+            "injector_service_worker_extension_id": None,
             "injector_service_worker_url_includes": [],
             "injector_service_worker_url_suffixes": [],
             "injector_trust_service_worker_target": False,
@@ -146,20 +145,17 @@ class ExtensionInjector:
             "injector_service_worker_ready_timeout_ms": DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
             "injector_service_worker_poll_interval_ms": DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
             "injector_target_session_poll_interval_ms": DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS,
-            "injector_browserbase_api_key": None,
-            "injector_browserbase_base_url": None,
-            "upstream_nativemessaging_host_name": None,
-            "upstream_nats_url": None,
-            "upstream_nats_subject_prefix": None,
+            "injector_bb_api_key": None,
+            "injector_bb_base_url": None,
             **dict(options or {}),
         })
         self.unusable_target_ids: set[str] = set()
         self.last_error: Exception | None = None
 
-    def update(self, config: ExtensionInjectorConfig | None = None) -> "ExtensionInjector":
-        config = cast(ExtensionInjectorConfig, dict(config or {}))
+    def update(self, config: InjectorOptions | None = None) -> "ExtensionInjector":
+        config = cast(InjectorOptions, dict(config or {}))
         self.options = cast(
-            ExtensionInjectorConfig,
+            InjectorOptions,
             {
                 **self.options,
                 **config,
@@ -175,15 +171,14 @@ class ExtensionInjector:
         )
         return self
 
-    def getInjectorConfig(self) -> ExtensionInjectorConfig:
-        return cast(ExtensionInjectorConfig, dict(self.options))
+    def getInjectorConfig(self) -> InjectorOptions:
+        return cast(InjectorOptions, dict(self.options))
 
     def getLauncherConfig(self) -> LauncherOptions:
         return {}
 
     def getTransportConfig(self) -> dict[str, Any]:
-        extension_id = self.options.get("injector_extension_id")
-        return {"injector_extension_id": extension_id} if extension_id else {}
+        return {}
 
     def prepare(self) -> None:
         return None
@@ -234,17 +229,6 @@ class ExtensionInjector:
             raise error
         return result or {}
 
-    def _ensureSessionForTarget(self, target_id: str, timeout_ms: int = 0, allow_attach: bool = False) -> str | None:
-        sessionId_from_targetId = self.options.get("sessionId_from_targetId")
-        if sessionId_from_targetId is not None:
-            session_id = sessionId_from_targetId.get(target_id)
-            if session_id:
-                return session_id
-        ensure_session_for_target = self.options.get("ensureSessionForTarget")
-        if ensure_session_for_target is None:
-            return None
-        return ensure_session_for_target(target_id, timeout_ms, allow_attach)
-
     def _targetInfos(self) -> list[TargetInfo]:
         result = self._sendWithTimeout("Target.getTargets")
         raw_targets = result.get("targetInfos")
@@ -271,30 +255,41 @@ class ExtensionInjector:
         target_id = target["targetId"]
         if target_id in self.unusable_target_ids:
             return None
-        session_id = self._ensureSessionForTarget(target_id, session_timeout_ms, allow_attach)
-        if session_id is None:
-            return None
-        self._sendWithTimeout("Runtime.enable", {}, session_id)
-        probe = self._sendWithTimeout(
-            "Runtime.evaluate",
-            {
-                "expression": self._readyExpression(),
-                "returnByValue": True,
-            },
-            session_id,
+        attached = self._sendWithTimeout(
+            "Target.attachToTarget",
+            {"targetId": target_id, "flatten": True},
+            None,
+            session_timeout_ms,
         )
-        result = cast(Mapping[str, Any], probe.get("result")) if isinstance(probe.get("result"), Mapping) else {}
-        value = result.get("value")
-        if value is not True:
-            return None
-        match = EXT_ID_FROM_URL_RE.match(target.get("url") or "")
-        return {
-            "source": "discovered",
-            "extension_id": match.group(1) if match else None,
-            "target_id": target_id,
-            "url": target["url"],
-            "session_id": session_id,
-        }
+        session_id = attached.get("sessionId")
+        if not isinstance(session_id, str) or not session_id:
+            raise RuntimeError(f"Target.attachToTarget returned no sessionId for targetId={target_id}")
+        try:
+            self._sendWithTimeout("Runtime.enable", {}, session_id)
+            probe = self._sendWithTimeout(
+                "Runtime.evaluate",
+                {
+                    "expression": self._readyExpression(),
+                    "returnByValue": True,
+                },
+                session_id,
+            )
+            result = cast(Mapping[str, Any], probe.get("result")) if isinstance(probe.get("result"), Mapping) else {}
+            value = result.get("value")
+            if value is not True:
+                self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
+                return None
+            match = EXT_ID_FROM_URL_RE.match(target.get("url") or "")
+            return {
+                "source": "discover",
+                "extension_id": match.group(1) if match else None,
+                "target_id": target_id,
+                "url": target["url"],
+                "session_id": session_id,
+            }
+        except BaseException:
+            self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
+            raise
 
     def _discoverReadyServiceWorker(self, *, matched_only: bool = False) -> ExtensionInjectionResult | None:
         target_infos = self._targetInfos()
@@ -343,7 +338,7 @@ class ExtensionInjector:
             return False
         if not target_url.startswith("chrome-extension://"):
             return False
-        extension_id = self.options.get("injector_extension_id")
+        extension_id = self.options.get("injector_service_worker_extension_id")
         has_extension_id = bool(extension_id)
         if extension_id and not target_url.startswith(f"chrome-extension://{extension_id}/"):
             return False

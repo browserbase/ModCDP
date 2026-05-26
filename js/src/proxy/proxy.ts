@@ -15,11 +15,11 @@
 //     true when debugging the service-worker mirror path itself.
 //
 // Run as a CLI:
-//   node proxy.js --port 9223 --upstream-mode=ws --upstream-cdp-url=http://127.0.0.1:9222
-//   node proxy.js --port 9223 --launcher-mode=local --upstream-mode=pipe
-//   node proxy.js --port 9223 --launcher-mode=local --upstream-mode=nativemessaging
-//   node proxy.js --port 9223 --launcher-mode=local --upstream-mode=reversews --upstream-reversews-bind=127.0.0.1:29292
-//   node proxy.js --port 9223 --launcher-mode=local --upstream-mode=nats --upstream-nats-url=ws://127.0.0.1:4223
+//   node proxy.js --bind=127.0.0.1:9223 --upstream-mode=ws --upstream-ws-cdp-url=http://127.0.0.1:9222
+//   node proxy.js --bind=127.0.0.1:9223 --launcher-mode=local --upstream-mode=pipe
+//   node proxy.js --bind=127.0.0.1:9223 --launcher-mode=local --upstream-mode=nativemessaging
+//   node proxy.js --bind=127.0.0.1:9223 --launcher-mode=local --upstream-mode=reversews --upstream-reversews-bind=127.0.0.1:29292
+//   node proxy.js --bind=127.0.0.1:9223 --launcher-mode=local --upstream-mode=nats --upstream-nats-url=ws://127.0.0.1:4223
 //
 // Or import { startProxy } and embed.
 
@@ -30,7 +30,7 @@ import type { RawData } from "ws";
 import type { WebSocket } from "ws";
 
 import { ModCDPClient } from "../client/ModCDPClient.js";
-import type { ClientConfigOptions } from "../client/ModCDPClient.js";
+import type { ClientConfigOptions, ClientRouterOptions } from "../client/ModCDPClient.js";
 import type { InjectorOptions } from "../injector/ExtensionInjector.js";
 import type { LauncherMode, LauncherOptions } from "../launcher/BrowserLauncher.js";
 import type { UpstreamOptions } from "../transport/UpstreamTransport.js";
@@ -85,21 +85,23 @@ const isWebSocketEndpoint = (url) => typeof url === "string" && /^wss?:\/\//i.te
 // --- public API -------------------------------------------------------------
 
 export async function startProxy({
-  host = DEFAULT_HOST,
-  port = DEFAULT_PORT,
+  proxy_listen_host = DEFAULT_HOST,
+  proxy_listen_port = DEFAULT_PORT,
   launcher = { launcher_mode: "remote" },
-  upstream = { upstream_mode: "ws", upstream_cdp_url: DEFAULT_UPSTREAM },
-  injector = { injector_mode: "auto" },
+  upstream = { upstream_mode: "ws", upstream_ws_cdp_url: DEFAULT_UPSTREAM },
+  injector = { injector_mode: "none" },
+  router = {},
   client: clientOptions = {},
   server: serverOptions = {},
   forward_mirrored_upstream_events = false,
   upstream_monitor_interval_ms = DEFAULT_UPSTREAM_MONITOR_INTERVAL_MS,
 }: {
-  host?: string;
-  port?: number;
+  proxy_listen_host?: string;
+  proxy_listen_port?: number;
   launcher?: LauncherOptions;
   upstream?: UpstreamOptions;
   injector?: InjectorOptions;
+  router?: ClientRouterOptions;
   client?: ClientConfigOptions;
   server?: ModCDPServerOptions | null;
   forward_mirrored_upstream_events?: boolean;
@@ -107,14 +109,14 @@ export async function startProxy({
 } = {}) {
   const { WebSocket, WebSocketServer } = await loadWsForProxy();
   const upstreamMode = upstream.upstream_mode ?? "ws";
-  const upstream_cdp_url = upstream.upstream_cdp_url ?? (launcher.launcher_mode === "local" ? null : DEFAULT_UPSTREAM);
+  const upstream_ws_cdp_url = upstream.upstream_ws_cdp_url ?? (launcher.launcher_mode === "local" ? null : DEFAULT_UPSTREAM);
   const clientManagedUpstream =
     upstreamMode === "nativemessaging" || upstreamMode === "nats" || upstreamMode === "pipe";
   const managed_reverse_upstream =
     upstreamMode === "reversews" &&
     (launcher.launcher_mode === "local" ||
       launcher.launcher_mode === "bb" ||
-      (launcher.launcher_mode === "remote" && upstream.upstream_cdp_url != null));
+      (launcher.launcher_mode === "remote" && upstream.upstream_ws_cdp_url != null));
   const reverse_wait_timeout_ms = upstream.upstream_reversews_wait_timeout_ms ?? DEFAULT_REVERSE_WAIT_TIMEOUT_MS;
   const reverseOptions =
     upstreamMode === "reversews" && !managed_reverse_upstream
@@ -154,12 +156,12 @@ export async function startProxy({
         res.end("Not found.");
         return;
       }
-      if (!upstream_cdp_url || isWebSocketEndpoint(upstream_cdp_url)) {
+      if (!upstream_ws_cdp_url || isWebSocketEndpoint(upstream_ws_cdp_url)) {
         res.writeHead(404);
         res.end("HTTP discovery is unavailable for this upstream.");
         return;
       }
-      const upstreamRes = await fetch(`${upstream_cdp_url}${requestUrl}`);
+      const upstreamRes = await fetch(`${upstream_ws_cdp_url}${requestUrl}`);
       const text = await upstreamRes.text();
       const contentType = upstreamRes.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
@@ -237,9 +239,10 @@ export async function startProxy({
         upstream: {
           ...upstream,
           upstream_mode: upstreamMode,
-          upstream_cdp_url,
+          upstream_ws_cdp_url,
         },
         injector,
+        router,
         client: clientOptions,
         server: serverOptions,
         activeCdps,
@@ -253,8 +256,9 @@ export async function startProxy({
     }
     handleConnection(client, earlyBuffer, earlyHandler, {
       launcher,
-      upstream: { ...upstream, upstream_mode: upstreamMode, upstream_cdp_url },
+      upstream: { ...upstream, upstream_mode: upstreamMode, upstream_ws_cdp_url },
       injector,
+      router,
       client: clientOptions,
       server: serverOptions,
       forward_mirrored_upstream_events,
@@ -290,7 +294,8 @@ export async function startProxy({
         upstream_reversews_bind: upstream.upstream_reversews_bind,
         upstream_reversews_wait_timeout_ms: reverse_wait_timeout_ms,
       },
-      injector: proxyInjectorOptions(injector, "auto"),
+      injector: proxyInjectorOptions(injector, "none"),
+      router,
       client: { client_hydrate_aliases: false, ...clientOptions },
       server: serverOptions,
     });
@@ -303,16 +308,16 @@ export async function startProxy({
     }
   }
 
-  await new Promise<void>((resolve) => httpServer.listen(port, host, () => resolve()));
+  await new Promise<void>((resolve) => httpServer.listen(proxy_listen_port, proxy_listen_host, () => resolve()));
   if (
     !reversePeer &&
     !managed_reverse_upstream &&
     !clientManagedUpstream &&
-    upstream_cdp_url &&
-    !isWebSocketEndpoint(upstream_cdp_url)
+    upstream_ws_cdp_url &&
+    !isWebSocketEndpoint(upstream_ws_cdp_url)
   ) {
     stopUpstreamMonitor = monitorUpstream(
-      upstream_cdp_url,
+      upstream_ws_cdp_url,
       upstream_monitor_interval_ms,
       () => {
         void close().catch((error) => log("proxy close failed:", errorMessage(error)));
@@ -322,17 +327,17 @@ export async function startProxy({
   }
   log(
     reverseOptions
-      ? `listening on ws://${host}:${port}/  (reverse: ws://${reverseOptions.host}:${reverseOptions.port})`
+      ? `listening on ws://${proxy_listen_host}:${proxy_listen_port}/  (reverse: ws://${reverseOptions.host}:${reverseOptions.port})`
       : managed_reverse_upstream
-        ? `listening on ws://${host}:${port}/  (upstream: reversews:${upstream.upstream_reversews_bind ?? "127.0.0.1:29292"})`
+        ? `listening on ws://${proxy_listen_host}:${proxy_listen_port}/  (upstream: reversews:${upstream.upstream_reversews_bind ?? "127.0.0.1:29292"})`
         : clientManagedUpstream
-          ? `listening on ws://${host}:${port}/  (upstream: ${upstreamMode})`
-          : `listening on ws://${host}:${port}/  (upstream: ${upstreamMode}:${upstream_cdp_url ?? "local-launch"})`,
+          ? `listening on ws://${proxy_listen_host}:${proxy_listen_port}/  (upstream: ${upstreamMode})`
+          : `listening on ws://${proxy_listen_host}:${proxy_listen_port}/  (upstream: ${upstreamMode}:${upstream_ws_cdp_url ?? "local-launch"})`,
   );
 
   return {
-    url: `http://${host}:${port}`,
-    cdp_url: `ws://${host}:${port}`,
+    url: `http://${proxy_listen_host}:${proxy_listen_port}`,
+    cdp_url: `ws://${proxy_listen_host}:${proxy_listen_port}`,
     close,
   };
 }
@@ -669,6 +674,7 @@ async function handleConnection(
     launcher,
     upstream,
     injector,
+    router,
     client: clientOptions,
     server,
     forward_mirrored_upstream_events,
@@ -678,6 +684,7 @@ async function handleConnection(
     launcher: LauncherOptions;
     upstream: UpstreamOptions;
     injector: InjectorOptions;
+    router?: ClientRouterOptions;
     client?: ClientConfigOptions;
     server?: ModCDPServerOptions | null;
     forward_mirrored_upstream_events: boolean;
@@ -687,8 +694,9 @@ async function handleConnection(
 ) {
   const cdp = new ModCDPClient({
     launcher: { ...launcher, launcher_mode: launcher.launcher_mode as LauncherMode },
-    upstream: { upstream_mode: "ws", upstream_cdp_url: upstream.upstream_cdp_url },
-    injector: proxyInjectorOptions(injector, "auto"),
+    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: upstream.upstream_ws_cdp_url },
+    injector: proxyInjectorOptions(injector, "none"),
+    router,
     client: { client_hydrate_aliases: false, ...clientOptions },
     server,
   });
@@ -720,9 +728,9 @@ async function handleConnection(
     upstream: upstream_socket,
     next_upstream_id: 1_000_000,
     pending: new Map(), // upstream_id -> { kind, client_id?, client_session_id?, ... }
-    ext_session_id: cdp.ext_session_id,
-    ext_target_id: cdp.ext_target_id,
-    ext_execution_context_id: cdp.ext_execution_context_id,
+    ext_session_id: cdp.injector?.session_id ?? null,
+    ext_target_id: cdp.injector?.target_id ?? null,
+    ext_execution_context_id: cdp.injector?.execution_context_id ?? null,
     hidden_session_ids: new Set(), // sessions we attached for ourselves
     hidden_target_ids: new Set(), // SW target the client must never see
     target_session_ids: cdp.router.sessionId_from_targetId,
@@ -732,8 +740,8 @@ async function handleConnection(
     closing: false,
     queued_from_client: [],
   };
-  if (cdp.ext_session_id) state.hidden_session_ids.add(cdp.ext_session_id);
-  if (cdp.ext_target_id) state.hidden_target_ids.add(cdp.ext_target_id);
+  if (cdp.injector?.session_id) state.hidden_session_ids.add(cdp.injector.session_id);
+  if (cdp.injector?.target_id) state.hidden_target_ids.add(cdp.injector.target_id);
 
   upstream_socket.addEventListener("message", (event) => {
     let msg: CdpResponseMessage | CdpEventMessage;
@@ -770,7 +778,9 @@ async function handleConnection(
     state.closing = true;
     void closeCdp();
   });
-  log(`injector ${cdp.connect_timing?.injector_source} (${cdp.extension_id}); ext session ${cdp.ext_session_id}`);
+  log(
+    `injector ${cdp.connect_timing?.injector_source} (${cdp.injector?.extension_id}); ext session ${cdp.injector?.session_id}`,
+  );
 
   // Swap the early-buffer handler for the real one. Drain anything that
   // arrived before we got here.
@@ -796,6 +806,7 @@ async function handleClientManagedConnection(
     launcher,
     upstream,
     injector,
+    router,
     client: clientOptions,
     server,
     activeCdps,
@@ -803,6 +814,7 @@ async function handleClientManagedConnection(
     launcher: LauncherOptions;
     upstream: UpstreamOptions;
     injector: InjectorOptions;
+    router?: ClientRouterOptions;
     client?: ClientConfigOptions;
     server?: ModCDPServerOptions | null;
     activeCdps: Set<ModCDPClient>;
@@ -812,7 +824,7 @@ async function handleClientManagedConnection(
     launcher: { ...launcher, launcher_mode: (launcher.launcher_mode ?? "none") as LauncherMode },
     upstream: {
       upstream_mode: upstream.upstream_mode as "pipe" | "nativemessaging" | "nats",
-      upstream_cdp_url: upstream.upstream_cdp_url,
+      upstream_ws_cdp_url: upstream.upstream_ws_cdp_url,
       upstream_nats_url: upstream.upstream_nats_url,
       upstream_nats_subject_prefix: upstream.upstream_nats_subject_prefix,
       upstream_nats_wait_timeout_ms: upstream.upstream_nats_wait_timeout_ms,
@@ -820,6 +832,7 @@ async function handleClientManagedConnection(
       upstream_ws_connect_error_settle_timeout_ms: upstream.upstream_ws_connect_error_settle_timeout_ms,
     },
     injector: proxyInjectorOptions(injector, "none"),
+    router,
     client: { client_hydrate_aliases: false, ...clientOptions },
     server,
   });
@@ -1142,54 +1155,71 @@ function sendToClient(state: ProxyConnectionState, obj: CdpMessage) {
 
 export function runProxyCli(args = process.argv.slice(2)) {
   const argv = parseProxyArgs(args);
-  const listen = argv.listen ? parseHostPort(String(argv.listen), DEFAULT_HOST, DEFAULT_PORT) : null;
-  const host = listen?.host ?? DEFAULT_HOST;
-  const port = listen?.port ?? Number(argv.port || DEFAULT_PORT);
+  const proxy_listen = argv.bind ? parseHostPort(String(argv.bind), DEFAULT_HOST, DEFAULT_PORT) : null;
+  const proxy_listen_host = proxy_listen?.host ?? DEFAULT_HOST;
+  const proxy_listen_port = proxy_listen?.port ?? DEFAULT_PORT;
   const launcher_mode = String(argv["launcher-mode"] || "remote");
   const upstream_mode = String(argv["upstream-mode"] || "ws");
-  const explicit_upstream_cdp_url =
-    typeof argv["upstream-cdp-url"] === "string" && argv["upstream-cdp-url"] !== "true"
-      ? String(argv["upstream-cdp-url"])
+  const explicit_upstream_ws_cdp_url =
+    typeof argv["upstream-ws-cdp-url"] === "string" && argv["upstream-ws-cdp-url"] !== "true"
+      ? String(argv["upstream-ws-cdp-url"])
       : null;
-  const injector_extension_path =
-    typeof argv["injector-extension-path"] === "string" && argv["injector-extension-path"] !== "true"
-      ? path.resolve(argv["injector-extension-path"])
+  const injector_cli_extension_path =
+    typeof argv["injector-cli-extension-path"] === "string" && argv["injector-cli-extension-path"] !== "true"
+      ? path.resolve(argv["injector-cli-extension-path"])
+      : null;
+  const injector_cdp_extension_path =
+    typeof argv["injector-cdp-extension-path"] === "string" && argv["injector-cdp-extension-path"] !== "true"
+      ? path.resolve(argv["injector-cdp-extension-path"])
+      : null;
+  const injector_bb_extension_path =
+    typeof argv["injector-bb-extension-path"] === "string" && argv["injector-bb-extension-path"] !== "true"
+      ? path.resolve(argv["injector-bb-extension-path"])
+      : null;
+  const injector_discover_extension_path =
+    typeof argv["injector-discover-extension-path"] === "string" && argv["injector-discover-extension-path"] !== "true"
+      ? path.resolve(argv["injector-discover-extension-path"])
       : null;
   const forward_mirrored_upstream_events = argv["forward-mirrored-upstream-events"] === "true";
   const clientConfig =
     typeof argv.client === "string" && argv.client !== "true"
       ? JSON.parse(argv.client)
-      : typeof argv["client-routes"] === "string" && argv["client-routes"] !== "true"
-        ? { client_routes: JSON.parse(argv["client-routes"]) }
+      : {};
+  const routerConfig =
+    typeof argv.router === "string" && argv.router !== "true"
+      ? JSON.parse(argv.router)
+      : typeof argv["router-routes"] === "string" && argv["router-routes"] !== "true"
+        ? { router_routes: JSON.parse(argv["router-routes"]) }
         : {};
   const serverConfig =
     typeof argv.server === "string" && argv.server !== "true"
       ? JSON.parse(argv.server)
-      : typeof argv["server-routes"] === "string" && argv["server-routes"] !== "true"
-        ? { server_routes: JSON.parse(argv["server-routes"]) }
+      : typeof argv["server-router-routes"] === "string" && argv["server-router-routes"] !== "true"
+        ? { router: { router_routes: JSON.parse(argv["server-router-routes"]) } }
         : {};
   const proxyPromise = startProxy({
-    host,
-    port,
+    proxy_listen_host,
+    proxy_listen_port,
     launcher: {
       launcher_mode: launcher_mode as LauncherOptions["launcher_mode"],
-      launcher_executable_path:
-        typeof argv["launcher-executable-path"] === "string" && argv["launcher-executable-path"] !== "true"
-          ? String(argv["launcher-executable-path"])
+      launcher_local_executable_path:
+        typeof argv["launcher-local-executable-path"] === "string" && argv["launcher-local-executable-path"] !== "true"
+          ? String(argv["launcher-local-executable-path"])
           : null,
-      launcher_user_data_dir:
-        typeof argv["launcher-user-data-dir"] === "string" && argv["launcher-user-data-dir"] !== "true"
-          ? String(argv["launcher-user-data-dir"])
+      launcher_local_user_data_dir:
+        typeof argv["launcher-local-user-data-dir"] === "string" && argv["launcher-local-user-data-dir"] !== "true"
+          ? String(argv["launcher-local-user-data-dir"])
           : null,
-      launcher_options:
-        typeof argv["launcher-options"] === "string" && argv["launcher-options"] !== "true"
-          ? JSON.parse(argv["launcher-options"])
-          : {},
+      launcher_local_cdp_listen_port: optionalNumberArg(argv, "launcher-local-cdp-listen-port"),
+      launcher_local_headless: optionalBooleanArg(argv, "launcher-local-headless"),
+      launcher_local_sandbox: optionalBooleanArg(argv, "launcher-local-sandbox"),
+      launcher_local_chrome_ready_timeout_ms: optionalNumberArg(argv, "launcher-local-chrome-ready-timeout-ms"),
+      launcher_local_chrome_ready_poll_interval_ms: optionalNumberArg(argv, "launcher-local-chrome-ready-poll-interval-ms"),
     },
     upstream: {
       upstream_mode: upstream_mode as UpstreamOptions["upstream_mode"],
-      upstream_cdp_url:
-        explicit_upstream_cdp_url ?? (upstream_mode === "ws" && launcher_mode !== "local" ? DEFAULT_UPSTREAM : null),
+      upstream_ws_cdp_url:
+        explicit_upstream_ws_cdp_url ?? (upstream_mode === "ws" && launcher_mode !== "local" ? DEFAULT_UPSTREAM : null),
       upstream_nats_url:
         typeof argv["upstream-nats-url"] === "string" && argv["upstream-nats-url"] !== "true"
           ? String(argv["upstream-nats-url"])
@@ -1218,9 +1248,18 @@ export function runProxyCli(args = process.argv.slice(2)) {
           : null,
     },
     injector: {
-      injector_mode: String(argv["injector-mode"] || "auto") as InjectorOptions["injector_mode"],
-      injector_extension_path,
-      injector_extension_id: optionalStringArg(argv, "injector-extension-id"),
+      injector_mode: String(argv["injector-mode"] || "none") as InjectorOptions["injector_mode"],
+      injector_cli_extension_path,
+      injector_cli_extension_id: optionalStringArg(argv, "injector-cli-extension-id"),
+      injector_cdp_extension_path,
+      injector_cdp_extension_id: optionalStringArg(argv, "injector-cdp-extension-id"),
+      injector_bb_extension_path,
+      injector_bb_extension_id: optionalStringArg(argv, "injector-bb-extension-id"),
+      injector_discover_extension_path,
+      injector_borrow_extension_path: optionalStringArg(argv, "injector-borrow-extension-path"),
+      injector_service_worker_extension_id: optionalStringArg(argv, "injector-service-worker-extension-id"),
+      injector_bb_api_key: optionalStringArg(argv, "injector-bb-api-key"),
+      injector_bb_base_url: optionalStringArg(argv, "injector-bb-base-url"),
       injector_service_worker_url_includes: optionalStringListArg(argv, "injector-service-worker-url-includes"),
       injector_service_worker_url_suffixes: optionalStringListArg(argv, "injector-service-worker-url-suffixes"),
       injector_trust_service_worker_target: optionalBooleanArg(argv, "injector-trust-service-worker-target"),
@@ -1232,6 +1271,7 @@ export function runProxyCli(args = process.argv.slice(2)) {
       injector_service_worker_poll_interval_ms: optionalNumberArg(argv, "injector-service-worker-poll-interval-ms"),
       injector_target_session_poll_interval_ms: optionalNumberArg(argv, "injector-target-session-poll-interval-ms"),
     },
+    router: routerConfig,
     client: clientConfig as ClientConfigOptions,
     server: serverConfig as ModCDPServerOptions,
     forward_mirrored_upstream_events,

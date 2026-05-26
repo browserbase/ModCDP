@@ -26,15 +26,15 @@ let browser: Awaited<ReturnType<typeof puppeteer.connect>> | null = null;
 
 try {
   chrome = await new LocalBrowserLauncher().launch({
-    chrome_ready_timeout_ms: 60_000,
-    headless: process.platform === "linux" && !process.env.DISPLAY,
-    sandbox: process.platform !== "linux",
-    extra_args: [`--load-extension=${extension_path}`],
+    launcher_local_chrome_ready_timeout_ms: 60_000,
+    launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
+    launcher_local_sandbox: process.platform !== "linux",
+    launcher_local_extra_args: [`--load-extension=${extension_path}`],
   });
   proxy = await startProxy({
-    port: await LocalBrowserLauncher.freePort(),
-    upstream: { upstream_mode: "ws", upstream_cdp_url: chrome.cdp_url },
-    injector: { injector_mode: "auto", injector_extension_path: extension_path },
+    proxy_listen_port: await LocalBrowserLauncher.freePort(),
+    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: chrome.cdp_url },
+    injector: { injector_mode: "discover", injector_discover_extension_path: extension_path },
   });
 
   browser = await puppeteer.connect({ browserURL: proxy.url });

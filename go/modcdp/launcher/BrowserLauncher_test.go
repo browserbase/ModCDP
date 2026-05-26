@@ -5,38 +5,34 @@ import (
 	"testing"
 )
 
-func TestBrowserLauncherMergesLaunchConfigAndExposesTransportAndInjectorConfig(t *testing.T) {
+func TestBrowserLauncherMergesLaunchConfigAndExposesTransportAndInjectorOptions(t *testing.T) {
 	launcher := NewBrowserLauncher(LaunchOptions{
-		CDPURL:              "ws://127.0.0.1:9222/devtools/browser/initial",
-		UserDataDir:         "/tmp/modcdp-browser-launcher",
-		BrowserbaseAPIKey:   "test-key",
-		InjectorExtensionID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		Args:                []string{"--load-extension=/tmp/args-one"},
-		ExtraArgs:           []string{"--load-extension=/tmp/one"},
+		LauncherRemoteCDPURL:     "ws://127.0.0.1:9222/devtools/browser/initial",
+		LauncherLocalUserDataDir: "/tmp/modcdp-browser-launcher",
+		LauncherBBAPIKey:         "test-key",
+		LauncherBBExtensionID:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		LauncherLocalArgs:        []string{"--load-extension=/tmp/args-one"},
+		LauncherLocalExtraArgs:   []string{"--load-extension=/tmp/one"},
 	})
 	launcher.Update(LaunchOptions{
-		CDPURL:    "ws://127.0.0.1:9222/devtools/browser/updated",
-		Args:      []string{"--load-extension=/tmp/args-two", "--lang=en-US"},
-		ExtraArgs: []string{"--load-extension=/tmp/two", "--window-size=900,700"},
+		LauncherRemoteCDPURL:   "ws://127.0.0.1:9222/devtools/browser/updated",
+		LauncherLocalArgs:      []string{"--load-extension=/tmp/args-two", "--lang=en-US"},
+		LauncherLocalExtraArgs: []string{"--load-extension=/tmp/two", "--window-size=900,700"},
 	})
 
-	assertStringsEqual(t, launcher.Options.Args, []string{"--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"})
-	assertStringsEqual(t, launcher.Options.ExtraArgs, []string{"--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"})
+	assertStringsEqual(t, launcher.Options.LauncherLocalArgs, []string{"--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"})
+	assertStringsEqual(t, launcher.Options.LauncherLocalExtraArgs, []string{"--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"})
 
 	transportConfig := launcher.GetTransportConfig()
-	if transportConfig["cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/updated" {
-		t.Fatalf("cdp_url = %v", transportConfig["cdp_url"])
+	if transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/updated" {
+		t.Fatalf("cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
-	if transportConfig["user_data_dir"] != "/tmp/modcdp-browser-launcher" {
-		t.Fatalf("user_data_dir = %v", transportConfig["user_data_dir"])
-	}
-
 	injectorConfig := launcher.GetInjectorConfig()
-	if injectorConfig.InjectorBrowserbaseAPIKey != "test-key" {
-		t.Fatalf("InjectorBrowserbaseAPIKey = %v", injectorConfig.InjectorBrowserbaseAPIKey)
+	if injectorConfig.InjectorBBAPIKey != "test-key" {
+		t.Fatalf("InjectorBBAPIKey = %v", injectorConfig.InjectorBBAPIKey)
 	}
-	if injectorConfig.InjectorExtensionID != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
-		t.Fatalf("InjectorExtensionID = %v", injectorConfig.InjectorExtensionID)
+	if injectorConfig.InjectorBBExtensionID != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("InjectorBBExtensionID = %v", injectorConfig.InjectorBBExtensionID)
 	}
 
 	if _, err := launcher.Launch(LaunchOptions{}); err == nil || !strings.Contains(err.Error(), "BrowserLauncher.Launch is not implemented") {

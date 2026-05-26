@@ -10,7 +10,7 @@ import (
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
-type ExtensionInjectorConfig = types.ExtensionInjectorConfig
+type InjectorOptions = types.InjectorOptions
 type LaunchOptions = types.LaunchOptions
 
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
@@ -83,8 +83,8 @@ func (e *UpstreamTransport) Send(message map[string]any) error {
 	return fmt.Errorf("%T.Send is not implemented", e)
 }
 
-func (e *UpstreamTransport) GetInjectorConfig() ExtensionInjectorConfig {
-	return ExtensionInjectorConfig{}
+func (e *UpstreamTransport) GetInjectorConfig() InjectorOptions {
+	return InjectorOptions{}
 }
 
 func (e *UpstreamTransport) GetLauncherConfig() LaunchOptions {

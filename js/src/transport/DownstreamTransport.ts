@@ -3,7 +3,6 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPConfigureParams,
   type ProtocolPayload,
 } from "../types/modcdp.js";
 
@@ -43,9 +42,6 @@ export abstract class DownstreamTransport {
 
   /** Start this transport's built-in extension-side default, when it has one. */
   abstract startDefault(): ProtocolPayload | null;
-
-  /** Apply a Mod.configure payload and perform any matching lifecycle update. */
-  abstract configure(params: ModCDPConfigureParams): ProtocolPayload | null;
 
   /** Stop accepting or reconnecting downstream clients for this transport. */
   abstract stop(reason?: string): ProtocolPayload | null;

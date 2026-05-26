@@ -1,45 +1,45 @@
 from .router.AutoSessionRouter import AutoSessionRouter
-from .injector.BBBrowserExtensionInjector import BBBrowserExtensionInjector
-from .injector.BorrowedExtensionInjector import BorrowedExtensionInjector
-from .launcher.BrowserbaseBrowserLauncher import BrowserbaseBrowserLauncher
+from .injector.BBExtensionInjector import BBExtensionInjector
+from .injector.BorrowExtensionInjector import BorrowExtensionInjector
+from .launcher.BBBrowserLauncher import BBBrowserLauncher
 from .launcher.BrowserLauncher import BrowserLauncher
-from .injector.DiscoveredExtensionInjector import DiscoveredExtensionInjector
+from .injector.DiscoverExtensionInjector import DiscoverExtensionInjector
 from .injector.ExtensionInjector import ExtensionInjector, defaultModCDPExtensionPath
-from .injector.ExtensionsLoadUnpackedInjector import ExtensionsLoadUnpackedInjector
-from .injector.LocalBrowserLaunchExtensionInjector import LocalBrowserLaunchExtensionInjector
+from .injector.CDPExtensionInjector import CDPExtensionInjector
+from .injector.CLIExtensionInjector import CLIExtensionInjector
 from .launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from .client.ModCDPClient import ModCDPClient
 from .transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from .transport.NatsUpstreamUpstreamTransport import NatsUpstreamUpstreamTransport
-from .launcher.NoopBrowserLauncher import NoopBrowserLauncher
+from .transport.NATSUpstreamTransport import NATSUpstreamTransport
+from .launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from .transport.PipeUpstreamTransport import PipeUpstreamTransport
 from .launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
-from .transport.ReverseWebSocketUpstreamTransport import ReverseWebSocketUpstreamTransport
+from .transport.ReverseWSUpstreamTransport import ReverseWSUpstreamTransport
 from .transport.UpstreamTransport import UpstreamTransport
-from .transport.WebSocketUpstreamTransport import WebSocketUpstreamTransport
+from .transport.WSUpstreamTransport import WSUpstreamTransport
 from .types.generated.cdp import CDPEvent, CDPModel, CDPParams
 
 __all__ = [
     "AutoSessionRouter",
-    "BBBrowserExtensionInjector",
-    "BorrowedExtensionInjector",
-    "BrowserbaseBrowserLauncher",
+    "BBExtensionInjector",
+    "BorrowExtensionInjector",
+    "BBBrowserLauncher",
     "BrowserLauncher",
-    "DiscoveredExtensionInjector",
+    "DiscoverExtensionInjector",
     "ExtensionInjector",
     "defaultModCDPExtensionPath",
-    "ExtensionsLoadUnpackedInjector",
-    "LocalBrowserLaunchExtensionInjector",
+    "CDPExtensionInjector",
+    "CLIExtensionInjector",
     "LocalBrowserLauncher",
     "ModCDPClient",
     "NativeMessagingUpstreamTransport",
-    "NatsUpstreamUpstreamTransport",
-    "NoopBrowserLauncher",
+    "NATSUpstreamTransport",
+    "NoneBrowserLauncher",
     "PipeUpstreamTransport",
     "RemoteBrowserLauncher",
-    "ReverseWebSocketUpstreamTransport",
+    "ReverseWSUpstreamTransport",
     "UpstreamTransport",
-    "WebSocketUpstreamTransport",
+    "WSUpstreamTransport",
     "CDPEvent",
     "CDPModel",
     "CDPParams",

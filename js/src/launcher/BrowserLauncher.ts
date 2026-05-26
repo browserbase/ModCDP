@@ -1,39 +1,38 @@
+import type { UpstreamTransport, UpstreamOptions } from "../transport/UpstreamTransport.js";
+import type { ModCDPServerOptions } from "../types/modcdp.js";
+
 export type LauncherMode = "local" | "remote" | "bb" | "none";
 export type LauncherOptions = {
   launcher_mode?: LauncherMode;
-  launcher_executable_path?: string | null;
-  launcher_user_data_dir?: string | null;
-  remote_cdp_url?: string | null;
-  launcher_options?: Record<string, unknown>;
-  executable_path?: string | null;
-  port?: number | null;
-  user_data_dir?: string | null;
-  headless?: boolean;
-  sandbox?: boolean;
-  args?: string[];
-  extra_args?: string[];
-  remote_debugging?: "port" | "pipe";
-  loopback_cdp?: boolean;
-  cleanup_user_data_dir?: boolean;
-  chrome_ready_timeout_ms?: number;
-  chrome_ready_poll_interval_ms?: number;
-  cdp_url?: string | null;
-  browserbase_api_key?: string | null;
-  browserbase_base_url?: string | null;
-  browserbase_session_id?: string | null;
-  browserbase_keep_alive?: boolean;
-  browserbase_close_session_on_close?: boolean;
-  region?: string | null;
-  timeout?: number | null;
-  injector_extension_id?: string | null;
-  browserbase_browser_settings?: Record<string, unknown> | null;
-  browserbase_user_metadata?: Record<string, unknown> | null;
-  browserbase_session_create_params?: Record<string, unknown> | null;
+  launcher_local_executable_path?: string | null;
+  launcher_local_user_data_dir?: string | null;
+  launcher_remote_cdp_url?: string | null;
+  launcher_local_cdp_listen_port?: number | null;
+  launcher_local_headless?: boolean;
+  launcher_local_sandbox?: boolean;
+  launcher_local_args?: string[];
+  launcher_local_extra_args?: string[];
+  launcher_local_cdp_transport?: "port" | "pipe";
+  launcher_local_loopback_cdp?: boolean;
+  launcher_local_cleanup_user_data_dir?: boolean;
+  launcher_local_chrome_ready_timeout_ms?: number;
+  launcher_local_chrome_ready_poll_interval_ms?: number;
+  launcher_bb_api_key?: string | null;
+  launcher_bb_base_url?: string | null;
+  launcher_bb_session_id?: string | null;
+  launcher_bb_keep_alive?: boolean;
+  launcher_bb_close_session_on_close?: boolean;
+  launcher_bb_region?: string | null;
+  launcher_bb_timeout?: number | null;
+  launcher_bb_extension_id?: string | null;
+  launcher_bb_browser_settings?: Record<string, unknown> | null;
+  launcher_bb_user_metadata?: Record<string, unknown> | null;
+  launcher_bb_session_create_params?: Record<string, unknown> | null;
 };
 
 export type LaunchedBrowser = {
   proc?: unknown;
-  port?: number;
+  cdp_listen_port?: number;
   // Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
   cdp_url: string | null;
   // Extension-dialable loopback CDP endpoint when it differs from cdp_url (usually they are the same unless public-facing cdp url differs from intranet/localhost equivalent).
@@ -75,100 +74,131 @@ function mergeChromeArgs(existing: string[] = [], incoming: string[] = []) {
 export class BrowserLauncher {
   // setup options
   launcher_mode: LauncherMode;
-  launcher_executable_path: string | null;
-  launcher_user_data_dir: string | null;
-  remote_cdp_url: string | null;
-  executable_path: string | null;
-  port: number | null;
-  user_data_dir: string | null;
-  headless?: boolean;
-  sandbox?: boolean;
-  args?: string[];
-  extra_args?: string[];
-  remote_debugging?: "port" | "pipe";
-  loopback_cdp?: boolean;
-  cleanup_user_data_dir?: boolean;
-  chrome_ready_timeout_ms: number;
-  chrome_ready_poll_interval_ms: number;
-  cdp_url: string | null;
-  browserbase_api_key: string | null;
-  browserbase_base_url: string | null;
-  browserbase_session_id: string | null;
-  browserbase_keep_alive?: boolean;
-  browserbase_close_session_on_close?: boolean;
-  region: string | null;
-  timeout: number | null;
-  injector_extension_id: string | null;
-  browserbase_browser_settings: Record<string, unknown> | null;
-  browserbase_user_metadata: Record<string, unknown> | null;
-  browserbase_session_create_params: Record<string, unknown> | null;
+  launcher_local_executable_path: string | null;
+  launcher_local_user_data_dir: string | null;
+  launcher_remote_cdp_url: string | null;
+  launcher_local_cdp_listen_port: number | null;
+  launcher_local_headless?: boolean;
+  launcher_local_sandbox?: boolean;
+  launcher_local_args?: string[];
+  launcher_local_extra_args?: string[];
+  launcher_local_cdp_transport?: "port" | "pipe";
+  launcher_local_loopback_cdp?: boolean;
+  launcher_local_cleanup_user_data_dir?: boolean;
+  launcher_local_chrome_ready_timeout_ms: number;
+  launcher_local_chrome_ready_poll_interval_ms: number;
+  launcher_bb_api_key: string | null;
+  launcher_bb_base_url: string | null;
+  launcher_bb_session_id: string | null;
+  launcher_bb_keep_alive?: boolean;
+  launcher_bb_close_session_on_close?: boolean;
+  launcher_bb_region: string | null;
+  launcher_bb_timeout: number | null;
+  launcher_bb_extension_id: string | null;
+  launcher_bb_browser_settings: Record<string, unknown> | null;
+  launcher_bb_user_metadata: Record<string, unknown> | null;
+  launcher_bb_session_create_params: Record<string, unknown> | null;
 
   // runtime state
   launched: LaunchedBrowser | null = null;
 
   constructor(options: LauncherOptions = {}) {
     this.launcher_mode = options.launcher_mode ?? "none";
-    this.launcher_executable_path = options.launcher_executable_path ?? null;
-    this.launcher_user_data_dir = options.launcher_user_data_dir ?? null;
-    this.remote_cdp_url = options.remote_cdp_url ?? null;
-    this.executable_path = options.executable_path ?? options.launcher_executable_path ?? null;
-    this.port = options.port ?? null;
-    this.user_data_dir = options.user_data_dir ?? options.launcher_user_data_dir ?? null;
-    this.headless = options.headless;
-    this.sandbox = options.sandbox;
-    this.args = options.args;
-    this.extra_args = options.extra_args;
-    this.remote_debugging = options.remote_debugging;
-    this.loopback_cdp = options.loopback_cdp;
-    this.cleanup_user_data_dir = options.cleanup_user_data_dir;
-    this.chrome_ready_timeout_ms = options.chrome_ready_timeout_ms ?? DEFAULT_CHROME_READY_TIMEOUT_MS;
-    this.chrome_ready_poll_interval_ms = options.chrome_ready_poll_interval_ms ?? DEFAULT_CHROME_READY_POLL_INTERVAL_MS;
-    this.cdp_url = options.cdp_url ?? null;
-    this.browserbase_api_key = options.browserbase_api_key ?? null;
-    this.browserbase_base_url = options.browserbase_base_url ?? null;
-    this.browserbase_session_id = options.browserbase_session_id ?? null;
-    this.browserbase_keep_alive = options.browserbase_keep_alive;
-    this.browserbase_close_session_on_close = options.browserbase_close_session_on_close;
-    this.region = options.region ?? null;
-    this.timeout = options.timeout ?? null;
-    this.injector_extension_id = options.injector_extension_id ?? null;
-    this.browserbase_browser_settings = options.browserbase_browser_settings ?? null;
-    this.browserbase_user_metadata = options.browserbase_user_metadata ?? null;
-    this.browserbase_session_create_params = options.browserbase_session_create_params ?? null;
+    this.launcher_local_executable_path = options.launcher_local_executable_path ?? null;
+    this.launcher_local_user_data_dir = options.launcher_local_user_data_dir ?? null;
+    this.launcher_remote_cdp_url = options.launcher_remote_cdp_url ?? null;
+    this.launcher_local_cdp_listen_port = options.launcher_local_cdp_listen_port ?? null;
+    this.launcher_local_headless = options.launcher_local_headless;
+    this.launcher_local_sandbox = options.launcher_local_sandbox;
+    this.launcher_local_args = options.launcher_local_args;
+    this.launcher_local_extra_args = options.launcher_local_extra_args;
+    this.launcher_local_cdp_transport = options.launcher_local_cdp_transport;
+    this.launcher_local_loopback_cdp = options.launcher_local_loopback_cdp;
+    this.launcher_local_cleanup_user_data_dir = options.launcher_local_cleanup_user_data_dir;
+    this.launcher_local_chrome_ready_timeout_ms =
+      options.launcher_local_chrome_ready_timeout_ms ?? DEFAULT_CHROME_READY_TIMEOUT_MS;
+    this.launcher_local_chrome_ready_poll_interval_ms =
+      options.launcher_local_chrome_ready_poll_interval_ms ?? DEFAULT_CHROME_READY_POLL_INTERVAL_MS;
+    this.launcher_bb_api_key = options.launcher_bb_api_key ?? null;
+    this.launcher_bb_base_url = options.launcher_bb_base_url ?? null;
+    this.launcher_bb_session_id = options.launcher_bb_session_id ?? null;
+    this.launcher_bb_keep_alive = options.launcher_bb_keep_alive;
+    this.launcher_bb_close_session_on_close = options.launcher_bb_close_session_on_close;
+    this.launcher_bb_region = options.launcher_bb_region ?? null;
+    this.launcher_bb_timeout = options.launcher_bb_timeout ?? null;
+    this.launcher_bb_extension_id = options.launcher_bb_extension_id ?? null;
+    this.launcher_bb_browser_settings = options.launcher_bb_browser_settings ?? null;
+    this.launcher_bb_user_metadata = options.launcher_bb_user_metadata ?? null;
+    this.launcher_bb_session_create_params = options.launcher_bb_session_create_params ?? null;
   }
 
   update(config: LauncherOptions = {}) {
-    this.executable_path = config.executable_path ?? this.executable_path;
-    this.port = config.port ?? this.port;
-    this.user_data_dir = config.user_data_dir ?? this.user_data_dir;
-    this.headless = config.headless ?? this.headless;
-    this.sandbox = config.sandbox ?? this.sandbox;
-    this.args = mergeChromeArgs(this.args, config.args ?? []);
-    this.extra_args = mergeChromeArgs(this.extra_args, config.extra_args ?? []);
-    this.remote_debugging = config.remote_debugging ?? this.remote_debugging;
-    this.loopback_cdp = config.loopback_cdp ?? this.loopback_cdp;
-    this.cleanup_user_data_dir = config.cleanup_user_data_dir ?? this.cleanup_user_data_dir;
-    this.chrome_ready_timeout_ms = config.chrome_ready_timeout_ms ?? this.chrome_ready_timeout_ms;
-    this.chrome_ready_poll_interval_ms = config.chrome_ready_poll_interval_ms ?? this.chrome_ready_poll_interval_ms;
-    this.cdp_url = config.cdp_url ?? this.cdp_url;
-    this.browserbase_api_key = config.browserbase_api_key ?? this.browserbase_api_key;
-    this.browserbase_base_url = config.browserbase_base_url ?? this.browserbase_base_url;
-    this.browserbase_session_id = config.browserbase_session_id ?? this.browserbase_session_id;
-    this.browserbase_keep_alive = config.browserbase_keep_alive ?? this.browserbase_keep_alive;
-    this.browserbase_close_session_on_close =
-      config.browserbase_close_session_on_close ?? this.browserbase_close_session_on_close;
-    this.region = config.region ?? this.region;
-    this.timeout = config.timeout ?? this.timeout;
-    this.injector_extension_id = config.injector_extension_id ?? this.injector_extension_id;
-    this.browserbase_browser_settings = config.browserbase_browser_settings ?? this.browserbase_browser_settings;
-    this.browserbase_user_metadata = config.browserbase_user_metadata ?? this.browserbase_user_metadata;
-    this.browserbase_session_create_params =
-      config.browserbase_session_create_params ?? this.browserbase_session_create_params;
+    this.launcher_mode = config.launcher_mode ?? this.launcher_mode;
+    this.launcher_local_executable_path = config.launcher_local_executable_path ?? this.launcher_local_executable_path;
+    this.launcher_local_user_data_dir = config.launcher_local_user_data_dir ?? this.launcher_local_user_data_dir;
+    this.launcher_remote_cdp_url = config.launcher_remote_cdp_url ?? this.launcher_remote_cdp_url;
+    this.launcher_local_cdp_listen_port = config.launcher_local_cdp_listen_port ?? this.launcher_local_cdp_listen_port;
+    this.launcher_local_headless = config.launcher_local_headless ?? this.launcher_local_headless;
+    this.launcher_local_sandbox = config.launcher_local_sandbox ?? this.launcher_local_sandbox;
+    if (config.launcher_local_args) this.launcher_local_args = mergeChromeArgs(this.launcher_local_args, config.launcher_local_args);
+    if (config.launcher_local_extra_args)
+      this.launcher_local_extra_args = mergeChromeArgs(this.launcher_local_extra_args, config.launcher_local_extra_args);
+    this.launcher_local_cdp_transport = config.launcher_local_cdp_transport ?? this.launcher_local_cdp_transport;
+    this.launcher_local_loopback_cdp = config.launcher_local_loopback_cdp ?? this.launcher_local_loopback_cdp;
+    this.launcher_local_cleanup_user_data_dir =
+      config.launcher_local_cleanup_user_data_dir ?? this.launcher_local_cleanup_user_data_dir;
+    this.launcher_local_chrome_ready_timeout_ms =
+      config.launcher_local_chrome_ready_timeout_ms ?? this.launcher_local_chrome_ready_timeout_ms;
+    this.launcher_local_chrome_ready_poll_interval_ms =
+      config.launcher_local_chrome_ready_poll_interval_ms ?? this.launcher_local_chrome_ready_poll_interval_ms;
+    this.launcher_bb_api_key = config.launcher_bb_api_key ?? this.launcher_bb_api_key;
+    this.launcher_bb_base_url = config.launcher_bb_base_url ?? this.launcher_bb_base_url;
+    this.launcher_bb_session_id =
+      config.launcher_bb_session_id ?? this.launcher_bb_session_id;
+    this.launcher_bb_keep_alive =
+      config.launcher_bb_keep_alive ?? this.launcher_bb_keep_alive;
+    this.launcher_bb_close_session_on_close =
+      config.launcher_bb_close_session_on_close ?? this.launcher_bb_close_session_on_close;
+    this.launcher_bb_region = config.launcher_bb_region ?? this.launcher_bb_region;
+    this.launcher_bb_timeout = config.launcher_bb_timeout ?? this.launcher_bb_timeout;
+    this.launcher_bb_extension_id =
+      config.launcher_bb_extension_id ?? this.launcher_bb_extension_id;
+    this.launcher_bb_browser_settings =
+      config.launcher_bb_browser_settings ?? this.launcher_bb_browser_settings;
+    this.launcher_bb_user_metadata =
+      config.launcher_bb_user_metadata ?? this.launcher_bb_user_metadata;
+    this.launcher_bb_session_create_params =
+      config.launcher_bb_session_create_params ?? this.launcher_bb_session_create_params;
     return this;
   }
 
   async launch(_options: LauncherOptions = {}): Promise<LaunchedBrowser> {
     throw new Error(`${this.constructor.name}.launch is not implemented.`);
+  }
+
+  configForUpstream(): UpstreamOptions {
+    return {
+      upstream_ws_cdp_url: this.launched?.cdp_url ?? this.launcher_remote_cdp_url,
+      upstream_pipe_read: this.launched?.pipe_read,
+      upstream_pipe_write: this.launched?.pipe_write,
+    };
+  }
+
+  configForServer(upstream: UpstreamTransport): ModCDPServerOptions {
+    const launcher_local_loopback_cdp_url =
+      this.launched?.loopback_cdp_url ??
+      (upstream.upstream_mode === "ws" && upstream.upstream_ws_cdp_url
+        ? upstream.upstream_ws_cdp_url
+        : upstream.upstream_mode !== "ws" && upstream.upstream_mode !== "pipe" && this.launched?.cdp_url
+          ? this.launched.cdp_url
+          : null);
+    return launcher_local_loopback_cdp_url ? { server_loopback_cdp_url: launcher_local_loopback_cdp_url } : {};
+  }
+
+  async close() {
+    const launched = this.launched;
+    this.launched = null;
+    await launched?.close();
   }
 }
 

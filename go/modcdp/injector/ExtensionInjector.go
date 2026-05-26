@@ -36,10 +36,8 @@ var bundledExtensionZip []byte
 const modcdpReadyExpression = `Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)`
 
 type SendCDP = types.SendCDP
-type EnsureSessionForTarget = types.EnsureSessionForTarget
-type WaitForExecutionContext = types.WaitForExecutionContext
 type LaunchOptions = types.LaunchOptions
-type ExtensionInjectorConfig = types.ExtensionInjectorConfig
+type InjectorOptions = types.InjectorOptions
 type ExtensionInjectionResult = types.ExtensionInjectionResult
 
 func boolPtr(value bool) *bool {
@@ -47,12 +45,12 @@ func boolPtr(value bool) *bool {
 }
 
 type ExtensionInjector struct {
-	Options           ExtensionInjectorConfig
+	Options           InjectorOptions
 	UnusableTargetIDs map[string]bool
 	LastError         error
 }
 
-func NewExtensionInjector(options ExtensionInjectorConfig) ExtensionInjector {
+func NewExtensionInjector(options InjectorOptions) ExtensionInjector {
 	if options.InjectorCDPSendTimeoutMS == 0 {
 		options.InjectorCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
 	}
@@ -74,24 +72,36 @@ func NewExtensionInjector(options ExtensionInjectorConfig) ExtensionInjector {
 	return ExtensionInjector{Options: options, UnusableTargetIDs: map[string]bool{}}
 }
 
-func (i *ExtensionInjector) Update(config ExtensionInjectorConfig) *ExtensionInjector {
+func (i *ExtensionInjector) Update(config InjectorOptions) *ExtensionInjector {
 	if config.Send != nil {
 		i.Options.Send = config.Send
 	}
-	if config.SessionId_from_targetId != nil {
-		i.Options.SessionId_from_targetId = config.SessionId_from_targetId
+	if config.InjectorCLIExtensionPath != "" {
+		i.Options.InjectorCLIExtensionPath = config.InjectorCLIExtensionPath
 	}
-	if config.EnsureSessionForTarget != nil {
-		i.Options.EnsureSessionForTarget = config.EnsureSessionForTarget
+	if config.InjectorCLIExtensionID != "" {
+		i.Options.InjectorCLIExtensionID = config.InjectorCLIExtensionID
 	}
-	if config.WaitForExecutionContext != nil {
-		i.Options.WaitForExecutionContext = config.WaitForExecutionContext
+	if config.InjectorCDPExtensionPath != "" {
+		i.Options.InjectorCDPExtensionPath = config.InjectorCDPExtensionPath
 	}
-	if config.InjectorExtensionPath != "" {
-		i.Options.InjectorExtensionPath = config.InjectorExtensionPath
+	if config.InjectorCDPExtensionID != "" {
+		i.Options.InjectorCDPExtensionID = config.InjectorCDPExtensionID
 	}
-	if config.InjectorExtensionID != "" {
-		i.Options.InjectorExtensionID = config.InjectorExtensionID
+	if config.InjectorBBExtensionPath != "" {
+		i.Options.InjectorBBExtensionPath = config.InjectorBBExtensionPath
+	}
+	if config.InjectorBBExtensionID != "" {
+		i.Options.InjectorBBExtensionID = config.InjectorBBExtensionID
+	}
+	if config.InjectorDiscoverExtensionPath != "" {
+		i.Options.InjectorDiscoverExtensionPath = config.InjectorDiscoverExtensionPath
+	}
+	if config.InjectorBorrowExtensionPath != "" {
+		i.Options.InjectorBorrowExtensionPath = config.InjectorBorrowExtensionPath
+	}
+	if config.InjectorServiceWorkerExtensionID != "" {
+		i.Options.InjectorServiceWorkerExtensionID = config.InjectorServiceWorkerExtensionID
 	}
 	if config.InjectorServiceWorkerURLIncludes != nil {
 		i.Options.InjectorServiceWorkerURLIncludes = append([]string{}, config.InjectorServiceWorkerURLIncludes...)
@@ -126,25 +136,16 @@ func (i *ExtensionInjector) Update(config ExtensionInjectorConfig) *ExtensionInj
 	if config.InjectorTargetSessionPollIntervalMS != 0 {
 		i.Options.InjectorTargetSessionPollIntervalMS = config.InjectorTargetSessionPollIntervalMS
 	}
-	if config.InjectorBrowserbaseAPIKey != "" {
-		i.Options.InjectorBrowserbaseAPIKey = config.InjectorBrowserbaseAPIKey
+	if config.InjectorBBAPIKey != "" {
+		i.Options.InjectorBBAPIKey = config.InjectorBBAPIKey
 	}
-	if config.InjectorBrowserbaseBaseURL != "" {
-		i.Options.InjectorBrowserbaseBaseURL = config.InjectorBrowserbaseBaseURL
-	}
-	if config.UpstreamNativeMessagingHostName != "" {
-		i.Options.UpstreamNativeMessagingHostName = config.UpstreamNativeMessagingHostName
-	}
-	if config.UpstreamNATSURL != "" {
-		i.Options.UpstreamNATSURL = config.UpstreamNATSURL
-	}
-	if config.UpstreamNATSSubjectPrefix != "" {
-		i.Options.UpstreamNATSSubjectPrefix = config.UpstreamNATSSubjectPrefix
+	if config.InjectorBBBaseURL != "" {
+		i.Options.InjectorBBBaseURL = config.InjectorBBBaseURL
 	}
 	return i
 }
 
-func (i ExtensionInjector) GetInjectorConfig() ExtensionInjectorConfig {
+func (i ExtensionInjector) GetInjectorConfig() InjectorOptions {
 	return i.Options
 }
 
@@ -153,10 +154,7 @@ func (i ExtensionInjector) GetLauncherConfig() LaunchOptions {
 }
 
 func (i ExtensionInjector) GetTransportConfig() map[string]any {
-	if i.Options.InjectorExtensionID == "" {
-		return map[string]any{}
-	}
-	return map[string]any{"injector_extension_id": i.Options.InjectorExtensionID}
+	return map[string]any{}
 }
 
 func (i *ExtensionInjector) Prepare() error {
@@ -212,18 +210,6 @@ func (i ExtensionInjector) SendWithTimeout(method string, params map[string]any,
 	return i.sendWithTimeout(method, params, sessionID, timeoutMS)
 }
 
-func (i ExtensionInjector) ensureSessionForTarget(targetID string, timeoutMS int, allowAttach bool) string {
-	if i.Options.SessionId_from_targetId != nil {
-		if sessionID := i.Options.SessionId_from_targetId[targetID]; sessionID != "" {
-			return sessionID
-		}
-	}
-	if i.Options.EnsureSessionForTarget == nil {
-		return ""
-	}
-	return i.Options.EnsureSessionForTarget(targetID, timeoutMS, allowAttach)
-}
-
 func (i ExtensionInjector) targetInfos() ([]map[string]any, error) {
 	result, err := i.sendWithTimeout("Target.getTargets", map[string]any{}, "", i.Options.InjectorCDPSendTimeoutMS)
 	if err != nil {
@@ -246,11 +232,19 @@ func (i ExtensionInjector) probeTarget(target map[string]any, sessionTimeoutMS i
 	if targetID == "" || i.UnusableTargetIDs[targetID] {
 		return nil, nil
 	}
-	sessionID := i.ensureSessionForTarget(targetID, sessionTimeoutMS, allowAttach)
+	attached, err := i.sendWithTimeout("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "", sessionTimeoutMS)
+	if err != nil {
+		return nil, err
+	}
+	sessionID, _ := attached["sessionId"].(string)
 	if sessionID == "" {
-		return nil, nil
+		return nil, fmt.Errorf("Target.attachToTarget returned no sessionId for targetId=%s", targetID)
+	}
+	detach := func() {
+		_, _ = i.sendWithTimeout("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, "", i.Options.InjectorCDPSendTimeoutMS)
 	}
 	if _, err := i.sendWithTimeout("Runtime.enable", map[string]any{}, sessionID, i.Options.InjectorCDPSendTimeoutMS); err != nil {
+		detach()
 		return nil, err
 	}
 	probe, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
@@ -258,10 +252,12 @@ func (i ExtensionInjector) probeTarget(target map[string]any, sessionTimeoutMS i
 		"returnByValue": true,
 	}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
 	if err != nil {
+		detach()
 		return nil, err
 	}
 	result, _ := probe["result"].(map[string]any)
 	if ready, _ := result["value"].(bool); !ready {
+		detach()
 		return nil, nil
 	}
 	extensionID := ""
@@ -269,7 +265,7 @@ func (i ExtensionInjector) probeTarget(target map[string]any, sessionTimeoutMS i
 		extensionID = m[1]
 	}
 	return &ExtensionInjectionResult{
-		Source:      "discovered",
+		Source:      "discover",
 		ExtensionID: extensionID,
 		TargetID:    targetID,
 		URL:         targetURL,
@@ -336,8 +332,8 @@ func (i ExtensionInjector) serviceWorkerTargetMatches(target map[string]any) boo
 	if targetType != "service_worker" || !strings.HasPrefix(targetURL, "chrome-extension://") {
 		return false
 	}
-	hasExtensionID := i.Options.InjectorExtensionID != ""
-	if i.Options.InjectorExtensionID != "" && !strings.HasPrefix(targetURL, "chrome-extension://"+i.Options.InjectorExtensionID+"/") {
+	hasExtensionID := i.Options.InjectorServiceWorkerExtensionID != ""
+	if i.Options.InjectorServiceWorkerExtensionID != "" && !strings.HasPrefix(targetURL, "chrome-extension://"+i.Options.InjectorServiceWorkerExtensionID+"/") {
 		return false
 	}
 	for _, part := range i.Options.InjectorServiceWorkerURLIncludes {

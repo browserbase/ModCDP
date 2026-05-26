@@ -38,8 +38,8 @@ func (t *NativeMessagingUpstreamTransport) GetServerConfig() map[string]any {
 	return map[string]any{}
 }
 
-func (t *NativeMessagingUpstreamTransport) GetInjectorConfig() ExtensionInjectorConfig {
-	return ExtensionInjectorConfig{UpstreamNativeMessagingHostName: t.UpstreamNativeMessagingHostName}
+func (t *NativeMessagingUpstreamTransport) GetInjectorConfig() InjectorOptions {
+	return InjectorOptions{}
 }
 
 func (t *NativeMessagingUpstreamTransport) Connect() error {

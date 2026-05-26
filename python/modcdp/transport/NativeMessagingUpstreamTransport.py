@@ -29,7 +29,7 @@ class NativeMessagingUpstreamTransport(UpstreamTransport):
         return {}
 
     def getInjectorConfig(self) -> dict[str, Any]:
-        return {"upstream_nativemessaging_host_name": self.upstream_nativemessaging_host_name}
+        return {}
 
     def connect(self) -> None:
         if self.connected:

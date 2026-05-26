@@ -9,12 +9,12 @@ class ExtensionInjectorTests(unittest.TestCase):
     def test_owns_shared_injector_config(self) -> None:
         injector = ExtensionInjector(
             {
-                "injector_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
             }
         )
 
-        self.assertEqual(injector.getTransportConfig(), {"injector_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+        self.assertEqual(injector.getTransportConfig(), {"injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
         self.assertEqual(injector.getLauncherConfig(), {})
         self.assertTrue(
             injector._serviceWorkerTargetMatches(

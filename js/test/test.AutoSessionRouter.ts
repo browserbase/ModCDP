@@ -12,17 +12,17 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
   const cdp = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
-      launcher_options: { headless: true },
+      launcher_local_headless: true,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "auto",
-      injector_extension_path: EXTENSION_PATH,
+      injector_mode: "cdp",
+      injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    client: {
-      client_routes: {
+    router: {
+      router_routes: {
         "Mod.*": "service_worker",
         "Custom.*": "service_worker",
         "*.*": "direct_cdp",

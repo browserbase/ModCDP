@@ -11,10 +11,10 @@ import (
 
 func TestPipeUpstreamTransportConstructorUpdateLauncherConfigAndUnconnectedErrorsMatchTransportSurface(t *testing.T) {
 	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{})
-	if launcherConfig := transport.GetLauncherConfig(); launcherConfig.RemoteDebugging != "pipe" {
+	if launcherConfig := transport.GetLauncherConfig(); launcherConfig.LauncherLocalCDPTransport != "pipe" {
 		t.Fatalf("launcher config = %#v", launcherConfig)
 	}
-	transport.Update(map[string]any{"cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"})
+	transport.Update(map[string]any{"upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"})
 	if err := transport.Connect(); err == nil {
 		t.Fatal("expected Connect to require pipe handles")
 	}
@@ -66,15 +66,14 @@ func TestPipeUpstreamTransportLaunchesRealBrowserWithoutCDPURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{LauncherMode: "local",
-			LauncherOptions: modcdp.LaunchOptions{
-				Headless: boolPtr(true),
-			},
+		Launcher: modcdp.LauncherConfig{
+			LauncherMode:          "local",
+			LauncherLocalHeadless: boolPtr(true),
 		},
 		Upstream: modcdp.UpstreamConfig{UpstreamMode: "pipe"},
-		Injector: modcdp.InjectorConfig{
-			InjectorMode:                     "inject",
-			InjectorExtensionPath:            extensionPath,
+		Injector: modcdp.InjectorOptions{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},

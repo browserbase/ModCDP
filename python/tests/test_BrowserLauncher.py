@@ -11,48 +11,46 @@ class BrowserLauncherTests(unittest.TestCase):
     def test_merges_launch_config_and_exposes_transport_and_injector_config(self) -> None:
         launcher = BrowserLauncher(
             {
-                "cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial",
-                "user_data_dir": "/tmp/modcdp-browser-launcher",
-                "browserbase_api_key": "test-key",
-                "injector_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                "args": ["--load-extension=/tmp/args-one"],
-                "extra_args": ["--load-extension=/tmp/one"],
+                "launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial",
+                "launcher_local_user_data_dir": "/tmp/modcdp-browser-launcher",
+                "launcher_bb_api_key": "test-key",
+                "launcher_bb_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "launcher_local_args": ["--load-extension=/tmp/args-one"],
+                "launcher_local_extra_args": ["--load-extension=/tmp/one"],
             }
         )
         launcher.update(
             {
-                "cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
-                "args": ["--load-extension=/tmp/args-two", "--lang=en-US"],
-                "extra_args": ["--load-extension=/tmp/two", "--window-size=900,700"],
+                "launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
+                "launcher_local_args": ["--load-extension=/tmp/args-two", "--lang=en-US"],
+                "launcher_local_extra_args": ["--load-extension=/tmp/two", "--window-size=900,700"],
             }
         )
 
         self.assertEqual(
-            launcher.options.get("args"),
+            launcher.options.get("launcher_local_args"),
             ["--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"],
         )
         self.assertEqual(
-            launcher.options.get("extra_args"),
+            launcher.options.get("launcher_local_extra_args"),
             ["--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"],
         )
         self.assertEqual(
             {
-                "cdp_url": launcher.getTransportConfig()["cdp_url"],
-                "user_data_dir": launcher.getTransportConfig()["user_data_dir"],
+                "upstream_ws_cdp_url": launcher.getTransportConfig()["upstream_ws_cdp_url"],
             },
             {
-                "cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
-                "user_data_dir": "/tmp/modcdp-browser-launcher",
+                "upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
             },
         )
         self.assertEqual(
             {
-                "injector_browserbase_api_key": launcher.getInjectorConfig()["injector_browserbase_api_key"],
-                "injector_extension_id": launcher.getInjectorConfig()["injector_extension_id"],
+                "injector_bb_api_key": launcher.getInjectorConfig()["injector_bb_api_key"],
+                "injector_service_worker_extension_id": launcher.getInjectorConfig()["injector_service_worker_extension_id"],
             },
             {
-                "injector_browserbase_api_key": "test-key",
-                "injector_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "injector_bb_api_key": "test-key",
+                "injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             },
         )
         with self.assertRaisesRegex(NotImplementedError, "BrowserLauncher.launch is not implemented"):

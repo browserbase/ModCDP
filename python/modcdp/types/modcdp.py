@@ -203,11 +203,6 @@ class ExtensionInfo(ExtensionProbe):
     source: str
 
 
-class BorrowedExtensionInfo(ExtensionInfo, total=False):
-    has_tabs: bool
-    has_debugger: bool
-
-
 class UnwrappedModCDPEvent(TypedDict):
     event: str
     data: ProtocolPayload

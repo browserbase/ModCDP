@@ -66,13 +66,13 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	}
 	owner := New(Options{
 		Launcher: LauncherConfig{
-			LauncherMode:    "local",
-			LauncherOptions: LaunchOptions{Headless: &headless},
+			LauncherMode:          "local",
+			LauncherLocalHeadless: &headless,
 		},
 		Upstream: UpstreamConfig{UpstreamMode: "ws"},
-		Injector: InjectorConfig{
-			InjectorMode:                     "auto",
-			InjectorExtensionPath:            extensionPath,
+		Injector: InjectorOptions{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
@@ -81,9 +81,9 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "remote"},
-		Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamCDPURL: owner.CDPURL},
-		Injector: InjectorConfig{
+		Launcher: LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
+		Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
+		Injector: InjectorOptions{
 			InjectorMode:                     "discover",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,

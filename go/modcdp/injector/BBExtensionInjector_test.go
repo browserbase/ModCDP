@@ -1,0 +1,57 @@
+package injector_test
+
+import (
+	"fmt"
+	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
+	"os"
+	"path/filepath"
+	"regexp"
+	"testing"
+)
+
+func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWithItInstalled(t *testing.T) {
+	if os.Getenv("BROWSERBASE_API_KEY") == "" {
+		t.Fatal("BROWSERBASE_API_KEY is required for live Browserbase tests")
+	}
+	extensionPath, err := filepath.Abs("../../../dist/extension")
+	if err != nil {
+		t.Fatal(err)
+	}
+	launchOptions := modcdp.LaunchOptions{
+		LauncherMode:      "bb",
+		LauncherBBTimeout: 120,
+	}
+	if region := os.Getenv("BROWSERBASE_REGION"); region != "" {
+		launchOptions.LauncherBBRegion = region
+	}
+	cdp := modcdp.New(modcdp.Options{
+		Launcher: launchOptions,
+		Upstream: modcdp.UpstreamConfig{UpstreamMode: "ws"},
+		Injector: modcdp.InjectorOptions{
+			InjectorMode:                     "bb",
+			InjectorBBExtensionPath:          extensionPath,
+			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
+			InjectorTrustServiceWorkerTarget: true,
+		},
+	})
+	defer cdp.Close()
+
+	if err := cdp.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	if cdp.ConnectTiming["injector_source"] != "bb" {
+		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
+	}
+	if cdp.ExtensionID == "" {
+		t.Fatal("expected ExtensionID")
+	}
+	result, err := cdp.Mod.Evaluate(map[string]any{
+		"expression": "chrome.runtime.getURL('modcdp/service_worker.js')",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`^chrome-extension://[a-z]{32}/modcdp/service_worker\.js$`).MatchString(fmt.Sprint(result)) {
+		t.Fatalf("service worker url = %#v", result)
+	}
+}

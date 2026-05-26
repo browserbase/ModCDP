@@ -21,15 +21,14 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "local",
-			LauncherOptions: LaunchOptions{
-				Headless: boolPtr(true),
-			},
+		Launcher: LauncherConfig{
+			LauncherMode:          "local",
+			LauncherLocalHeadless: boolPtr(true),
 		},
 		Upstream: UpstreamConfig{UpstreamMode: "ws"},
-		Injector: InjectorConfig{
-			InjectorMode:                     "auto",
-			InjectorExtensionPath:            extensionPath,
+		Injector: InjectorOptions{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
@@ -80,15 +79,14 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "local",
-			LauncherOptions: LaunchOptions{
-				Headless: boolPtr(true),
-			},
+		Launcher: LauncherConfig{
+			LauncherMode:          "local",
+			LauncherLocalHeadless: boolPtr(true),
 		},
 		Upstream: UpstreamConfig{UpstreamMode: "ws"},
-		Injector: InjectorConfig{
-			InjectorMode:                     "auto",
-			InjectorExtensionPath:            extensionPath,
+		Injector: InjectorOptions{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},

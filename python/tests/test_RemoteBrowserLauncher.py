@@ -10,18 +10,18 @@ from modcdp.launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 
 
 class RemoteBrowserLauncherTests(unittest.TestCase):
-    def test_requires_upstream_cdp_url(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "launcher.launcher_mode=remote requires upstream.upstream_cdp_url"):
+    def test_requires_upstream_ws_cdp_url(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "launcher.launcher_mode=remote requires launcher_remote_cdp_url"):
             RemoteBrowserLauncher().launch()
 
     def test_connects_to_real_browser_from_http_and_websocket_cdp_endpoints(self) -> None:
         port = LocalBrowserLauncher.freePort()
         local = LocalBrowserLauncher().launch(
-            {"port": port, "headless": True, "chrome_ready_timeout_ms": 45_000}
+            {"launcher_local_cdp_listen_port": port, "launcher_local_headless": True, "launcher_local_chrome_ready_timeout_ms": 45_000}
         )
         ws = None
         try:
-            from_http = RemoteBrowserLauncher({"remote_cdp_url": f"http://127.0.0.1:{port}"}).launch()
+            from_http = RemoteBrowserLauncher({"launcher_remote_cdp_url": f"http://127.0.0.1:{port}"}).launch()
             self.assertEqual(from_http["cdp_url"], local["cdp_url"])
             from_http_cdp_url = from_http.get("cdp_url")
             if not isinstance(from_http_cdp_url, str):
@@ -30,19 +30,19 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
             _expect_cdp_browser_surface(ws)
             from_http["close"]()
 
-            from_host_port = RemoteBrowserLauncher({"remote_cdp_url": f"127.0.0.1:{port}"}).launch()
+            from_host_port = RemoteBrowserLauncher({"launcher_remote_cdp_url": f"127.0.0.1:{port}"}).launch()
             self.assertEqual(from_host_port["cdp_url"], local["cdp_url"])
             from_host_port["close"]()
 
-            from_options = RemoteBrowserLauncher({"cdp_url": local["cdp_url"]}).launch()
+            from_options = RemoteBrowserLauncher({"launcher_remote_cdp_url": local["cdp_url"]}).launch()
             self.assertEqual(from_options["cdp_url"], local["cdp_url"])
             from_options["close"]()
 
-            from_override = RemoteBrowserLauncher({"cdp_url": "http://127.0.0.1:1"}).launch({"cdp_url": f"127.0.0.1:{port}"})
+            from_override = RemoteBrowserLauncher({"launcher_remote_cdp_url": "http://127.0.0.1:1"}).launch({"launcher_remote_cdp_url": f"127.0.0.1:{port}"})
             self.assertEqual(from_override["cdp_url"], local["cdp_url"])
             from_override["close"]()
 
-            from_ws = RemoteBrowserLauncher().launch({"cdp_url": local["cdp_url"]})
+            from_ws = RemoteBrowserLauncher().launch({"launcher_remote_cdp_url": local["cdp_url"]})
             self.assertEqual(from_ws["cdp_url"], local["cdp_url"])
             _expect_cdp_browser_surface(ws)
             from_ws["close"]()
@@ -52,7 +52,7 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
             local["close"]()
 
     def test_accepts_wss_cdp_endpoint_without_http_discovery(self) -> None:
-        launched = RemoteBrowserLauncher({"remote_cdp_url": "wss://example.test/devtools/browser/test"}).launch()
+        launched = RemoteBrowserLauncher({"launcher_remote_cdp_url": "wss://example.test/devtools/browser/test"}).launch()
 
         self.assertEqual(launched["cdp_url"], "wss://example.test/devtools/browser/test")
         launched["close"]()

@@ -2,8 +2,17 @@ import type { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
-import type { CdpCommandMessage, CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamOptions } from "./UpstreamTransport.js";
+import type {
+  CdpCommandMessage,
+  CdpDebuggeeCommandParams,
+  ProtocolPayload,
+  ProtocolResult,
+} from "../types/modcdp.js";
+import {
+  UpstreamTransport,
+  type TargetRoute,
+  type UpstreamOptions,
+} from "./UpstreamTransport.js";
 
 const target_auto_attach_params = {
   autoAttach: true,
@@ -49,7 +58,10 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   // TargetID -> chrome.debugger.Debuggee selected for that target. Updated by
   // attachToTarget; read by send so subsequent commands use the same native
   // debuggee shape.
-  private readonly debuggee_from_targetId = new Map<string, chrome.debugger.Debuggee>();
+  private readonly debuggee_from_targetId = new Map<
+    string,
+    chrome.debugger.Debuggee
+  >();
 
   // True once chrome.debugger.onEvent/onDetach listeners are installed in this
   // service worker. Updated by installEventListener; read by getTargets.
@@ -68,25 +80,30 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   async getTargets() {
     const chrome_api = globalThis.chrome;
     this.installEventListener();
-    if (!chrome_api?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
-    const targetInfos = (await chrome_api.debugger.getTargets()).map((target) => {
-      if (typeof target.tabId === "number") this.targetId_from_tabId.set(target.tabId, target.id);
-      return {
-        targetId: target.id,
-        type: target.type,
-        title: target.title,
-        url: target.url,
-        attached: target.attached,
-        canAccessOpener: false,
-        ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
-      };
-    });
+    if (!chrome_api?.debugger?.getTargets)
+      throw new Error("chrome.debugger is unavailable.");
+    const targetInfos = (await chrome_api.debugger.getTargets()).map(
+      (target) => {
+        if (typeof target.tabId === "number")
+          this.targetId_from_tabId.set(target.tabId, target.id);
+        return {
+          targetId: target.id,
+          type: target.type,
+          title: target.title,
+          url: target.url,
+          attached: target.attached,
+          canAccessOpener: false,
+          ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
+        };
+      },
+    );
     return Target.GetTargetsResult.parse({ targetInfos }).targetInfos;
   }
 
   /** Resolve a target id from target id, debuggee target id, or chrome tab id. */
   async resolveTargetId(params: CdpDebuggeeCommandParams) {
-    if (typeof params.targetId === "string" && params.targetId.length > 0) return params.targetId;
+    if (typeof params.targetId === "string" && params.targetId.length > 0)
+      return params.targetId;
     if (params.debuggee?.targetId) return params.debuggee.targetId;
     if (typeof params.tabId === "number") {
       await this.getTargets();
@@ -98,10 +115,14 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   /** Create a new foreground tab and return the corresponding CDP target id. */
   async createTarget(url: string) {
     const tab = await globalThis.chrome.tabs.create({ url, active: true });
-    if (!tab.id) throw new Error(`chrome_debugger could not create a tab for ${url}.`);
+    if (!tab.id)
+      throw new Error(`chrome_debugger could not create a tab for ${url}.`);
     await this.getTargets();
     const targetId = this.targetId_from_tabId.get(tab.id);
-    if (!targetId) throw new Error(`chrome_debugger could not resolve target for created tab ${tab.id}.`);
+    if (!targetId)
+      throw new Error(
+        `chrome_debugger could not resolve target for created tab ${tab.id}.`,
+      );
     return targetId;
   }
 
@@ -132,27 +153,51 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   >(
     command: CdpCommandSchema<Params, Result, Name>,
     params?: z.input<Params>,
-    route?: TargetRoute,
+    route?: TargetRoute | string | null,
   ): Promise<z.output<Result>>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command_or_message_or_method:
+      | CdpCommandMessage
+      | string
+      | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
-      throw new Error("chrome_debugger does not support raw CDP command messages.");
+    if (
+      typeof command_or_message_or_method !== "string" &&
+      "method" in command_or_message_or_method
+    ) {
+      throw new Error(
+        "chrome_debugger does not support raw CDP command messages.",
+      );
     }
     if (typeof command_or_message_or_method === "string") {
-      throw new Error("chrome_debugger raw string sends must go through ModCDPClient.router.");
+      throw new Error(
+        "chrome_debugger raw string sends must go through ModCDPClient.router.",
+      );
+    }
+    let route: TargetRoute | undefined;
+    if (typeof route_or_sessionId === "string") {
+      const targetId = this.targetId_from_sessionId.get(route_or_sessionId);
+      if (!targetId)
+        throw new Error(
+          `No target is recorded for sessionId=${route_or_sessionId}.`,
+        );
+      route = { targetId, sessionId: route_or_sessionId };
+    } else {
+      route =
+        route_or_sessionId && typeof route_or_sessionId === "object"
+          ? route_or_sessionId
+          : undefined;
     }
     return this.sendCommand(
       command_or_message_or_method,
       params as z.input<Params>,
-      route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined,
+      route,
     );
   }
 
@@ -170,28 +215,50 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     if (!route) {
       const debuggee = await this.defaultDebuggee();
       await this.attachDebuggee(debuggee);
-      return command.result.parse(await this.sendToDebugger(debuggee, command.id, command.params.parse(params)));
+      return command.result.parse(
+        await this.sendToDebugger(
+          debuggee,
+          command.id,
+          command.params.parse(params),
+        ),
+      );
     }
     const routedTargetId = route.sessionId
       ? (this.targetId_from_sessionId.get(route.sessionId) ?? route.targetId)
       : route.targetId;
-    const debuggee = this.debuggee_from_targetId.get(routedTargetId) ?? (await this.debuggeeForTarget(routedTargetId));
+    const debuggee =
+      this.debuggee_from_targetId.get(routedTargetId) ??
+      (await this.debuggeeForTarget(routedTargetId));
     await this.attachDebuggee(debuggee);
-    return command.result.parse(await this.sendToDebugger(debuggee, command.id, command.params.parse(params)));
+    return command.result.parse(
+      await this.sendToDebugger(
+        debuggee,
+        command.id,
+        command.params.parse(params),
+      ),
+    );
   }
 
   private async debuggeeForTarget(targetId: cdp.types.ts.Target.TargetID) {
     const targets = await this.getTargets();
     const target = targets.find((candidate) => candidate.targetId === targetId);
-    if (!target) throw new Error(`chrome_debugger could not resolve targetId=${targetId}.`);
+    if (!target)
+      throw new Error(
+        `chrome_debugger could not resolve targetId=${targetId}.`,
+      );
     const tabId = typeof target.tabId === "number" ? target.tabId : null;
     return tabId == null ? { targetId } : { tabId };
   }
 
   private async defaultDebuggee() {
     const targetId =
-      (await this.resolveTargetId({})) ?? (await this.getTargets()).find((target) => target.type === "page")?.targetId;
-    if (!targetId) return await this.debuggeeForTarget(await this.createTarget("about:blank#modcdp"));
+      (await this.resolveTargetId({})) ??
+      (await this.getTargets()).find((target) => target.type === "page")
+        ?.targetId;
+    if (!targetId)
+      return await this.debuggeeForTarget(
+        await this.createTarget("about:blank#modcdp"),
+      );
     return await this.debuggeeForTarget(targetId);
   }
 
@@ -202,7 +269,11 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     await new Promise<void>((resolve, reject) =>
       chrome_api.debugger.attach(debuggee, "1.3", () => {
         const error = chrome_api.runtime.lastError;
-        if (!error || error.message?.includes("Another debugger is already attached")) resolve();
+        if (
+          !error ||
+          error.message?.includes("Another debugger is already attached")
+        )
+          resolve();
         else reject(new Error(error.message));
       }),
     );
@@ -223,17 +294,30 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
 
   private installEventListener() {
     const chrome_api = globalThis.chrome;
-    if (this.event_listener_installed || !chrome_api?.debugger?.onEvent?.addListener) return;
+    if (
+      this.event_listener_installed ||
+      !chrome_api?.debugger?.onEvent?.addListener
+    )
+      return;
     chrome_api.debugger.onEvent.addListener((source, method, params) => {
       const payload = (params ?? {}) as ProtocolPayload;
       const sourceTargetId =
         source.targetId ??
-        (typeof source.tabId === "number" ? (this.targetId_from_tabId.get(source.tabId) ?? null) : null);
+        (typeof source.tabId === "number"
+          ? (this.targetId_from_tabId.get(source.tabId) ?? null)
+          : null);
       const cdpSessionId = source.sessionId ?? null;
       if (method === Target.AttachedToTargetEvent.id) {
         const attached = Target.AttachedToTargetEvent.parse(payload);
-        if (typeof source.tabId === "number") this.targetId_from_tabId.set(source.tabId, attached.targetInfo.targetId);
-        this.targetId_from_sessionId.set(attached.sessionId, attached.targetInfo.targetId);
+        if (typeof source.tabId === "number")
+          this.targetId_from_tabId.set(
+            source.tabId,
+            attached.targetInfo.targetId,
+          );
+        this.targetId_from_sessionId.set(
+          attached.sessionId,
+          attached.targetInfo.targetId,
+        );
       } else if (method === Target.DetachedFromTargetEvent.id) {
         const detached = Target.DetachedFromTargetEvent.parse(payload);
         this.targetId_from_sessionId.delete(detached.sessionId);
@@ -241,18 +325,26 @@ export class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
       this.emitUpstreamEvent(method, payload, sourceTargetId, cdpSessionId);
     });
     chrome_api.debugger.onDetach?.addListener?.((source) => {
-      this.attached_debuggees.delete(JSON.stringify(this.compactDebuggee(source)));
+      this.attached_debuggees.delete(
+        JSON.stringify(this.compactDebuggee(source)),
+      );
     });
     this.event_listener_installed = true;
   }
 
   private compactDebuggee(input: {
-    [Key in keyof chrome.debugger.Debuggee]?: chrome.debugger.Debuggee[Key] | null;
+    [Key in keyof chrome.debugger.Debuggee]?:
+      | chrome.debugger.Debuggee[Key]
+      | null;
   }): chrome.debugger.Debuggee {
     return {
       ...(typeof input.tabId === "number" ? { tabId: input.tabId } : {}),
-      ...(typeof input.targetId === "string" ? { targetId: input.targetId } : {}),
-      ...(typeof input.extensionId === "string" ? { extensionId: input.extensionId } : {}),
+      ...(typeof input.targetId === "string"
+        ? { targetId: input.targetId }
+        : {}),
+      ...(typeof input.extensionId === "string"
+        ? { extensionId: input.extensionId }
+        : {}),
     };
   }
 

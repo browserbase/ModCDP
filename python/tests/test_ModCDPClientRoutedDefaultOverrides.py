@@ -74,20 +74,20 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
         owner = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
-                "launcher_options": {"headless": True},
+                "launcher_local_headless": True,
             },
             upstream={"upstream_mode": "ws"},
             injector={
-                "injector_mode": "auto",
-                "injector_extension_path": str(EXTENSION_PATH),
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
         )
         owner.connect()
         cdp = ModCDPClient(
-            launcher={"launcher_mode": "remote"},
-            upstream={"upstream_mode": "ws", "upstream_cdp_url": owner.cdp_url},
+            launcher={"launcher_mode": "remote", "launcher_remote_cdp_url": owner.cdp_url},
+            upstream={"upstream_mode": "ws", "upstream_ws_cdp_url": owner.cdp_url},
             injector={
                 "injector_mode": "discover",
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],

@@ -13,22 +13,22 @@ class PipeUpstreamTransport(UpstreamTransport):
     def __init__(self, options: dict[str, Any] | None = None) -> None:
         super().__init__()
         options = options or {}
-        self.pipe_read = options.get("pipe_read")
-        self.pipe_write = options.get("pipe_write")
+        self.pipe_read = options.get("upstream_pipe_read")
+        self.pipe_write = options.get("upstream_pipe_write")
         self._connected = False
 
     def update(self, config: dict[str, Any] | None = None) -> "PipeUpstreamTransport":
         config = config or {}
-        self.pipe_read = config.get("pipe_read") or self.pipe_read
-        self.pipe_write = config.get("pipe_write") or self.pipe_write
+        self.pipe_read = config.get("upstream_pipe_read") or self.pipe_read
+        self.pipe_write = config.get("upstream_pipe_write") or self.pipe_write
         return self
 
     def getLauncherConfig(self) -> dict[str, Any]:
-        return {"remote_debugging": "pipe"}
+        return {"launcher_local_cdp_transport": "pipe"}
 
     def connect(self) -> None:
         if self.pipe_read is None or self.pipe_write is None:
-            raise RuntimeError("upstream.upstream_mode=pipe requires launcher-provided remote-debugging pipe handles.")
+            raise RuntimeError("upstream.upstream_mode=pipe requires launcher-provided CDP pipe handles.")
         if self._connected:
             return
         self._connected = True

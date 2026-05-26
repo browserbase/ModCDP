@@ -20,11 +20,11 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="modcdp-python-local-profile-") as user_data_dir:
             chrome = LocalBrowserLauncher(
                 {
-                    "headless": True,
-                    "chrome_ready_timeout_ms": 45_000,
-                    "chrome_ready_poll_interval_ms": 50,
+                    "launcher_local_headless": True,
+                    "launcher_local_chrome_ready_timeout_ms": 45_000,
+                    "launcher_local_chrome_ready_poll_interval_ms": 50,
                 }
-            ).launch({"user_data_dir": user_data_dir, "args": ["--window-size=900,700"]})
+            ).launch({"launcher_local_user_data_dir": user_data_dir, "launcher_local_args": ["--window-size=900,700"]})
             cdp_url = chrome["cdp_url"]
             if cdp_url is None:
                 raise AssertionError("expected launcher to return cdp_url")
@@ -57,10 +57,10 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         user_data_dir = tempfile.mkdtemp(prefix="modcdp-python-local-profile-")
         chrome = LocalBrowserLauncher(
             {
-                "headless": True,
-                "chrome_ready_timeout_ms": 45_000,
+                "launcher_local_headless": True,
+                "launcher_local_chrome_ready_timeout_ms": 45_000,
             }
-        ).launch({"user_data_dir": user_data_dir, "cleanup_user_data_dir": True})
+        ).launch({"launcher_local_user_data_dir": user_data_dir, "launcher_local_cleanup_user_data_dir": True})
 
         try:
             self.assertEqual(chrome.get("profile_dir"), user_data_dir)
@@ -68,12 +68,12 @@ class LocalBrowserLauncherTests(unittest.TestCase):
             chrome["close"]()
         self.assertFalse(Path(user_data_dir).exists())
 
-    def test_launches_real_browser_over_remote_debugging_pipe(self) -> None:
+    def test_launches_real_browser_over_local_cdp_transport_pipe(self) -> None:
         chrome = LocalBrowserLauncher(
             {
-                "headless": True,
-                "remote_debugging": "pipe",
-                "chrome_ready_timeout_ms": 45_000,
+                "launcher_local_headless": True,
+                "launcher_local_cdp_transport": "pipe",
+                "launcher_local_chrome_ready_timeout_ms": 45_000,
             }
         ).launch()
         pipe_read = chrome.get("pipe_read")
@@ -95,10 +95,10 @@ class LocalBrowserLauncherTests(unittest.TestCase):
     def test_launches_pipe_browser_with_auxiliary_loopback_only_when_requested(self) -> None:
         chrome = LocalBrowserLauncher(
             {
-                "headless": True,
-                "remote_debugging": "pipe",
-                "loopback_cdp": True,
-                "chrome_ready_timeout_ms": 45_000,
+                "launcher_local_headless": True,
+                "launcher_local_cdp_transport": "pipe",
+                "launcher_local_loopback_cdp": True,
+                "launcher_local_chrome_ready_timeout_ms": 45_000,
             }
         ).launch()
         loopback_cdp_url = chrome.get("loopback_cdp_url")

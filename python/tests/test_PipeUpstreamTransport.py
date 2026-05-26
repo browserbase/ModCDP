@@ -16,8 +16,8 @@ class PipeUpstreamTransportTests(unittest.TestCase):
         transport = PipeUpstreamTransport()
         self.assertEqual(transport.mode, "pipe")
         self.assertIsNone(transport.url)
-        self.assertEqual(transport.getLauncherConfig(), {"remote_debugging": "pipe"})
-        self.assertIs(transport.update({"cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"}), transport)
+        self.assertEqual(transport.getLauncherConfig(), {"launcher_local_cdp_transport": "pipe"})
+        self.assertIs(transport.update({"upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"}), transport)
         self.assertIsNone(transport.url)
         with self.assertRaisesRegex(RuntimeError, r"upstream\.upstream_mode=pipe requires"):
             transport.connect()
@@ -31,7 +31,7 @@ class PipeUpstreamTransportTests(unittest.TestCase):
         pipe_read_writer = os.fdopen(read_writer_fd, "wb", buffering=0)
         pipe_write_reader = os.fdopen(write_reader_fd, "rb", buffering=0)
         pipe_write = os.fdopen(write_fd, "wb", buffering=0)
-        transport = PipeUpstreamTransport({"pipe_read": pipe_read, "pipe_write": pipe_write})
+        transport = PipeUpstreamTransport({"upstream_pipe_read": pipe_read, "upstream_pipe_write": pipe_write})
         closed: list[Exception] = []
         transport.onClose(lambda error: closed.append(error))
 
@@ -48,11 +48,11 @@ class PipeUpstreamTransportTests(unittest.TestCase):
 
     def test_launches_real_browser_without_a_cdp_url(self) -> None:
         cdp = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_options": {"headless": True}},
+            launcher={"launcher_mode": "local", "launcher_local_headless": True},
             upstream={"upstream_mode": "pipe"},
             injector={
-                "injector_mode": "inject",
-                "injector_extension_path": str(EXTENSION_PATH),
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },

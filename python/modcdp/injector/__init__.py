@@ -1,6 +1,6 @@
-from .BBBrowserExtensionInjector import BBBrowserExtensionInjector
-from .BorrowedExtensionInjector import BorrowedExtensionInjector
-from .DiscoveredExtensionInjector import DiscoveredExtensionInjector
+from .BBExtensionInjector import BBExtensionInjector
+from .BorrowExtensionInjector import BorrowExtensionInjector
+from .DiscoverExtensionInjector import DiscoverExtensionInjector
 from .ExtensionInjector import ExtensionInjector, defaultModCDPExtensionPath
-from .ExtensionsLoadUnpackedInjector import ExtensionsLoadUnpackedInjector
-from .LocalBrowserLaunchExtensionInjector import LocalBrowserLaunchExtensionInjector
+from .CDPExtensionInjector import CDPExtensionInjector
+from .CLIExtensionInjector import CLIExtensionInjector

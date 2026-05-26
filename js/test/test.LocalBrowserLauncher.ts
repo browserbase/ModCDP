@@ -26,18 +26,18 @@ describe("LocalBrowserLauncher", () => {
       const userDataDir = await mkdtemp(path.join(tmpdir(), "modcdp-local-profile-"));
       const port = await LocalBrowserLauncher.freePort();
       const chrome = await new LocalBrowserLauncher({
-        headless: true,
-        chrome_ready_timeout_ms: 45_000,
-        chrome_ready_poll_interval_ms: 50,
+        launcher_local_headless: true,
+        launcher_local_chrome_ready_timeout_ms: 45_000,
+        launcher_local_chrome_ready_poll_interval_ms: 50,
       }).launch({
-        port,
-        user_data_dir: userDataDir,
-        extra_args: ["--window-size=900,700"],
+        launcher_local_cdp_listen_port: port,
+        launcher_local_user_data_dir: userDataDir,
+        launcher_local_extra_args: ["--window-size=900,700"],
       });
       let cdp: CdpSocket | null = null;
 
       try {
-        expect(chrome.port).toBe(port);
+        expect(chrome.cdp_listen_port).toBe(port);
         expect(chrome.cdp_url).toEqual(expect.stringMatching(new RegExp(`^ws://127\\.0\\.0\\.1:${port}/`)));
         expect(chrome.profile_dir).toBe(userDataDir);
         expect((chrome.proc as { spawnargs?: string[] }).spawnargs ?? []).toEqual(
@@ -91,14 +91,14 @@ describe("LocalBrowserLauncher", () => {
     { timeout: LIVE_BROWSER_TIMEOUT_MS },
     async () => {
       const chrome = await new LocalBrowserLauncher().launch({
-        headless: true,
-        remote_debugging: "pipe",
-        chrome_ready_timeout_ms: 45_000,
+        launcher_local_headless: true,
+        launcher_local_cdp_transport: "pipe",
+        launcher_local_chrome_ready_timeout_ms: 45_000,
       });
       const profile_dir = chrome.profile_dir;
 
       try {
-        expect(chrome.port).toBeUndefined();
+        expect(chrome.cdp_listen_port).toBeUndefined();
         expect(chrome.cdp_url).toBeNull();
         expect(chrome.loopback_cdp_url).toBeUndefined();
         expect(chrome.pipe_read).toBeTruthy();
@@ -123,16 +123,16 @@ describe("LocalBrowserLauncher", () => {
     { timeout: LIVE_BROWSER_TIMEOUT_MS },
     async () => {
       const chrome = await new LocalBrowserLauncher().launch({
-        headless: true,
-        remote_debugging: "pipe",
-        loopback_cdp: true,
-        chrome_ready_timeout_ms: 45_000,
+        launcher_local_headless: true,
+        launcher_local_cdp_transport: "pipe",
+        launcher_local_loopback_cdp: true,
+        launcher_local_chrome_ready_timeout_ms: 45_000,
       });
       let cdp: CdpSocket | null = null;
 
       try {
         expect(chrome.cdp_url).toBeNull();
-        expect(chrome.port).toEqual(expect.any(Number));
+        expect(chrome.cdp_listen_port).toEqual(expect.any(Number));
         expect(chrome.loopback_cdp_url).toEqual(expect.stringMatching(/^ws:\/\/127\.0\.0\.1:\d+\//));
         cdp = await CdpSocket.connect(chrome.loopback_cdp_url!);
         await expectCdpBrowserSurface(cdp);
@@ -149,11 +149,11 @@ describe("LocalBrowserLauncher", () => {
     async () => {
       const userDataDir = await mkdtemp(path.join(tmpdir(), "modcdp-local-profile-"));
       const chrome = await new LocalBrowserLauncher({
-        headless: true,
-        chrome_ready_timeout_ms: 45_000,
+        launcher_local_headless: true,
+        launcher_local_chrome_ready_timeout_ms: 45_000,
       }).launch({
-        user_data_dir: userDataDir,
-        cleanup_user_data_dir: true,
+        launcher_local_user_data_dir: userDataDir,
+        launcher_local_cleanup_user_data_dir: true,
       });
 
       try {
