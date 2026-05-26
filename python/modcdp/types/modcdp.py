@@ -56,6 +56,61 @@ class ModCDPPingLatency(TypedDict):
     return_path_ms: int | float | None
 
 
+class ModCDPGetTopologyParams(TypedDict, total=False):
+    rootTargetId: str
+    targetId: str
+    active: bool
+
+
+class ModCDPTopologyFrame(TypedDict, total=False):
+    targetId: str
+    url: str | None
+    parentFrameId: str | None
+    outerBackendNodeId: int | None
+
+
+class ModCDPTopologyDomRoot(TypedDict, total=False):
+    kind: Literal["document", "shadow"]
+    frameId: str
+    outerBackendNodeId: int | None
+    innerBackendNodeId: int | None
+    mode: Literal["open", "closed", "user-agent"]
+    executionContextId: int
+    uniqueContextId: str
+
+
+class ModCDPTopologyTarget(TypedDict, total=False):
+    targetId: str
+    type: str
+    title: str
+    url: str
+    attached: bool
+    parentId: str
+    parentFrameId: str
+    sessionId: str | None
+
+
+class ModCDPTopologyExecutionContext(TypedDict, total=False):
+    id: int
+    origin: str
+    name: str
+    uniqueId: str
+    auxData: dict[str, object]
+    sessionId: str | None
+    targetId: str
+    frameId: str | None
+    world: str
+
+
+class ModCDPTopology(TypedDict):
+    objectGroup: str
+    rootFrameId: str
+    frames: dict[str, ModCDPTopologyFrame]
+    roots: dict[str, ModCDPTopologyDomRoot]
+    targets: dict[str, ModCDPTopologyTarget]
+    contexts: dict[str, ModCDPTopologyExecutionContext]
+
+
 class ModCDPConnectTiming(TypedDict):
     started_at: int
     upstream_mode: str | None

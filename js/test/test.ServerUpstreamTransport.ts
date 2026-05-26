@@ -8,7 +8,7 @@ import { ModCDPClient } from "../src/client/ModCDPClient.js";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
-test("loopback server upstream routes target commands through one transport", async () => {
+test("loopback server upstream routes commands, events, and topology through one transport", async () => {
   const owner = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
@@ -41,12 +41,19 @@ test("loopback server upstream routes target commands through one transport", as
   let targetId: string | null = null;
   try {
     await cdp.connect();
-    const created = (await cdp.send("Target.createTarget", { url: targetTestUrl("loopback") })) as {
+    const created = (await cdp.send("Target.createTarget", { url: topologyTestUrl("loopback") })) as {
       targetId?: string;
     };
     assert.equal(typeof created.targetId, "string");
     targetId = created.targetId;
     await assertPageMarker(cdp, targetId, "loopback");
+
+    const topology = await cdp.Mod.getTopology({ targetId });
+    assertTopology(topology, targetId);
+    assert.equal(
+      Object.values(topology.targets).some((target) => target.sessionId),
+      true,
+    );
   } finally {
     if (targetId) await cdp.send("Target.closeTarget", { targetId }).catch(() => ({}));
     await cdp.close();
@@ -54,7 +61,7 @@ test("loopback server upstream routes target commands through one transport", as
   }
 }, 90_000);
 
-test("chrome.debugger server upstream routes target commands through one transport", async () => {
+test("chrome.debugger server upstream routes commands, events, and topology through one transport", async () => {
   const owner = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
@@ -86,12 +93,19 @@ test("chrome.debugger server upstream routes target commands through one transpo
   let targetId: string | null = null;
   try {
     await cdp.connect();
-    const created = (await cdp.send("Target.createTarget", { url: targetTestUrl("debugger") })) as {
+    const created = (await cdp.send("Target.createTarget", { url: topologyTestUrl("debugger") })) as {
       targetId?: string;
     };
     assert.equal(typeof created.targetId, "string");
     targetId = created.targetId;
     await assertPageMarker(cdp, targetId, "debugger");
+
+    const topology = await cdp.Mod.getTopology({ targetId });
+    assertTopology(topology, targetId);
+    assert.equal(
+      Object.values(topology.targets).some((target) => target.targetId === targetId && target.sessionId == null),
+      true,
+    );
   } finally {
     if (targetId) await cdp.send("Target.closeTarget", { targetId }).catch(() => ({}));
     await cdp.close();
@@ -112,10 +126,46 @@ async function assertPageMarker(cdp: ModCDPClient, targetId: string, label: stri
   });
 }
 
-function targetTestUrl(label: string) {
+function assertTopology(topology: Awaited<ReturnType<ModCDPClient["Mod"]["getTopology"]>>, targetId: string) {
+  assert.equal(typeof topology.objectGroup, "string");
+  assert.equal(typeof topology.rootFrameId, "string");
+  assert.ok(topology.frames[topology.rootFrameId], "topology should include the root frame");
+  assert.equal(topology.frames[topology.rootFrameId]?.targetId, targetId);
+  assert.ok(topology.targets[targetId], "topology should include the requested page target");
+
+  const contexts = Object.values(topology.contexts);
+  assert.ok(
+    contexts.some((context) => context.frameId === topology.rootFrameId && context.world === "piercer"),
+    "topology should include a piercer execution context for the root frame",
+  );
+
+  const roots = Object.values(topology.roots);
+  assert.ok(
+    roots.some((root) => root.kind === "document" && root.frameId === topology.rootFrameId),
+    "topology should include the root document",
+  );
+  assert.ok(
+    roots.some((root) => root.kind === "shadow" && root.mode === "open"),
+    "topology should include open shadow roots",
+  );
+  assert.ok(
+    roots.some((root) => root.kind === "shadow" && root.mode === "closed"),
+    "topology should include closed shadow roots",
+  );
+}
+
+function topologyTestUrl(label: string) {
   const html = `<!doctype html>
     <html>
-      <body data-modcdp-marker="${label}"></body>
+      <body data-modcdp-marker="${label}">
+        <div id="open-host"></div>
+        <div id="closed-host"></div>
+        <iframe srcdoc="<button id='frame-button'>Frame button</button>"></iframe>
+        <script>
+          document.getElementById("open-host").attachShadow({mode: "open"}).innerHTML = "<button>Open shadow</button>";
+          document.getElementById("closed-host").attachShadow({mode: "closed"}).innerHTML = "<button>Closed shadow</button>";
+        </script>
+      </body>
     </html>`;
   return `data:text/html,${encodeURIComponent(html)}`;
 }

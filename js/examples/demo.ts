@@ -293,6 +293,26 @@ async function main() {
       throw new Error(`unexpected Mod.evaluate result ${JSON.stringify(modcdpEval)}`);
     console.log("Mod.evaluate     ->", modcdpEval);
 
+    let topologyChecked = false;
+    if (mode !== "direct") {
+      const topology = assertObject(await cdp.Mod.getTopology(), "Mod.getTopology");
+      if (
+        typeof topology.rootFrameId !== "string" ||
+        !topology.frames?.[topology.rootFrameId] ||
+        !Object.values(topology.roots || {}).some((root: any) => root?.kind === "document") ||
+        !Object.values(topology.contexts || {}).some((context: any) => context?.world === "piercer")
+      ) {
+        throw new Error(`unexpected Mod.getTopology result ${JSON.stringify(topology)}`);
+      }
+      topologyChecked = true;
+      console.log("Mod.getTopology ->", {
+        rootFrameId: topology.rootFrameId,
+        frames: Object.keys(topology.frames || {}).length,
+        roots: Object.keys(topology.roots || {}).length,
+        contexts: Object.keys(topology.contexts || {}).length,
+      });
+    }
+
     const responseMiddlewareRegistration = assertObject(
       await cdp.Mod.addMiddleware({
         name: "Custom.echo",
@@ -373,7 +393,7 @@ async function main() {
     console.log("Runtime.evaluate ->", runtimeEval);
 
     console.log(
-      `\nSUCCESS (${mode}/${upstream_mode}): native command, custom commands, custom event, and middleware all passed`,
+      `\nSUCCESS (${mode}/${upstream_mode}): native command, ${topologyChecked ? "topology, " : ""}custom commands, custom event, and middleware all passed`,
     );
 
     // Drop into an interactive prompt when stdin is a TTY. Lets you poke at

@@ -750,6 +750,8 @@ export class ModCDPClient extends ModCDPEventEmitter {
     }
     this.command_params_schemas.set("Mod.evaluate", Mod.EvaluateParams);
     this.command_result_schemas.set("Mod.evaluate", Mod.EvaluateResponse);
+    this.command_params_schemas.set("Mod.getTopology", Mod.GetTopologyParams);
+    this.command_result_schemas.set("Mod.getTopology", Mod.GetTopologyResponse);
     this.command_params_schemas.set("Mod.addCustomCommand", Mod.AddCustomCommandParams);
     this.command_result_schemas.set("Mod.addCustomCommand", Mod.AddCustomCommandResponse);
     this.command_params_schemas.set("Mod.addCustomEvent", Mod.AddCustomEventParams);

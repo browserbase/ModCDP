@@ -1245,6 +1245,10 @@ func (d ModDomain) Ping(params map[string]any) (any, error) {
 	return d.client.Send("Mod.ping", params)
 }
 
+func (d ModDomain) GetTopology(params map[string]any) (any, error) {
+	return d.client.Send("Mod.getTopology", params)
+}
+
 func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSessionID string, validateSchema bool) (any, error) {
 	startedAt := time.Now().UnixMilli()
 	if params == nil {

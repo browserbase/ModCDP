@@ -179,6 +179,52 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal("expected at least one page target to be matched to a chrome.tabs tab id")
 	}
 
+	topologyRaw, err := cdp.Mod.GetTopology(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, ok := topologyRaw.(map[string]any)
+	if !ok {
+		t.Fatalf("Mod.getTopology returned %T: %#v", topologyRaw, topologyRaw)
+	}
+	rootFrameID, ok := topology["rootFrameId"].(string)
+	if !ok || rootFrameID == "" {
+		t.Fatalf("Mod.getTopology rootFrameId = %#v", topology["rootFrameId"])
+	}
+	frames, ok := topology["frames"].(map[string]any)
+	if !ok {
+		t.Fatalf("Mod.getTopology frames = %T: %#v", topology["frames"], topology["frames"])
+	}
+	if _, ok := frames[rootFrameID]; !ok {
+		t.Fatalf("Mod.getTopology frames missing rootFrameId %q: %#v", rootFrameID, frames)
+	}
+	roots, ok := topology["roots"].(map[string]any)
+	if !ok {
+		t.Fatalf("Mod.getTopology roots = %T: %#v", topology["roots"], topology["roots"])
+	}
+	hasDocumentRoot := false
+	for _, root := range roots {
+		if rootMap, ok := root.(map[string]any); ok && rootMap["kind"] == "document" {
+			hasDocumentRoot = true
+		}
+	}
+	if !hasDocumentRoot {
+		t.Fatalf("Mod.getTopology should include at least one document root: %#v", roots)
+	}
+	contexts, ok := topology["contexts"].(map[string]any)
+	if !ok {
+		t.Fatalf("Mod.getTopology contexts = %T: %#v", topology["contexts"], topology["contexts"])
+	}
+	hasPiercerContext := false
+	for _, context := range contexts {
+		if contextMap, ok := context.(map[string]any); ok && contextMap["world"] == "piercer" {
+			hasPiercerContext = true
+		}
+	}
+	if !hasPiercerContext {
+		t.Fatalf("Mod.getTopology should include a piercer execution context: %#v", contexts)
+	}
+
 	if _, err := cdp.Mod.AddCustomEvent(CustomEvent{Name: "Target.targetCreated"}); err != nil {
 		t.Fatal(err)
 	}

@@ -221,8 +221,82 @@ export const ModCDPPingLatencySchema = z.object({
 });
 export type ModCDPPingLatency = z.infer<typeof ModCDPPingLatencySchema>;
 
+export const ModCDPGetTopologyParamsSchema = z
+  .object({
+    rootTargetId: z.string().optional(),
+    targetId: z.string().optional(),
+    active: z.boolean().optional(),
+  })
+  .passthrough();
+export type ModCDPGetTopologyParams = z.infer<typeof ModCDPGetTopologyParamsSchema>;
+
+export const ModCDPTopologyFrameSchema = z
+  .object({
+    targetId: z.string(),
+    url: z.string().nullable().optional(),
+    parentFrameId: z.string().nullable().optional(),
+    outerBackendNodeId: z.number().int().nullable().optional(),
+  })
+  .passthrough();
+export type ModCDPTopologyFrame = z.infer<typeof ModCDPTopologyFrameSchema>;
+
+export const ModCDPTopologyDomRootSchema = z
+  .object({
+    kind: z.enum(["document", "shadow"]),
+    frameId: z.string(),
+    outerBackendNodeId: z.number().int().nullable().optional(),
+    innerBackendNodeId: z.number().int().nullable().optional(),
+    mode: z.enum(["open", "closed", "user-agent"]).optional(),
+    executionContextId: z.number().int().optional(),
+    uniqueContextId: z.string().optional(),
+  })
+  .passthrough();
+export type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
+
+export const ModCDPTopologyTargetSchema = z
+  .object({
+    targetId: z.string(),
+    type: z.string(),
+    title: z.string().optional(),
+    url: z.string().optional(),
+    attached: z.boolean().optional(),
+    parentId: z.string().optional(),
+    parentFrameId: z.string().optional(),
+    sessionId: z.string().nullable().optional(),
+  })
+  .passthrough();
+export type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
+
+export const ModCDPTopologyExecutionContextSchema = z
+  .object({
+    id: z.number().int(),
+    origin: z.string().optional(),
+    name: z.string().optional(),
+    uniqueId: z.string().optional(),
+    auxData: z.record(z.string(), z.unknown()).optional(),
+    sessionId: z.string().nullable(),
+    targetId: z.string(),
+    frameId: z.string().nullable().optional(),
+    world: z.string(),
+  })
+  .passthrough();
+export type ModCDPTopologyExecutionContext = z.infer<typeof ModCDPTopologyExecutionContextSchema>;
+
+export const ModCDPTopologySchema = z
+  .object({
+    objectGroup: z.string(),
+    rootFrameId: z.string(),
+    frames: z.record(z.string(), ModCDPTopologyFrameSchema),
+    roots: z.record(z.string(), ModCDPTopologyDomRootSchema),
+    targets: z.record(z.string(), ModCDPTopologyTargetSchema),
+    contexts: z.record(z.string(), ModCDPTopologyExecutionContextSchema),
+  })
+  .passthrough();
+export type ModCDPTopology = z.infer<typeof ModCDPTopologySchema>;
+
 export const ModCDPCommandParamsSchema = z.union([
   ModCDPEvaluateParamsSchema,
+  ModCDPGetTopologyParamsSchema,
   ModCDPAddCustomCommandParamsSchema,
   ModCDPAddCustomEventParamsSchema,
   ModCDPAddMiddlewareParamsSchema,
@@ -240,6 +314,9 @@ export type ModCDPCommandResult = z.infer<typeof ModCDPCommandResultSchema>;
 
 export const ModCDPEvaluateResponseSchema = z.unknown();
 export type ModCDPEvaluateResponse = z.infer<typeof ModCDPEvaluateResponseSchema>;
+
+export const ModCDPGetTopologyResponseSchema = ModCDPTopologySchema;
+export type ModCDPGetTopologyResponse = z.infer<typeof ModCDPGetTopologyResponseSchema>;
 
 export const ModCDPAddCustomCommandResponseSchema = z
   .object({
@@ -420,6 +497,7 @@ export const Mod = {
   PayloadShape: ModCDPPayloadShapeSchema,
   PayloadSchemaSpec: ModCDPPayloadSchemaSpecSchema,
   EvaluateParams: ModCDPEvaluateParamsSchema,
+  GetTopologyParams: ModCDPGetTopologyParamsSchema,
   AddCustomCommandParams: ModCDPAddCustomCommandParamsSchema,
   AddCustomEventObjectParams: ModCDPAddCustomEventObjectParamsSchema,
   AddCustomEventParams: ModCDPAddCustomEventParamsSchema,
@@ -432,9 +510,15 @@ export const Mod = {
   PingParams: ModCDPPingParamsSchema,
   PongEvent: ModCDPPongEventSchema,
   PingLatency: ModCDPPingLatencySchema,
+  TopologyFrame: ModCDPTopologyFrameSchema,
+  TopologyDomRoot: ModCDPTopologyDomRootSchema,
+  TopologyTarget: ModCDPTopologyTargetSchema,
+  TopologyExecutionContext: ModCDPTopologyExecutionContextSchema,
+  Topology: ModCDPTopologySchema,
   CommandParams: ModCDPCommandParamsSchema,
   CommandResult: ModCDPCommandResultSchema,
   EvaluateResponse: ModCDPEvaluateResponseSchema,
+  GetTopologyResponse: ModCDPGetTopologyResponseSchema,
   AddCustomCommandResponse: ModCDPAddCustomCommandResponseSchema,
   AddCustomEventResponse: ModCDPAddCustomEventResponseSchema,
   AddMiddlewareResponse: ModCDPAddMiddlewareResponseSchema,

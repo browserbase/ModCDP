@@ -869,6 +869,15 @@ export function installModCDPServer(
   });
 
   ModCDPServer.addCustomCommand({
+    name: "Mod.getTopology",
+    handler: async (params: ProtocolParams = {}) => {
+      if (!ModCDPServer.router) setupServerUpstreamTransport();
+      if (!ModCDPServer.router) throw new Error("ModCDP autorouter is not initialized.");
+      return await ModCDPServer.router.getTopology(params as Record<string, unknown>);
+    },
+  });
+
+  ModCDPServer.addCustomCommand({
     name: "Mod.addCustomCommand",
     handler: async (params: ProtocolParams = {}) =>
       ModCDPServer.addCustomCommand(params as ModCDPCustomCommandRegistration),

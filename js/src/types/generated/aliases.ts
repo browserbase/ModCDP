@@ -1051,6 +1051,7 @@ export type CdpAliases = {
     addMiddleware(params: cdp.types.ts.Mod.AddMiddlewareParams): Promise<cdp.types.ts.Mod.AddMiddlewareResponse>;
     configure(params: cdp.types.ts.Mod.ConfigureParams): Promise<cdp.types.ts.Mod.ConfigureResponse>;
     ping(params?: cdp.types.ts.Mod.PingParams): Promise<cdp.types.ts.Mod.PingResponse>;
+    getTopology(params?: cdp.types.ts.Mod.GetTopologyParams): Promise<cdp.types.ts.Mod.GetTopologyResponse>;
   };
 };
 
@@ -2133,6 +2134,10 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
       ping: async (params?: unknown) => {
         const parsed = Mod.PingParams.parse(params ?? {});
         return Mod.PingResponse.parse(await send("Mod.ping", parsed));
+      },
+      getTopology: async (params?: unknown) => {
+        const parsed = Mod.GetTopologyParams.parse(params ?? {});
+        return Mod.GetTopologyResponse.parse(await send("Mod.getTopology", parsed));
       },
     },
   };

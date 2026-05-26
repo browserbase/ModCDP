@@ -33,8 +33,8 @@ const target_auto_attach_params = {
  * request rejection, loopback event listener dispatch, loopback execution
  * context waits used by discovery, and loopback endpoint verification. It does
  * not choose ModCDP routes, manage custom command registries, run middleware,
- * publish Stagehand/ModCDP events, or interpret browser-specific semantics
- * beyond the narrow discovery probe needed to verify the current service worker.
+ * publish Stagehand/ModCDP events, or interpret topology beyond the narrow
+ * discovery probe needed to verify the current service worker.
  *
  * Lifecycle:
  * 1. The server constructs the transport with current config values.

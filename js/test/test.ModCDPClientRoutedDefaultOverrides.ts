@@ -158,6 +158,18 @@ test(
         "expected at least one page target to be matched to a chrome.tabs tab id",
       );
 
+      const topology = await cdp.Mod.getTopology();
+      assert.equal(typeof topology.rootFrameId, "string");
+      assert.ok(topology.frames[topology.rootFrameId], "Mod.getTopology should include its root frame");
+      assert.ok(
+        Object.values(topology.roots).some((root) => root.kind === "document"),
+        "Mod.getTopology should include at least one document root",
+      );
+      assert.ok(
+        Object.values(topology.contexts).some((context) => context.world === "piercer"),
+        "Mod.getTopology should include a piercer execution context",
+      );
+
       await cdp.Mod.addCustomEvent({ name: cdp.Target.targetCreated });
 
       const transformedEvents: cdp.types.ts.Target.TargetCreatedEvent[] = [];

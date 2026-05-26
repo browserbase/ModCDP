@@ -110,6 +110,14 @@ func mustMap(value any, label string) map[string]any {
 	return result
 }
 
+func mustString(value any, label string) string {
+	result, ok := value.(string)
+	if !ok || result == "" {
+		log.Fatalf("%s returned non-string value: %v", label, value)
+	}
+	return result
+}
+
 func int64Value(value any) (int64, bool) {
 	switch typed := value.(type) {
 	case int64:
@@ -292,6 +300,47 @@ func main() {
 		fmt.Println("Mod.evaluate     ->", string(b))
 	}
 
+	topologyChecked := false
+	if mode != "direct" {
+		topologyRaw, err := cdp.Mod.GetTopology(nil)
+		if err != nil {
+			log.Fatalf("Mod.getTopology: %v", err)
+		}
+		topology := mustMap(topologyRaw, "Mod.getTopology")
+		rootFrameID := mustString(topology["rootFrameId"], "Mod.getTopology.rootFrameId")
+		frames := mustMap(topology["frames"], "Mod.getTopology.frames")
+		roots := mustMap(topology["roots"], "Mod.getTopology.roots")
+		contexts := mustMap(topology["contexts"], "Mod.getTopology.contexts")
+		if _, ok := frames[rootFrameID]; !ok {
+			log.Fatalf("Mod.getTopology frames missing root frame %s: %v", rootFrameID, frames)
+		}
+		hasDocumentRoot := false
+		for _, root := range roots {
+			rootMap, ok := root.(map[string]any)
+			if ok && rootMap["kind"] == "document" {
+				hasDocumentRoot = true
+			}
+		}
+		hasPiercerContext := false
+		for _, context := range contexts {
+			contextMap, ok := context.(map[string]any)
+			if ok && contextMap["world"] == "piercer" {
+				hasPiercerContext = true
+			}
+		}
+		if !hasDocumentRoot || !hasPiercerContext {
+			log.Fatalf("unexpected Mod.getTopology result: %v", topology)
+		}
+		topologyChecked = true
+		b, _ := json.Marshal(map[string]any{
+			"rootFrameId": rootFrameID,
+			"frames":      len(frames),
+			"roots":       len(roots),
+			"contexts":    len(contexts),
+		})
+		fmt.Println("Mod.getTopology ->", string(b))
+	}
+
 	responseMiddlewareRegistrationRaw, err := cdp.Mod.AddMiddleware(modcdp.CustomMiddleware{
 		Name:       "Custom.echo",
 		Phase:      "response",
@@ -376,7 +425,11 @@ func main() {
 	runtimeJSON, _ := json.Marshal(runtimeEval)
 	fmt.Println("Runtime.evaluate ->", string(runtimeJSON))
 
-	fmt.Printf("\nSUCCESS (%s/%s): native command, custom commands, custom event, and middleware all passed\n", mode, upstreamMode)
+	topologyLabel := ""
+	if topologyChecked {
+		topologyLabel = "topology, "
+	}
+	fmt.Printf("\nSUCCESS (%s/%s): native command, %scustom commands, custom event, and middleware all passed\n", mode, upstreamMode, topologyLabel)
 
 	// TTY-only REPL. Lets you poke at the live browser interactively;
 	// subscribed events print as they arrive. Skip when stdin is not a tty
