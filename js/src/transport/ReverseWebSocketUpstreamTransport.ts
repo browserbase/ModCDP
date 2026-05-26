@@ -117,12 +117,12 @@ export class ReverseWebSocketUpstreamTransport extends UpstreamTransport {
   async connect() {
     const { WebSocketServer } = await import("ws");
     const { host, port } = parseHostPort(this.endpoint_url, "127.0.0.1", 29292);
-    const server = new WebSocketServer({ host, port });
-    this.reversews_listener = server;
-    server.on("connection", (socket) => this.accept(socket));
+    const reversews_listener = new WebSocketServer({ host, port });
+    this.reversews_listener = reversews_listener;
+    reversews_listener.on("connection", (socket) => this.accept(socket));
     await new Promise<void>((resolve, reject) => {
-      server.once("listening", () => resolve());
-      server.once("error", reject);
+      reversews_listener.once("listening", () => resolve());
+      reversews_listener.once("error", reject);
     });
   }
 

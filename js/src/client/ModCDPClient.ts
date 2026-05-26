@@ -376,9 +376,12 @@ export class ModCDPClient extends ModCDPEventEmitter {
       upstream.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
     this.upstream.upstream_reversews_wait_timeout_ms =
       upstream.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
-    this.upstream.upstream_nativemessaging_manifest = upstream.upstream_nativemessaging_manifest ?? null;
-    this.upstream.upstream_nativemessaging_manifests = upstream.upstream_nativemessaging_manifests ?? [];
-    this.upstream.upstream_nativemessaging_host_name = upstream.upstream_nativemessaging_host_name ?? null;
+    if (upstream.upstream_nativemessaging_manifest !== undefined)
+      this.upstream.upstream_nativemessaging_manifest = upstream.upstream_nativemessaging_manifest;
+    if (upstream.upstream_nativemessaging_manifests !== undefined)
+      this.upstream.upstream_nativemessaging_manifests = upstream.upstream_nativemessaging_manifests ?? [];
+    if (upstream.upstream_nativemessaging_host_name)
+      this.upstream.upstream_nativemessaging_host_name = upstream.upstream_nativemessaging_host_name;
     this.upstream.upstream_nativemessaging_wait_timeout_ms =
       upstream.upstream_nativemessaging_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATIVEMESSAGING_WAIT_TIMEOUT_MS;
     this.upstream.upstream_ws_connect_error_settle_timeout_ms =
@@ -541,6 +544,21 @@ export class ModCDPClient extends ModCDPEventEmitter {
         }),
       );
     }
+    // MV3 service workers cannot run arbitrary extension code through normal page eval paths.
+    // Run the offscreen keepalive startup through the configured upstream CDP route, which
+    // executes Runtime.callFunctionOn inside the service worker execution context.
+    await this._sendRaw(
+      wrapCommandIfNeeded(
+        "Mod.evaluate",
+        Mod.EvaluateParams.parse({
+          expression: "ModCDP.ensureOffscreenKeepAlive()",
+        }),
+        {
+          routes: this.client.client_routes,
+          cdpSessionId: this.ext_session_id,
+        },
+      ),
+    );
 
     this._startHeartbeat();
     void this._measurePingLatency().catch(() => {});

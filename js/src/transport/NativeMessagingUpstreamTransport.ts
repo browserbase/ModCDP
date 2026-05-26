@@ -156,13 +156,13 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       throw new Error("upstream.upstream_mode=nativemessaging requires Node.");
     }
     const net = await import("node:net");
-    const server = net.createServer((socket) => this.accept(socket));
-    this.native_host_listener = server;
+    const native_host_listener = net.createServer((socket) => this.accept(socket));
+    this.native_host_listener = native_host_listener;
     await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => resolve());
+      native_host_listener.once("error", reject);
+      native_host_listener.listen(0, "127.0.0.1", () => resolve());
     });
-    const address = server.address();
+    const address = native_host_listener.address();
     if (!address || typeof address === "string") throw new Error("Native messaging bridge did not bind a TCP port.");
     this.upstream_nativemessaging_url = `native://${this.upstream_nativemessaging_host_name}@127.0.0.1:${address.port}`;
     this.bound_port = address.port;
