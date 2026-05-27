@@ -21,6 +21,9 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 	if routeFor("Target.getTargets", map[string]string{"Browser.*": "direct_cdp", "*.*": "service_worker"}) != "service_worker" {
 		t.Fatal("Target.getTargets route mismatch")
 	}
+	if routeFor("Browser.getVersion", nil) != "direct_cdp" {
+		t.Fatal("Browser.getVersion default route mismatch")
+	}
 
 	direct, err := wrapCommandIfNeeded("Browser.getVersion", map[string]any{}, map[string]string{"*.*": "direct_cdp"}, "")
 	if err != nil {
