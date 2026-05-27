@@ -311,19 +311,19 @@ func TestModCDPClientSelectsExactlyOneInjectorFromExplicitInjectorMode(t *testin
 		Launcher: LauncherConfig{LauncherMode: "local"},
 		Injector: InjectorConfig{InjectorMode: "cli"},
 	})
-	if _, ok := cdp.Injector.(*CLIExtensionInjector); !ok {
-		t.Fatalf("Injector = %T", cdp.Injector)
+	if _, ok := cdp.extensionInjectors[0].(*CLIExtensionInjector); !ok {
+		t.Fatalf("Injector = %T", cdp.extensionInjectors[0])
 	}
-	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "cdp"}}).Injector.(*CDPExtensionInjector); !ok {
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "cdp"}}).extensionInjectors[0].(*CDPExtensionInjector); !ok {
 		t.Fatalf("cdp injector type mismatch")
 	}
-	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "bb"}, Injector: InjectorConfig{InjectorMode: "bb"}}).Injector.(*BBExtensionInjector); !ok {
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "bb"}, Injector: InjectorConfig{InjectorMode: "bb"}}).extensionInjectors[0].(*BBExtensionInjector); !ok {
 		t.Fatalf("bb injector type mismatch")
 	}
-	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "discover"}}).Injector.(*DiscoverExtensionInjector); !ok {
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "discover"}}).extensionInjectors[0].(*DiscoverExtensionInjector); !ok {
 		t.Fatalf("discover injector type mismatch")
 	}
-	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "borrow"}}).Injector.(*BorrowExtensionInjector); !ok {
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "borrow"}}).extensionInjectors[0].(*BorrowExtensionInjector); !ok {
 		t.Fatalf("borrow injector type mismatch")
 	}
 }
@@ -432,8 +432,8 @@ func TestModCDPClientConnectsWithNestedLaunchUpstreamExtensionClientServerConfig
 	default:
 		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
 	}
-	if cdp.ExtensionID != DefaultModCDPExtensionID {
-		t.Fatalf("ExtensionID = %q", cdp.ExtensionID)
+	if cdp.Injector.ExtensionID != DefaultModCDPExtensionID {
+		t.Fatalf("Injector.ExtensionID = %q", cdp.Injector.ExtensionID)
 	}
 	if cdp.Config.Launcher.LauncherMode != "local" {
 		t.Fatalf("launcher mode = %q", cdp.Config.Launcher.LauncherMode)

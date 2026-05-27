@@ -299,14 +299,11 @@ type ModCDPClient struct {
 	Types                    *CDPTypes
 	CDPURL                   string
 	Launcher                 browserLauncherClient
-	Injector                 extensionInjector
+	Injector                 *ExtensionInjector
 	Upstream                 upstreamTransportClient
 	handlers                 map[string][]handlerEntry
 	handlersMu               sync.Mutex
 	Router                   *AutoSessionRouter
-	ExtensionID              string
-	ExtTargetID              string
-	ExtSessionID             string
 	Latency                  map[string]any
 	ConnectTiming            map[string]any
 	LastCommandTiming        map[string]any
@@ -419,9 +416,9 @@ func New(config Config) *ModCDPClient {
 	client.Mod = ModDomain{client: client}
 	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, client.Types, config.Router)
 	client.Launcher = client.browserLauncher()
-	injectors := client.extensionInjectorsForConfig()
+	injectors, selectedInjector := client.extensionInjectorsForConfig()
 	if len(injectors) > 0 {
-		client.Injector = injectors[0]
+		client.Injector = selectedInjector
 		client.extensionInjectors = injectors
 	}
 	if *client.Config.ClientConfig.ClientHydrateAliases {
@@ -438,8 +435,8 @@ func (c *ModCDPClient) ToJSON() map[string]any {
 	if child, ok := c.Upstream.(types.ModCDPJSONChild); ok {
 		children["upstream"] = child
 	}
-	if child, ok := c.Injector.(types.ModCDPJSONChild); ok {
-		children["injector"] = child
+	if c.Injector != nil {
+		children["injector"] = c.Injector
 	}
 	if child, ok := any(c.Router).(types.ModCDPJSONChild); ok {
 		children["router"] = child
@@ -588,24 +585,21 @@ func (c *ModCDPClient) Connect() error {
 		return err
 	}
 	extensionStartedAt := time.Now().UnixMilli()
-	ext, err := c.injectExtension(c.extensionInjectors)
+	ext, injectorState, err := c.injectExtension(c.extensionInjectors)
 	if err != nil {
 		c.Close()
 		return err
 	}
 	extensionCompletedAt := time.Now().UnixMilli()
-	c.ExtensionID = ext.ExtensionID
-	c.ExtTargetID = ext.TargetID
-	c.ExtSessionID = ext.SessionID
-	if ext.TargetID == "" || ext.SessionID == "" {
+	if injectorState.TargetID == "" || injectorState.SessionID == "" {
 		c.Close()
 		return fmt.Errorf("%T did not record a ModCDP extension target", c.Injector)
 	}
-	if _, err := c.Router.Send("Runtime.enable", map[string]any{}, c.ExtSessionID); err != nil {
+	if _, err := c.Router.Send("Runtime.enable", map[string]any{}, injectorState.SessionID); err != nil {
 		c.Close()
 		return err
 	}
-	if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.CustomEventBindingName}, c.ExtSessionID); err != nil {
+	if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.CustomEventBindingName}, injectorState.SessionID); err != nil {
 		c.Close()
 		return err
 	}
@@ -614,7 +608,7 @@ func (c *ModCDPClient) Connect() error {
 		mirrorUpstreamEvents = *c.Config.ClientConfig.ClientMirrorUpstreamEvents
 	}
 	if mirrorUpstreamEvents {
-		if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.UpstreamEventBindingName}, c.ExtSessionID); err != nil {
+		if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.UpstreamEventBindingName}, injectorState.SessionID); err != nil {
 			c.Close()
 			return err
 		}
@@ -674,10 +668,10 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	}
 	injectors := c.extensionInjectors
 	if len(injectors) == 0 && c.Config.Injector.InjectorMode != "none" {
-		injectors = c.extensionInjectorsForConfig()
+		injectors, selectedInjector := c.extensionInjectorsForConfig()
 		c.extensionInjectors = injectors
 		if len(injectors) > 0 {
-			c.Injector = injectors[0]
+			c.Injector = selectedInjector
 		}
 	}
 	initialTransportConfig := c.upstreamTransportConfig()
@@ -989,7 +983,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 	preparation, err := c.Types.PrepareCommand(
 		method,
 		params,
-		method == "Mod.addCustomCommand" || ((method == "Mod.addCustomEvent" || method == "Mod.addMiddleware") && c.ExtSessionID == ""),
+		method == "Mod.addCustomCommand" || ((method == "Mod.addCustomEvent" || method == "Mod.addMiddleware") && (c.Injector == nil || c.Injector.SessionID == "")),
 	)
 	if err != nil {
 		return nil, err
@@ -1075,14 +1069,14 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		step := command.Steps[0]
 		result, err = c.Upstream.Send(step.Method, step.Params, step.SessionID)
 	} else if command.Target == "service_worker" {
-		if c.ExtSessionID == "" {
+		if c.Injector == nil || c.Injector.SessionID == "" {
 			return nil, fmt.Errorf("service_worker commands require an injected ModCDP extension target")
 		}
 		step, stepErr := c.Types.ServiceWorkerCommandStep(method, params, cdpSessionID, 0)
 		if stepErr != nil {
 			return nil, stepErr
 		}
-		rawResult, routeErr := c.Router.Send(step.Method, step.Params, c.ExtSessionID)
+		rawResult, routeErr := c.Router.Send(step.Method, step.Params, c.Injector.SessionID)
 		if routeErr != nil {
 			return nil, routeErr
 		}
@@ -1198,31 +1192,31 @@ func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 	}
 }
 
-func (c *ModCDPClient) extensionInjectorsForConfig() []extensionInjector {
+func (c *ModCDPClient) extensionInjectorsForConfig() ([]extensionInjector, *ExtensionInjector) {
 	if c.Config.Injector.InjectorMode == "none" {
-		return nil
+		return nil, nil
 	}
 	if c.Config.Injector.InjectorMode == "cli" {
 		injector := NewCLIExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
 	if c.Config.Injector.InjectorMode == "cdp" {
 		injector := NewCDPExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
 	if c.Config.Injector.InjectorMode == "bb" {
 		injector := NewBBExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
 	if c.Config.Injector.InjectorMode == "discover" {
 		injector := NewDiscoverExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
 	if c.Config.Injector.InjectorMode == "borrow" {
 		injector := NewBorrowExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
-	return nil
+	return nil, nil
 }
 
 func isKnownLaunchMode(mode string) bool {
@@ -1266,9 +1260,9 @@ func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 	}
 }
 
-func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*ExtensionInjectionResult, error) {
+func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*ExtensionInjectionResult, *ExtensionInjector, error) {
 	if len(injectors) == 0 {
-		return nil, fmt.Errorf("injector.injector_mode=none cannot be used with an extension-routed browser upstream")
+		return nil, nil, fmt.Errorf("injector.injector_mode=none cannot be used with an extension-routed browser upstream")
 	}
 	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
 		if c.Upstream == nil {
@@ -1289,11 +1283,12 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 			continue
 		}
 		if result != nil {
-			injector.RecordInjectionResult(result)
-			return result, nil
+			state := injector.RecordInjectionResult(result)
+			c.Injector = state
+			return result, state, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot install, discover, or borrow the ModCDP extension in the running browser.%s", formatInjectorErrors(errors))
+	return nil, nil, fmt.Errorf("cannot install, discover, or borrow the ModCDP extension in the running browser.%s", formatInjectorErrors(errors))
 }
 
 func formatInjectorErrors(errors []string) string {
@@ -1410,8 +1405,8 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	method, _ := msg["method"].(string)
 	sessionID, _ := msg["sessionId"].(string)
 	params, _ := msg["params"].(map[string]any)
-	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
-		if unwrapped, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
+	if c.Injector != nil && c.Injector.SessionID != "" && sessionID == c.Injector.SessionID {
+		if unwrapped, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.Injector.SessionID); ok {
 			validatedData, valid := c.Types.ParseEventPayload(unwrapped.Event, unwrapped.Data)
 			if !valid {
 				return

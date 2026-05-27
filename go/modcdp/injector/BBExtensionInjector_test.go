@@ -48,8 +48,8 @@ func TestUploadsTheRealExtensionAndLaunchesABrowserbaseBrowserWithItInstalled(t 
 	if cdp.ConnectTiming["injector_source"] != "bb" {
 		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
 	}
-	if cdp.ExtensionID == "" {
-		t.Fatal("expected ExtensionID")
+	if cdp.Injector.ExtensionID == "" {
+		t.Fatal("expected Injector.ExtensionID")
 	}
 	result, err := cdp.Mod.Evaluate(map[string]any{
 		"expression": "chrome.runtime.getURL('modcdp/service_worker.js')",

@@ -51,8 +51,8 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideALiveExtensionServiceWorke
 	if cdp.ConnectTiming["injector_source"] != "borrow" {
 		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
 	}
-	if cdp.ExtensionID != DefaultModCDPExtensionID {
-		t.Fatalf("ExtensionID = %q", cdp.ExtensionID)
+	if cdp.Injector.ExtensionID != DefaultModCDPExtensionID {
+		t.Fatalf("Injector.ExtensionID = %q", cdp.Injector.ExtensionID)
 	}
 	result, err := cdp.Mod.Evaluate(map[string]any{
 		"expression": "chrome.runtime.getURL('modcdp/service_worker.js')",
