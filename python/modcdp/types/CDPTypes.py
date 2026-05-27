@@ -34,8 +34,8 @@ JsonSchema: TypeAlias = dict[str, JsonValue]
 CustomCommandConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomEventConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomMiddlewareConfig: TypeAlias = Mapping[str, object]
-CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | Mapping[str, CustomCommandConfig]
-CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | Mapping[str, CustomEventConfig]
+CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | dict[str, CustomCommandConfig]
+CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | dict[str, CustomEventConfig]
 CustomMiddlewareRegistrations: TypeAlias = Sequence[ModCDPAddMiddlewareParams | CustomMiddlewareConfig]
 
 
@@ -615,7 +615,7 @@ def _custom_command_entries(
 ) -> list[ModCDPAddCustomCommandParams]:
     if custom_commands is None:
         return []
-    if isinstance(custom_commands, Mapping):
+    if isinstance(custom_commands, dict):
         entries: list[ModCDPAddCustomCommandParams] = []
         for name, command in custom_commands.items():
             entry: ModCDPAddCustomCommandParams = {"name": name}
@@ -638,7 +638,7 @@ def _custom_event_entries(
 ) -> list[ModCDPAddCustomEventParams]:
     if custom_events is None:
         return []
-    if isinstance(custom_events, Mapping):
+    if isinstance(custom_events, dict):
         entries: list[ModCDPAddCustomEventParams] = []
         for name, event in custom_events.items():
             entry: ModCDPAddCustomEventObjectParams = {"name": name}
