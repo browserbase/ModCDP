@@ -17,11 +17,11 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modcdp import ModCDPClient
 from modcdp.types import ProtocolPayload
+from modcdp.types.modcdp import _isObjectMap
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 EXTENSION_PATH = ROOT / "dist" / "extension"
@@ -37,9 +37,9 @@ LIVE_DEVTOOLS_ACTIVE_PORTS = [
 
 
 def expect_object(value: object, label: str) -> ProtocolPayload:
-    if not isinstance(value, dict):
+    if not _isObjectMap(value):
         raise RuntimeError(f"{label} returned non-object value: {value!r}")
-    return cast(ProtocolPayload, value)
+    return value
 
 
 def server_router_routes_for(mode: str, upstream_mode: str) -> ProtocolPayload:
@@ -218,8 +218,8 @@ def main():
             if (
                 not isinstance(root_frame_id, str)
                 or root_frame_id not in frames
-                or not any(isinstance(root, dict) and root.get("kind") == "document" for root in roots.values())
-                or not any(isinstance(context, dict) and context.get("world") == "piercer" for context in contexts.values())
+                or not any(_isObjectMap(root) and root.get("kind") == "document" for root in roots.values())
+                or not any(_isObjectMap(context) and context.get("world") == "piercer" for context in contexts.values())
             ):
                 raise RuntimeError(f"unexpected Mod.getTopology result {topology}")
             topology_checked = True

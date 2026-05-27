@@ -732,7 +732,7 @@ class ModCDPClient(CDPSurfaceMixin):
             return
         method = msg.get("method")
         raw_params = msg.get("params")
-        params = cast(ProtocolParams, raw_params) if isinstance(raw_params, Mapping) else {}
+        params = raw_params if isinstance(raw_params, Mapping) else {}
         if isinstance(method, str):
             session_id = msg.get("sessionId")
             self.router.recordProtocolEvent(method, params, session_id if isinstance(session_id, str) else None)

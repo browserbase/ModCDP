@@ -9,6 +9,7 @@ from __future__ import annotations
 import unittest
 
 from modcdp.types.CDPTypes import CDPTypes
+from modcdp.types.modcdp import _isObjectMap
 
 
 class CDPTypesPayloadSchemaNormalizationTests(unittest.TestCase):
@@ -58,10 +59,10 @@ class CDPTypesPayloadSchemaNormalizationTests(unittest.TestCase):
             },
         )
         client_config = parsed_configure_params.get("client_config")
-        if not isinstance(client_config, dict):
+        if not _isObjectMap(client_config):
             raise AssertionError(f"client_config = {client_config!r}")
         downstream = parsed_configure_params.get("downstream")
-        if not isinstance(downstream, dict):
+        if not _isObjectMap(downstream):
             raise AssertionError(f"downstream = {downstream!r}")
         self.assertEqual(client_config["client_hydrate_aliases"], False)
         self.assertEqual(downstream["downstream_client_timeout_ms"], 1234)

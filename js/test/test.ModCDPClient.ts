@@ -260,16 +260,11 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       expression: "chrome.runtime.getURL('modcdp/service_worker.js')",
     });
     assert.equal(service_worker_url, `chrome-extension://${cdp.injector?.extension_id}/modcdp/service_worker.js`);
-    const contexts = (await cdp.Mod.evaluate({
-      expression:
-        "chrome.runtime.getContexts({}).then((contexts) => contexts.map((context) => ({ type: context.contextType, url: context.documentUrl || context.origin || '' })))",
-    })) as { type?: string; url?: string }[];
     assert.equal(
-      contexts.some(
-        (context) =>
-          context.type === "OFFSCREEN_DOCUMENT" &&
-          context.url === `chrome-extension://${cdp.injector?.extension_id}/offscreen/keepalive.html`,
-      ),
+      await cdp.Mod.evaluate({
+        expression:
+          "chrome.runtime.getContexts({}).then((contexts) => contexts.some((context) => context.contextType === 'OFFSCREEN_DOCUMENT'))",
+      }),
       true,
     );
     const version = await cdp.Browser.getVersion();

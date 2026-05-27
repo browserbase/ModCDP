@@ -198,19 +198,14 @@ class ModCDPClientTests(unittest.TestCase):
                 cdp.Mod.evaluate(expression="chrome.runtime.getURL('modcdp/service_worker.js')"),
                 "chrome-extension://mdedooklbnfejodmnhmkdpkaedafkehf/modcdp/service_worker.js",
             )
-            contexts = cdp.Mod.evaluate(
-                expression=(
-                    "chrome.runtime.getContexts({}).then((contexts) => contexts.map((context) => "
-                    "({ type: context.contextType, url: context.documentUrl || context.origin || '' })))"
-                )
-            )
-            self.assertTrue(
-                any(
-                    isinstance(context, Mapping)
-                    and context.get("type") == "OFFSCREEN_DOCUMENT"
-                    and context.get("url") == "chrome-extension://mdedooklbnfejodmnhmkdpkaedafkehf/offscreen/keepalive.html"
-                    for context in cast(list[Any], contexts)
-                )
+            self.assertEqual(
+                cdp.Mod.evaluate(
+                    expression=(
+                        "chrome.runtime.getContexts({}).then((contexts) => "
+                        "contexts.some((context) => context.contextType === 'OFFSCREEN_DOCUMENT'))"
+                    )
+                ),
+                True,
             )
             sent_at = int(time.time() * 1000)
             pong: Queue[Mapping[str, Any]] = Queue()

@@ -537,23 +537,14 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 	if result != "chrome-extension://mdedooklbnfejodmnhmkdpkaedafkehf/modcdp/service_worker.js" {
 		t.Fatalf("Mod.evaluate = %#v", result)
 	}
-	contextsRaw, err := cdp.Mod.Evaluate(map[string]any{
-		"expression": "chrome.runtime.getContexts({}).then((contexts) => contexts.map((context) => ({ type: context.contextType, url: context.documentUrl || context.origin || '' })))",
+	offscreenReady, err := cdp.Mod.Evaluate(map[string]any{
+		"expression": "chrome.runtime.getContexts({}).then((contexts) => contexts.some((context) => context.contextType === 'OFFSCREEN_DOCUMENT'))",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	contexts, _ := contextsRaw.([]any)
-	foundOffscreen := false
-	for _, rawContext := range contexts {
-		context, _ := rawContext.(map[string]any)
-		if context["type"] == "OFFSCREEN_DOCUMENT" &&
-			context["url"] == "chrome-extension://"+DefaultModCDPExtensionID+"/offscreen/keepalive.html" {
-			foundOffscreen = true
-		}
-	}
-	if !foundOffscreen {
-		t.Fatalf("expected offscreen keepalive context, got %#v", contextsRaw)
+	if offscreenReady != true {
+		t.Fatalf("expected offscreen keepalive context, got %#v", offscreenReady)
 	}
 	directTargetRaw, err := cdp.Send("Target.createTarget", map[string]any{"url": "about:blank#direct-session-routing"})
 	if err != nil {

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from queue import Queue
-from typing import Any, Literal, Protocol, TypeAlias, TypedDict
+from typing import Any, Literal, Protocol, TypeAlias, TypedDict, TypeGuard
 
 from typing_extensions import NotRequired
 
@@ -24,6 +24,10 @@ ProtocolResult: TypeAlias = Mapping[str, object]
 ProtocolPayload: TypeAlias = Mapping[str, object]
 MessageParams: TypeAlias = Mapping[str, object]
 ModCDPRoutes: TypeAlias = dict[str, str]
+
+
+def _isObjectMap(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
 
 
 class RuntimeBindingCalledEvent(TypedDict, total=False):

@@ -5,12 +5,9 @@
 """Pure ModCDP <-> CDP translation helpers for the Python client."""
 
 import json
-from typing import cast
 
 from ..types.modcdp import (
     ModCDPRoutes,
-    JsonObject,
-    JsonValue,
     ProtocolParams,
     ProtocolPayload,
     ProtocolResult,
@@ -18,6 +15,7 @@ from ..types.modcdp import (
     TranslatedCommand,
     TranslatedStep,
     UnwrappedModCDPEvent,
+    _isObjectMap,
 )
 
 UPSTREAM_EVENT_BINDING_NAME = "__ModCDP_event_from_upstream__"
@@ -59,8 +57,8 @@ def _optional_string(params: ProtocolParams, name: str) -> str | None:
     return value
 
 
-def _object_or_empty(value: object | None) -> JsonObject:
-    return value if isinstance(value, dict) else {}
+def _object_or_empty(value: object | None) -> dict[str, object]:
+    return value if _isObjectMap(value) else {}
 
 
 def _call_function_params(function_declaration: str) -> RuntimeCallFunctionOnParams:
@@ -139,7 +137,7 @@ def _unwrap_evaluate_response(result: ProtocolResult) -> object:
 def unwrap_response_if_needed(result: ProtocolResult, unwrap: str | None = None) -> object:
     if unwrap == "runtime_json":
         value = _unwrap_evaluate_response(result)
-        return cast(JsonValue, json.loads(value)) if isinstance(value, str) else value
+        return json.loads(value) if isinstance(value, str) else value
     return _unwrap_evaluate_response(result) if unwrap == "runtime" else (result or {})
 
 
@@ -161,9 +159,9 @@ def unwrap_event_if_needed(
         parsed: object = json.loads(raw_payload)
     except json.JSONDecodeError:
         return None
-    if not isinstance(parsed, dict):
+    if not _isObjectMap(parsed):
         return None
-    payload = cast(ProtocolPayload, parsed)
+    payload: ProtocolPayload = parsed
     is_upstream_event_binding = binding_name == UPSTREAM_EVENT_BINDING_NAME
     is_custom_event_binding = binding_name == CUSTOM_EVENT_BINDING_NAME
     if not is_upstream_event_binding and not is_custom_event_binding:

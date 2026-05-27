@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
-from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult
+from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 
@@ -143,27 +143,27 @@ class AutoSessionRouter:
         return resolved_target_id, session_id
 
     def recordProtocolEvent(self, method: str, data: object, session_id: str | None) -> None:
-        event_data = dict(data) if isinstance(data, Mapping) else {}
+        event_data = data if _isObjectMap(data) else {}
         if method == "Target.attachedToTarget":
             attached_session_id = event_data.get("sessionId") if isinstance(event_data.get("sessionId"), str) else session_id
             raw_target_info = event_data.get("targetInfo")
-            target_info = dict(raw_target_info) if isinstance(raw_target_info, Mapping) else None
+            target_info = raw_target_info if _isObjectMap(raw_target_info) else None
             target_id = target_info.get("targetId") if target_info else None
             if isinstance(attached_session_id, str) and isinstance(target_id, str) and target_info:
                 with self._lock:
                     self._recordTargetSession(target_id, attached_session_id, target_info)
         elif method == "Target.targetInfoChanged":
             raw_target_info = event_data.get("targetInfo")
-            if isinstance(raw_target_info, Mapping):
+            if _isObjectMap(raw_target_info):
                 with self._lock:
-                    self._recordTarget(dict(raw_target_info))
+                    self._recordTarget(raw_target_info)
         elif method == "Target.targetDestroyed":
             target_id = event_data.get("targetId")
             if isinstance(target_id, str):
                 self._forgetTarget(target_id)
         elif method == "Runtime.executionContextCreated":
             raw_context = event_data.get("context")
-            context = dict(raw_context) if isinstance(raw_context, Mapping) else None
+            context = raw_context if _isObjectMap(raw_context) else None
             context_id = context.get("id") if context else None
             if session_id and isinstance(context_id, int) and context is not None:
                 self._recordExecutionContext(None, session_id, context)
@@ -176,7 +176,7 @@ class AutoSessionRouter:
                 self._forgetExecutionContextsForRoute(session_id)
         elif method == "Page.frameNavigated":
             raw_frame = event_data.get("frame")
-            frame = dict(raw_frame) if isinstance(raw_frame, Mapping) else {}
+            frame = raw_frame if _isObjectMap(raw_frame) else {}
             frame_id = frame.get("id")
             target_id = self.targetId_from_sessionId.get(session_id) if session_id else None
             if isinstance(frame_id, str):
@@ -242,7 +242,7 @@ class AutoSessionRouter:
     def getTopology(self, params: Mapping[str, Any] | None = None) -> dict[str, Any]:
         object_group = f"modcdp-topology-{int(time.time() * 1000)}"
         raw_target_infos = self._send("Target.getTargets", {}, None).get("targetInfos")
-        target_infos = [dict(target) for target in raw_target_infos if isinstance(target, Mapping)] if isinstance(raw_target_infos, list) else []
+        target_infos = [target for target in raw_target_infos if _isObjectMap(target)] if isinstance(raw_target_infos, list) else []
         for target_info in target_infos:
             self._recordTarget(target_info)
         root_target = self._resolveRootTarget(dict(params or {}), target_infos)
@@ -252,7 +252,7 @@ class AutoSessionRouter:
         root_target_id = str(root_target["targetId"])
         _root_route_target_id, root_session_id = self._enableTarget(root_target_id)
         root_tree = self._send("Page.getFrameTree", {}, root_session_id).get("frameTree")
-        if not isinstance(root_tree, Mapping):
+        if not _isObjectMap(root_tree):
             raise RuntimeError("Page.getFrameTree returned no frameTree.")
         root_frame_id = self._recordFrameTree(root_tree, root_target_id, None, frames)
 
@@ -265,7 +265,7 @@ class AutoSessionRouter:
             target_id = str(target["targetId"])
             _route_target_id, session_id = self._enableTarget(target_id)
             frame_tree = self._send("Page.getFrameTree", {}, session_id).get("frameTree")
-            if isinstance(frame_tree, Mapping):
+            if _isObjectMap(frame_tree):
                 self._recordFrameTree(frame_tree, target_id, str(target.get("parentFrameId")), frames)
 
         for frame_id, frame in list(frames.items()):
@@ -293,14 +293,14 @@ class AutoSessionRouter:
                 evaluate_params["contextId"] = context["id"]
             root_object = self._send("Runtime.evaluate", evaluate_params, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
             result = root_object.get("result")
-            if not isinstance(result, Mapping):
+            if not _isObjectMap(result):
                 raise RuntimeError("Runtime.evaluate returned no remote object result.")
             object_id = result.get("objectId")
             if not isinstance(object_id, str) or not object_id:
                 raise RuntimeError(f"Mod.getTopology could not resolve document root for frameId={frame_id}.")
             described = self._send("DOM.describeNode", {"objectId": object_id}, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
             node = described.get("node")
-            if not isinstance(node, Mapping):
+            if not _isObjectMap(node):
                 raise RuntimeError("DOM.describeNode returned no node.")
             roots[object_id] = {
                 "kind": "document",
@@ -315,7 +315,7 @@ class AutoSessionRouter:
             _route_target_id, session_id = self.ensureRouteForTarget(target_id)
             document = self._send("DOM.getDocument", {"depth": -1, "pierce": True}, session_id)
             root = document.get("root")
-            if isinstance(root, Mapping):
+            if _isObjectMap(root):
                 self._recordShadowRoots(root, frames, roots, object_group)
 
         frame_target_ids = {frame.get("targetId") for frame in frames.values()}
@@ -332,7 +332,7 @@ class AutoSessionRouter:
             "contexts": contexts,
         }
 
-    def _recordTarget(self, target_info: Mapping[str, Any]) -> None:
+    def _recordTarget(self, target_info: dict[str, object]) -> None:
         target_id = target_info.get("targetId")
         if not isinstance(target_id, str):
             return
@@ -357,14 +357,16 @@ class AutoSessionRouter:
         existing = self.targets.get(target_id)
         self.targets[target_id] = {**existing, "sessionId": None} if existing else {"targetId": target_id, "type": "page", "sessionId": None}
 
-    def _recordExecutionContext(self, event_target_id: str | None, session_id: str | None, context: Mapping[str, Any]) -> None:
+    def _recordExecutionContext(self, event_target_id: str | None, session_id: str | None, context: dict[str, object]) -> None:
         with self._lock:
             target_id = event_target_id or (self.targetId_from_sessionId.get(session_id) if session_id else None)
             if target_id is None:
                 return
-            context_id = int(context["id"])
+            context_id = context.get("id")
+            if not isinstance(context_id, int):
+                raise RuntimeError("Runtime.executionContextCreated returned no numeric context id.")
             raw_aux_data = context.get("auxData")
-            aux_data: Mapping[str, Any] = raw_aux_data if isinstance(raw_aux_data, Mapping) else {}
+            aux_data = raw_aux_data if _isObjectMap(raw_aux_data) else {}
             frame_id = aux_data.get("frameId") if isinstance(aux_data.get("frameId"), str) else None
             context_name = context.get("name") if isinstance(context.get("name"), str) else ""
             aux_type = aux_data.get("type")
@@ -467,9 +469,9 @@ class AutoSessionRouter:
                     raise
         return route_target_id, session_id
 
-    def _recordFrameTree(self, tree: Mapping[str, Any], target_id: str, parent_frame_id: str | None, frames: dict[str, dict[str, Any]]) -> str:
+    def _recordFrameTree(self, tree: dict[str, object], target_id: str, parent_frame_id: str | None, frames: dict[str, dict[str, Any]]) -> str:
         frame = tree.get("frame")
-        if not isinstance(frame, Mapping):
+        if not _isObjectMap(frame):
             raise RuntimeError("frame tree entry is missing frame.")
         frame_id = frame.get("id")
         if not isinstance(frame_id, str):
@@ -482,24 +484,27 @@ class AutoSessionRouter:
         child_frames = tree.get("childFrames")
         if isinstance(child_frames, list):
             for child in child_frames:
-                if isinstance(child, Mapping):
+                if _isObjectMap(child):
                     self._recordFrameTree(child, target_id, frame_id, frames)
         return frame_id
 
     def _recordShadowRoots(
         self,
-        node: Mapping[str, Any],
+        node: dict[str, object],
         frames: dict[str, dict[str, Any]],
         roots: dict[str, dict[str, Any]],
         object_group: str,
         frame_id: str | None = None,
         outer_backend_node_id: int | None = None,
     ) -> None:
-        current_frame_id = node.get("frameId") if isinstance(node.get("frameId"), str) else frame_id
+        raw_frame_id = node.get("frameId")
+        current_frame_id = raw_frame_id if isinstance(raw_frame_id, str) else frame_id
+        raw_node_backend_node_id = node.get("backendNodeId")
+        node_backend_node_id = raw_node_backend_node_id if isinstance(raw_node_backend_node_id, int) else None
         shadow_roots = node.get("shadowRoots")
         if isinstance(shadow_roots, list):
             for shadow_root in shadow_roots:
-                if not isinstance(shadow_root, Mapping):
+                if not _isObjectMap(shadow_root):
                     continue
                 if current_frame_id:
                     frame = frames.get(current_frame_id)
@@ -511,33 +516,34 @@ class AutoSessionRouter:
                             context.get("sessionId") if isinstance(context.get("sessionId"), str) else None,
                         )
                         remote_object = resolved.get("object")
-                        if not isinstance(remote_object, Mapping):
+                        if not _isObjectMap(remote_object):
                             raise RuntimeError("DOM.resolveNode returned no remote object.")
                         object_id = remote_object.get("objectId")
                         if isinstance(object_id, str):
                             roots[object_id] = {
                                 "kind": "shadow",
                                 "frameId": current_frame_id,
-                                "outerBackendNodeId": outer_backend_node_id if outer_backend_node_id is not None else node.get("backendNodeId"),
+                                "outerBackendNodeId": outer_backend_node_id if outer_backend_node_id is not None else node_backend_node_id,
                                 "innerBackendNodeId": shadow_root.get("backendNodeId"),
                                 "mode": shadow_root.get("shadowRootType"),
                                 "executionContextId": context["id"],
                                 **({"uniqueContextId": context["uniqueId"]} if isinstance(context.get("uniqueId"), str) else {}),
                             }
-                self._recordShadowRoots(shadow_root, frames, roots, object_group, current_frame_id, node.get("backendNodeId") if isinstance(node.get("backendNodeId"), int) else None)
+                self._recordShadowRoots(shadow_root, frames, roots, object_group, current_frame_id, node_backend_node_id)
         children = node.get("children")
         if isinstance(children, list):
             for child in children:
-                if isinstance(child, Mapping):
+                if _isObjectMap(child):
                     self._recordShadowRoots(child, frames, roots, object_group, current_frame_id, outer_backend_node_id)
         content_document = node.get("contentDocument")
-        if isinstance(content_document, Mapping):
+        if _isObjectMap(content_document):
+            raw_content_frame_id = content_document.get("frameId")
             self._recordShadowRoots(
                 content_document,
                 frames,
                 roots,
                 object_group,
-                content_document.get("frameId") if isinstance(content_document.get("frameId"), str) else current_frame_id,
+                raw_content_frame_id if isinstance(raw_content_frame_id, str) else current_frame_id,
                 outer_backend_node_id,
             )
 
@@ -606,10 +612,10 @@ class AutoSessionRouter:
         target_infos = self._send("Target.getTargets", {}, None).get("targetInfos")
         if isinstance(target_infos, list):
             for raw_target_info in target_infos:
-                if isinstance(raw_target_info, Mapping):
+                if _isObjectMap(raw_target_info):
                     self._recordTarget(raw_target_info)
             for raw_target_info in target_infos:
-                if isinstance(raw_target_info, Mapping) and raw_target_info.get("type") == "page":
+                if _isObjectMap(raw_target_info) and raw_target_info.get("type") == "page":
                     url = raw_target_info.get("url")
                     if isinstance(url, str) and not url.startswith("devtools://"):
                         target_id = raw_target_info.get("targetId")

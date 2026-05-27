@@ -12,7 +12,7 @@ from typing import Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict
-from ..types.modcdp import ProtocolPayload, ProtocolResult
+from ..types.modcdp import ProtocolPayload, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 
@@ -141,7 +141,7 @@ class UpstreamTransport:
     def getTargets(self) -> list[dict[str, Any]]:
         result = self.send("Target.getTargets", {})
         target_infos = result.get("targetInfos") if isinstance(result, dict) else None
-        return [dict(target) for target in target_infos if isinstance(target, Mapping)] if isinstance(target_infos, list) else []
+        return [target for target in target_infos if _isObjectMap(target)] if isinstance(target_infos, list) else []
 
     def resolveTargetId(self, params: dict[str, Any] | None = None) -> str | None:
         target_id = (params or {}).get("targetId")

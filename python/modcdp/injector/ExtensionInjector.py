@@ -9,11 +9,11 @@ import threading
 import time
 from collections.abc import Callable, Mapping
 from queue import Empty, Queue
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..launcher.BrowserLauncher import LauncherConfig
-from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
+from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
@@ -167,7 +167,7 @@ class ExtensionInjector:
             return []
         targets: list[TargetInfo] = []
         for raw_target in raw_targets:
-            if not isinstance(raw_target, Mapping):
+            if not _isObjectMap(raw_target):
                 continue
             target_id = raw_target.get("targetId")
             target_type = raw_target.get("type")
@@ -205,7 +205,8 @@ class ExtensionInjector:
                 },
                 session_id,
             )
-            result = cast(Mapping[str, Any], probe.get("result")) if isinstance(probe.get("result"), Mapping) else {}
+            raw_result = probe.get("result")
+            result = raw_result if _isObjectMap(raw_result) else {}
             value = result.get("value")
             if value is not True:
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
