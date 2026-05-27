@@ -174,7 +174,6 @@ func TestModCDPClientDispatchesRootEventsBeforeExtensionSessionIsAttached(t *tes
 
 func TestModCDPClientEventDispatchSnapshotsHandlersWhenOnceRemovesItself(t *testing.T) {
 	cdp := New(Config{})
-	cdp.ExtSessionID = "ext-session"
 	seen := make(chan string, 3)
 	cdp.Once("Target.targetCreated", func(payload any) {
 		seen <- "once"

@@ -268,10 +268,6 @@ class ModCDPClient(CDPSurfaceMixin):
         else:
             self.types = CDPTypes()
 
-        self.extension_id: str | None = None
-        self.ext_target_id: str | None = None
-        self.ext_session_id: str | None = None
-        self.ext_execution_context_id: int | None = None
         self.latency: ModCDPPingLatency | None = None
         self.connect_timing: ModCDPConnectTiming | None = None
         self.last_command_timing: ModCDPCommandTiming | None = None
@@ -338,17 +334,12 @@ class ModCDPClient(CDPSurfaceMixin):
             raise RuntimeError("injector.injector_mode=none cannot be used with an extension-routed browser upstream.")
         ext = self._inject_extension()
         injector_completed_at = int(time.time() * 1000)
-        self.extension_id = ext["extension_id"]
-        self.ext_target_id = ext["target_id"]
-        self.ext_session_id = ext["session_id"]
-        self.router.send("Runtime.enable", {}, self.ext_session_id)
-        self.ext_execution_context_id = self.router.waitForExecutionContext(
-            self.ext_session_id,
-            self.injector.config.injector_execution_context_timeout_ms,
-        )
-        self.router.send("Runtime.addBinding", {"name": CUSTOM_EVENT_BINDING_NAME}, self.ext_session_id)
+        if self.injector.target_id is None or self.injector.session_id is None:
+            raise RuntimeError(f"{type(self.injector).__name__} did not record a ModCDP extension target.")
+        self.router.send("Runtime.enable", {}, self.injector.session_id)
+        self.router.send("Runtime.addBinding", {"name": CUSTOM_EVENT_BINDING_NAME}, self.injector.session_id)
         if self.config.client_mirror_upstream_events:
-            self.router.send("Runtime.addBinding", {"name": UPSTREAM_EVENT_BINDING_NAME}, self.ext_session_id)
+            self.router.send("Runtime.addBinding", {"name": UPSTREAM_EVENT_BINDING_NAME}, self.injector.session_id)
 
         if self.server_config is not None:
             self.send("Mod.configure", self._server_configure_params())
@@ -382,7 +373,10 @@ class ModCDPClient(CDPSurfaceMixin):
             method,
             dict(params or {}),
             can_register_locally=method == "Mod.addCustomCommand"
-            or (method in ("Mod.addCustomEvent", "Mod.addMiddleware") and self.ext_session_id is None),
+            or (
+                method in ("Mod.addCustomEvent", "Mod.addMiddleware")
+                and (self.injector is None or self.injector.session_id is None)
+            ),
         )
         if preparation.local_result is not None:
             completed_at = int(time.time() * 1000)
@@ -420,21 +414,11 @@ class ModCDPClient(CDPSurfaceMixin):
             step_params = step.get("params")
             result = self.router.send(step["method"], step_params if isinstance(step_params, Mapping) else {}, step.get("sessionId"))
         elif command["target"] == "service_worker":
-            if self.injector is None:
-                raise RuntimeError("injector.injector_mode='none' cannot route commands through the service worker.")
-            result = {}
-            unwrap: str | None = None
-            for step in command["steps"]:
-                params = dict(step.get("params") or {})
-                if step["method"] == "Runtime.callFunctionOn" and "executionContextId" not in params:
-                    if self.ext_execution_context_id is None:
-                        self.ext_execution_context_id = self.router.waitForExecutionContext(
-                            self.ext_session_id,
-                            self.injector.config.injector_execution_context_timeout_ms,
-                        )
-                    params["executionContextId"] = self.ext_execution_context_id
-                result = self.router.send(step["method"], params, self.ext_session_id)
-                unwrap = step.get("unwrap")
+            if self.injector is None or self.injector.session_id is None:
+                raise RuntimeError("service_worker commands require an injected ModCDP extension target.")
+            step = self.types.serviceWorkerCommandStep(method, command_params, session_id)
+            result = self.router.send(step["method"], step.get("params") or {}, self.injector.session_id)
+            unwrap = step.get("unwrap")
             result = unwrap_response_if_needed(result, unwrap)
         else:
             raise RuntimeError(f"Unsupported command target {command['target']!r}")
@@ -741,13 +725,14 @@ class ModCDPClient(CDPSurfaceMixin):
         method = msg.get("method")
         raw_params = msg.get("params")
         params = raw_params if isinstance(raw_params, Mapping) else {}
-        if method and self.ext_session_id is not None and msg.get("sessionId") == self.ext_session_id:
+        extension_session_id = self.injector.session_id if self.injector is not None else None
+        if method and extension_session_id is not None and msg.get("sessionId") == extension_session_id:
             session_id = msg.get("sessionId")
             u = unwrap_event_if_needed(
                 method,
                 params,
                 session_id if isinstance(session_id, str) else None,
-                self.ext_session_id,
+                extension_session_id,
             )
             if u:
                 validated_payload = self.types.parseEventPayload(u["event"], u["data"])

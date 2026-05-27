@@ -307,7 +307,6 @@ type ModCDPClient struct {
 	ExtensionID              string
 	ExtTargetID              string
 	ExtSessionID             string
-	ExtExecutionContextID    int
 	Latency                  map[string]any
 	ConnectTiming            map[string]any
 	LastCommandTiming        map[string]any
@@ -599,17 +598,15 @@ func (c *ModCDPClient) Connect() error {
 	c.ExtensionID = ext.ExtensionID
 	c.ExtTargetID = ext.TargetID
 	c.ExtSessionID = ext.SessionID
-	if _, err := c.transport.Send("Runtime.enable", map[string]any{}, c.ExtSessionID); err != nil {
+	if ext.TargetID == "" || ext.SessionID == "" {
+		c.Close()
+		return fmt.Errorf("%T did not record a ModCDP extension target", c.Injector)
+	}
+	if _, err := c.Router.Send("Runtime.enable", map[string]any{}, c.ExtSessionID); err != nil {
 		c.Close()
 		return err
 	}
-	extExecutionContextID, err := c.Router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
-	if err != nil {
-		c.Close()
-		return err
-	}
-	c.ExtExecutionContextID = extExecutionContextID
-	if _, err := c.transport.Send("Runtime.addBinding", map[string]any{"name": translate.CustomEventBindingName}, c.ExtSessionID); err != nil {
+	if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.CustomEventBindingName}, c.ExtSessionID); err != nil {
 		c.Close()
 		return err
 	}
@@ -618,7 +615,7 @@ func (c *ModCDPClient) Connect() error {
 		mirrorUpstreamEvents = *c.Config.ClientConfig.ClientMirrorUpstreamEvents
 	}
 	if mirrorUpstreamEvents {
-		if _, err := c.transport.Send("Runtime.addBinding", map[string]any{"name": translate.UpstreamEventBindingName}, c.ExtSessionID); err != nil {
+		if _, err := c.Router.Send("Runtime.addBinding", map[string]any{"name": translate.UpstreamEventBindingName}, c.ExtSessionID); err != nil {
 			c.Close()
 			return err
 		}
@@ -1082,37 +1079,18 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		step := command.Steps[0]
 		result, err = c.transport.Send(step.Method, step.Params, step.SessionID)
 	} else if command.Target == "service_worker" {
-		var rawResult map[string]any
-		unwrap := ""
-		for _, step := range command.Steps {
-			stepParams := step.Params
-			if stepParams == nil {
-				stepParams = map[string]any{}
-			}
-			if step.Method == "Runtime.callFunctionOn" {
-				if _, exists := stepParams["executionContextId"]; !exists {
-					if c.ExtExecutionContextID == 0 {
-						contextID, contextErr := c.Router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
-						if contextErr != nil {
-							return nil, contextErr
-						}
-						c.ExtExecutionContextID = contextID
-					}
-					nextParams := map[string]any{}
-					for key, value := range stepParams {
-						nextParams[key] = value
-					}
-					nextParams["executionContextId"] = c.ExtExecutionContextID
-					stepParams = nextParams
-				}
-			}
-			rawResult, err = c.transport.Send(step.Method, stepParams, c.ExtSessionID)
-			if err != nil {
-				return nil, err
-			}
-			unwrap = step.Unwrap
+		if c.ExtSessionID == "" {
+			return nil, fmt.Errorf("service_worker commands require an injected ModCDP extension target")
 		}
-		result, err = translate.UnwrapResponseIfNeeded(rawResult, unwrap)
+		step, stepErr := c.Types.ServiceWorkerCommandStep(method, params, cdpSessionID, 0)
+		if stepErr != nil {
+			return nil, stepErr
+		}
+		rawResult, routeErr := c.Router.Send(step.Method, step.Params, c.ExtSessionID)
+		if routeErr != nil {
+			return nil, routeErr
+		}
+		result, err = translate.UnwrapResponseIfNeeded(rawResult, step.Unwrap)
 	} else {
 		err = fmt.Errorf("unsupported command target %q", command.Target)
 	}

@@ -255,7 +255,7 @@ class ModCDPClientTests(unittest.TestCase):
             self.assertEqual(cdp.injector.config.injector_mode, "cli")
             self.assertEqual(cdp.router.config.router_routes["*.*"], "direct_cdp")
             self.assertRegex(cdp.upstream.config.upstream_ws_cdp_url or "", r"^ws://")
-            self.assertEqual(cdp.extension_id, "mdedooklbnfejodmnhmkdpkaedafkehf")
+            self.assertEqual(cdp.injector.extension_id, "mdedooklbnfejodmnhmkdpkaedafkehf")
             self.assertEqual(
                 cdp.Mod.evaluate(expression="chrome.runtime.getURL('modcdp/service_worker.js')"),
                 "chrome-extension://mdedooklbnfejodmnhmkdpkaedafkehf/modcdp/service_worker.js",
@@ -463,7 +463,6 @@ class ModCDPClientTests(unittest.TestCase):
 
     def test_modcdpclient_event_dispatch_snapshots_handlers_when_once_removes_itself(self) -> None:
         client = ModCDPClient()
-        client.ext_session_id = "ext-session"
         seen: Queue[str] = Queue()
 
         def persistent(_payload: Mapping[str, Any]) -> None:

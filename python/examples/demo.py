@@ -160,7 +160,10 @@ def main():
 
         cdp.connect()
         print(f"upstream cdp: {cdp.cdp_url}")
-        print(f"connected; ext {cdp.extension_id} session {cdp.ext_session_id}")
+        print(
+            f"connected; ext {cdp.injector.extension_id if cdp.injector else None} "
+            f"session {cdp.injector.session_id if cdp.injector else None}"
+        )
         print(f"connect timing    -> {cdp.connect_timing}")
 
         configure_params: ProtocolPayload = {
@@ -204,7 +207,8 @@ def main():
         print(f"ping latency      -> {ping_latency}")
 
         modcdp_eval = expect_object(cdp.send("Mod.evaluate", {"expression": "({ extension_id: chrome.runtime.id })"}), "Mod.evaluate")
-        if not isinstance(modcdp_eval.get("extension_id"), str) or (cdp.extension_id and modcdp_eval.get("extension_id") != cdp.extension_id):
+        injector_extension_id = cdp.injector.extension_id if cdp.injector else None
+        if not isinstance(modcdp_eval.get("extension_id"), str) or (injector_extension_id and modcdp_eval.get("extension_id") != injector_extension_id):
             raise RuntimeError(f"unexpected Mod.evaluate result {modcdp_eval}")
         print(f"Mod.evaluate     -> {modcdp_eval}")
 

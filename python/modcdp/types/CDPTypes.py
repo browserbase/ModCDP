@@ -4,9 +4,10 @@
 # - ./go/modcdp/client/CDPTypes.go
 from __future__ import annotations
 
+import json
 import re
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
@@ -27,6 +28,7 @@ from ..types.modcdp import (
     ProtocolParams,
     ProtocolPayload,
     ProtocolResult,
+    TranslatedStep,
 )
 from ..types.toJSON import modCDPToJSON
 
@@ -428,6 +430,7 @@ class CDPTypes:
         self.command_result_schemas: dict[str, TypeAdapter[object]] = {}
         self.native_command_schemas: dict[str, TypeAdapter[object]] = {}
         self.event_classes: dict[str, type[CDPEvent]] = {}
+        self.service_worker_expression_builders: dict[str, Callable[[ProtocolParams, str | None], str]] = {}
         self._lock = threading.RLock()
         self.hydrateNativeProtocolSchemas()
         for command in DEFAULT_BUILTIN_COMMANDS:
@@ -440,6 +443,12 @@ class CDPTypes:
             self.addCustomEvent({"name": event} if isinstance(event, str) else event)
         for middleware in custom_middlewares or []:
             self.addCustomMiddleware(middleware)
+        self.service_worker_expression_builders["Mod.evaluate"] = lambda params, _cdp_session_id: (
+            "\n        async ({ params = {}, cdpSessionId = null }) => {\n"
+            f"          const value = ({params['expression']});\n"
+            "          return typeof value === \"function\" ? await value(params) : value;\n"
+            "        }\n      "
+        )
 
     def update(
         self,
@@ -694,6 +703,124 @@ class CDPTypes:
             middleware
             for middleware in self.custom_middlewares
             if middleware["phase"] == phase and (middleware.get("name") in (None, "*", name))
+        ]
+
+    def serviceWorkerCommandStep(
+        self,
+        method: str,
+        params: ProtocolParams | None = None,
+        cdp_session_id: str | None = None,
+        execution_context_id: int | None = None,
+    ) -> TranslatedStep:
+        command = self.custom_commands.get(method)
+        command_expression = command.get("expression") if command else None
+        command_params = dict(params or {})
+        if isinstance(command_expression, str) and command_expression:
+            expression_builder = self.service_worker_expression_builders.get(method)
+            expression = expression_builder(command_params, cdp_session_id) if expression_builder else command_expression
+            runtime_params: dict[str, object] = {
+                "expression": self._serviceWorkerRuntimeExpression(method, command_params, cdp_session_id, expression),
+                "awaitPromise": True,
+                "returnByValue": True,
+            }
+            if execution_context_id is not None:
+                runtime_params["contextId"] = execution_context_id
+            return {"method": "Runtime.evaluate", "params": runtime_params, "unwrap": "runtime"}
+        runtime_params = {
+            "functionDeclaration": (
+                "async function(method, paramsJson, cdpSessionId) { "
+                "return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); "
+                "}"
+            ),
+            "arguments": [{"value": method}, {"value": json.dumps(command_params)}, {"value": cdp_session_id}],
+            "awaitPromise": True,
+            "returnByValue": True,
+        }
+        if execution_context_id is not None:
+            runtime_params["executionContextId"] = execution_context_id
+        return {"method": "Runtime.callFunctionOn", "params": runtime_params, "unwrap": "runtime_json"}
+
+    def _serviceWorkerRuntimeExpression(
+        self,
+        method: str,
+        params: ProtocolParams,
+        cdp_session_id: str | None,
+        command_expression: str,
+    ) -> str:
+        request_middlewares = ",".join(self._serviceWorkerMiddlewareExpressions("request", method))
+        response_middlewares = ",".join(self._serviceWorkerMiddlewareExpressions("response", method))
+        return f"""
+      (async () => {{
+        const method = {json.dumps(method)};
+        let commandParams = {json.dumps(dict(params or {}))};
+        const cdpSessionId = {json.dumps(cdp_session_id)};
+        const upstream = globalThis.ModCDP.client;
+        const downstream = globalThis.ModCDP.downstream;
+        const ModCDP = globalThis.ModCDP;
+        const cdp = {{
+          upstream,
+          client: upstream,
+          downstream,
+          send: (method, params = {{}}, targetCdpSessionId = cdpSessionId) =>
+            ModCDP.handleCommand(method, params, targetCdpSessionId),
+        }};
+        const chrome = globalThis.chrome;
+        const runMiddlewares = async (middlewares, payload, context = {{}}) => {{
+          const dispatch = async (index, value) => {{
+            const middleware = middlewares[index];
+            if (!middleware) return value;
+            let nextCalled = false;
+            const next = async (nextValue = value) => {{
+              if (nextCalled) throw new Error("Middleware called next() more than once.");
+              nextCalled = true;
+              return await dispatch(index + 1, nextValue);
+            }};
+            const result = await middleware(value, next, context);
+            if (result && result.__ModCDP_middleware_next__ === true) {{
+              const nextResult = await next(result.value);
+              const {{ __ModCDP_middleware_next__, value: _value, ...overrides }} = result;
+              if (Object.keys(overrides).length === 0) return nextResult;
+              return nextResult && typeof nextResult === "object" && !Array.isArray(nextResult)
+                ? {{ ...nextResult, ...overrides }}
+                : overrides;
+            }}
+            return result;
+          }};
+          return await dispatch(0, payload);
+        }};
+        const requestMiddlewares = [{request_middlewares}];
+        const responseMiddlewares = [{response_middlewares}];
+        const request = {{ method, params: commandParams, cdpSessionId }};
+        commandParams = await runMiddlewares(requestMiddlewares, commandParams, {{
+          cdpSessionId,
+          request,
+          name: method,
+          phase: "request",
+        }});
+        if (commandParams == null) throw new Error("Request middleware returned no params.");
+        commandParams = ModCDP.types.parseCommandParams(method, commandParams);
+        const handler = ({command_expression});
+        let result = await handler(commandParams || {{}}, method);
+        result = await runMiddlewares(responseMiddlewares, result, {{
+          cdpSessionId,
+          request: {{ ...request, params: commandParams }},
+          response: {{ result }},
+          name: method,
+          phase: "response",
+        }});
+        return ModCDP.types.parseCommandResult(method, result);
+      }})()
+    """
+
+    def _serviceWorkerMiddlewareExpressions(self, phase: str, method: str) -> list[str]:
+        return [
+            f"""
+        async (payload, next, context = {{}}) => {{
+          const middleware = ({middleware["expression"]});
+          return await middleware(payload, next, context);
+        }}
+      """
+            for middleware in self.customMiddlewareRegistrations(phase, method)
         ]
 
     def _adapterFromOptionalSchema(self, schema: object, field_name: str) -> _AdapterRegistration:

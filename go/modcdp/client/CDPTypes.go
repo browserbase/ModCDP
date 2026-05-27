@@ -5,11 +5,13 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
 	abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
+	"github.com/browserbase/modcdp/go/modcdp/translate"
 	modtypes "github.com/browserbase/modcdp/go/modcdp/types"
 )
 
@@ -676,6 +678,144 @@ func (types *CDPTypes) CustomMiddlewareRegistrations(phase string, name string) 
 		}
 	}
 	return middlewares
+}
+
+func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string]any, cdpSessionID string, executionContextID int) (translate.RawStep, error) {
+	if params == nil {
+		params = map[string]any{}
+	}
+	types.mu.RLock()
+	command, hasCommand := types.CustomCommands[method]
+	types.mu.RUnlock()
+	if hasCommand && command.Expression != "" {
+		commandExpression := command.Expression
+		if method == "Mod.evaluate" {
+			expression, _ := params["expression"].(string)
+			commandExpression = fmt.Sprintf(`
+        async ({ params = {}, cdpSessionId = null }) => {
+          const value = (%s);
+          return typeof value === "function" ? await value(params) : value;
+        }
+      `, expression)
+		}
+		runtimeParams := map[string]any{
+			"expression":    types.serviceWorkerRuntimeExpression(method, params, cdpSessionID, commandExpression),
+			"awaitPromise":  true,
+			"returnByValue": true,
+		}
+		if executionContextID != 0 {
+			runtimeParams["contextId"] = executionContextID
+		}
+		return translate.RawStep{Method: "Runtime.evaluate", Params: runtimeParams, Unwrap: "runtime"}, nil
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return translate.RawStep{}, err
+	}
+	runtimeParams := map[string]any{
+		"functionDeclaration": `async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }`,
+		"arguments":           []map[string]any{{"value": method}, {"value": string(paramsJSON)}, {"value": nil}},
+		"awaitPromise":        true,
+		"returnByValue":       true,
+	}
+	if cdpSessionID != "" {
+		runtimeParams["arguments"] = []map[string]any{{"value": method}, {"value": string(paramsJSON)}, {"value": cdpSessionID}}
+	}
+	if executionContextID != 0 {
+		runtimeParams["executionContextId"] = executionContextID
+	}
+	return translate.RawStep{Method: "Runtime.callFunctionOn", Params: runtimeParams, Unwrap: "runtime_json"}, nil
+}
+
+func (types *CDPTypes) serviceWorkerRuntimeExpression(method string, params map[string]any, cdpSessionID string, commandExpression string) string {
+	methodJSON := jsonLiteral(method)
+	paramsJSON := jsonLiteral(params)
+	cdpSessionIDJSON := "null"
+	if cdpSessionID != "" {
+		cdpSessionIDJSON = jsonLiteral(cdpSessionID)
+	}
+	requestMiddlewares := strings.Join(types.serviceWorkerMiddlewareExpressions("request", method), ",")
+	responseMiddlewares := strings.Join(types.serviceWorkerMiddlewareExpressions("response", method), ",")
+	return fmt.Sprintf(`
+      (async () => {
+        const method = %s;
+        let commandParams = %s;
+        const cdpSessionId = %s;
+        const upstream = globalThis.ModCDP.client;
+        const downstream = globalThis.ModCDP.downstream;
+        const ModCDP = globalThis.ModCDP;
+        const cdp = {
+          upstream,
+          client: upstream,
+          downstream,
+          send: (method, params = {}, targetCdpSessionId = cdpSessionId) =>
+            ModCDP.handleCommand(method, params, targetCdpSessionId),
+        };
+        const chrome = globalThis.chrome;
+        const runMiddlewares = async (middlewares, payload, context = {}) => {
+          const dispatch = async (index, value) => {
+            const middleware = middlewares[index];
+            if (!middleware) return value;
+            let nextCalled = false;
+            const next = async (nextValue = value) => {
+              if (nextCalled) throw new Error("Middleware called next() more than once.");
+              nextCalled = true;
+              return await dispatch(index + 1, nextValue);
+            };
+            const result = await middleware(value, next, context);
+            if (result && result.__ModCDP_middleware_next__ === true) {
+              const nextResult = await next(result.value);
+              const { __ModCDP_middleware_next__, value: _value, ...overrides } = result;
+              if (Object.keys(overrides).length === 0) return nextResult;
+              return nextResult && typeof nextResult === "object" && !Array.isArray(nextResult)
+                ? { ...nextResult, ...overrides }
+                : overrides;
+            }
+            return result;
+          };
+          return await dispatch(0, payload);
+        };
+        const requestMiddlewares = [%s];
+        const responseMiddlewares = [%s];
+        const request = { method, params: commandParams, cdpSessionId };
+        commandParams = await runMiddlewares(requestMiddlewares, commandParams, {
+          cdpSessionId,
+          request,
+          name: method,
+          phase: "request",
+        });
+        if (commandParams == null) throw new Error("Request middleware returned no params.");
+        commandParams = ModCDP.types.parseCommandParams(method, commandParams);
+        const handler = (%s);
+        let result = await handler(commandParams || {}, method);
+        result = await runMiddlewares(responseMiddlewares, result, {
+          cdpSessionId,
+          request: { ...request, params: commandParams },
+          response: { result },
+          name: method,
+          phase: "response",
+        });
+        return ModCDP.types.parseCommandResult(method, result);
+      })()
+    `, methodJSON, paramsJSON, cdpSessionIDJSON, requestMiddlewares, responseMiddlewares, commandExpression)
+}
+
+func (types *CDPTypes) serviceWorkerMiddlewareExpressions(phase string, method string) []string {
+	expressions := []string{}
+	for _, middleware := range types.CustomMiddlewareRegistrations(phase, method) {
+		expressions = append(expressions, fmt.Sprintf(`
+        async (payload, next, context = {}) => {
+          const middleware = (%s);
+          return await middleware(payload, next, context);
+        }
+      `, middleware.Expression))
+	}
+	return expressions
+}
+
+func jsonLiteral(value any) string {
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
 }
 
 func CustomCommandFromParams(params map[string]any) CustomCommand {

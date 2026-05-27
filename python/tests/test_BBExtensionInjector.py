@@ -38,7 +38,8 @@ class BBExtensionInjectorTests(unittest.TestCase):
         try:
             cdp.connect()
             self.assertEqual(cdp.connect_timing.get("injector_source") if cdp.connect_timing else None, "bb")
-            self.assertIsInstance(cdp.extension_id, str)
+            assert cdp.injector is not None
+            self.assertIsInstance(cdp.injector.extension_id, str)
             service_worker_url = cdp.Mod.evaluate(expression="chrome.runtime.getURL('modcdp/service_worker.js')")
             self.assertRegex(str(service_worker_url), r"^chrome-extension://[a-z]{32}/modcdp/service_worker\.js$")
         finally:
