@@ -15,7 +15,6 @@ from pathlib import Path
 
 from ..launcher.BrowserLauncher import LauncherConfig
 from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig
-from ..injector.NodeExtensionFiles import defaultModCDPExtensionPath
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
 
@@ -35,7 +34,7 @@ class BBExtensionInjector(ExtensionInjector):
             return
         if self.extension_id:
             return
-        extension_path = self.config.injector_bb_extension_path or defaultModCDPExtensionPath()
+        extension_path = self.config.injector_bb_extension_path
         if not extension_path:
             return
         self.update({"injector_bb_extension_path": extension_path})
@@ -48,9 +47,7 @@ class BBExtensionInjector(ExtensionInjector):
             raise
 
     def configForLauncher(self) -> LauncherConfig | dict:
-        if not self.extension_id:
-            return {}
-        return {"launcher_bb_extension_id": self.extension_id}
+        return {"launcher_bb_extension_id": self.extension_id or self.config.injector_bb_extension_id}
 
     def inject(self) -> ExtensionInjectionResult | None:
         extension_id = self.config.injector_service_worker_extension_id
@@ -81,7 +78,7 @@ class BBExtensionInjector(ExtensionInjector):
     def _uploadExtension(self, zip_path: str) -> str:
         browserbase_api_key = _first_string(self.config.injector_bb_api_key, os.environ.get("BROWSERBASE_API_KEY"))
         if not browserbase_api_key:
-            raise RuntimeError("BBExtensionInjector requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")
+            raise RuntimeError("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.")
         base_url = _first_string(
             self.config.injector_bb_base_url,
             os.environ.get("BROWSERBASE_BASE_URL"),

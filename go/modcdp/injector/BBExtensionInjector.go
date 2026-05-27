@@ -93,7 +93,7 @@ func (i *BBExtensionInjector) Close() error {
 func (i *BBExtensionInjector) uploadExtension(zipPath string) (string, error) {
 	browserbaseAPIKey := firstNonEmptyString(i.Config.InjectorBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
 	if browserbaseAPIKey == "" {
-		return "", fmt.Errorf("BBExtensionInjector requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key")
+		return "", fmt.Errorf("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.")
 	}
 	baseURL := firstNonEmptyString(i.Config.InjectorBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseBaseURL)
 	body := &bytes.Buffer{}
