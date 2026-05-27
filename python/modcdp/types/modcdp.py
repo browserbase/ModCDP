@@ -256,10 +256,10 @@ ModCDPConfigureResponse: TypeAlias = Mapping[str, object]
 ModCDPPingResponse: TypeAlias = ModCDPOkResponse
 
 
-class ModCDPBindingPayload(TypedDict, total=False):
+class ModCDPBindingPayload(TypedDict):
     event: str
-    data: JsonValue
-    cdpSessionId: str | None
+    data: object
+    cdpSessionId: NotRequired[str | None]
 
 
 RuntimeCallFunctionOnParams: TypeAlias = dict[str, object]

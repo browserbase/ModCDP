@@ -111,6 +111,7 @@ var ParseHostPort = transport.ParseHostPort
 var WrapCommandIfNeeded = translate.WrapCommandIfNeeded
 var UnwrapResponseIfNeeded = translate.UnwrapResponseIfNeeded
 var UnwrapEventIfNeeded = translate.UnwrapEventIfNeeded
+var EncodeBindingPayload = translate.EncodeBindingPayload
 
 const UpstreamModeWS = transport.UpstreamModeWS
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID

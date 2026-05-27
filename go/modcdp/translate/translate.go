@@ -68,6 +68,7 @@ var routeFor = RouteFor
 var wrapCommandIfNeeded = WrapCommandIfNeeded
 var unwrapResponseIfNeeded = UnwrapResponseIfNeeded
 var unwrapEventIfNeeded = UnwrapEventIfNeeded
+var encodeBindingPayload = EncodeBindingPayload
 
 const upstreamEventBindingName = UpstreamEventBindingName
 const customEventBindingName = CustomEventBindingName
@@ -188,4 +189,24 @@ func UnwrapEventIfNeeded(method string, params map[string]any, sessionID string,
 		return &types.UnwrappedModCDPEvent{Event: resolvedEvent, Data: data, SessionID: sourceSessionIDPtr}, true
 	}
 	return &types.UnwrappedModCDPEvent{Event: resolvedEvent, Data: payload, SessionID: sourceSessionIDPtr}, true
+}
+
+func EncodeBindingPayload(payload types.ModCDPBindingPayload) (string, error) {
+	var cdpSessionID any
+	if payload.CDPSessionID != "" {
+		cdpSessionID = payload.CDPSessionID
+	}
+	encoded, err := json.Marshal(struct {
+		Event        string `json:"event"`
+		Data         any    `json:"data"`
+		CDPSessionID any    `json:"cdpSessionId"`
+	}{
+		Event:        payload.Event,
+		Data:         payload.Data,
+		CDPSessionID: cdpSessionID,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
 }

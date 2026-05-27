@@ -6,12 +6,13 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
-import unittest
 import json
+import unittest
 from typing import cast
 
 from modcdp.translate import (
     CUSTOM_EVENT_BINDING_NAME,
+    encode_binding_payload,
     route_for,
     unwrap_event_if_needed,
     unwrap_response_if_needed,
@@ -77,9 +78,12 @@ class TranslateTests(unittest.TestCase):
         self.assertEqual(unwrap_response_if_needed({"result": {"type": "object", "value": {"ok": True}}}, "runtime"), {"ok": True})
         self.assertEqual(unwrap_response_if_needed({"product": "Chrome/1"}, None), {"product": "Chrome/1"})
 
-        payload = json.dumps(
-            {"event": "Custom.ready", "data": {"ready": True}, "cdpSessionId": "session-2"},
-            separators=(",", ":"),
+        payload = encode_binding_payload(
+            {
+                "event": "Custom.ready",
+                "data": {"ready": True},
+                "cdpSessionId": "session-2",
+            }
         )
         self.assertEqual(
             unwrap_event_if_needed(

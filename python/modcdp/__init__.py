@@ -19,7 +19,7 @@ from .launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from .launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 from .transport.UpstreamTransport import UpstreamTransport, parseHostPort
 from .transport.WSUpstreamTransport import WSUpstreamTransport
-from .translate.translate import wrap_command_if_needed, unwrap_response_if_needed, unwrap_event_if_needed
+from .translate.translate import wrap_command_if_needed, unwrap_response_if_needed, unwrap_event_if_needed, encode_binding_payload
 from .types.generated.cdp import CDPEvent, CDPModel, CDPParams
 
 __all__ = [
@@ -50,6 +50,7 @@ __all__ = [
     "wrap_command_if_needed",
     "unwrap_response_if_needed",
     "unwrap_event_if_needed",
+    "encode_binding_payload",
     "CDPEvent",
     "CDPModel",
     "CDPParams",

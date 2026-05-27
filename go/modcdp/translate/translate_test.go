@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
 func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t *testing.T) {
@@ -142,21 +144,24 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 		t.Fatalf("raw = %#v", raw)
 	}
 
-	payload, _ := json.Marshal(map[string]any{
-		"event":        "Custom.ready",
-		"data":         map[string]any{"ready": true},
-		"cdpSessionId": "session-2",
+	payload, err := encodeBindingPayload(types.ModCDPBindingPayload{
+		Event:        "Custom.ready",
+		Data:         map[string]any{"ready": true},
+		CDPSessionID: "session-2",
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	unwrappedEvent, ok := UnwrapEventIfNeeded(
 		"Runtime.bindingCalled",
-		map[string]any{"name": customEventBindingName, "payload": string(payload)},
+		map[string]any{"name": customEventBindingName, "payload": payload},
 		"session-1",
 		"session-1",
 	)
 	if !ok || unwrappedEvent.Event != "Custom.ready" || unwrappedEvent.Data.(map[string]any)["ready"] != true || unwrappedEvent.SessionID == nil || *unwrappedEvent.SessionID != "session-2" {
 		t.Fatalf("unwrappedEvent=%#v ok=%v", unwrappedEvent, ok)
 	}
-	if _, ok := UnwrapEventIfNeeded("Runtime.consoleAPICalled", map[string]any{"name": customEventBindingName, "payload": string(payload)}, "", ""); ok {
+	if _, ok := UnwrapEventIfNeeded("Runtime.consoleAPICalled", map[string]any{"name": customEventBindingName, "payload": payload}, "", ""); ok {
 		t.Fatal("expected console event to ignore binding payload")
 	}
 }

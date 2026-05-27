@@ -7,6 +7,7 @@
 import json
 
 from ..types.modcdp import (
+    ModCDPBindingPayload,
     ModCDPRoutes,
     ProtocolParams,
     ProtocolPayload,
@@ -179,3 +180,14 @@ def unwrap_event_if_needed(
     source_session_id = raw_source_session_id if isinstance(raw_source_session_id, str) else session_id
     unwrapped: UnwrappedModCDPEvent = {"event": resolved_event, "data": data, "sessionId": source_session_id}
     return unwrapped
+
+
+def encode_binding_payload(payload: ModCDPBindingPayload) -> str:
+    return json.dumps(
+        {
+            "event": payload["event"],
+            "data": payload.get("data"),
+            "cdpSessionId": payload.get("cdpSessionId"),
+        },
+        separators=(",", ":"),
+    )
