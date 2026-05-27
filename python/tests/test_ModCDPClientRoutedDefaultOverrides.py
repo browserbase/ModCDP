@@ -120,8 +120,19 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
             self.assertTrue(raw_target_infos)
             self.assertFalse(any("tabId" in target_info for target_info in raw_target_infos))
 
-            cdp.Mod.addCustomCommand("Custom.tabIdFromTargetId", expression=TAB_ID_FROM_TARGET_ID_COMMAND)
-            cdp.Mod.addMiddleware(name="*", phase="response", expression=ADD_TAB_ID_MIDDLEWARE)
+            cdp.Mod.addCustomCommand(
+                {
+                    "name": "Custom.tabIdFromTargetId",
+                    "expression": TAB_ID_FROM_TARGET_ID_COMMAND,
+                }
+            )
+            cdp.Mod.addMiddleware(
+                {
+                    "name": "*",
+                    "phase": "response",
+                    "expression": ADD_TAB_ID_MIDDLEWARE,
+                }
+            )
             middleware_targets = cdp.send("Target.getTargets")
             self.assertTrue(
                 any(
@@ -130,8 +141,19 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
                 )
             )
 
-            cdp.Mod.addMiddleware(name="*", phase="event", expression=ADD_TAB_ID_MIDDLEWARE)
-            cdp.Mod.addCustomCommand("Target.getTargets", expression=GET_TARGETS_OVERRIDE)
+            cdp.Mod.addMiddleware(
+                {
+                    "name": "*",
+                    "phase": "event",
+                    "expression": ADD_TAB_ID_MIDDLEWARE,
+                }
+            )
+            cdp.Mod.addCustomCommand(
+                {
+                    "name": "Target.getTargets",
+                    "expression": GET_TARGETS_OVERRIDE,
+                }
+            )
 
             enriched_targets = cdp.send("Target.getTargets")
             enriched_target_infos = target_infos_from_result(enriched_targets)
@@ -154,7 +176,7 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
             self.assertTrue(any(root.get("kind") == "document" for root in roots.values()))
             self.assertTrue(any(context.get("world") == "piercer" for context in contexts.values()))
 
-            cdp.Mod.addCustomEvent("Target.targetCreated")
+            cdp.Mod.addCustomEvent({"name": "Target.targetCreated"})
             transformed_events: Queue[dict] = Queue()
 
             def on_target_created(params):

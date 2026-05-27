@@ -102,27 +102,30 @@ class _ModDomain:
 
     def evaluate(
         self,
-        *,
-        expression: str,
         params: Mapping[str, Any] | None = None,
+        *,
+        expression: str | None = None,
+        evaluate_params: Mapping[str, Any] | None = None,
         cdpSessionId: str | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = {"expression": expression}
-        if params is not None:
-            payload["params"] = dict(params)
+        payload: dict[str, Any] = dict(params or {})
+        if expression is not None:
+            payload["expression"] = expression
+        if evaluate_params is not None:
+            payload["params"] = dict(evaluate_params)
         if cdpSessionId is not None:
             payload["cdpSessionId"] = cdpSessionId
         return self._client._send_command("Mod.evaluate", payload)
 
     def addCustomCommand(
         self,
-        name: str,
+        name: str | Mapping[str, Any],
         *,
         params_schema: Any | None = None,
         result_schema: Any | None = None,
         expression: str | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = {"name": name}
+        payload: dict[str, Any] = dict(name) if isinstance(name, Mapping) else {"name": name}
         if params_schema is not None:
             payload["params_schema"] = params_schema
         if result_schema is not None:
@@ -131,20 +134,30 @@ class _ModDomain:
             payload["expression"] = expression
         return self._client._send_command("Mod.addCustomCommand", payload)
 
-    def addCustomEvent(self, name: str, *, event_schema: Any | None = None) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = {"name": name}
+    def addCustomEvent(
+        self,
+        name: str | Mapping[str, Any],
+        *,
+        event_schema: Any | None = None,
+    ) -> AwaitableDict | AwaitableValue:
+        payload: dict[str, Any] = dict(name) if isinstance(name, Mapping) else {"name": name}
         if event_schema is not None:
             payload["event_schema"] = event_schema
         return self._client._send_command("Mod.addCustomEvent", payload)
 
     def addMiddleware(
         self,
+        params: Mapping[str, Any] | None = None,
         *,
-        phase: str,
-        expression: str,
+        phase: str | None = None,
+        expression: str | None = None,
         name: str | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = {"phase": phase, "expression": expression}
+        payload: dict[str, Any] = dict(params or {})
+        if phase is not None:
+            payload["phase"] = phase
+        if expression is not None:
+            payload["expression"] = expression
         if name is not None:
             payload["name"] = name
         return self._client._send_command("Mod.addMiddleware", payload)
