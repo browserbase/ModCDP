@@ -122,12 +122,11 @@ Each demo launches Chrome with the fixed ModCDP extension artifact loaded, headf
 pnpm run demo:js                    # defaults to --loopback --upstream=ws
 pnpm run demo:js -- --debugger --upstream=pipe
 pnpm run demo:js -- --loopback --upstream=reversews
-pnpm run demo:js -- --loopback --upstream=nativemessaging
 pnpm run demo:python
 pnpm run demo:go
 ```
 
-The Python package is managed with `uv`; `pnpm run demo:python` runs the built demo through `uv` and does not require a separate `pip install`. Set `CHROME_PATH=/path/to/chromium` to force a specific browser binary.
+The Python package is managed with `uv`; `pnpm run demo:python` runs the built demo through `uv` and does not require a separate `pip install`. Set `CHROME_PATH=/path/to/chromium` to force a specific browser binary. Native messaging mode requires Chrome to launch the configured native host; it is not a standalone shell demo mode.
 
 ## Transparent Proxy
 
@@ -136,7 +135,6 @@ Upgrade any vanilla CDP client like Stagehand, Playwright, or Puppeteer transpar
 ```sh
 pnpm run proxy -- --upstream-mode=ws --upstream-ws-cdp-url=http://127.0.0.1:9222 --port 9223
 pnpm run proxy -- --launcher-mode=local --upstream-mode=pipe --port 9223
-pnpm run proxy -- --launcher-mode=local --upstream-mode=nativemessaging --port 9223
 pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url=ws://127.0.0.1:4223 --port 9223
 # const browser = await playwright.chromium.connectOverCDP("http://127.0.0.1:9223")
 # const session = await browser.contexts()[0].newCDPSession(page)
@@ -146,7 +144,7 @@ pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url
 
 The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-config='{"client_cdp_send_timeout_ms": 10000}'`, `--router='{"router_routes": {...}}'`, and `--server-config='{"router": {"router_routes": {...}}}'` config groups as `ModCDPClient`. CLI flags use kebab case and map to the owner-prefixed config fields, for example `--launcher-local-executable-path` maps to `launcher.launcher_local_executable_path`. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
 
-Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host.
+Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host. Because Chrome owns native host process launch and stdio, native messaging is not a standalone `pnpm run proxy` mode.
 
 ### Reverse proxy mode
 
