@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import unittest
-from typing import cast
 
 from modcdp.translate import (
     CUSTOM_EVENT_BINDING_NAME,
@@ -37,9 +36,17 @@ class TranslateTests(unittest.TestCase):
         )
         self.assertEqual(wrapped["target"], "service_worker")
         self.assertEqual(wrapped["steps"][0]["method"], "Runtime.callFunctionOn")
-        wrapped_step_params = wrapped["steps"][0].get("params", {})
+        wrapped_step_params = wrapped["steps"][0].get("params")
+        self.assertIsNotNone(wrapped_step_params)
+        assert wrapped_step_params is not None
         self.assertIn("globalThis.ModCDP.handleCommand", str(wrapped_step_params.get("functionDeclaration")))
-        wrapped_arguments = cast("list[dict[str, object]]", wrapped_step_params.get("arguments", []))
+        wrapped_arguments = wrapped_step_params["arguments"]
+        self.assertIsInstance(wrapped_arguments, list)
+        assert isinstance(wrapped_arguments, list)
+        self.assertIsInstance(wrapped_arguments[1], dict)
+        self.assertIsInstance(wrapped_arguments[2], dict)
+        assert isinstance(wrapped_arguments[1], dict)
+        assert isinstance(wrapped_arguments[2], dict)
         self.assertEqual(json.loads(str(wrapped_arguments[1].get("value"))), {"expression": "({ ok: true })", "params": {"value": 1}})
         self.assertEqual(wrapped_arguments[2].get("value"), "session-1")
         self.assertEqual(wrapped["steps"][0].get("unwrap"), "runtime_json")
@@ -52,7 +59,14 @@ class TranslateTests(unittest.TestCase):
         self.assertEqual(configured["steps"][0].get("unwrap"), "runtime_json")
 
         ping = wrap_command_if_needed("Mod.ping", {})
-        ping_arguments = cast("list[dict[str, object]]", ping["steps"][0].get("params", {}).get("arguments", []))
+        ping_step_params = ping["steps"][0].get("params")
+        self.assertIsNotNone(ping_step_params)
+        assert ping_step_params is not None
+        ping_arguments = ping_step_params["arguments"]
+        self.assertIsInstance(ping_arguments, list)
+        assert isinstance(ping_arguments, list)
+        self.assertIsInstance(ping_arguments[1], dict)
+        assert isinstance(ping_arguments[1], dict)
         self.assertEqual(json.loads(str(ping_arguments[1].get("value"))), {})
 
         custom = wrap_command_if_needed(
@@ -60,10 +74,20 @@ class TranslateTests(unittest.TestCase):
             {"secret": "x" * 100, "nested": {"ok": True}},
             cdp_session_id="session-1",
         )
-        custom_step_params = custom["steps"][0].get("params", {})
+        custom_step_params = custom["steps"][0].get("params")
+        self.assertIsNotNone(custom_step_params)
+        assert custom_step_params is not None
         self.assertIn("JSON.parse(paramsJson)", str(custom_step_params.get("functionDeclaration")))
         self.assertNotIn("xxxxxxxxxx", str(custom_step_params.get("functionDeclaration")))
-        custom_arguments = cast("list[dict[str, object]]", custom_step_params.get("arguments", []))
+        custom_arguments = custom_step_params["arguments"]
+        self.assertIsInstance(custom_arguments, list)
+        assert isinstance(custom_arguments, list)
+        self.assertIsInstance(custom_arguments[0], dict)
+        self.assertIsInstance(custom_arguments[1], dict)
+        self.assertIsInstance(custom_arguments[2], dict)
+        assert isinstance(custom_arguments[0], dict)
+        assert isinstance(custom_arguments[1], dict)
+        assert isinstance(custom_arguments[2], dict)
         self.assertEqual(custom_arguments[0].get("value"), "Custom.echo")
         self.assertEqual(json.loads(str(custom_arguments[1].get("value"))), {"secret": "x" * 100, "nested": {"ok": True}})
         self.assertEqual(custom_arguments[2].get("value"), "session-1")
@@ -73,7 +97,14 @@ class TranslateTests(unittest.TestCase):
             {"secret": "targeted"},
             cdp_session_id="target-session-1",
         )
-        custom_with_session_arguments = cast("list[dict[str, object]]", custom_with_session["steps"][0].get("params", {}).get("arguments", []))
+        custom_with_session_params = custom_with_session["steps"][0].get("params")
+        self.assertIsNotNone(custom_with_session_params)
+        assert custom_with_session_params is not None
+        custom_with_session_arguments = custom_with_session_params["arguments"]
+        self.assertIsInstance(custom_with_session_arguments, list)
+        assert isinstance(custom_with_session_arguments, list)
+        self.assertIsInstance(custom_with_session_arguments[2], dict)
+        assert isinstance(custom_with_session_arguments[2], dict)
         self.assertEqual(custom_with_session_arguments[2].get("value"), "target-session-1")
 
         self.assertEqual(unwrap_response_if_needed({"result": {"type": "object", "value": {"ok": True}}}, "runtime"), {"ok": True})

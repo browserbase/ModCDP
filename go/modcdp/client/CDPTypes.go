@@ -35,9 +35,9 @@ var modAddCustomCommandParamsSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"name":          map[string]any{"type": "string"},
-		"expression":    map[string]any{"type": "string"},
-		"params_schema": jsonSchemaObject,
-		"result_schema": jsonSchemaObject,
+		"expression":    map[string]any{"type": []any{"string", "null"}},
+		"params_schema": map[string]any{"type": []any{"object", "null"}},
+		"result_schema": map[string]any{"type": []any{"object", "null"}},
 	},
 	"required":             []any{"name"},
 	"additionalProperties": false,
@@ -47,7 +47,7 @@ var modAddCustomEventParamsSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"name":         map[string]any{"type": "string"},
-		"event_schema": jsonSchemaObject,
+		"event_schema": map[string]any{"type": []any{"object", "null"}},
 	},
 	"required":             []any{"name"},
 	"additionalProperties": false,
@@ -56,7 +56,7 @@ var modAddCustomEventParamsSchema = map[string]any{
 var modAddMiddlewareParamsSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"name":       map[string]any{"type": "string"},
+		"name":       map[string]any{"type": []any{"string", "null"}},
 		"phase":      map[string]any{"enum": []any{"request", "response", "event"}},
 		"expression": map[string]any{"type": "string"},
 	},
@@ -68,9 +68,9 @@ var modCommandRegistrationSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"name":          map[string]any{"type": "string"},
-		"expression":    map[string]any{"type": "string"},
-		"params_schema": jsonSchemaObject,
-		"result_schema": jsonSchemaObject,
+		"expression":    map[string]any{"type": []any{"string", "null"}},
+		"params_schema": map[string]any{"type": []any{"object", "null"}},
+		"result_schema": map[string]any{"type": []any{"object", "null"}},
 	},
 	"required":             []any{"name"},
 	"additionalProperties": false,
@@ -80,7 +80,7 @@ var modEventRegistrationSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"name":         map[string]any{"type": "string"},
-		"event_schema": jsonSchemaObject,
+		"event_schema": map[string]any{"type": []any{"object", "null"}},
 	},
 	"required":             []any{"name"},
 	"additionalProperties": false,
@@ -89,7 +89,7 @@ var modEventRegistrationSchema = map[string]any{
 var modMiddlewareRegistrationSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"name":       map[string]any{"type": "string"},
+		"name":       map[string]any{"type": []any{"string", "null"}},
 		"phase":      map[string]any{"enum": []any{"request", "response", "event"}},
 		"expression": map[string]any{"type": "string"},
 	},
@@ -272,8 +272,8 @@ var defaultBuiltinCommands = []CustomCommand{
 			"type": "object",
 			"properties": map[string]any{
 				"expression":   map[string]any{"type": "string"},
-				"params":       jsonSchemaObject,
-				"cdpSessionId": map[string]any{"type": "string"},
+				"params":       map[string]any{"type": []any{"object", "null"}},
+				"cdpSessionId": map[string]any{"type": []any{"string", "null"}},
 			},
 			"required":             []any{"expression"},
 			"additionalProperties": false,

@@ -86,17 +86,17 @@ class ModCDPEvaluateParams(_ModCDPEvaluateParamsRequired, total=False):
 
 
 class ModCDPPingParams(TypedDict, total=False):
-    sent_at: int
+    sent_at: int | float
 
 
 ModCDPPongEvent = TypedDict("ModCDPPongEvent", {"sent_at": int, "received_at": int, "from": str})
 
 
 class ModCDPPingLatency(TypedDict):
-    sent_at: int
+    sent_at: int | float
     received_at: int | float | None
-    returned_at: int
-    round_trip_ms: int
+    returned_at: int | float
+    round_trip_ms: int | float
     service_worker_ms: int | float | None
     return_path_ms: int | float | None
 
@@ -136,11 +136,11 @@ class _ModCDPTopologyTargetRequired(TypedDict):
 
 
 class ModCDPTopologyTarget(_ModCDPTopologyTargetRequired, total=False):
-    title: str
-    url: str
-    attached: bool
-    parentId: str
-    parentFrameId: str
+    title: str | None
+    url: str | None
+    attached: bool | None
+    parentId: str | None
+    parentFrameId: str | None
     sessionId: str | None
 
 
@@ -152,10 +152,10 @@ class _ModCDPTopologyExecutionContextRequired(TypedDict):
 
 
 class ModCDPTopologyExecutionContext(_ModCDPTopologyExecutionContextRequired, total=False):
-    origin: str
-    name: str
-    uniqueId: str
-    auxData: dict[str, object]
+    origin: str | None
+    name: str | None
+    uniqueId: str | None
+    auxData: dict[str, object] | None
     frameId: str | None
 
 
@@ -289,7 +289,7 @@ class _TranslatedStepRequired(TypedDict):
 
 
 class TranslatedStep(_TranslatedStepRequired, total=False):
-    params: MessageParams
+    params: MessageParams | None
     sessionId: str | None
     unwrap: Literal["runtime", "runtime_json"]
 
@@ -303,16 +303,16 @@ class TranslatedCommand(TypedDict):
 class CdpError(TypedDict, total=False):
     code: int | None
     message: str
-    data: JsonValue
+    data: object | None
 
 
 class CdpMessage(TypedDict, total=False):
     id: int
     method: str
-    params: MessageParams
-    sessionId: str
-    result: ProtocolResult
-    error: CdpError
+    params: MessageParams | None
+    sessionId: str | None
+    result: object | None
+    error: CdpError | None
 
 
 class TargetInfo(TypedDict):

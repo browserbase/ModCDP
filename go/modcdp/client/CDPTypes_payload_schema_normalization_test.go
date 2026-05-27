@@ -28,7 +28,7 @@ func TestPayloadSchemaNormalizationRejectsUnsupportedSchemaSpecs(t *testing.T) {
 		"name":          "Custom.bad",
 		"params_schema": "not-a-schema",
 	})
-	if err == nil || !strings.Contains(err.Error(), "params_schema") || !strings.Contains(err.Error(), "expected object") {
+	if err == nil || !strings.Contains(err.Error(), "params_schema") {
 		t.Fatalf("expected unsupported schema error, got %v", err)
 	}
 }

@@ -104,9 +104,9 @@ MOD_ADD_CUSTOM_COMMAND_PARAMS_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "expression": {"type": "string"},
-        "params_schema": JSON_SCHEMA_OBJECT,
-        "result_schema": JSON_SCHEMA_OBJECT,
+        "expression": {"type": ["string", "null"]},
+        "params_schema": {"type": ["object", "null"]},
+        "result_schema": {"type": ["object", "null"]},
     },
     "required": ["name"],
     "additionalProperties": False,
@@ -115,7 +115,7 @@ MOD_ADD_CUSTOM_EVENT_PARAMS_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "event_schema": JSON_SCHEMA_OBJECT,
+        "event_schema": {"type": ["object", "null"]},
     },
     "required": ["name"],
     "additionalProperties": False,
@@ -123,7 +123,7 @@ MOD_ADD_CUSTOM_EVENT_PARAMS_SCHEMA: JsonSchema = {
 MOD_ADD_MIDDLEWARE_PARAMS_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
-        "name": {"type": "string"},
+        "name": {"type": ["string", "null"]},
         "phase": {"enum": ["request", "response", "event"]},
         "expression": {"type": "string"},
     },
@@ -134,9 +134,9 @@ MOD_COMMAND_REGISTRATION_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "expression": {"type": "string"},
-        "params_schema": JSON_SCHEMA_OBJECT,
-        "result_schema": JSON_SCHEMA_OBJECT,
+        "expression": {"type": ["string", "null"]},
+        "params_schema": {"type": ["object", "null"]},
+        "result_schema": {"type": ["object", "null"]},
     },
     "required": ["name"],
     "additionalProperties": False,
@@ -145,7 +145,7 @@ MOD_EVENT_REGISTRATION_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "event_schema": JSON_SCHEMA_OBJECT,
+        "event_schema": {"type": ["object", "null"]},
     },
     "required": ["name"],
     "additionalProperties": False,
@@ -153,7 +153,7 @@ MOD_EVENT_REGISTRATION_SCHEMA: JsonSchema = {
 MOD_MIDDLEWARE_REGISTRATION_SCHEMA: JsonSchema = {
     "type": "object",
     "properties": {
-        "name": {"type": "string"},
+        "name": {"type": ["string", "null"]},
         "phase": {"enum": ["request", "response", "event"]},
         "expression": {"type": "string"},
     },
@@ -328,8 +328,8 @@ DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
             "type": "object",
             "properties": {
                 "expression": {"type": "string"},
-                "params": JSON_SCHEMA_OBJECT,
-                "cdpSessionId": {"type": "string"},
+                "params": {"type": ["object", "null"]},
+                "cdpSessionId": {"type": ["string", "null"]},
             },
             "required": ["expression"],
             "additionalProperties": False,
