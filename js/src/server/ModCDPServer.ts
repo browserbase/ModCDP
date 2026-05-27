@@ -56,7 +56,6 @@ type ModCDPGlobalScope = typeof globalThis &
     ModCDP?: ModCDPServer;
   };
 
-const MODCDP_SERVER_VERSION = 2;
 const UPSTREAM_EVENT_BINDING_NAME = "__ModCDP_event_from_upstream__";
 const CUSTOM_EVENT_BINDING_NAME = "__ModCDP_custom_event__";
 const DEFAULT_ROUTES = {
@@ -75,8 +74,6 @@ const DEFAULT_ROUTES = {
  * ModCDPClient.router.
  */
 export class ModCDPServer {
-  readonly __ModCDPServerVersion = MODCDP_SERVER_VERSION;
-
   // sub-services
   router: { router_routes: ModCDPRoutes };
   loopback_cdp_url: string | null;
@@ -1050,7 +1047,6 @@ export function installModCDPServer(
   options: Omit<ModCDPServerOptions, "global_scope"> = {},
 ): ModCDPServer {
   if (
-    global_scope.ModCDP?.__ModCDPServerVersion === MODCDP_SERVER_VERSION &&
     global_scope.ModCDP?.handleCommand &&
     global_scope.ModCDP?.addCustomEvent
   )

@@ -19,7 +19,7 @@ export const DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = [
   "/modcdp/service_worker.js",
 ];
 const MODCDP_READY_EXPRESSION =
-  "Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
+  "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
 export const DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000;
 export const DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
 export const DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS = 10_000;
