@@ -1322,9 +1322,7 @@ func (c *ModCDPClient) measurePingLatency() error {
 }
 
 func (c *ModCDPClient) startPingLatencyMeasurement() {
-	go func() {
-		_ = c.measurePingLatency()
-	}()
+	_ = c.measurePingLatency()
 }
 
 func (c *ModCDPClient) startHeartbeat() {
