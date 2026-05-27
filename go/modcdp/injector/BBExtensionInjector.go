@@ -95,7 +95,7 @@ func (i *BBExtensionInjector) uploadExtension(zipPath string) (string, error) {
 	if browserbaseAPIKey == "" {
 		return "", fmt.Errorf("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.")
 	}
-	baseURL := firstNonEmptyString(i.Config.InjectorBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseBaseURL)
+	baseURL := i.Config.InjectorBBBaseURL
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	fileWriter, err := writer.CreateFormFile("file", filepath.Base(zipPath))

@@ -16,9 +16,6 @@ from pathlib import Path
 from ..launcher.BrowserLauncher import LauncherConfig
 from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig
 
-DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
-
-
 class BBExtensionInjector(ExtensionInjector):
     def __init__(self, config: InjectorConfig | dict | None = None) -> None:
         config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
@@ -79,10 +76,7 @@ class BBExtensionInjector(ExtensionInjector):
         browserbase_api_key = _first_string(self.config.injector_bb_api_key, os.environ.get("BROWSERBASE_API_KEY"))
         if not browserbase_api_key:
             raise RuntimeError("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.")
-        base_url = _first_string(
-            self.config.injector_bb_base_url,
-            os.environ.get("BROWSERBASE_BASE_URL"),
-        ) or DEFAULT_BROWSERBASE_BASE_URL
+        base_url = self.config.injector_bb_base_url
         boundary = f"----modcdp-{uuid.uuid4().hex}"
         zip_bytes = Path(zip_path).read_bytes()
         body = (

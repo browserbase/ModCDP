@@ -61,6 +61,9 @@ func NewExtensionInjector(config InjectorConfig) ExtensionInjector {
 	if config.InjectorTargetSessionPollIntervalMS == 0 {
 		config.InjectorTargetSessionPollIntervalMS = DefaultTargetSessionPollIntervalMS
 	}
+	if config.InjectorBBBaseURL == "" {
+		config.InjectorBBBaseURL = DefaultBrowserbaseBaseURL
+	}
 	return ExtensionInjector{Config: config, UnusableTargetIDs: map[string]bool{}}
 }
 

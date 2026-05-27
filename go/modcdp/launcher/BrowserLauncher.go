@@ -105,6 +105,9 @@ type BrowserLauncher struct {
 }
 
 func NewBrowserLauncher(config LauncherConfig) BrowserLauncher {
+	if config.LauncherBBBaseURL == "" {
+		config.LauncherBBBaseURL = DefaultBrowserbaseLauncherBaseURL
+	}
 	return BrowserLauncher{Config: config}
 }
 

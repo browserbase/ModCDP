@@ -47,7 +47,7 @@ func (l *BBBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, err
 		return nil, fmt.Errorf("launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")
 	}
 
-	baseURL := firstString(merged.LauncherBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseLauncherBaseURL)
+	baseURL := merged.LauncherBBBaseURL
 	resumeSessionID := firstString(merged.LauncherBBSessionID)
 	keepAlive := boolValue(merged.LauncherBBKeepAlive, false)
 	closeSessionOnClose := boolValue(merged.LauncherBBCloseSessionOnClose, !keepAlive)

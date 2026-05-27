@@ -14,7 +14,6 @@ from websocket import create_connection
 from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, LaunchedBrowser, _launcher_config
 
 
-DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
 DEFAULT_BROWSERBASE_VIEWPORT = {"width": 1288, "height": 711}
 
 
@@ -29,10 +28,7 @@ class BBBrowserLauncher(BrowserLauncher):
         if not browserbase_api_key:
             raise RuntimeError("launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")
 
-        base_url = _first_string(
-            merged.launcher_bb_base_url,
-            os.environ.get("BROWSERBASE_BASE_URL"),
-        ) or DEFAULT_BROWSERBASE_BASE_URL
+        base_url = merged.launcher_bb_base_url
         resume_session_id = _first_string(merged.launcher_bb_session_id)
         keep_alive = _first_bool(merged.launcher_bb_keep_alive) or False
         close_session_on_close = _first_bool(merged.launcher_bb_close_session_on_close)
