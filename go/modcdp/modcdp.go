@@ -8,6 +8,7 @@ import (
 	"github.com/browserbase/modcdp/go/modcdp/client"
 	"github.com/browserbase/modcdp/go/modcdp/injector"
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/translate"
 	"github.com/browserbase/modcdp/go/modcdp/transport"
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
@@ -107,6 +108,9 @@ var NewUpstreamTransport = transport.NewUpstreamTransport
 var NewWSUpstreamTransport = transport.NewWSUpstreamTransport
 var NewAutoSessionRouter = client.NewAutoSessionRouter
 var ParseHostPort = transport.ParseHostPort
+var WrapCommandIfNeeded = translate.WrapCommandIfNeeded
+var UnwrapResponseIfNeeded = translate.UnwrapResponseIfNeeded
+var UnwrapEventIfNeeded = translate.UnwrapEventIfNeeded
 
 const UpstreamModeWS = transport.UpstreamModeWS
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
