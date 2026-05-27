@@ -129,7 +129,7 @@ export class AutoSessionRouter {
   // Timeout in milliseconds for Runtime.executionContextCreated waits. Set once
   // by the owner when constructing the router; read when installing a new
   // execution-context waiter.
-  private readonly loopback_execution_context_timeout_ms: number;
+  readonly loopback_execution_context_timeout_ms: number;
   private subscription_cleanup: (() => void) | null = null;
   private initialized = false;
 

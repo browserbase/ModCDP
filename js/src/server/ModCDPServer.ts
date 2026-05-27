@@ -11,7 +11,10 @@ import { resolveCdpWebSocketUrl } from "../launcher/BrowserLauncher.js";
 import { normalizeModCDPPayloadSchema } from "../types/modcdp.js";
 import { AutoSessionRouter } from "../router/AutoSessionRouter.js";
 import { routeFor } from "../translate/translate.js";
-import { DownstreamTransportCollection } from "../transport/DownstreamTransportCollection.js";
+import {
+  DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
+  DownstreamTransportCollection,
+} from "../transport/DownstreamTransportCollection.js";
 import { NativeHostDownstreamTransport } from "../transport/NativeHostDownstreamTransport.js";
 import { NATSDownstreamTransport } from "../transport/NATSDownstreamTransport.js";
 import { ReverseWSDownstreamTransport } from "../transport/ReverseWSDownstreamTransport.js";
@@ -33,7 +36,6 @@ import type {
 export const DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000;
 export const DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
 export const DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
-export const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
 export {
   DEFAULT_NATIVE_BRIDGE_HOST_NAME,
   DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
@@ -75,18 +77,13 @@ const DEFAULT_ROUTES = {
  */
 export class ModCDPServer {
   // sub-services
-  router: { router_routes: ModCDPRoutes };
-  loopback_cdp_url: string | null;
-  browser_token: string | null;
   client: ModCDPClient | null;
   downstream: DownstreamTransportCollection;
 
-  // runtime state
-  cdp_send_timeout_ms: number;
-  loopback_execution_context_timeout_ms: number;
-  ws_connect_error_settle_timeout_ms: number;
-  downstream_client_timeout_ms: number;
-  close_browser_on_downstream_disconnect: boolean;
+  // Server-only secret used to verify that a discovered loopback endpoint is
+  // this same service worker. Browser routing/downstream config live on
+  // client.router, client.upstream, client.client, and downstream.
+  server_browser_token: string | null;
 
   private readonly global_scope: ModCDPGlobalScope;
   private readonly initial_server_options: ProtocolModCDPServerOptions;
@@ -130,18 +127,13 @@ export class ModCDPServer {
     } = options;
     this.global_scope = global_scope;
     this.initial_server_options = server_options;
-    this.router = { router_routes: { ...DEFAULT_ROUTES } };
-    this.loopback_cdp_url = null;
-    this.browser_token = null;
+    this.server_browser_token = null;
     this.client = null;
-    this.downstream = new DownstreamTransportCollection();
-    this.cdp_send_timeout_ms = DEFAULT_CDP_SEND_TIMEOUT_MS;
-    this.loopback_execution_context_timeout_ms =
-      DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS;
-    this.ws_connect_error_settle_timeout_ms =
-      DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
-    this.downstream_client_timeout_ms = DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS;
-    this.close_browser_on_downstream_disconnect = false;
+    this.downstream = new DownstreamTransportCollection({
+      downstream_client_timeout_ms: DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
+      close_browser_on_downstream_disconnect: false,
+    });
+    this.setupServerClient();
   }
 
   /** Install transports/default commands/listeners and return this server. */
@@ -231,18 +223,26 @@ export class ModCDPServer {
   /** Apply Mod.configure settings and register custom server extensions. */
   async configure(params: ModCDPConfigureParams = {}) {
     const server = params.server ?? {};
+    const current_client = this.setupServerClient();
+    const current_loopback_cdp_url =
+      current_client.upstream.upstream_mode === "ws"
+        ? (current_client.upstream.upstream_ws_cdp_url ?? null)
+        : null;
     const {
-      server_loopback_cdp_url = this.loopback_cdp_url,
-      router = this.router,
-      server_browser_token = this.browser_token,
-      server_cdp_send_timeout_ms = this.cdp_send_timeout_ms,
-      server_loopback_execution_context_timeout_ms = this
-        .loopback_execution_context_timeout_ms,
-      server_ws_connect_error_settle_timeout_ms = this
-        .ws_connect_error_settle_timeout_ms,
-      server_downstream_client_timeout_ms = this.downstream_client_timeout_ms,
+      server_loopback_cdp_url = current_loopback_cdp_url,
+      router = { router_routes: current_client.router.router_routes },
+      server_browser_token = this.server_browser_token,
+      server_cdp_send_timeout_ms = current_client.client
+        .client_cdp_send_timeout_ms,
+      server_loopback_execution_context_timeout_ms =
+        current_client.router.loopback_execution_context_timeout_ms,
+      server_ws_connect_error_settle_timeout_ms =
+        current_client.upstream.upstream_ws_connect_error_settle_timeout_ms ??
+        DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
+      server_downstream_client_timeout_ms = this.downstream
+        .downstream_client_timeout_ms,
       server_close_browser_on_downstream_disconnect = this
-        .close_browser_on_downstream_disconnect,
+        .downstream.close_browser_on_downstream_disconnect,
     } = server;
     const {
       custom_commands = [],
@@ -250,46 +250,58 @@ export class ModCDPServer {
       custom_middlewares = [],
     } = params;
 
-    this.loopback_cdp_url = server_loopback_cdp_url
+    const loopback_cdp_url = server_loopback_cdp_url
       ? await resolveCdpWebSocketUrl(
           server_loopback_cdp_url,
           "server_loopback_cdp_url",
         )
       : null;
-    this.browser_token = server_browser_token;
-    this.cdp_send_timeout_ms = server_cdp_send_timeout_ms;
-    this.loopback_execution_context_timeout_ms =
-      server_loopback_execution_context_timeout_ms;
-    this.ws_connect_error_settle_timeout_ms =
-      server_ws_connect_error_settle_timeout_ms;
-    this.downstream_client_timeout_ms = server_downstream_client_timeout_ms;
-    this.close_browser_on_downstream_disconnect =
-      server_close_browser_on_downstream_disconnect;
-    if (router.router_routes)
-      this.router = {
-        router_routes: { ...DEFAULT_ROUTES, ...router.router_routes },
-      };
-    else {
-      this.router = { router_routes: { ...DEFAULT_ROUTES } };
-      await this.discoverLoopbackCDP();
+    this.server_browser_token = server_browser_token;
+    this.downstream.update({
+      downstream_client_timeout_ms: server_downstream_client_timeout_ms,
+      close_browser_on_downstream_disconnect:
+        server_close_browser_on_downstream_disconnect,
+    });
+    let configured_loopback_cdp_url = loopback_cdp_url;
+    let router_routes: ModCDPRoutes;
+    if (router.router_routes) {
+      router_routes = { ...DEFAULT_ROUTES, ...router.router_routes };
+    } else {
+      router_routes = { ...DEFAULT_ROUTES };
+      const discovered = await this.discoverLoopbackCDP({
+        server_cdp_send_timeout_ms,
+        server_loopback_execution_context_timeout_ms,
+        server_ws_connect_error_settle_timeout_ms,
+      });
+      configured_loopback_cdp_url =
+        discovered.loopback_cdp_url ?? configured_loopback_cdp_url;
     }
 
-    const default_server_route = router.router_routes?.["*.*"];
-    this.setupServerClient(
-      default_server_route === "loopback_cdp" ||
+    const default_server_route = router_routes["*.*"];
+    this.setupServerClient({
+      upstream_mode:
+        default_server_route === "loopback_cdp" ||
         default_server_route === "chrome_debugger"
-        ? default_server_route
-        : this.loopback_cdp_url
-          ? "loopback_cdp"
-          : "chrome_debugger",
-    );
+          ? default_server_route
+          : configured_loopback_cdp_url
+            ? "loopback_cdp"
+            : "chrome_debugger",
+      loopback_cdp_url: configured_loopback_cdp_url,
+      router_routes,
+      server_cdp_send_timeout_ms,
+      server_loopback_execution_context_timeout_ms,
+      server_ws_connect_error_settle_timeout_ms,
+    });
     for (const command of custom_commands)
       this.addCustomCommand(command as ModCDPCustomCommandRegistration);
     for (const event of custom_events)
       this.addCustomEvent(event as ModCDPCustomEventRegistration);
     for (const middleware of custom_middlewares)
       this.addMiddleware(middleware as ModCDPMiddlewareRegistration);
-    return { loopback_cdp_url: this.loopback_cdp_url, router: this.router };
+    return {
+      loopback_cdp_url: configured_loopback_cdp_url,
+      router: { router_routes },
+    };
   }
 
   addCustomCommand({
@@ -489,7 +501,10 @@ export class ModCDPServer {
       return types.parseCommandResult(method, result) as ProtocolResult;
     }
 
-    const upstream = routeFor(method, this.router.router_routes);
+    const upstream = routeFor(
+      method,
+      this.setupServerClient().router.router_routes,
+    );
     if (upstream === "service_worker")
       throw new Error(`No service-worker command registered for ${method}.`);
     if (
@@ -500,8 +515,8 @@ export class ModCDPServer {
       throw new Error(`No service-worker command registered for ${method}.`);
     const client = this.setupServerClient(
       upstream === "loopback_cdp" || upstream === "chrome_debugger"
-        ? upstream
-        : undefined,
+        ? { upstream_mode: upstream }
+        : {},
     );
     result = await client.router.send(method, params, cdpSessionId);
     result = await this.runMiddleware("response", method, result, {
@@ -541,14 +556,29 @@ export class ModCDPServer {
     return this.publishEvent(eventName, payload, cdpSessionId);
   }
 
-  async discoverLoopbackCDP(): Promise<{
+  async discoverLoopbackCDP(options: {
+    server_cdp_send_timeout_ms?: number;
+    server_loopback_execution_context_timeout_ms?: number;
+    server_ws_connect_error_settle_timeout_ms?: number;
+  } = {}): Promise<{
     loopback_cdp_url: string | null;
     verified: boolean;
     version?: unknown;
   }> {
-    if (!this.browser_token) return { loopback_cdp_url: null, verified: false };
+    if (!this.server_browser_token)
+      return { loopback_cdp_url: null, verified: false };
 
-    const previous_loopback_cdp_url = this.loopback_cdp_url;
+    const current_client = this.setupServerClient();
+    const server_cdp_send_timeout_ms =
+      options.server_cdp_send_timeout_ms ??
+      current_client.client.client_cdp_send_timeout_ms;
+    const server_loopback_execution_context_timeout_ms =
+      options.server_loopback_execution_context_timeout_ms ??
+      current_client.router.loopback_execution_context_timeout_ms;
+    const server_ws_connect_error_settle_timeout_ms =
+      options.server_ws_connect_error_settle_timeout_ms ??
+      current_client.upstream.upstream_ws_connect_error_settle_timeout_ms ??
+      DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
     const service_worker_url = this.currentServiceWorkerUrl();
     const loopback_cdp_url = await resolveCdpWebSocketUrl(
       "http://127.0.0.1:9222",
@@ -561,17 +591,17 @@ export class ModCDPServer {
       injector: {
         injector_mode: "none",
         injector_execution_context_timeout_ms:
-          this.loopback_execution_context_timeout_ms,
+          server_loopback_execution_context_timeout_ms,
       },
       upstream: {
         upstream_mode: "ws",
         upstream_ws_cdp_url: loopback_cdp_url,
         upstream_ws_connect_error_settle_timeout_ms:
-          this.ws_connect_error_settle_timeout_ms,
+          server_ws_connect_error_settle_timeout_ms,
       },
       client: {
         client_hydrate_aliases: false,
-        client_cdp_send_timeout_ms: this.cdp_send_timeout_ms,
+        client_cdp_send_timeout_ms: server_cdp_send_timeout_ms,
       },
       server: null,
     });
@@ -582,7 +612,6 @@ export class ModCDPServer {
           target.type === "service_worker" && target.url === service_worker_url,
       );
       if (!service_worker_target) {
-        this.loopback_cdp_url = previous_loopback_cdp_url;
         return { loopback_cdp_url: null, verified: false };
       }
       const route = await client.router.ensureRouteForTarget(
@@ -590,24 +619,22 @@ export class ModCDPServer {
       );
       const execution_context_ready = client.router.waitForExecutionContext(
         route.sessionId,
-        { timeout_ms: this.loopback_execution_context_timeout_ms },
+        { timeout_ms: server_loopback_execution_context_timeout_ms },
       );
       await client.upstream.send(Runtime.EnableCommand, {}, route);
       const executionContextId = await execution_context_ready;
       const result = await client.upstream.send(
         Runtime.CallFunctionOnCommand,
         {
-          functionDeclaration: `function() { return globalThis.ModCDP?.browser_token === ${JSON.stringify(this.browser_token)}; }`,
+          functionDeclaration: `function() { return globalThis.ModCDP?.server_browser_token === ${JSON.stringify(this.server_browser_token)}; }`,
           executionContextId,
           returnByValue: true,
         },
         route,
       );
       if (result.result?.value !== true) {
-        this.loopback_cdp_url = previous_loopback_cdp_url;
         return { loopback_cdp_url: null, verified: false };
       }
-      this.loopback_cdp_url = loopback_cdp_url;
       return { loopback_cdp_url, verified: true };
     } finally {
       await client.close();
@@ -627,7 +654,7 @@ export class ModCDPServer {
   }
 
   private touchDownstreamClientLease(cdpSessionId: string | null) {
-    const timeout_ms = this.downstream_client_timeout_ms;
+    const timeout_ms = this.downstream.downstream_client_timeout_ms;
     if (!(timeout_ms > 0)) return;
     if (!this.downstream_client_registered) return;
     const last_seen_at = Date.now();
@@ -635,7 +662,8 @@ export class ModCDPServer {
     const timer = setTimeout(() => {
       const expired = this.clearDownstreamClientLease();
       if (!expired) return;
-      if (this.close_browser_on_downstream_disconnect !== true) return;
+      if (this.downstream.close_browser_on_downstream_disconnect !== true)
+        return;
       void this.setupServerClient()
         .router.send(Browser.CloseCommand.id, {})
         .catch(() => {});
@@ -694,24 +722,69 @@ export class ModCDPServer {
       : { event: eventName, emitted: false, reason: "binding_not_installed" };
   }
 
-  private setupServerClient(name?: BrowserTargetUpstreamMode): ModCDPClient {
+  private setupServerClient({
+    upstream_mode,
+    loopback_cdp_url,
+    router_routes,
+    server_cdp_send_timeout_ms,
+    server_loopback_execution_context_timeout_ms,
+    server_ws_connect_error_settle_timeout_ms,
+  }: {
+    upstream_mode?: BrowserTargetUpstreamMode;
+    loopback_cdp_url?: string | null;
+    router_routes?: ModCDPRoutes;
+    server_cdp_send_timeout_ms?: number;
+    server_loopback_execution_context_timeout_ms?: number;
+    server_ws_connect_error_settle_timeout_ms?: number;
+  } = {}): ModCDPClient {
     const current_types = this.client?.types;
+    const current_loopback_cdp_url =
+      this.client?.upstream.upstream_mode === "ws"
+        ? (this.client.upstream.upstream_ws_cdp_url ?? null)
+        : null;
+    const configured_loopback_cdp_url =
+      loopback_cdp_url !== undefined
+        ? loopback_cdp_url
+        : current_loopback_cdp_url;
+    const configured_router_routes =
+      router_routes ?? this.client?.router.router_routes ?? { ...DEFAULT_ROUTES };
+    const configured_cdp_send_timeout_ms =
+      server_cdp_send_timeout_ms ??
+      this.client?.client.client_cdp_send_timeout_ms ??
+      DEFAULT_CDP_SEND_TIMEOUT_MS;
+    const configured_execution_context_timeout_ms =
+      server_loopback_execution_context_timeout_ms ??
+      this.client?.router.loopback_execution_context_timeout_ms ??
+      DEFAULT_LOOPBACK_EXECUTION_CONTEXT_TIMEOUT_MS;
+    const configured_ws_connect_error_settle_timeout_ms =
+      server_ws_connect_error_settle_timeout_ms ??
+      this.client?.upstream.upstream_ws_connect_error_settle_timeout_ms ??
+      DEFAULT_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
     const selected_name =
-      name ??
+      upstream_mode ??
       (this.client?.upstream.upstream_mode === "chrome_debugger"
         ? "chrome_debugger"
         : this.client?.upstream.upstream_mode === "ws" &&
             this.client.upstream.upstream_ws_cdp_url
           ? "loopback_cdp"
-          : this.loopback_cdp_url
+          : configured_loopback_cdp_url
             ? "loopback_cdp"
             : "chrome_debugger");
+    const config_changed =
+      loopback_cdp_url !== undefined ||
+      router_routes !== undefined ||
+      server_cdp_send_timeout_ms !== undefined ||
+      server_loopback_execution_context_timeout_ms !== undefined ||
+      server_ws_connect_error_settle_timeout_ms !== undefined;
     if (
-      (selected_name === "chrome_debugger" &&
-        this.client?.upstream.upstream_mode === "chrome_debugger") ||
-      (selected_name === "loopback_cdp" &&
-        this.client?.upstream.upstream_mode === "ws" &&
-        this.client.upstream.upstream_ws_cdp_url === this.loopback_cdp_url)
+      this.client &&
+      !config_changed &&
+      ((selected_name === "chrome_debugger" &&
+        this.client.upstream.upstream_mode === "chrome_debugger") ||
+        (selected_name === "loopback_cdp" &&
+          this.client.upstream.upstream_mode === "ws" &&
+          this.client.upstream.upstream_ws_cdp_url ===
+            configured_loopback_cdp_url))
     )
       return this.client;
 
@@ -721,25 +794,25 @@ export class ModCDPServer {
       injector: {
         injector_mode: "none",
         injector_execution_context_timeout_ms:
-          this.loopback_execution_context_timeout_ms,
+          configured_execution_context_timeout_ms,
       },
       upstream:
         selected_name === "loopback_cdp"
           ? {
               upstream_mode: "ws",
-              upstream_ws_cdp_url: this.loopback_cdp_url,
+              upstream_ws_cdp_url: configured_loopback_cdp_url,
               upstream_ws_connect_error_settle_timeout_ms:
-                this.ws_connect_error_settle_timeout_ms,
+                configured_ws_connect_error_settle_timeout_ms,
             }
           : { upstream_mode: "chrome_debugger" },
       router: {
-        router_routes: this.router.router_routes,
+        router_routes: configured_router_routes,
         loopback_execution_context_timeout_ms:
-          this.loopback_execution_context_timeout_ms,
+          configured_execution_context_timeout_ms,
       },
       client: {
         client_hydrate_aliases: false,
-        client_cdp_send_timeout_ms: this.cdp_send_timeout_ms,
+        client_cdp_send_timeout_ms: configured_cdp_send_timeout_ms,
       },
       server: null,
       types: current_types,

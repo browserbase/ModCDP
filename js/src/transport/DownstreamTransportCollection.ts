@@ -11,6 +11,13 @@ import {
   DownstreamTransport,
 } from "./DownstreamTransport.js";
 
+export const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
+
+export type DownstreamTransportCollectionOptions = {
+  downstream_client_timeout_ms?: number;
+  close_browser_on_downstream_disconnect?: boolean;
+};
+
 /**
  * Owns the SDK/client-facing transports installed in the extension service worker.
  *
@@ -22,9 +29,29 @@ import {
  * transport talks to its peers.
  */
 export class DownstreamTransportCollection {
+  downstream_client_timeout_ms: number;
+  close_browser_on_downstream_disconnect: boolean;
+
   // Transport name -> concrete downstream transport. Written during service
   // worker setup; read for fan-out, status, and lifecycle transitions.
   private readonly transports = new Map<DownstreamTransportName, DownstreamTransport>();
+
+  constructor(options: DownstreamTransportCollectionOptions = {}) {
+    this.downstream_client_timeout_ms =
+      options.downstream_client_timeout_ms ??
+      DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS;
+    this.close_browser_on_downstream_disconnect =
+      options.close_browser_on_downstream_disconnect ?? false;
+  }
+
+  update(config: DownstreamTransportCollectionOptions = {}) {
+    this.downstream_client_timeout_ms =
+      config.downstream_client_timeout_ms ?? this.downstream_client_timeout_ms;
+    this.close_browser_on_downstream_disconnect =
+      config.close_browser_on_downstream_disconnect ??
+      this.close_browser_on_downstream_disconnect;
+    return this;
+  }
 
   /** Add one downstream transport implementation to the collection. */
   add(transport: DownstreamTransport) {
