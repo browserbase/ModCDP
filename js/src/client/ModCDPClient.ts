@@ -394,13 +394,12 @@ export class ModCDPClient<
 
   async send(method: string, params: unknown = {}, session_id: string | null = null): Promise<Record<string, unknown>> {
     const started_at = Date.now();
-    const prepared = this.types.prepareCommand(
-      method,
-      params,
-      method === "Mod.addCustomCommand" ||
+    const can_register_locally =
+      !this.upstream.upstream_is_modcdp_server &&
+      (method === "Mod.addCustomCommand" ||
         (method === "Mod.addCustomEvent" && !this.injector?.session_id) ||
-        (method === "Mod.addMiddleware" && !this.injector?.session_id),
-    );
+        (method === "Mod.addMiddleware" && !this.injector?.session_id));
+    const prepared = this.types.prepareCommand(method, params, can_register_locally);
     const command_params = prepared.params;
     if (prepared.custom_command_name) {
       this.types.installCustomCommandAlias(this, prepared.custom_command_name, (alias_method, alias_params) =>
