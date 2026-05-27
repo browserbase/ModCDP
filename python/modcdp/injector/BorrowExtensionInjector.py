@@ -7,7 +7,6 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Mapping, cast
 
 from ..injector.ExtensionInjector import (
     EXT_ID_FROM_URL_RE,
@@ -16,10 +15,8 @@ from ..injector.ExtensionInjector import (
     ExtensionInjector,
     InjectorConfig,
 )
-from ..injector.NodeExtensionFiles import (
-    defaultModCDPExtensionPath,
-    prepareUnpackedExtension,
-)
+from ..injector.NodeExtensionFiles import defaultModCDPExtensionPath, prepareUnpackedExtension
+from ..types.modcdp import ExtensionInfo, ProtocolResult, TargetInfo, _isObjectMap
 
 BORROW_BOOTSTRAP_STATUS_EXPRESSION = """
 (() => ({
@@ -32,9 +29,9 @@ BORROW_BOOTSTRAP_STATUS_EXPRESSION = """
 
 
 class BorrowExtensionInjector(ExtensionInjector):
-    def __init__(self, config: InjectorConfig | dict[str, Any] | None = None) -> None:
-        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
-        super().__init__({**config, "injector_mode": "borrow"})
+    def __init__(self, config: InjectorConfig | dict[str, object] | None = None) -> None:
+        config_data = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config_data, "injector_mode": "borrow"})
         self.unpacked_extension_path: str | None = None
         self.cleanup: Callable[[], None] | None = None
         self.bootstrap_modcdp_server_expression: str | None = None
@@ -93,14 +90,18 @@ class BorrowExtensionInjector(ExtensionInjector):
         visible_service_workers = [
             target
             for target in self._targetInfos()
-            if target.get("type") == "service_worker" and isinstance(target.get("url"), str) and target["url"].startswith("chrome-extension://")
+            if target.type == "service_worker" and target.url.startswith("chrome-extension://")
         ]
         has_configured_matcher = bool(
             self.config.injector_service_worker_extension_id
             or self.config.injector_service_worker_url_includes
             or self.config.injector_service_worker_url_suffixes
         )
-        candidates = [target for target in visible_service_workers if self._serviceWorkerTargetMatches(target)] if has_configured_matcher else visible_service_workers
+        candidates = (
+            [target for target in visible_service_workers if self._serviceWorkerTargetMatches(target)]
+            if has_configured_matcher
+            else visible_service_workers
+        )
         for target in candidates:
             try:
                 bootstrapped = self._bootstrapTarget(target)
@@ -111,78 +112,85 @@ class BorrowExtensionInjector(ExtensionInjector):
         borrowed.sort(key=lambda item: (item[2], item[1]), reverse=True)
         return borrowed[0][0] if borrowed else None
 
-    def _bootstrapTarget(self, target) -> tuple[ExtensionInjectionResult, bool, bool] | None:
+    def _bootstrapTarget(self, target: TargetInfo) -> tuple[ExtensionInjectionResult, bool, bool] | None:
         attached = self._sendWithTimeout(
             "Target.attachToTarget",
-            {"targetId": target["targetId"], "flatten": True},
+            {"targetId": target.targetId, "flatten": True},
             None,
             self.config.injector_service_worker_probe_timeout_ms,
         )
         session_id = attached.get("sessionId")
         if not isinstance(session_id, str) or not session_id:
-            raise RuntimeError(f"Target.attachToTarget returned no sessionId for targetId={target['targetId']}")
+            raise RuntimeError(f"Target.attachToTarget returned no sessionId for targetId={target.targetId}")
         try:
             try:
                 self._sendWithTimeout("Runtime.enable", {}, session_id)
             except Exception:
                 pass
-            status = self._sendWithTimeout(
-                "Runtime.evaluate",
-                {
-                    "expression": BORROW_BOOTSTRAP_STATUS_EXPRESSION,
-                    "returnByValue": True,
-                },
-                session_id,
+            value = self._runtimeEvaluateValue(
+                self._sendWithTimeout(
+                    "Runtime.evaluate",
+                    {
+                        "expression": BORROW_BOOTSTRAP_STATUS_EXPRESSION,
+                        "returnByValue": True,
+                    },
+                    session_id,
+                )
             )
-            status_result = cast(Mapping[str, Any], status.get("result")) if isinstance(status.get("result"), Mapping) else {}
-            raw_value = status_result.get("value")
-            value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
             if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
                 return None
             if not bool(value.get("ok")):
                 if self.bootstrap_modcdp_server_expression is None:
                     raise RuntimeError("BorrowExtensionInjector requires prepare before inject.")
-                bootstrap = self._sendWithTimeout(
-                    "Runtime.evaluate",
-                    {
-                        "expression": f"({self.bootstrap_modcdp_server_expression})()",
-                        "awaitPromise": True,
-                        "returnByValue": True,
-                    },
-                    session_id,
+                value = self._runtimeEvaluateValue(
+                    self._sendWithTimeout(
+                        "Runtime.evaluate",
+                        {
+                            "expression": f"({self.bootstrap_modcdp_server_expression})()",
+                            "awaitPromise": True,
+                            "returnByValue": True,
+                        },
+                        session_id,
+                    )
                 )
-                bootstrap_result = cast(Mapping[str, Any], bootstrap.get("result")) if isinstance(bootstrap.get("result"), Mapping) else {}
-                raw_value = bootstrap_result.get("value")
-                value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
             if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
                 return None
             ready = bool(value.get("ok"))
             if ready and self._readyExpression() != MODCDP_READY_EXPRESSION:
-                probe = self._sendWithTimeout(
-                    "Runtime.evaluate",
-                    {
-                        "expression": self._readyExpression(),
-                        "returnByValue": True,
-                    },
-                    session_id,
+                probe_value = self._runtimeEvaluateValue(
+                    self._sendWithTimeout(
+                        "Runtime.evaluate",
+                        {
+                            "expression": self._readyExpression(),
+                            "returnByValue": True,
+                        },
+                        session_id,
+                    )
                 )
-                probe_result = cast(Mapping[str, Any], probe.get("result")) if isinstance(probe.get("result"), Mapping) else {}
-                ready = bool(probe_result.get("value"))
+                ready = probe_value.get("value") is True
             if not ready:
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
                 return None
-            match = EXT_ID_FROM_URL_RE.match(target["url"])
-            extension_id = value.get("extension_id") if isinstance(value.get("extension_id"), str) else None
-            result: ExtensionInjectionResult = {
-                "source": "borrow",
-                "extension_id": extension_id or (match.group(1) if match else None),
-                "target_id": target["targetId"],
-                "url": target["url"],
-                "session_id": session_id,
-            }
+            match = EXT_ID_FROM_URL_RE.match(target.url)
+            raw_extension_id = value.get("extension_id")
+            extension_id = raw_extension_id if isinstance(raw_extension_id, str) else None
+            result = ExtensionInfo(
+                source="borrow",
+                extension_id=extension_id or (match.group(1) if match else None),
+                target_id=target.targetId,
+                url=target.url,
+                session_id=session_id,
+            )
             return result, bool(value.get("has_tabs")), bool(value.get("has_debugger"))
         except BaseException:
             self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
             raise
+
+    def _runtimeEvaluateValue(self, response: ProtocolResult) -> dict[str, object]:
+        result = response.get("result")
+        if not _isObjectMap(result):
+            return {}
+        value = result.get("value")
+        return value if _isObjectMap(value) else {}

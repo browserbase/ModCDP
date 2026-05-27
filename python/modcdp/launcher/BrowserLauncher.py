@@ -8,59 +8,16 @@ import json
 import re
 import urllib.request
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import NotRequired
+from ..types.modcdp import LaunchedBrowser, ModCDPLauncherConfig
 from ..types.toJSON import modCDPToJSON
 
 if TYPE_CHECKING:
     from ..transport.UpstreamTransport import UpstreamTransport
 
 
-class LauncherConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    launcher_mode: Literal["local", "remote", "bb", "none"] = "none"
-    launcher_local_executable_path: str | None = None
-    launcher_local_user_data_dir: str | None = None
-    launcher_local_cdp_listen_port: int | None = None
-    launcher_remote_cdp_url: str | None = None
-    launcher_local_headless: bool | None = None
-    launcher_local_sandbox: bool | None = None
-    launcher_local_args: list[str] = Field(default_factory=list)
-    launcher_local_extra_args: list[str] = Field(default_factory=list)
-    launcher_local_cdp_transport: str = "port"
-    launcher_local_loopback_cdp: bool = False
-    launcher_local_cleanup_user_data_dir: bool = False
-    launcher_local_chrome_ready_timeout_ms: int = 45_000
-    launcher_local_chrome_ready_poll_interval_ms: int = 100
-    launcher_bb_api_key: str | None = None
-    launcher_bb_base_url: str = "https://api.browserbase.com"
-    launcher_bb_session_id: str | None = None
-    launcher_bb_keep_alive: bool = False
-    launcher_bb_close_session_on_close: bool | None = None
-    launcher_bb_region: str | None = None
-    launcher_bb_timeout: int | None = None
-    launcher_bb_extension_id: str | None = None
-    launcher_bb_browser_settings: dict[str, Any] = Field(default_factory=lambda: {"viewport": {"width": 1288, "height": 711}})
-    launcher_bb_user_metadata: dict[str, Any] = Field(default_factory=dict)
-    launcher_bb_session_create_params: dict[str, Any] = Field(default_factory=lambda: {"userMetadata": {}})
-
-
-class LaunchedBrowser(TypedDict):
-    # Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
-    cdp_url: str | None
-    # Extension-dialable loopback CDP endpoint when it differs from cdp_url.
-    loopback_cdp_url: NotRequired[str | None]
-    close: Callable[[], Any]
-    profile_dir: NotRequired[str | None]
-    pipe_read: NotRequired[Any]
-    pipe_write: NotRequired[Any]
-    browserbase_session_id: NotRequired[str | None]
-    browserbase_session_url: NotRequired[str | None]
-    browserbase_debug_url: NotRequired[str | None]
-    cdp_listen_port: NotRequired[int | None]
+LauncherConfig: TypeAlias = ModCDPLauncherConfig
 
 
 DEFAULT_CHROME_READY_TIMEOUT_MS = 45_000
@@ -87,25 +44,15 @@ class BrowserLauncher:
 
     def configForUpstream(self) -> dict[str, Any]:
         config: dict[str, Any] = {}
-        launched = self.launched or {}
-        upstream_ws_cdp_url = launched.get("cdp_url") or self.config.launcher_remote_cdp_url
+        upstream_ws_cdp_url = (self.launched.cdp_url if self.launched is not None else None) or self.config.launcher_remote_cdp_url
         if upstream_ws_cdp_url:
             config["upstream_ws_cdp_url"] = upstream_ws_cdp_url
-        pipe_read = launched.get("pipe_read")
-        if pipe_read:
-            config["upstream_pipe_read"] = pipe_read
-        pipe_write = launched.get("pipe_write")
-        if pipe_write:
-            config["upstream_pipe_write"] = pipe_write
         return config
 
     def configForServer(self, upstream: UpstreamTransport) -> dict[str, Any]:
-        launched = self.launched or {}
-        launcher_local_loopback_cdp_url = launched.get("loopback_cdp_url")
+        launcher_local_loopback_cdp_url = self.launched.loopback_cdp_url if self.launched is not None else None
         if not launcher_local_loopback_cdp_url and upstream.config.upstream_mode == "ws" and upstream.config.upstream_ws_cdp_url:
             launcher_local_loopback_cdp_url = upstream.config.upstream_ws_cdp_url
-        if not launcher_local_loopback_cdp_url and upstream.config.upstream_mode not in ("ws", "pipe") and launched.get("cdp_url"):
-            launcher_local_loopback_cdp_url = launched.get("cdp_url")
         return {"upstream": {"upstream_ws_cdp_url": launcher_local_loopback_cdp_url}} if launcher_local_loopback_cdp_url else {}
 
     def launch(self, config: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
@@ -115,22 +62,21 @@ class BrowserLauncher:
         launched = self.launched
         self.launched = None
         if launched is not None:
-            launched["close"]()
+            launched.close()
 
     def toJSON(self) -> dict[str, object]:
-        launched = self.launched or {}
         return modCDPToJSON(
             self,
             {
                 "state": {
                     "launched": self.launched is not None,
-                    "cdp_url": launched.get("cdp_url"),
-                    "loopback_cdp_url": launched.get("loopback_cdp_url"),
-                    "cdp_listen_port": launched.get("cdp_listen_port"),
-                    "profile_dir": launched.get("profile_dir"),
-                    "browserbase_session_id": launched.get("browserbase_session_id"),
-                    "browserbase_session_url": launched.get("browserbase_session_url"),
-                    "browserbase_debug_url": launched.get("browserbase_debug_url"),
+                    "cdp_url": self.launched.cdp_url if self.launched is not None else None,
+                    "loopback_cdp_url": self.launched.loopback_cdp_url if self.launched is not None else None,
+                    "cdp_listen_port": self.launched.cdp_listen_port if self.launched is not None else None,
+                    "profile_dir": self.launched.profile_dir if self.launched is not None else None,
+                    "browserbase_session_id": self.launched.browserbase_session_id if self.launched is not None else None,
+                    "browserbase_session_url": self.launched.browserbase_session_url if self.launched is not None else None,
+                    "browserbase_debug_url": self.launched.browserbase_debug_url if self.launched is not None else None,
                 }
             },
         )

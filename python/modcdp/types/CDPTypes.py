@@ -36,9 +36,12 @@ JsonSchema: TypeAlias = dict[str, JsonValue]
 CustomCommandConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomEventConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomMiddlewareConfig: TypeAlias = Mapping[str, object]
-CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | dict[str, object]
-CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | dict[str, object]
-CustomMiddlewareRegistrations: TypeAlias = Sequence[ModCDPAddMiddlewareParams | CustomMiddlewareConfig]
+CustomCommandRegistration: TypeAlias = dict[str, object]
+CustomEventRegistration: TypeAlias = dict[str, object]
+CustomMiddlewareRegistration: TypeAlias = dict[str, object]
+CustomCommandRegistrations: TypeAlias = Sequence[Mapping[str, object]] | dict[str, object]
+CustomEventRegistrations: TypeAlias = Sequence[str | Mapping[str, object]] | dict[str, object]
+CustomMiddlewareRegistrations: TypeAlias = Sequence[Mapping[str, object]]
 
 
 class _ModCDPAddCustomCommand(BaseModel):
@@ -174,15 +177,8 @@ MOD_CONFIGURE_PARAMS_SCHEMA: JsonSchema = {
         "upstream": {
             "type": "object",
             "properties": {
-                "upstream_mode": {"enum": ["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]},
+                "upstream_mode": {"enum": ["ws"]},
                 "upstream_ws_cdp_url": {"type": "string"},
-                "upstream_nats_url": {"type": "string"},
-                "upstream_nats_subject_prefix": {"type": "string"},
-                "upstream_nats_role": {"enum": ["client", "browser"]},
-                "upstream_nats_wait_timeout_ms": {"type": "number"},
-                "upstream_reversews_bind": {"type": "string"},
-                "upstream_reversews_wait_timeout_ms": {"type": "number"},
-                "upstream_nativemessaging_host_name": {"type": "string"},
                 "upstream_ws_connect_error_settle_timeout_ms": {"type": "number"},
                 "upstream_cdp_send_timeout_ms": {"type": "number"},
             },
@@ -207,15 +203,6 @@ MOD_CONFIGURE_PARAMS_SCHEMA: JsonSchema = {
             },
             "additionalProperties": False,
         },
-        "downstream": {
-            "type": "object",
-            "properties": {
-                "downstream_client_timeout_ms": {"type": "number"},
-                "downstream_close_browser_on_disconnect": {"type": "boolean"},
-            },
-            "additionalProperties": False,
-        },
-        "server_browser_token": {"type": "string"},
         "custom_commands": {"type": "array", "items": MOD_COMMAND_REGISTRATION_SCHEMA},
         "custom_events": {"type": "array", "items": MOD_EVENT_REGISTRATION_SCHEMA},
         "custom_middlewares": {"type": "array", "items": MOD_MIDDLEWARE_REGISTRATION_SCHEMA},
@@ -299,7 +286,7 @@ MOD_TOPOLOGY_RESPONSE_SCHEMA: JsonSchema = {
     "required": ["objectGroup", "rootFrameId", "frames", "roots", "targets", "contexts"],
     "additionalProperties": False,
 }
-DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
+DEFAULT_BUILTIN_COMMANDS: tuple[CustomCommandRegistration, ...] = (
     {
         "name": "Mod.ping",
         "params_schema": {"type": "object", "properties": {"sent_at": {"type": "number"}}, "additionalProperties": False},
@@ -373,7 +360,7 @@ DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
         "expression": "async (params) => ModCDP.addMiddleware(params)",
     },
 )
-DEFAULT_BUILTIN_EVENTS: tuple[ModCDPAddCustomEventObjectParams, ...] = (
+DEFAULT_BUILTIN_EVENTS: tuple[CustomEventRegistration, ...] = (
     {
         "name": "Mod.pong",
         "event_schema": {
@@ -428,9 +415,9 @@ class CDPTypes:
         custom_events: CustomEventRegistrations | None = None,
         custom_middlewares: CustomMiddlewareRegistrations | None = None,
     ) -> None:
-        self.custom_commands: dict[str, ModCDPAddCustomCommandParams] = {}
-        self.custom_events: dict[str, ModCDPAddCustomEventObjectParams] = {}
-        self.custom_middlewares: list[ModCDPAddMiddlewareParams] = []
+        self.custom_commands: dict[str, CustomCommandRegistration] = {}
+        self.custom_events: dict[str, CustomEventRegistration] = {}
+        self.custom_middlewares: list[CustomMiddlewareRegistration] = []
         self.command_schemas: dict[str, CommandSchema] = {}
         self.event_schemas: dict[str, TypeAdapter[object]] = {}
         self.native_command_names: set[str] = set()
@@ -554,7 +541,7 @@ class CDPTypes:
     def prepareCommand(self, method: str, params: object = None, can_register_locally: bool = False) -> CommandPreparation:
         if method == "Mod.addCustomCommand":
             parsed = _ModCDPAddCustomCommand.model_validate(params or {})
-            command_registration: ModCDPAddCustomCommandParams = {"name": parsed.name}
+            command_registration: CustomCommandRegistration = {"name": parsed.name}
             if parsed.expression is not None:
                 command_registration["expression"] = parsed.expression
             if parsed.params_schema is not None:
@@ -567,7 +554,7 @@ class CDPTypes:
             return CommandPreparation(params=self.customCommandWireRegistration(name), custom_command_name=name)
         if method == "Mod.addCustomEvent":
             parsed = _ModCDPAddCustomEvent.model_validate(params or {})
-            event_registration: ModCDPAddCustomEventObjectParams = {"name": parsed.name}
+            event_registration: CustomEventRegistration = {"name": parsed.name}
             if parsed.event_schema is not None:
                 event_registration["event_schema"] = _json_value(parsed.event_schema)
             name = self.addCustomEvent(event_registration)
@@ -577,7 +564,7 @@ class CDPTypes:
         command_params = self.parseCommandParams(method, params or {})
         if method == "Mod.addMiddleware":
             parsed = _ModCDPAddMiddleware.model_validate(command_params)
-            middleware_registration: ModCDPAddMiddlewareParams = {"phase": parsed.phase, "expression": parsed.expression}
+            middleware_registration: CustomMiddlewareRegistration = {"phase": parsed.phase, "expression": parsed.expression}
             if parsed.name is not None:
                 middleware_registration["name"] = parsed.name
             name = self.addCustomMiddleware(middleware_registration)
@@ -629,7 +616,7 @@ class CDPTypes:
             jsonable = _json_value(to_jsonable_python(validated))
         return jsonable if isinstance(jsonable, dict) else {"value": jsonable}
 
-    def addCustomCommand(self, registration: ModCDPAddCustomCommandParams | CustomCommandConfig) -> str:
+    def addCustomCommand(self, registration: Mapping[str, object]) -> str:
         parsed = _ModCDPAddCustomCommand.model_validate(registration)
         name = normalizeModCDPName(parsed.name)
         if not re.match(r"^[^.]+\.[^.]+$", name):
@@ -643,7 +630,7 @@ class CDPTypes:
             if result_schema.adapter is not None:
                 existing = CommandSchema(params=existing.params, result=result_schema.adapter)
             self.command_schemas[name] = existing
-            command: ModCDPAddCustomCommandParams = {"name": name}
+            command: CustomCommandRegistration = {"name": name}
             if parsed.expression:
                 command["expression"] = parsed.expression
             if params_schema.json_schema:
@@ -667,7 +654,10 @@ class CDPTypes:
             expression = command.get("expression")
             if expression_required and not expression:
                 continue
-            name = normalizeModCDPName(command["name"])
+            raw_name = command.get("name")
+            if not isinstance(raw_name, str):
+                raise ValueError("custom command registration is missing name")
+            name = normalizeModCDPName(raw_name)
             wire: dict[str, object] = {"name": name}
             if expression is not None:
                 wire["expression"] = expression
@@ -680,7 +670,7 @@ class CDPTypes:
             registrations.append(wire)
         return registrations
 
-    def addCustomEvent(self, registration: ModCDPAddCustomEventObjectParams | CustomEventConfig) -> str:
+    def addCustomEvent(self, registration: Mapping[str, object]) -> str:
         parsed = _ModCDPAddCustomEvent.model_validate(registration)
         name = normalizeModCDPName(parsed.name)
         if not re.match(r"^[^.]+\.[^.]+$", name):
@@ -689,7 +679,7 @@ class CDPTypes:
         with self._lock:
             if event_schema.adapter is not None:
                 self.event_schemas[name] = event_schema.adapter
-            event: ModCDPAddCustomEventObjectParams = {"name": name}
+            event: CustomEventRegistration = {"name": name}
             if event_schema.json_schema:
                 event["event_schema"] = event_schema.json_schema
             self.custom_events[name] = event
@@ -708,21 +698,21 @@ class CDPTypes:
     def customEventWireRegistrations(self) -> list[dict[str, object]]:
         return [self.customEventWireRegistration(name) for name in self.custom_events]
 
-    def addCustomMiddleware(self, registration: ModCDPAddMiddlewareParams | CustomMiddlewareConfig) -> str:
+    def addCustomMiddleware(self, registration: Mapping[str, object]) -> str:
         parsed = _ModCDPAddMiddleware.model_validate(registration)
         name = "*" if parsed.name is None or parsed.name == "*" else normalizeModCDPName(parsed.name)
         if name != "*" and "." not in name:
             raise ValueError("name must be '*' or Domain.name form")
-        middleware: ModCDPAddMiddlewareParams = {"phase": parsed.phase, "expression": parsed.expression}
+        middleware: CustomMiddlewareRegistration = {"phase": parsed.phase, "expression": parsed.expression}
         if name != "*":
             middleware["name"] = name
         self.custom_middlewares.append(middleware)
         return name
 
-    def customMiddlewareWireRegistrations(self) -> list[ModCDPAddMiddlewareParams]:
+    def customMiddlewareWireRegistrations(self) -> list[CustomMiddlewareRegistration]:
         return list(self.custom_middlewares)
 
-    def customMiddlewareRegistrations(self, phase: str, name: str) -> list[ModCDPAddMiddlewareParams]:
+    def customMiddlewareRegistrations(self, phase: str, name: str) -> list[CustomMiddlewareRegistration]:
         return [
             middleware
             for middleware in self.custom_middlewares
@@ -749,7 +739,7 @@ class CDPTypes:
             }
             if execution_context_id is not None:
                 runtime_params["contextId"] = execution_context_id
-            return {"method": "Runtime.evaluate", "params": runtime_params, "unwrap": "runtime"}
+            return TranslatedStep(method="Runtime.evaluate", params=runtime_params, unwrap="runtime")
         runtime_params: dict[str, object] = {
             "functionDeclaration": (
                 "async function(method, paramsJson, cdpSessionId) { "
@@ -762,7 +752,7 @@ class CDPTypes:
         }
         if execution_context_id is not None:
             runtime_params["executionContextId"] = execution_context_id
-        return {"method": "Runtime.callFunctionOn", "params": runtime_params, "unwrap": "runtime_json"}
+        return TranslatedStep(method="Runtime.callFunctionOn", params=runtime_params, unwrap="runtime_json")
 
     def _serviceWorkerRuntimeExpression(
         self,
@@ -860,13 +850,13 @@ class CDPTypes:
 
 def _custom_command_entries(
     custom_commands: CustomCommandRegistrations | None,
-) -> list[ModCDPAddCustomCommandParams]:
+) -> list[CustomCommandRegistration]:
     if custom_commands is None:
         return []
     if isinstance(custom_commands, dict):
-        entries: list[ModCDPAddCustomCommandParams] = []
+        entries: list[CustomCommandRegistration] = []
         for name, command in _CustomCommandConfigMap.model_validate(custom_commands).root.items():
-            entry: ModCDPAddCustomCommandParams = {"name": name}
+            entry: CustomCommandRegistration = {"name": name}
             if command.expression is not None:
                 entry["expression"] = command.expression
             if command.params_schema is not None:
@@ -875,20 +865,20 @@ def _custom_command_entries(
                 entry["result_schema"] = command.result_schema
             entries.append(entry)
         return entries
-    return list(custom_commands)
+    return [dict(command) for command in custom_commands]
 
 
 def _custom_event_entries(
     custom_events: CustomEventRegistrations | None,
-) -> list[ModCDPAddCustomEventParams]:
+) -> list[str | CustomEventRegistration]:
     if custom_events is None:
         return []
     if isinstance(custom_events, dict):
-        entries: list[ModCDPAddCustomEventParams] = []
+        entries: list[str | CustomEventRegistration] = []
         for name, event in _CustomEventConfigMap.model_validate(custom_events).root.items():
-            entry: ModCDPAddCustomEventObjectParams = {"name": name}
+            entry: CustomEventRegistration = {"name": name}
             if event.event_schema is not None:
                 entry["event_schema"] = event.event_schema
             entries.append(entry)
         return entries
-    return list(custom_events)
+    return [event if isinstance(event, str) else dict(event) for event in custom_events]

@@ -9,11 +9,11 @@ import threading
 import time
 from collections.abc import Callable, Mapping
 from queue import Empty, Queue
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..launcher.BrowserLauncher import LauncherConfig
-from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo, _isObjectMap
+from ..types.modcdp import ExtensionInfo, ProtocolParams, ProtocolResult, TargetInfo, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
@@ -35,7 +35,7 @@ SendCDP = Callable[[str, ProtocolParams | None, str | None], ProtocolResult]
 class InjectorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    injector_mode: Literal["cli", "cdp", "bb", "discover", "borrow", "none"] = "none"
+    injector_mode: Literal["cli", "cdp", "bb", "borrow", "discover", "none"] = "none"
     send: Any | None = None
     injector_cli_extension_path: str | None = None
     injector_cli_extension_id: str | None = None
@@ -43,8 +43,8 @@ class InjectorConfig(BaseModel):
     injector_cdp_extension_id: str | None = None
     injector_bb_extension_path: str | None = None
     injector_bb_extension_id: str | None = None
-    injector_discover_extension_path: str | None = None
     injector_borrow_extension_path: str | None = None
+    injector_discover_extension_path: str | None = None
     injector_service_worker_extension_id: str | None = None
     injector_service_worker_url_includes: list[str] = Field(default_factory=list)
     injector_service_worker_url_suffixes: list[str] = Field(default_factory=lambda: [*DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES])
@@ -65,12 +65,7 @@ def _defaulted(value: Any, fallback: int) -> int:
     return fallback if value is None else int(value)
 
 
-class ExtensionInjectionResult(TypedDict):
-    source: str
-    extension_id: str | None
-    target_id: str
-    url: str
-    session_id: str
+ExtensionInjectionResult: TypeAlias = ExtensionInfo
 
 
 class ExtensionInjector:
@@ -114,13 +109,13 @@ class ExtensionInjector:
         raise NotImplementedError(f"{type(self).__name__}.inject is not implemented.")
 
     def recordInjectionResult(self, result: ExtensionInjectionResult) -> "ExtensionInjector":
-        self.source = result["source"]
-        self.extension_id = result.get("extension_id")
-        if result.get("extension_id") is not None:
-            self.service_worker_extension_id = result.get("extension_id")
-        self.target_id = result["target_id"]
-        self.url = result.get("url")
-        self.session_id = result["session_id"]
+        self.source = result.source
+        self.extension_id = result.extension_id
+        if result.extension_id is not None:
+            self.service_worker_extension_id = result.extension_id
+        self.target_id = result.target_id
+        self.url = result.url
+        self.session_id = result.session_id
         return self
 
     def _readyExpression(self) -> str:
@@ -176,7 +171,7 @@ class ExtensionInjector:
             target_type = raw_target.get("type")
             target_url = raw_target.get("url")
             if isinstance(target_id, str) and isinstance(target_type, str) and isinstance(target_url, str):
-                targets.append({"targetId": target_id, "type": target_type, "url": target_url})
+                targets.append(TargetInfo(targetId=target_id, type=target_type, url=target_url))
         return targets
 
     def _probeTarget(
@@ -186,7 +181,7 @@ class ExtensionInjector:
         *,
         allow_attach: bool = False,
     ) -> ExtensionInjectionResult | None:
-        target_id = target["targetId"]
+        target_id = target.targetId
         if target_id in self.unusable_target_ids:
             return None
         attached = self._sendWithTimeout(
@@ -214,14 +209,14 @@ class ExtensionInjector:
             if value is not True:
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
                 return None
-            match = EXT_ID_FROM_URL_RE.match(target.get("url") or "")
-            return {
-                "source": "discover",
-                "extension_id": match.group(1) if match else None,
-                "target_id": target_id,
-                "url": target["url"],
-                "session_id": session_id,
-            }
+            match = EXT_ID_FROM_URL_RE.match(target.url)
+            return ExtensionInfo(
+                source="discover",
+                extension_id=match.group(1) if match else None,
+                target_id=target.targetId,
+                url=target.url,
+                session_id=session_id,
+            )
         except BaseException:
             self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
             raise
@@ -238,13 +233,14 @@ class ExtensionInjector:
                     allow_attach=True,
                 )
                 if probed:
-                    return {**probed, "source": "trusted"}
+                    probed.source = "trusted"
+                    return probed
         if self.config.injector_trust_service_worker_target or matched_only:
             return None
         for candidate in target_infos:
-            if candidate["type"] != "service_worker":
+            if candidate.type != "service_worker":
                 continue
-            if not candidate["url"].startswith("chrome-extension://"):
+            if not candidate.url.startswith("chrome-extension://"):
                 continue
             try:
                 probed = self._probeTarget(
@@ -266,10 +262,11 @@ class ExtensionInjector:
             time.sleep(self.config.injector_service_worker_poll_interval_ms / 1000)
         return None
 
-    def _serviceWorkerTargetMatches(self, candidate: Mapping[str, object]) -> bool:
-        raw_target_url = candidate.get("url")
+    def _serviceWorkerTargetMatches(self, candidate: TargetInfo | Mapping[str, object]) -> bool:
+        raw_target_url = candidate.url if isinstance(candidate, TargetInfo) else candidate.get("url")
         target_url = raw_target_url if isinstance(raw_target_url, str) else ""
-        if candidate.get("type") != "service_worker":
+        candidate_type = candidate.type if isinstance(candidate, TargetInfo) else candidate.get("type")
+        if candidate_type != "service_worker":
             return False
         if not target_url.startswith("chrome-extension://"):
             return False

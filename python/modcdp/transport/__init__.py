@@ -4,5 +4,5 @@
 # - ./js/src/transport/WSUpstreamTransport.ts
 # - ./go/modcdp/transport/UpstreamTransport.go
 # - ./go/modcdp/transport/WSUpstreamTransport.go
-from .UpstreamTransport import UpstreamTransport, UpstreamTransportConfig, parseHostPort
+from .UpstreamTransport import UpstreamTransport, UpstreamTransportConfig
 from .WSUpstreamTransport import WSUpstreamTransport

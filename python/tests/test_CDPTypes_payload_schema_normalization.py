@@ -52,30 +52,14 @@ class CDPTypesPayloadSchemaNormalizationTests(unittest.TestCase):
             "Mod.configure",
             {
                 "client_config": {"client_hydrate_aliases": False},
-                "downstream": {
-                    "downstream_client_timeout_ms": 1234,
-                    "downstream_close_browser_on_disconnect": True,
-                },
             },
         )
         client_config = parsed_configure_params.get("client_config")
         if not _isObjectMap(client_config):
             raise AssertionError(f"client_config = {client_config!r}")
-        downstream = parsed_configure_params.get("downstream")
-        if not _isObjectMap(downstream):
-            raise AssertionError(f"downstream = {downstream!r}")
         self.assertEqual(client_config["client_hydrate_aliases"], False)
-        self.assertEqual(downstream["downstream_client_timeout_ms"], 1234)
-        self.assertEqual(downstream["downstream_close_browser_on_disconnect"], True)
-        with self.assertRaisesRegex(ValueError, "closeBrowser"):
-            types.parseCommandParams(
-                "Mod.configure",
-                {
-                    "downstream": {
-                        "closeBrowser": "not allowed over the wire",
-                    },
-                },
-            )
+        with self.assertRaisesRegex(ValueError, "downstream"):
+            types.parseCommandParams("Mod.configure", {"downstream": {}})
 
 
 if __name__ == "__main__":

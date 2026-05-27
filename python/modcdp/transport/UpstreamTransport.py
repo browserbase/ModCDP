@@ -8,33 +8,14 @@ import json
 import threading
 from collections.abc import Callable, Mapping
 from queue import Empty, Queue
-from typing import Any, Literal, overload
-from urllib.parse import urlparse
+from typing import Any, Literal, TypeAlias, overload
 
-from pydantic import BaseModel, ConfigDict
-from ..types.modcdp import ProtocolPayload, ProtocolResult, _isObjectMap
+from ..types.modcdp import ModCDPUpstreamConfig, ProtocolPayload, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 
-UpstreamMode = Literal["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]
-
-
-class UpstreamTransportConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    upstream_mode: UpstreamMode = "ws"
-    upstream_ws_cdp_url: str | None = None
-    upstream_pipe_read: Any | None = None
-    upstream_pipe_write: Any | None = None
-    upstream_nats_url: str = "ws://127.0.0.1:4223"
-    upstream_nats_subject_prefix: str = "modcdp.default"
-    upstream_nats_role: Literal["client", "browser"] = "client"
-    upstream_nats_wait_timeout_ms: int = 10_000
-    upstream_reversews_bind: str = "127.0.0.1:29292"
-    upstream_reversews_wait_timeout_ms: int = 10_000
-    upstream_nativemessaging_host_name: str = "com.modcdp.bridge"
-    upstream_ws_connect_error_settle_timeout_ms: int = 250
-    upstream_cdp_send_timeout_ms: int = 10_000
+UpstreamMode: TypeAlias = Literal["ws"]
+UpstreamTransportConfig: TypeAlias = ModCDPUpstreamConfig
 
 
 class UpstreamTransport:
@@ -209,8 +190,6 @@ class UpstreamTransport:
 
     def toJSON(self) -> dict[str, object]:
         config = self.config.model_dump(mode="json")
-        config.pop("upstream_pipe_read", None)
-        config.pop("upstream_pipe_write", None)
         return modCDPToJSON(
             self,
             {
@@ -265,17 +244,6 @@ class UpstreamTransport:
     ) -> None:
         for listener in list(self._event_listeners.get(method, [])):
             listener(payload, target_id, session_id)
-
-
-def parseHostPort(value: str, defaultHost: str, defaultPort: int) -> dict[str, int | str]:
-    parsed = urlparse(value if "://" in value else f"ws://{value}")
-    host = parsed.hostname or defaultHost
-    port = parsed.port or defaultPort
-    if port <= 0 or port > 65_535:
-        raise ValueError(f"Invalid host:port {value}")
-    return {"host": host, "port": port}
-
-
 def _upstream_transport_config(config: UpstreamTransportConfig | dict[str, Any] | None = None) -> UpstreamTransportConfig:
     if isinstance(config, UpstreamTransportConfig):
         return config

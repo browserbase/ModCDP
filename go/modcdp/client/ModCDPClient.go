@@ -8,7 +8,7 @@
 //
 //	Launcher       browser/session creation and cleanup.
 //	Upstream       message transport to raw CDP or a ModCDP server.
-//	Injector       raw-CDP extension discovery/injection/borrowing.
+//	Injector       raw-CDP extension discovery/injection.
 //	ServerConfig         ModCDPServer.configure params.
 //	ClientConfig client routing and client-owned send/event timings.
 //	Upstream      upstream transport config and upstream-owned timings.
@@ -78,15 +78,14 @@ type RouterConfig = types.ModCDPRouterConfig
 type ExtensionInjector = injector.ExtensionInjector
 type DiscoverExtensionInjector = injector.DiscoverExtensionInjector
 type BBExtensionInjector = injector.BBExtensionInjector
+type BorrowExtensionInjector = injector.BorrowExtensionInjector
 type CLIExtensionInjector = injector.CLIExtensionInjector
 type CDPExtensionInjector = injector.CDPExtensionInjector
-type BorrowExtensionInjector = injector.BorrowExtensionInjector
 type UpstreamMode = transportpkg.UpstreamMode
 type UpstreamTransportConfig = types.UpstreamTransportConfig
 type UpstreamTransport = transportpkg.UpstreamTransport
 type WSUpstreamTransport = transportpkg.WSUpstreamTransport
 type AutoSessionRouter = router.AutoSessionRouter
-type DownstreamConfig = types.ModCDPDownstreamConfig
 type CustomCommand = types.ModCDPAddCustomCommandParams
 type CustomEvent = types.ModCDPAddCustomEventObjectParams
 type CustomMiddleware = types.ModCDPAddMiddlewareParams
@@ -97,9 +96,9 @@ var NewBBBrowserLauncher = launcher.NewBBBrowserLauncher
 var NewNoneBrowserLauncher = launcher.NewNoneBrowserLauncher
 var NewDiscoverExtensionInjector = injector.NewDiscoverExtensionInjector
 var NewBBExtensionInjector = injector.NewBBExtensionInjector
+var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewCLIExtensionInjector = injector.NewCLIExtensionInjector
 var NewCDPExtensionInjector = injector.NewCDPExtensionInjector
-var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewWSUpstreamTransport = transportpkg.NewWSUpstreamTransport
 var NewAutoSessionRouter = router.NewAutoSessionRouter
 
@@ -172,15 +171,13 @@ type CDPTypesConfig struct {
 }
 
 type ServerConfig struct {
-	Upstream           UpstreamTransportConfig `json:"upstream,omitempty"`
-	Router             RouterConfig            `json:"router,omitempty"`
-	ClientConfig       ClientConfig            `json:"client_config,omitempty"`
-	Downstream         DownstreamConfig        `json:"downstream,omitempty"`
-	ServerBrowserToken string                  `json:"server_browser_token,omitempty"`
-	CustomCommands     []CustomCommand         `json:"custom_commands,omitempty"`
-	CustomEvents       []CustomEvent           `json:"custom_events,omitempty"`
-	CustomMiddlewares  []CustomMiddleware      `json:"custom_middlewares,omitempty"`
-	disabled           bool
+	Upstream          UpstreamTransportConfig `json:"upstream,omitempty"`
+	Router            RouterConfig            `json:"router,omitempty"`
+	ClientConfig      ClientConfig            `json:"client_config,omitempty"`
+	CustomCommands    []CustomCommand         `json:"custom_commands,omitempty"`
+	CustomEvents      []CustomEvent           `json:"custom_events,omitempty"`
+	CustomMiddlewares []CustomMiddleware      `json:"custom_middlewares,omitempty"`
+	disabled          bool
 }
 
 var ServerConfigNone = &ServerConfig{disabled: true}
@@ -541,32 +538,6 @@ func (c *ModCDPClient) Connect() error {
 	c.Upstream.OnClose(func(err error) {
 		c.stopHeartbeat()
 	})
-	if c.Config.Upstream.UpstreamMode != "ws" {
-		if err := c.Upstream.WaitForPeer(); err != nil {
-			c.Close()
-			return err
-		}
-		if c.Config.ServerConfig != nil {
-			if _, err := c.Upstream.Send("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
-				c.Close()
-				return err
-			}
-			c.configuredPeerGeneration = c.Upstream.PeerGeneration()
-		}
-		c.startHeartbeat()
-		c.startPingLatencyMeasurement()
-		connectedAt := time.Now().UnixMilli()
-		c.ConnectTiming = map[string]any{
-			"started_at":             connectStartedAt,
-			"upstream_mode":          c.Config.Upstream.UpstreamMode,
-			"transport_started_at":   transportStartedAt,
-			"transport_connected_at": transportConnectedAt,
-			"transport_duration_ms":  transportConnectedAt - transportStartedAt,
-			"connected_at":           connectedAt,
-			"duration_ms":            connectedAt - connectStartedAt,
-		}
-		return nil
-	}
 	if c.Config.Injector.InjectorMode == "none" && c.Config.ServerConfig == nil {
 		connectedAt := time.Now().UnixMilli()
 		c.ConnectTiming = map[string]any{
@@ -696,11 +667,6 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	launcher.Update(LauncherConfig{LauncherLocalLoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
 	transport.Update(launcher.ConfigForUpstream())
 
-	if c.Config.Upstream.UpstreamMode != "ws" {
-		if err := transport.Connect(); err != nil {
-			return err
-		}
-	}
 	launchedCDPURL := ""
 	if c.Config.Launcher.LauncherMode != "none" {
 		launched, err := launcher.Launch(LauncherConfig{})
@@ -714,19 +680,13 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		}
 		launchedCDPURL = launched.CDPURL
 	}
-	if c.Config.Upstream.UpstreamMode == "ws" {
-		if err := transport.Connect(); err != nil {
-			return err
-		}
+	if err := transport.Connect(); err != nil {
+		return err
 	}
 
 	c.Upstream = transport
 	transportURL := transportURL(transport)
-	if c.Config.Upstream.UpstreamMode == "ws" {
-		c.CDPURL = firstNonEmptyString(transportURL, launchedCDPURL)
-	} else {
-		c.CDPURL = launchedCDPURL
-	}
+	c.CDPURL = firstNonEmptyString(transportURL, launchedCDPURL)
 	if wsTransport, ok := transport.(*WSUpstreamTransport); ok && wsTransport.URL != "" {
 		// For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
 		c.Config.Upstream.UpstreamWSCDPURL = wsTransport.URL
@@ -811,9 +771,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	clientConfig := map[string]any{
 		"client_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS,
 	}
-	downstream := map[string]any{
-		"downstream_client_timeout_ms": maxInt(c.Config.ClientConfig.ClientHeartbeatIntervalMS*4, 1_000),
-	}
 	params := map[string]any{}
 	if c.Config.ServerConfig != nil {
 		serverUpstream := c.Config.ServerConfig.Upstream
@@ -822,27 +779,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		}
 		if serverUpstream.UpstreamWSCDPURL != "" {
 			upstream["upstream_ws_cdp_url"] = serverUpstream.UpstreamWSCDPURL
-		}
-		if serverUpstream.UpstreamNatsURL != "" {
-			upstream["upstream_nats_url"] = serverUpstream.UpstreamNatsURL
-		}
-		if serverUpstream.UpstreamNatsSubjectPrefix != "" {
-			upstream["upstream_nats_subject_prefix"] = serverUpstream.UpstreamNatsSubjectPrefix
-		}
-		if serverUpstream.UpstreamNatsRole != "" {
-			upstream["upstream_nats_role"] = serverUpstream.UpstreamNatsRole
-		}
-		if serverUpstream.UpstreamNatsWaitTimeoutMS != 0 {
-			upstream["upstream_nats_wait_timeout_ms"] = serverUpstream.UpstreamNatsWaitTimeoutMS
-		}
-		if serverUpstream.UpstreamReverseWSBind != "" {
-			upstream["upstream_reversews_bind"] = serverUpstream.UpstreamReverseWSBind
-		}
-		if serverUpstream.UpstreamReverseWSWaitTimeoutMS != 0 {
-			upstream["upstream_reversews_wait_timeout_ms"] = serverUpstream.UpstreamReverseWSWaitTimeoutMS
-		}
-		if serverUpstream.UpstreamNativeMessagingHostName != "" {
-			upstream["upstream_nativemessaging_host_name"] = serverUpstream.UpstreamNativeMessagingHostName
 		}
 		if serverUpstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
 			upstream["upstream_ws_connect_error_settle_timeout_ms"] = serverUpstream.UpstreamWSConnectErrorSettleTimeoutMS
@@ -862,15 +798,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		if c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS != 0 {
 			clientConfig["client_cdp_send_timeout_ms"] = c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS
 		}
-		if c.Config.ServerConfig.Downstream.DownstreamClientTimeoutMS != 0 {
-			downstream["downstream_client_timeout_ms"] = c.Config.ServerConfig.Downstream.DownstreamClientTimeoutMS
-		}
-		if c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect != nil {
-			downstream["downstream_close_browser_on_disconnect"] = *c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect
-		}
-		if c.Config.ServerConfig.ServerBrowserToken != "" {
-			params["server_browser_token"] = c.Config.ServerConfig.ServerBrowserToken
-		}
 	}
 	if hasUpstreamConfig {
 		if _, ok := upstream["upstream_ws_connect_error_settle_timeout_ms"]; !ok {
@@ -880,7 +807,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	}
 	params["router"] = router
 	params["client_config"] = clientConfig
-	params["downstream"] = downstream
 	params["custom_commands"] = customCommands
 	params["custom_events"] = customEvents
 	params["custom_middlewares"] = customMiddlewares
@@ -1058,37 +984,6 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		}
 		return result, nil
 	}
-	if c.Config.Upstream.UpstreamMode != "ws" {
-		if method != "Mod.configure" {
-			if err := c.ensureModCDPServerConfigured(); err != nil {
-				return nil, err
-			}
-		}
-		rawResult, err := c.Upstream.Send(method, params, "")
-		var result any = rawResult
-		completedAt := time.Now().UnixMilli()
-		c.LastCommandTiming = map[string]any{
-			"method":       method,
-			"target":       "modcdp_server",
-			"started_at":   startedAt,
-			"completed_at": completedAt,
-			"duration_ms":  completedAt - startedAt,
-		}
-		if err != nil {
-			return nil, err
-		}
-		if method == "Mod.configure" && c.Upstream != nil {
-			c.configuredPeerGeneration = c.Upstream.PeerGeneration()
-		}
-		if validateSchema {
-			var err error
-			result, err = c.Types.ParseCommandResult(method, result)
-			if err != nil {
-				return nil, err
-			}
-		}
-		return result, nil
-	}
 	command, err := translate.WrapCommandIfNeeded(method, params, c.Config.Router.RouterRoutes, cdpSessionID)
 	if err != nil {
 		return nil, err
@@ -1237,12 +1132,12 @@ func (c *ModCDPClient) extensionInjectorsForConfig() ([]extensionInjector, *Exte
 		injector := NewBBExtensionInjector(InjectorConfig{})
 		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
-	if c.Config.Injector.InjectorMode == "discover" {
-		injector := NewDiscoverExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}, &injector.ExtensionInjector
-	}
 	if c.Config.Injector.InjectorMode == "borrow" {
 		injector := NewBorrowExtensionInjector(InjectorConfig{})
+		return []extensionInjector{&injector}, &injector.ExtensionInjector
+	}
+	if c.Config.Injector.InjectorMode == "discover" {
+		injector := NewDiscoverExtensionInjector(InjectorConfig{})
 		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
 	return nil, nil
@@ -1257,7 +1152,7 @@ func isKnownUpstreamMode(mode string) bool {
 }
 
 func isKnownExtensionMode(mode string) bool {
-	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "discover" || mode == "borrow" || mode == "none"
+	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "borrow" || mode == "discover" || mode == "none"
 }
 
 func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
@@ -1270,8 +1165,8 @@ func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 		InjectorCDPExtensionID:               c.Config.Injector.InjectorCDPExtensionID,
 		InjectorBBExtensionPath:              c.Config.Injector.InjectorBBExtensionPath,
 		InjectorBBExtensionID:                c.Config.Injector.InjectorBBExtensionID,
-		InjectorDiscoverExtensionPath:        c.Config.Injector.InjectorDiscoverExtensionPath,
 		InjectorBorrowExtensionPath:          c.Config.Injector.InjectorBorrowExtensionPath,
+		InjectorDiscoverExtensionPath:        c.Config.Injector.InjectorDiscoverExtensionPath,
 		InjectorServiceWorkerExtensionID:     c.Config.Injector.InjectorServiceWorkerExtensionID,
 		InjectorServiceWorkerURLIncludes:     c.Config.Injector.InjectorServiceWorkerURLIncludes,
 		InjectorServiceWorkerURLSuffixes:     c.Config.Injector.InjectorServiceWorkerURLSuffixes,
@@ -1317,7 +1212,7 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 			return result, state, nil
 		}
 	}
-	return nil, nil, fmt.Errorf("cannot install, discover, or borrow the ModCDP extension in the running browser.%s", formatInjectorErrors(errors))
+	return nil, nil, fmt.Errorf("cannot install or discover the ModCDP extension in the running browser.%s", formatInjectorErrors(errors))
 }
 
 func formatInjectorErrors(errors []string) string {
@@ -1370,29 +1265,6 @@ func (c *ModCDPClient) startPingLatencyMeasurement() {
 
 func (c *ModCDPClient) startHeartbeat() {
 	c.stopHeartbeat()
-	if c.Config.ServerConfig == nil || c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect == nil || !*c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect {
-		return
-	}
-	interval := c.Config.ClientConfig.ClientHeartbeatIntervalMS
-	if interval <= 0 {
-		return
-	}
-	stop := make(chan struct{})
-	c.heartbeatStop = stop
-	go func() {
-		ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				if _, err := c.Send("Mod.ping", map[string]any{"sent_at": time.Now().UnixMilli()}); err != nil {
-					return
-				}
-			case <-stop:
-				return
-			}
-		}
-	}()
 }
 
 func (c *ModCDPClient) stopHeartbeat() {
@@ -1401,13 +1273,6 @@ func (c *ModCDPClient) stopHeartbeat() {
 	}
 	close(c.heartbeatStop)
 	c.heartbeatStop = nil
-}
-
-func maxInt(left int, right int) int {
-	if left > right {
-		return left
-	}
-	return right
 }
 
 func numberAsInt64(value any) (int64, bool) {

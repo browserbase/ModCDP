@@ -4,8 +4,6 @@
 # - ./go/modcdp/launcher/RemoteBrowserLauncher.go
 from __future__ import annotations
 
-from typing import cast
-
 from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, LaunchedBrowser, resolveCdpWebSocketUrl, _launcher_config
 
 
@@ -19,7 +17,6 @@ class RemoteBrowserLauncher(BrowserLauncher):
         cdp_url = merged.launcher_remote_cdp_url
         if not cdp_url:
             raise RuntimeError("launcher_mode=remote requires launcher_remote_cdp_url.")
-        # cdp_url is resolved here so downstream transports can dial it directly.
-        cdp_url = resolveCdpWebSocketUrl(cast(str, cdp_url), "launcher_remote_cdp_url")
-        self.launched = {"cdp_url": cdp_url, "close": lambda: None}
+        cdp_url = resolveCdpWebSocketUrl(cdp_url, "launcher_remote_cdp_url")
+        self.launched = LaunchedBrowser(cdp_url=cdp_url, close=lambda: None)
         return self.launched

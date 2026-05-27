@@ -24,10 +24,10 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	extensionInjector := NewExtensionInjector(InjectorConfig{})
 	discoveredInjector := NewDiscoverExtensionInjector(InjectorConfig{})
 	bbInjector := NewBBExtensionInjector(InjectorConfig{})
+	borrowInjector := NewBorrowExtensionInjector(InjectorConfig{})
 	localLaunchInjector := NewCLIExtensionInjector(InjectorConfig{})
 	loadUnpackedInjector := NewCDPExtensionInjector(InjectorConfig{})
-	borrowedInjector := NewBorrowExtensionInjector(InjectorConfig{})
-	_ = []any{extensionInjector, discoveredInjector, bbInjector, localLaunchInjector, loadUnpackedInjector, borrowedInjector}
+	_ = []any{extensionInjector, discoveredInjector, bbInjector, borrowInjector, localLaunchInjector, loadUnpackedInjector}
 
 	if NewUpstreamTransport(UpstreamTransportConfig{}).Config.UpstreamMode != string(UpstreamModeWS) {
 		t.Fatal("NewUpstreamTransport did not hydrate default ws mode")

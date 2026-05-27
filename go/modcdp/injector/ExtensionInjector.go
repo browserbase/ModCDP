@@ -94,11 +94,11 @@ func (i *ExtensionInjector) Update(config InjectorConfig) *ExtensionInjector {
 	if config.InjectorBBExtensionID != "" {
 		i.Config.InjectorBBExtensionID = config.InjectorBBExtensionID
 	}
-	if config.InjectorDiscoverExtensionPath != "" {
-		i.Config.InjectorDiscoverExtensionPath = config.InjectorDiscoverExtensionPath
-	}
 	if config.InjectorBorrowExtensionPath != "" {
 		i.Config.InjectorBorrowExtensionPath = config.InjectorBorrowExtensionPath
+	}
+	if config.InjectorDiscoverExtensionPath != "" {
+		i.Config.InjectorDiscoverExtensionPath = config.InjectorDiscoverExtensionPath
 	}
 	if config.InjectorServiceWorkerExtensionID != "" {
 		i.Config.InjectorServiceWorkerExtensionID = config.InjectorServiceWorkerExtensionID

@@ -31,7 +31,6 @@ type LauncherConfig struct {
 	LauncherLocalArgs                      []string       `json:"launcher_local_args,omitempty"`
 	LauncherLocalHeadless                  *bool          `json:"launcher_local_headless,omitempty"`
 	LauncherLocalCDPListenPort             int            `json:"launcher_local_cdp_listen_port,omitempty"`
-	LauncherLocalCDPTransport              string         `json:"launcher_local_cdp_transport,omitempty"`
 	LauncherLocalLoopbackCDP               *bool          `json:"launcher_local_loopback_cdp,omitempty"`
 	LauncherLocalSandbox                   *bool          `json:"launcher_local_sandbox,omitempty"`
 	LauncherLocalUserDataDir               string         `json:"launcher_local_user_data_dir,omitempty"`
@@ -55,15 +54,6 @@ type LauncherConfig struct {
 type UpstreamTransportConfig struct {
 	UpstreamMode                          string `json:"upstream_mode,omitempty"`
 	UpstreamWSCDPURL                      string `json:"upstream_ws_cdp_url,omitempty"`
-	UpstreamPipeRead                      any    `json:"upstream_pipe_read,omitempty"`
-	UpstreamPipeWrite                     any    `json:"upstream_pipe_write,omitempty"`
-	UpstreamNatsURL                       string `json:"upstream_nats_url,omitempty"`
-	UpstreamNatsSubjectPrefix             string `json:"upstream_nats_subject_prefix,omitempty"`
-	UpstreamNatsRole                      string `json:"upstream_nats_role,omitempty"`
-	UpstreamNatsWaitTimeoutMS             int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
-	UpstreamReverseWSBind                 string `json:"upstream_reversews_bind,omitempty"`
-	UpstreamReverseWSWaitTimeoutMS        int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
-	UpstreamNativeMessagingHostName       string `json:"upstream_nativemessaging_host_name,omitempty"`
 	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
 	UpstreamCDPSendTimeoutMS              int    `json:"upstream_cdp_send_timeout_ms,omitempty"`
 }
@@ -78,8 +68,8 @@ type InjectorConfig struct {
 	InjectorCDPExtensionID               string   `json:"injector_cdp_extension_id,omitempty"`
 	InjectorBBExtensionPath              string   `json:"injector_bb_extension_path,omitempty"`
 	InjectorBBExtensionID                string   `json:"injector_bb_extension_id,omitempty"`
-	InjectorDiscoverExtensionPath        string   `json:"injector_discover_extension_path,omitempty"`
 	InjectorBorrowExtensionPath          string   `json:"injector_borrow_extension_path,omitempty"`
+	InjectorDiscoverExtensionPath        string   `json:"injector_discover_extension_path,omitempty"`
 	InjectorServiceWorkerExtensionID     string   `json:"injector_service_worker_extension_id,omitempty"`
 	InjectorServiceWorkerURLIncludes     []string `json:"injector_service_worker_url_includes,omitempty"`
 	InjectorServiceWorkerURLSuffixes     []string `json:"injector_service_worker_url_suffixes,omitempty"`
@@ -160,20 +150,13 @@ type ModCDPClientConfig struct {
 	ClientHeartbeatIntervalMS  int   `json:"client_heartbeat_interval_ms,omitempty"`
 }
 
-type ModCDPDownstreamConfig struct {
-	DownstreamClientTimeoutMS          int   `json:"downstream_client_timeout_ms,omitempty"`
-	DownstreamCloseBrowserOnDisconnect *bool `json:"downstream_close_browser_on_disconnect,omitempty"`
-}
-
 type ModCDPServerConfig struct {
-	Upstream           UpstreamTransportConfig            `json:"upstream,omitempty"`
-	Router             ModCDPRouterConfig                 `json:"router,omitempty"`
-	ClientConfig       ModCDPClientConfig                 `json:"client_config,omitempty"`
-	Downstream         ModCDPDownstreamConfig             `json:"downstream,omitempty"`
-	ServerBrowserToken string                             `json:"server_browser_token,omitempty"`
-	CustomCommands     []ModCDPAddCustomCommandParams     `json:"custom_commands,omitempty"`
-	CustomEvents       []ModCDPAddCustomEventObjectParams `json:"custom_events,omitempty"`
-	CustomMiddlewares  []ModCDPAddMiddlewareParams        `json:"custom_middlewares,omitempty"`
+	Upstream          UpstreamTransportConfig            `json:"upstream,omitempty"`
+	Router            ModCDPRouterConfig                 `json:"router,omitempty"`
+	ClientConfig      ModCDPClientConfig                 `json:"client_config,omitempty"`
+	CustomCommands    []ModCDPAddCustomCommandParams     `json:"custom_commands,omitempty"`
+	CustomEvents      []ModCDPAddCustomEventObjectParams `json:"custom_events,omitempty"`
+	CustomMiddlewares []ModCDPAddMiddlewareParams        `json:"custom_middlewares,omitempty"`
 }
 
 type ModCDPGetTopologyParams struct {

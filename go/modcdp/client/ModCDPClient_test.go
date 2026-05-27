@@ -59,11 +59,9 @@ func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 			ClientHeartbeatIntervalMS:  3456,
 		},
 		ServerConfig: &ServerConfig{
-			Router:             RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
-			ClientConfig:       ClientConfig{ClientCDPSendTimeoutMS: 9876},
-			Upstream:           UpstreamTransportConfig{UpstreamWSConnectErrorSettleTimeoutMS: 7654},
-			Downstream:         DownstreamConfig{DownstreamClientTimeoutMS: 4567},
-			ServerBrowserToken: "token-1",
+			Router:       RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
+			ClientConfig: ClientConfig{ClientCDPSendTimeoutMS: 9876},
+			Upstream:     UpstreamTransportConfig{UpstreamWSConnectErrorSettleTimeoutMS: 7654},
 		},
 	})
 
@@ -116,13 +114,9 @@ func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 	clientConfigConfig := params["client_config"].(map[string]any)
 	routerConfig := params["router"].(map[string]any)
 	upstreamConfig := params["upstream"].(map[string]any)
-	downstreamConfig := params["downstream"].(map[string]any)
 	routes := routerConfig["router_routes"].(map[string]string)
 	if routes["*.*"] != "loopback_cdp" {
 		t.Fatalf("configure router routes = %#v", routes)
-	}
-	if params["server_browser_token"] != "token-1" {
-		t.Fatalf("configure browser_token = %#v", params["server_browser_token"])
 	}
 	if clientConfigConfig["client_cdp_send_timeout_ms"] != 9876 {
 		t.Fatalf("configure cdp_send_timeout_ms = %#v", clientConfigConfig["client_cdp_send_timeout_ms"])
@@ -132,9 +126,6 @@ func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 	}
 	if upstreamConfig["upstream_ws_connect_error_settle_timeout_ms"] != 7654 {
 		t.Fatalf("configure ws_connect_error_settle_timeout_ms = %#v", upstreamConfig["upstream_ws_connect_error_settle_timeout_ms"])
-	}
-	if downstreamConfig["downstream_client_timeout_ms"] != 4567 {
-		t.Fatalf("configure downstream_client_timeout_ms = %#v", downstreamConfig["downstream_client_timeout_ms"])
 	}
 }
 
@@ -272,7 +263,7 @@ func TestModCDPClientValidatesNativeAndRegisteredCustomEventsBeforeDispatch(t *t
 func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.T) {
 	cdp := New(Config{
 		Injector: InjectorConfig{
-			InjectorMode:                     "borrow",
+			InjectorMode:                     "discover",
 			InjectorServiceWorkerURLSuffixes: []string{},
 		},
 	})
@@ -322,9 +313,6 @@ func TestModCDPClientSelectsExactlyOneInjectorFromExplicitInjectorMode(t *testin
 	}
 	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "discover"}}).extensionInjectors[0].(*DiscoverExtensionInjector); !ok {
 		t.Fatalf("discover injector type mismatch")
-	}
-	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "borrow"}}).extensionInjectors[0].(*BorrowExtensionInjector); !ok {
-		t.Fatalf("borrow injector type mismatch")
 	}
 }
 
@@ -428,7 +416,7 @@ func TestModCDPClientConnectsWithNestedLaunchUpstreamExtensionClientServerConfig
 		t.Fatal(err)
 	}
 	switch cdp.ConnectTiming["injector_source"] {
-	case "discover", "cli", "cdp", "borrow":
+	case "discover", "cli", "cdp":
 	default:
 		t.Fatalf("injector_source = %v", cdp.ConnectTiming["injector_source"])
 	}

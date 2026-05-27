@@ -4,7 +4,6 @@
 //   --live       Use the running Google Chrome enabled via chrome://inspect.
 //   --direct     *.* -> direct_cdp on the client.
 //   --loopback   *.* -> service_worker on client; *.* -> loopback_cdp on server. Default.
-//   --debugger   *.* -> service_worker on client; *.* -> chromedebugger on server.
 //   --upstream   ws. Defaults to ws.
 
 package main
@@ -91,8 +90,6 @@ func serverRoutesFor(mode, upstreamMode string) map[string]string {
 	serverRoute := "auto"
 	if mode == "loopback" {
 		serverRoute = "loopback_cdp"
-	} else if mode == "debugger" {
-		serverRoute = "chromedebugger"
 	}
 	routes := map[string]string{
 		"Mod.*":    "service_worker",
@@ -170,9 +167,7 @@ func parseArgs(argv []string) (string, string, bool, error) {
 	}
 	live := flags["live"]
 	mode := "loopback"
-	if flags["debugger"] {
-		mode = "debugger"
-	} else if flags["direct"] {
+	if flags["direct"] {
 		mode = "direct"
 	} else if flags["loopback"] {
 		mode = "loopback"

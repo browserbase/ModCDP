@@ -86,11 +86,11 @@ def _wrap_service_worker_command(
     cdp_session_id: str | None = None,
 ) -> list[TranslatedStep]:
     return [
-        {
-            "method": "Runtime.callFunctionOn",
-            "params": _wrap_custom_command(method, params, _optional_string(params, "cdpSessionId") or cdp_session_id),
-            "unwrap": "runtime_json",
-        }
+        TranslatedStep(
+            method="Runtime.callFunctionOn",
+            params=_wrap_custom_command(method, params, _optional_string(params, "cdpSessionId") or cdp_session_id),
+            unwrap="runtime_json",
+        )
     ]
 
 
@@ -104,16 +104,16 @@ def wrap_command_if_needed(
     params = params or {}
     route = route_for(method, routes or DEFAULT_CLIENT_ROUTES)
     if route == "direct_cdp":
-        step: TranslatedStep = {"method": method, "params": params}
+        step = TranslatedStep(method=method, params=params)
         if cdp_session_id:
-            step["sessionId"] = cdp_session_id
-        return {"route": route, "target": "direct_cdp", "steps": [step]}
+            step.sessionId = cdp_session_id
+        return TranslatedCommand(route=route, target="direct_cdp", steps=[step])
     if route == "service_worker":
-        return {
-            "route": route,
-            "target": "service_worker",
-            "steps": _wrap_service_worker_command(method, params, cdp_session_id),
-        }
+        return TranslatedCommand(
+            route=route,
+            target="service_worker",
+            steps=_wrap_service_worker_command(method, params, cdp_session_id),
+        )
     raise RuntimeError(f"Unsupported client route '{route}' for {method}")
 
 
@@ -178,8 +178,7 @@ def unwrap_event_if_needed(
     data = payload["data"] if "data" in payload else payload
     raw_source_session_id = payload.get("cdpSessionId")
     source_session_id = raw_source_session_id if isinstance(raw_source_session_id, str) else session_id
-    unwrapped: UnwrappedModCDPEvent = {"event": resolved_event, "data": data, "sessionId": source_session_id}
-    return unwrapped
+    return UnwrappedModCDPEvent(event=resolved_event, data=data, sessionId=source_session_id)
 
 
 def encode_binding_payload(payload: ModCDPBindingPayload) -> str:

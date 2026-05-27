@@ -101,10 +101,8 @@ class ModCDPClientTests(unittest.TestCase):
             },
             server_config={
                 "router": {"router_routes": {"*.*": "loopback_cdp"}},
-                "server_browser_token": "token-1",
                 "client_config": {"client_cdp_send_timeout_ms": 9876},
                 "upstream": {"upstream_ws_connect_error_settle_timeout_ms": 7654},
-                "downstream": {"downstream_client_timeout_ms": 4567},
             },
         )
 
@@ -140,24 +138,19 @@ class ModCDPClientTests(unittest.TestCase):
         router_config = params.get("router")
         client_config = params.get("client_config")
         upstream_config = params.get("upstream")
-        downstream_config = params.get("downstream")
         self.assertIsInstance(router_config, dict)
         self.assertIsInstance(client_config, dict)
         self.assertIsInstance(upstream_config, dict)
-        self.assertIsInstance(downstream_config, dict)
         assert isinstance(router_config, dict)
         assert isinstance(client_config, dict)
         assert isinstance(upstream_config, dict)
-        assert isinstance(downstream_config, dict)
         self.assertEqual(router_config.get("router_routes", {}).get("*.*"), "loopback_cdp")
-        self.assertEqual(params.get("server_browser_token"), "token-1")
         self.assertEqual(client_config.get("client_cdp_send_timeout_ms"), 9876)
         self.assertEqual(router_config.get("loopback_execution_context_timeout_ms"), 4321)
         self.assertEqual(upstream_config.get("upstream_ws_connect_error_settle_timeout_ms"), 7654)
-        self.assertEqual(downstream_config.get("downstream_client_timeout_ms"), 4567)
 
     def test_modcdpclient_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
-        cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
+        cdp = ModCDPClient(injector={"injector_mode": "discover", "injector_service_worker_url_suffixes": []})
 
         self.assertIsNotNone(cdp.injector)
         injector = cdp.injector
@@ -196,11 +189,6 @@ class ModCDPClientTests(unittest.TestCase):
             type(ModCDPClient(launcher={"launcher_mode": "remote"}, injector={"injector_mode": "discover"}).injector).__name__,
             "DiscoverExtensionInjector",
         )
-        self.assertEqual(
-            type(ModCDPClient(launcher={"launcher_mode": "remote"}, injector={"injector_mode": "borrow"}).injector).__name__,
-            "BorrowExtensionInjector",
-        )
-
     def test_modcdpclient_rejects_unknown_component_modes_at_their_owning_factory_boundary(self) -> None:
         with self.assertRaisesRegex(Exception, r"unknown upstream_mode=bogus"):
             ModCDPClient(upstream={"upstream_mode": "bogus"})
@@ -246,7 +234,7 @@ class ModCDPClientTests(unittest.TestCase):
             cdp.connect()
             self.assertIn(
                 cdp.connect_timing.get("injector_source") if cdp.connect_timing else None,
-                ("discover", "cli", "cdp", "borrow"),
+                ("discover", "cli", "cdp"),
             )
             self.assertEqual(cdp.launcher.config.launcher_mode, "local")
             self.assertEqual(cdp.upstream.config.upstream_mode, "ws")

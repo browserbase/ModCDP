@@ -47,48 +47,6 @@ class LocalBrowserLauncherTests(unittest.TestCase):
 
             self.assertTrue(Path(user_data_dir).exists())
 
-    def test_launches_a_real_browser_over_remote_debugging_pipe_and_speaks_cdp_over_the_returned_pipes(self) -> None:
-        chrome = LocalBrowserLauncher(
-            {
-                "launcher_local_headless": True,
-                "launcher_local_cdp_transport": "pipe",
-                "launcher_local_chrome_ready_timeout_ms": 45_000,
-            }
-        ).launch()
-        pipe_read = chrome.get("pipe_read")
-        pipe_write = chrome.get("pipe_write")
-        if pipe_read is None or pipe_write is None:
-            raise AssertionError("expected launcher to return pipe handles")
-
-        try:
-            self.assertIsNone(chrome["cdp_url"])
-            self.assertNotIn("loopback_cdp_url", chrome)
-            expect_pipe_cdp_browser_surface(pipe_read, pipe_write)
-        finally:
-            chrome["close"]()
-
-    def test_launches_a_pipe_browser_with_an_auxiliary_loopback_cdp_endpoint_only_when_requested(self) -> None:
-        chrome = LocalBrowserLauncher(
-            {
-                "launcher_local_headless": True,
-                "launcher_local_cdp_transport": "pipe",
-                "launcher_local_loopback_cdp": True,
-                "launcher_local_chrome_ready_timeout_ms": 45_000,
-            }
-        ).launch()
-        loopback_cdp_url = chrome.get("loopback_cdp_url")
-        if not isinstance(loopback_cdp_url, str):
-            raise AssertionError("expected launcher to return loopback_cdp_url")
-        ws = create_connection(loopback_cdp_url, timeout=10)
-
-        try:
-            self.assertIsNone(chrome["cdp_url"])
-            self.assertRegex(loopback_cdp_url, r"^ws://127\.0\.0\.1:\d+/")
-            expect_cdp_browser_surface(ws)
-        finally:
-            ws.close()
-            chrome["close"]()
-
     def test_removes_an_explicit_user_data_dir_when_cleanup_user_data_dir_is_set(self) -> None:
         user_data_dir = tempfile.mkdtemp(prefix="modcdp-python-local-profile-")
         chrome = LocalBrowserLauncher(
@@ -126,24 +84,6 @@ def send_ws_cdp(ws, request_id: int, method: str, params: dict | None = None, se
         return result
 
 
-def send_pipe_cdp(pipe_read, pipe_write, request_id: int, method: str, params: dict | None = None, session_id: str | None = None) -> dict:
-    message: dict[str, object] = {"id": request_id, "method": method, "params": params or {}}
-    if session_id is not None:
-        message["sessionId"] = session_id
-    pipe_write.write(json.dumps(message).encode() + b"\0")
-    pipe_write.flush()
-    while True:
-        response = read_pipe_message(pipe_read)
-        if response.get("id") != request_id:
-            continue
-        if "error" in response:
-            raise AssertionError(f"CDP pipe response error: {response!r}")
-        result = response.get("result", {})
-        if not isinstance(result, dict):
-            raise AssertionError(f"CDP pipe response result is not an object: {response!r}")
-        return result
-
-
 def expect_cdp_browser_surface(ws) -> None:
     version = send_ws_cdp(ws, 1, "Browser.getVersion")
     expect_version_result(version)
@@ -176,61 +116,12 @@ def expect_cdp_browser_surface(ws) -> None:
             pass
 
 
-def expect_pipe_cdp_browser_surface(pipe_read, pipe_write) -> None:
-    version = send_pipe_cdp(pipe_read, pipe_write, 1, "Browser.getVersion")
-    expect_version_result(version)
-
-    created = send_pipe_cdp(pipe_read, pipe_write, 2, "Target.createTarget", {"url": "about:blank#modcdp-launcher-test"})
-    target_id = created.get("targetId")
-    if not isinstance(target_id, str):
-        raise AssertionError(f"Target.createTarget result = {created!r}")
-
-    try:
-        attached = send_pipe_cdp(pipe_read, pipe_write, 3, "Target.attachToTarget", {"targetId": target_id, "flatten": True})
-        session_id = attached.get("sessionId")
-        if not isinstance(session_id, str):
-            raise AssertionError(f"Target.attachToTarget result = {attached!r}")
-        send_pipe_cdp(pipe_read, pipe_write, 4, "Runtime.enable", {}, session_id)
-        evaluated = send_pipe_cdp(
-            pipe_read,
-            pipe_write,
-            5,
-            "Runtime.evaluate",
-            {"expression": "(() => ({ ok: true, value: 42 }))()", "returnByValue": True},
-            session_id,
-        )
-        result = evaluated.get("result")
-        if not isinstance(result, dict) or result.get("type") != "object" or result.get("value") != {"ok": True, "value": 42}:
-            raise AssertionError(f"Runtime.evaluate result = {evaluated!r}")
-    finally:
-        try:
-            send_pipe_cdp(pipe_read, pipe_write, 6, "Target.closeTarget", {"targetId": target_id})
-        except Exception:
-            pass
-
-
 def expect_version_result(version: dict) -> None:
     product = version.get("product")
     if not isinstance(product, str) or ("Chrome" not in product and "Chromium" not in product):
         raise AssertionError(f"Browser.getVersion product = {product!r}")
     if not isinstance(version.get("protocolVersion"), str):
         raise AssertionError(f"Browser.getVersion protocolVersion = {version.get('protocolVersion')!r}")
-
-
-def read_pipe_message(pipe_read) -> dict:
-    buffer = b""
-    while True:
-        chunk = pipe_read.read(1)
-        if not chunk:
-            raise AssertionError("pipe closed before CDP response")
-        buffer += chunk
-        if b"\0" not in buffer:
-            continue
-        raw, _ = buffer.split(b"\0", 1)
-        response = json.loads(raw.decode())
-        if not isinstance(response, dict):
-            raise AssertionError(f"CDP pipe response is not an object: {response!r}")
-        return response
 
 
 if __name__ == "__main__":

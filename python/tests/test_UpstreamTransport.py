@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from modcdp.transport.UpstreamTransport import UpstreamTransport, parseHostPort
+from modcdp.transport.UpstreamTransport import UpstreamTransport
 
 
 class TestTransport(UpstreamTransport):
@@ -24,7 +24,6 @@ class UpstreamTransportTests(unittest.TestCase):
         received = []
         stop = transport.onRecv(lambda message: received.append(message))
 
-        self.assertEqual(parseHostPort("127.0.0.1:29292", "0.0.0.0", 80), {"host": "127.0.0.1", "port": 29292})
         self.assertIs(transport.update(), transport)
 
         parsed = []

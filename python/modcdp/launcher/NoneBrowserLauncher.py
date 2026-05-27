@@ -13,5 +13,5 @@ class NoneBrowserLauncher(BrowserLauncher):
         super().__init__({**raw_config, "launcher_mode": "none"})
 
     def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
-        self.launched = {"cdp_url": None, "close": lambda: None}
+        self.launched = LaunchedBrowser(cdp_url=None, close=lambda: None)
         return self.launched

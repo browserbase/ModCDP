@@ -35,14 +35,16 @@ class DiscoverExtensionInjector(ExtensionInjector):
     def inject(self) -> ExtensionInjectionResult | None:
         discovered = self._discoverReadyServiceWorker()
         if discovered:
-            return {**discovered, "source": "discover"}
+            discovered.source = "discover"
+            return discovered
         if self.config.injector_trust_service_worker_target:
             waited = self._waitForReadyServiceWorker(
                 self.config.injector_service_worker_probe_timeout_ms,
                 matched_only=True,
             )
             if waited:
-                return {**waited, "source": "discover"}
+                waited.source = "discover"
+                return waited
         if not self.config.injector_require_service_worker_target:
             return None
         waited = self._waitForReadyServiceWorker(
@@ -50,7 +52,8 @@ class DiscoverExtensionInjector(ExtensionInjector):
             matched_only=self.config.injector_trust_service_worker_target,
         )
         if waited:
-            return {**waited, "source": "discover"}
+            waited.source = "discover"
+            return waited
         matchers = ", ".join(
             [
                 *self.config.injector_service_worker_url_includes,

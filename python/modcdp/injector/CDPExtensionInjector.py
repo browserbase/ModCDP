@@ -51,7 +51,7 @@ class CDPExtensionInjector(ExtensionInjector):
         deadline = time.monotonic() + self.config.injector_service_worker_ready_timeout_ms / 1000
         while time.monotonic() < deadline:
             for target in self._targetInfos():
-                if target["type"] != "service_worker" or not target["url"].startswith(sw_url_prefix):
+                if target.type != "service_worker" or not target.url.startswith(sw_url_prefix):
                     continue
                 probed = self._probeTarget(
                     target,
@@ -59,7 +59,9 @@ class CDPExtensionInjector(ExtensionInjector):
                     allow_attach=True,
                 )
                 if probed:
-                    return {**probed, "source": "cdp", "extension_id": extension_id}
+                    probed.source = "cdp"
+                    probed.extension_id = extension_id
+                    return probed
             time.sleep(self.config.injector_service_worker_poll_interval_ms / 1000)
         raise RuntimeError(f"Timed out waiting for service worker target for extension {extension_id}.")
 

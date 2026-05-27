@@ -111,14 +111,14 @@ class BBBrowserLauncher(BrowserLauncher):
             except Exception:
                 pass
 
-        self.launched = {
+        self.launched = LaunchedBrowser(
             # Browserbase connectUrl is already a WebSocket CDP endpoint.
-            "cdp_url": connect_url,
-            "browserbase_session_id": session_id,
-            "browserbase_session_url": f"https://www.browserbase.com/sessions/{session_id}",
-            "browserbase_debug_url": _first_string(session.get("debuggerUrl"), session.get("debuggerFullscreenUrl")),
-            "close": close,
-        }
+            cdp_url=connect_url,
+            browserbase_session_id=session_id,
+            browserbase_session_url=f"https://www.browserbase.com/sessions/{session_id}",
+            browserbase_debug_url=_first_string(session.get("debuggerUrl"), session.get("debuggerFullscreenUrl")),
+            close=close,
+        )
         return self.launched
 
 

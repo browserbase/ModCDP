@@ -42,7 +42,10 @@ class CLIExtensionInjector(ExtensionInjector):
             self.config.injector_service_worker_ready_timeout_ms,
             matched_only=self.config.injector_trust_service_worker_target,
         )
-        return {**discovered, "source": "cli"} if discovered else None
+        if discovered is None:
+            return None
+        discovered.source = "cli"
+        return discovered
 
     def close(self) -> None:
         super().close()

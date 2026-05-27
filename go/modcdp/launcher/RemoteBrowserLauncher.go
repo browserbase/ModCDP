@@ -24,7 +24,7 @@ func (l *RemoteBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser,
 	if err != nil {
 		return nil, err
 	}
-	// CDPURL is resolved here so downstream transports can dial it directly.
+	// CDPURL is resolved here so the websocket transport can dial it directly.
 	launched := &LaunchedBrowser{CDPURL: resolvedCDPURL, Close: func() {}}
 	l.Launched = launched
 	return launched, nil

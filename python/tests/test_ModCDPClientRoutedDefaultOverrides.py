@@ -82,9 +82,8 @@ async (params) => {
 
 TAB_ID_FROM_TARGET_ID_COMMAND = r"""
 async ({ targetId }) => {
-  const targets = await chrome.debugger.getTargets();
-  const target = targets.find(target => target.id === targetId);
-  if (target?.tabId != null) return { tabId: target.tabId };
+  const { targetInfos = [] } = await cdp.upstream.send("Target.getTargets", {});
+  const target = targetInfos.find(target => target.targetId === targetId);
   const tabs = await chrome.tabs.query({});
   const tab = tabs.find(tab => target?.url && (tab.url === target.url || tab.pendingUrl === target.url));
   return { tabId: tab?.id ?? null };

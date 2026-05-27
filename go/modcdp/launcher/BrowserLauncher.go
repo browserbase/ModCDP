@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -64,17 +63,14 @@ func WebsocketURLFor(endpoint string) (string, error) {
 }
 
 type LaunchedBrowser struct {
-	// CDPURL is the browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
-	CDPURL                string   `json:"cdp_url,omitempty"`
-	CDPListenPort         int      `json:"cdp_listen_port,omitempty"`
-	LoopbackCDPURL        string   `json:"loopback_cdp_url,omitempty"`
-	Close                 func()   `json:"-"`
-	ProfileDir            string   `json:"profile_dir,omitempty"`
-	PipeRead              *os.File `json:"-"`
-	PipeWrite             *os.File `json:"-"`
-	BrowserbaseSessionID  string   `json:"browserbase_session_id,omitempty"`
-	BrowserbaseSessionURL string   `json:"browserbase_session_url,omitempty"`
-	BrowserbaseDebugURL   string   `json:"browserbase_debug_url,omitempty"`
+	CDPURL                string `json:"cdp_url,omitempty"`
+	CDPListenPort         int    `json:"cdp_listen_port,omitempty"`
+	LoopbackCDPURL        string `json:"loopback_cdp_url,omitempty"`
+	Close                 func() `json:"-"`
+	ProfileDir            string `json:"profile_dir,omitempty"`
+	BrowserbaseSessionID  string `json:"browserbase_session_id,omitempty"`
+	BrowserbaseSessionURL string `json:"browserbase_session_url,omitempty"`
+	BrowserbaseDebugURL   string `json:"browserbase_debug_url,omitempty"`
 }
 
 type BrowserLauncher struct {
@@ -100,12 +96,6 @@ func (l BrowserLauncher) ConfigForUpstream() map[string]any {
 	if upstreamWSCDPURL != "" {
 		config["upstream_ws_cdp_url"] = upstreamWSCDPURL
 	}
-	if l.Launched != nil && l.Launched.PipeRead != nil {
-		config["upstream_pipe_read"] = l.Launched.PipeRead
-	}
-	if l.Launched != nil && l.Launched.PipeWrite != nil {
-		config["upstream_pipe_write"] = l.Launched.PipeWrite
-	}
 	return config
 }
 
@@ -115,8 +105,6 @@ func (l BrowserLauncher) ConfigForServer(upstreamConfig UpstreamTransportConfig)
 		launcherLocalLoopbackCDPURL = l.Launched.LoopbackCDPURL
 	} else if upstreamConfig.UpstreamMode == "ws" && upstreamConfig.UpstreamWSCDPURL != "" {
 		launcherLocalLoopbackCDPURL = upstreamConfig.UpstreamWSCDPURL
-	} else if upstreamConfig.UpstreamMode != "ws" && upstreamConfig.UpstreamMode != "pipe" && l.Launched != nil && l.Launched.CDPURL != "" {
-		launcherLocalLoopbackCDPURL = l.Launched.CDPURL
 	}
 	if launcherLocalLoopbackCDPURL != "" {
 		return map[string]any{"upstream": map[string]any{"upstream_ws_cdp_url": launcherLocalLoopbackCDPURL}}
@@ -157,9 +145,6 @@ func mergeLaunchConfig(existing LauncherConfig, incoming LauncherConfig) Launche
 	}
 	if incoming.LauncherLocalCDPListenPort != 0 {
 		merged.LauncherLocalCDPListenPort = incoming.LauncherLocalCDPListenPort
-	}
-	if incoming.LauncherLocalCDPTransport != "" {
-		merged.LauncherLocalCDPTransport = incoming.LauncherLocalCDPTransport
 	}
 	if incoming.LauncherLocalLoopbackCDP != nil {
 		merged.LauncherLocalLoopbackCDP = incoming.LauncherLocalLoopbackCDP

@@ -44,12 +44,7 @@ func freePort() (int, error) {
 type UpstreamMode string
 
 const (
-	UpstreamModeWS              UpstreamMode = "ws"
-	UpstreamModePipe            UpstreamMode = "pipe"
-	UpstreamModeNativeMessaging UpstreamMode = "nativemessaging"
-	UpstreamModeReverseWS       UpstreamMode = "reversews"
-	UpstreamModeNats            UpstreamMode = "nats"
-	UpstreamModeChromeDebugger  UpstreamMode = "chromedebugger"
+	UpstreamModeWS UpstreamMode = "ws"
 )
 
 type HostPort struct {
@@ -89,27 +84,6 @@ func NewUpstreamTransport(config UpstreamTransportConfig) UpstreamTransport {
 	if config.UpstreamMode == "" {
 		config.UpstreamMode = string(UpstreamModeWS)
 	}
-	if config.UpstreamNatsURL == "" {
-		config.UpstreamNatsURL = "ws://127.0.0.1:4223"
-	}
-	if config.UpstreamNatsSubjectPrefix == "" {
-		config.UpstreamNatsSubjectPrefix = "modcdp.default"
-	}
-	if config.UpstreamNatsRole == "" {
-		config.UpstreamNatsRole = "client"
-	}
-	if config.UpstreamNatsWaitTimeoutMS == 0 {
-		config.UpstreamNatsWaitTimeoutMS = 10_000
-	}
-	if config.UpstreamReverseWSBind == "" {
-		config.UpstreamReverseWSBind = "127.0.0.1:29292"
-	}
-	if config.UpstreamReverseWSWaitTimeoutMS == 0 {
-		config.UpstreamReverseWSWaitTimeoutMS = 10_000
-	}
-	if config.UpstreamNativeMessagingHostName == "" {
-		config.UpstreamNativeMessagingHostName = "com.modcdp.bridge"
-	}
 	if config.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
 		config.UpstreamWSConnectErrorSettleTimeoutMS = 250
 	}
@@ -135,33 +109,6 @@ func (e *UpstreamTransport) Update(config map[string]any) {
 	}
 	if value, ok := config["upstream_mode"].(string); ok && value != "" {
 		e.Config.UpstreamMode = value
-	}
-	if value, ok := config["upstream_pipe_read"]; ok {
-		e.Config.UpstreamPipeRead = value
-	}
-	if value, ok := config["upstream_pipe_write"]; ok {
-		e.Config.UpstreamPipeWrite = value
-	}
-	if value, ok := config["upstream_nats_url"].(string); ok && value != "" {
-		e.Config.UpstreamNatsURL = value
-	}
-	if value, ok := config["upstream_nats_subject_prefix"].(string); ok && value != "" {
-		e.Config.UpstreamNatsSubjectPrefix = value
-	}
-	if value, ok := config["upstream_nats_role"].(string); ok && value != "" {
-		e.Config.UpstreamNatsRole = value
-	}
-	if value, ok := intFromConfig(config["upstream_nats_wait_timeout_ms"]); ok {
-		e.Config.UpstreamNatsWaitTimeoutMS = value
-	}
-	if value, ok := config["upstream_reversews_bind"].(string); ok && value != "" {
-		e.Config.UpstreamReverseWSBind = value
-	}
-	if value, ok := intFromConfig(config["upstream_reversews_wait_timeout_ms"]); ok {
-		e.Config.UpstreamReverseWSWaitTimeoutMS = value
-	}
-	if value, ok := config["upstream_nativemessaging_host_name"].(string); ok && value != "" {
-		e.Config.UpstreamNativeMessagingHostName = value
 	}
 	if value, ok := intFromConfig(config["upstream_ws_connect_error_settle_timeout_ms"]); ok {
 		e.Config.UpstreamWSConnectErrorSettleTimeoutMS = value
@@ -429,8 +376,6 @@ func (e *UpstreamTransport) ToJSON() map[string]any {
 	eventListeners := len(e.eventListeners)
 	e.listenerMu.Unlock()
 	config := e.Config
-	config.UpstreamPipeRead = nil
-	config.UpstreamPipeWrite = nil
 	return types.ModCDPToJSON(e, types.ModCDPJSONConfig{
 		Config: config,
 		State: map[string]any{

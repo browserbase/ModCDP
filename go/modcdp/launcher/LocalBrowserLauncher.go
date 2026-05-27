@@ -5,10 +5,8 @@
 package launcher
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -54,8 +52,6 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 	if chromeReadyPollIntervalMS == 0 {
 		chromeReadyPollIntervalMS = DefaultChromeReadyPollIntervalMS
 	}
-	usePipe := config.LauncherLocalCDPTransport == "pipe"
-	useLoopbackCDP := !usePipe || config.LauncherLocalCDPListenPort != 0 || (config.LauncherLocalLoopbackCDP != nil && *config.LauncherLocalLoopbackCDP)
 	port := config.LauncherLocalCDPListenPort
 	profileDir := config.LauncherLocalUserDataDir
 	ownsProfileDir := false
@@ -88,12 +84,7 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		"--disable-gpu",
 		fmt.Sprintf("--user-data-dir=%s", profileDir),
 	}
-	if useLoopbackCDP {
-		args = append(args, "--remote-debugging-address=127.0.0.1", fmt.Sprintf("--remote-debugging-port=%d", port))
-	}
-	if usePipe {
-		args = append(args, "--remote-debugging-pipe")
-	}
+	args = append(args, "--remote-debugging-address=127.0.0.1", fmt.Sprintf("--remote-debugging-port=%d", port))
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
 	if config.LauncherLocalHeadless != nil {
 		headless = *config.LauncherLocalHeadless
@@ -115,38 +106,7 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 	if runtime.GOOS != "windows" {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
-	var pipeRead *os.File
-	var pipeWrite *os.File
-	if usePipe {
-		var childRead *os.File
-		var childWrite *os.File
-		pipeRead, childWrite, err = os.Pipe()
-		if err != nil {
-			if cleanupProfileDir {
-				_ = os.RemoveAll(profileDir)
-			}
-			return nil, err
-		}
-		childRead, pipeWrite, err = os.Pipe()
-		if err != nil {
-			_ = pipeRead.Close()
-			_ = childWrite.Close()
-			if cleanupProfileDir {
-				_ = os.RemoveAll(profileDir)
-			}
-			return nil, err
-		}
-		cmd.ExtraFiles = []*os.File{childRead, childWrite}
-		defer childRead.Close()
-		defer childWrite.Close()
-	}
 	if err := cmd.Start(); err != nil {
-		if pipeRead != nil {
-			_ = pipeRead.Close()
-		}
-		if pipeWrite != nil {
-			_ = pipeWrite.Close()
-		}
 		if cleanupProfileDir {
 			_ = os.RemoveAll(profileDir)
 		}
@@ -160,12 +120,6 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		close(processDone)
 	}()
 	close := func() {
-		if pipeRead != nil {
-			_ = pipeRead.Close()
-		}
-		if pipeWrite != nil {
-			_ = pipeWrite.Close()
-		}
 		if cmd.Process != nil {
 			select {
 			case <-processDone:
@@ -204,39 +158,6 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		default:
 			return nil
 		}
-	}
-	if usePipe {
-		if err := processExitedError(); err != nil {
-			close()
-			return nil, err
-		}
-		if err := waitForPipeReady(pipeRead, pipeWrite, time.Duration(chromeReadyTimeoutMS)*time.Millisecond); err != nil {
-			close()
-			return nil, err
-		}
-		loopbackCDPURL := ""
-		loopbackCDPPort := port
-		if useLoopbackCDP {
-			if port == 0 {
-				loopbackCDPURL, loopbackCDPPort, err = waitForBrowserSelectedCdpWebSocketURL(profileDir, time.Duration(chromeReadyTimeoutMS)*time.Millisecond, time.Duration(chromeReadyPollIntervalMS)*time.Millisecond)
-			} else {
-				loopbackCDPURL, err = waitForCdpWebSocketURL(fmt.Sprintf("http://127.0.0.1:%d", port), time.Duration(chromeReadyTimeoutMS)*time.Millisecond, time.Duration(chromeReadyPollIntervalMS)*time.Millisecond)
-			}
-			if err != nil {
-				close()
-				return nil, err
-			}
-		}
-		launched := &LaunchedBrowser{
-			LoopbackCDPURL: loopbackCDPURL,
-			CDPListenPort:  loopbackCDPPort,
-			Close:          close,
-			ProfileDir:     profileDir,
-			PipeRead:       pipeRead,
-			PipeWrite:      pipeWrite,
-		}
-		l.Launched = launched
-		return launched, nil
 	}
 	deadline := time.Now().Add(time.Duration(chromeReadyTimeoutMS) * time.Millisecond)
 	client := &http.Client{Timeout: 2 * time.Second}
@@ -285,36 +206,6 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 	}
 	close()
 	return nil, fmt.Errorf("Chrome did not become ready within %dms", chromeReadyTimeoutMS)
-}
-
-func waitForPipeReady(pipeRead *os.File, pipeWrite *os.File, timeout time.Duration) error {
-	if err := WritePipeMessage(pipeWrite, map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
-		return err
-	}
-	type result struct {
-		message map[string]any
-		err     error
-	}
-	ch := make(chan result, 1)
-	go func() {
-		message, err := ReadPipeMessage(pipeRead)
-		ch <- result{message: message, err: err}
-	}()
-	select {
-	case result := <-ch:
-		if result.err != nil {
-			return result.err
-		}
-		if id, _ := result.message["id"].(float64); id != 1 {
-			return fmt.Errorf("unexpected pipe ready response id %v", result.message["id"])
-		}
-		if errorValue, ok := result.message["error"].(map[string]any); ok {
-			return fmt.Errorf("Browser.getVersion failed over pipe: %v", errorValue["message"])
-		}
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("Chrome remote-debugging pipe did not respond within %s", timeout)
-	}
 }
 
 func waitForCdpWebSocketURL(cdpURL string, timeout time.Duration, pollInterval time.Duration) (string, error) {
@@ -387,42 +278,6 @@ func removeProfileDir(profileDir string) {
 		time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
 	}
 	_ = os.RemoveAll(profileDir)
-}
-
-func WritePipeMessage(pipeWrite *os.File, message map[string]any) error {
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-	body = append(body, 0)
-	_, err = pipeWrite.Write(body)
-	return err
-}
-
-func ReadPipeMessage(pipeRead *os.File) (map[string]any, error) {
-	var buffer bytes.Buffer
-	for {
-		var b [1]byte
-		_, err := pipeRead.Read(b[:])
-		if err != nil {
-			if err == io.EOF {
-				return nil, fmt.Errorf("CDP pipe closed")
-			}
-			return nil, err
-		}
-		if b[0] != 0 {
-			buffer.WriteByte(b[0])
-			continue
-		}
-		if buffer.Len() == 0 {
-			continue
-		}
-		var message map[string]any
-		if err := json.Unmarshal(buffer.Bytes(), &message); err != nil {
-			return nil, err
-		}
-		return message, nil
-	}
 }
 
 func findChromeBinary(explicit string) (string, error) {

@@ -9,24 +9,17 @@ import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
 from ..transport.UpstreamTransport import UpstreamTransport
 from ..types.CDPTypes import CDPTypes
 from ..types.generated.cdp import PageDomain, RuntimeDomain, TargetDomain
-from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult, _isObjectMap
+from ..types.modcdp import ModCDPRouterConfig, ProtocolParams, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
 browserLevelDomains = {"Browser", "Target", "SystemInfo"}
 DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
-
-
-class RouterConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    router_routes: ModCDPRoutes = Field(default_factory=lambda: dict(DEFAULT_CLIENT_ROUTES))
-    loopback_execution_context_timeout_ms: int = DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS
+RouterConfig = ModCDPRouterConfig
 
 
 class AutoSessionRouter:

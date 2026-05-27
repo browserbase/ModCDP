@@ -7,11 +7,11 @@
 from __future__ import annotations
 
 import glob
-import unittest
-from pathlib import Path
 import os
 import re
 import sys
+import unittest
+from pathlib import Path
 
 from modcdp import ModCDPClient
 

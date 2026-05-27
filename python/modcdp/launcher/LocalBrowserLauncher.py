@@ -8,7 +8,6 @@ import glob
 import json
 import os
 import re
-import select
 import signal
 import shutil
 import subprocess
@@ -50,10 +49,8 @@ class LocalBrowserLauncher(BrowserLauncher):
     def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         merged = self.config if config is None else _launcher_config({**self.config.model_dump(), **_launcher_config(config).model_dump(exclude_unset=True)})
         executable_path = self.findChromeBinary(merged.launcher_local_executable_path)
-        use_pipe = merged.launcher_local_cdp_transport == "pipe"
-        use_loopback_cdp = (not use_pipe) or merged.launcher_local_loopback_cdp or merged.launcher_local_cdp_listen_port is not None
         requested_port = merged.launcher_local_cdp_listen_port
-        port = int(requested_port) if use_loopback_cdp and requested_port is not None else (0 if use_loopback_cdp else None)
+        port = int(requested_port) if requested_port is not None else 0
         temp_profile_dir: tempfile.TemporaryDirectory[str] | None = None
         profile_dir = merged.launcher_local_user_data_dir
         if not profile_dir:
@@ -77,9 +74,8 @@ class LocalBrowserLauncher(BrowserLauncher):
             "--use-mock-keychain",
             "--disable-gpu",
             f"--user-data-dir={profile_dir}",
-            "--remote-debugging-address=127.0.0.1" if use_loopback_cdp else None,
-            f"--remote-debugging-port={port}" if use_loopback_cdp else None,
-            "--remote-debugging-pipe" if use_pipe else None,
+            "--remote-debugging-address=127.0.0.1",
+            f"--remote-debugging-port={port}",
         ]
         args = [arg for arg in args if arg is not None]
         default_headless = sys.platform.startswith("linux") and not os.environ.get("DISPLAY")
@@ -92,61 +88,6 @@ class LocalBrowserLauncher(BrowserLauncher):
         args.extend(list(merged.launcher_local_args))
         args.extend(list(merged.launcher_local_extra_args))
         args.append("about:blank")
-        if use_pipe:
-            parent_read, child_write = os.pipe()
-            child_read, parent_write = os.pipe()
-            parent_read = _move_fd_if_needed(parent_read, {3, 4})
-            parent_write = _move_fd_if_needed(parent_write, {3, 4})
-            child_read = _move_fd_if_needed(child_read, {3, 4})
-            child_write = _move_fd_if_needed(child_write, {3, 4})
-            process = _spawn_chrome_with_pipe_fds(executable_path, args, child_read, child_write)
-            os.close(child_read)
-            os.close(child_write)
-            pipe_read = os.fdopen(parent_read, "rb", buffering=0)
-            pipe_write = os.fdopen(parent_write, "wb", buffering=0)
-            try:
-                _wait_for_pipe_ready(pipe_read, pipe_write, merged.launcher_local_chrome_ready_timeout_ms)
-                loopback_cdp_url: str | None = None
-                loopback_cdp_port: int | None = port
-                if port is not None:
-                    if port == 0:
-                        loopback_cdp_url, loopback_cdp_port = _wait_for_browser_selected_cdp_websocket_url(
-                            str(profile_dir),
-                            merged.launcher_local_chrome_ready_timeout_ms,
-                            merged.launcher_local_chrome_ready_poll_interval_ms,
-                            process,
-                        )
-                    else:
-                        loopback_cdp_url = _wait_for_cdp_websocket_url(
-                            f"http://127.0.0.1:{port}",
-                            merged.launcher_local_chrome_ready_timeout_ms,
-                            merged.launcher_local_chrome_ready_poll_interval_ms,
-                        )
-            except Exception:
-                pipe_read.close()
-                pipe_write.close()
-                _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir)
-                raise
-            launched = LaunchedBrowser(
-                cdp_url=None,
-                profile_dir=profile_dir,
-                pipe_read=pipe_read,
-                pipe_write=pipe_write,
-                close=lambda: _close(
-                    process,
-                    temp_profile_dir,
-                    pipe_read,
-                    pipe_write,
-                    cleanup_profile_dir=cleanup_profile_dir,
-                ),
-            )
-            if isinstance(loopback_cdp_port, int):
-                launched["cdp_listen_port"] = loopback_cdp_port
-            if loopback_cdp_url:
-                launched["loopback_cdp_url"] = loopback_cdp_url
-            self.launched = launched
-            return self.launched
-
         process = subprocess.Popen(
             [executable_path, *args],
             stdout=subprocess.DEVNULL,
@@ -173,14 +114,14 @@ class LocalBrowserLauncher(BrowserLauncher):
             try:
                 with urllib.request.urlopen(f"{cdp_url}/json/version", timeout=0.5) as response:
                     version = json.loads(response.read())
-                    self.launched = {
+                    self.launched = LaunchedBrowser(
                         # cdp_url is resolved from the HTTP discovery endpoint before returning.
-                        "cdp_url": version.get("webSocketDebuggerUrl") or cdp_url,
-                        "cdp_listen_port": active_port if port == 0 else port,
-                        "loopback_cdp_url": version.get("webSocketDebuggerUrl") or cdp_url,
-                        "profile_dir": profile_dir,
-                        "close": lambda: _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir),
-                    }
+                        cdp_url=version.get("webSocketDebuggerUrl") or cdp_url,
+                        cdp_listen_port=active_port if port == 0 else port,
+                        loopback_cdp_url=version.get("webSocketDebuggerUrl") or cdp_url,
+                        profile_dir=profile_dir,
+                        close=lambda: _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir),
+                    )
                     return self.launched
             except Exception:
                 time.sleep(poll_s)
@@ -248,36 +189,6 @@ def _candidate_paths() -> list[str]:
     return [*canary, *_chrome_for_testing_candidates(), *stock]
 
 
-def _move_fd_if_needed(fd: int, reserved: set[int]) -> int:
-    if fd not in reserved:
-        return fd
-    moved = os.dup(fd)
-    while moved in reserved:
-        next_fd = os.dup(fd)
-        os.close(moved)
-        moved = next_fd
-    os.close(fd)
-    return moved
-
-
-def _spawn_chrome_with_pipe_fds(executable_path: str, args: list[str], child_read: int, child_write: int) -> _ChromeProcess:
-    def map_pipe_fds() -> None:
-        os.dup2(child_read, 3)
-        os.dup2(child_write, 4)
-        os.close(child_read)
-        os.close(child_write)
-
-    return subprocess.Popen(
-        [executable_path, *args],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        close_fds=sys.platform.startswith("win"),
-        preexec_fn=None if sys.platform.startswith("win") else map_pipe_fds,
-        start_new_session=not sys.platform.startswith("win"),
-    )
-
-
 class _ChromeProcess(Protocol):
     pid: int
 
@@ -288,35 +199,6 @@ class _ChromeProcess(Protocol):
     def wait(self, timeout: float | None = None) -> int | None: ...
 
     def poll(self) -> int | None: ...
-
-
-def _wait_for_pipe_ready(pipe_read, pipe_write, timeout_ms: int) -> None:
-    ready_id = 1
-    pipe_write.write(json.dumps({"id": ready_id, "method": "Browser.getVersion", "params": {}}).encode() + b"\0")
-    pipe_write.flush()
-    deadline = time.time() + timeout_ms / 1000
-    buffer = b""
-    while time.time() < deadline:
-        ready, _, _ = select.select([pipe_read], [], [], max(0.0, min(0.1, deadline - time.time())))
-        if not ready:
-            continue
-        chunk = pipe_read.read(1)
-        if not chunk:
-            time.sleep(0.01)
-            continue
-        buffer += chunk
-        if b"\0" not in buffer:
-            continue
-        raw, buffer = buffer.split(b"\0", 1)
-        if not raw:
-            continue
-        message = json.loads(raw.decode())
-        if message.get("id") != ready_id:
-            continue
-        if message.get("error"):
-            raise RuntimeError(message["error"].get("message") or "Browser.getVersion failed over pipe")
-        return
-    raise RuntimeError(f"Chrome remote-debugging pipe did not respond within {timeout_ms}ms")
 
 
 def _wait_for_cdp_websocket_url(cdp_url: str, timeout_ms: int, poll_interval_ms: int) -> str:
@@ -382,16 +264,8 @@ def _wait_for_browser_selected_cdp_websocket_url(
 def _close(
     process: _ChromeProcess,
     temp_profile_dir: tempfile.TemporaryDirectory[str] | None,
-    pipe_read=None,
-    pipe_write=None,
     cleanup_profile_dir: str | None = None,
 ) -> None:
-    for pipe in (pipe_read, pipe_write):
-        try:
-            if pipe is not None:
-                pipe.close()
-        except Exception:
-            pass
     _signal_process(process, signal.SIGTERM)
     try:
         process.wait(timeout=2)

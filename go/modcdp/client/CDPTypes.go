@@ -26,13 +26,15 @@ type CDPCommandSchema struct {
 }
 
 type CDPTypes struct {
-	CustomCommands    map[string]CustomCommand
-	CustomEvents      map[string]CustomEvent
-	CustomMiddlewares []CustomMiddleware
-	commandSchemas    map[string]CDPCommandSchema
-	nativeCommands    map[string]bool
-	eventSchemas      map[string]map[string]any
-	mu                sync.RWMutex
+	CustomCommands       map[string]CustomCommand
+	CustomEvents         map[string]CustomEvent
+	CustomMiddlewares    []CustomMiddleware
+	commandSchemas       map[string]CDPCommandSchema
+	commandParamsSchemas map[string]map[string]any
+	commandResultSchemas map[string]map[string]any
+	nativeCommands       map[string]bool
+	eventSchemas         map[string]map[string]any
+	mu                   sync.RWMutex
 }
 
 var jsonSchemaObject = map[string]any{"type": "object"}
@@ -109,15 +111,8 @@ var modConfigureParamsSchema = map[string]any{
 		"upstream": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"upstream_mode":                               map[string]any{"enum": []any{"ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"}},
-				"upstream_ws_cdp_url":                         map[string]any{"type": "string"},
-				"upstream_nats_url":                           map[string]any{"type": "string"},
-				"upstream_nats_subject_prefix":                map[string]any{"type": "string"},
-				"upstream_nats_role":                          map[string]any{"enum": []any{"client", "browser"}},
-				"upstream_nats_wait_timeout_ms":               map[string]any{"type": "number"},
-				"upstream_reversews_bind":                     map[string]any{"type": "string"},
-				"upstream_reversews_wait_timeout_ms":          map[string]any{"type": "number"},
-				"upstream_nativemessaging_host_name":          map[string]any{"type": "string"},
+				"upstream_mode":       map[string]any{"enum": []any{"ws"}},
+				"upstream_ws_cdp_url": map[string]any{"type": "string"},
 				"upstream_ws_connect_error_settle_timeout_ms": map[string]any{"type": "number"},
 				"upstream_cdp_send_timeout_ms":                map[string]any{"type": "number"},
 			},
@@ -142,18 +137,9 @@ var modConfigureParamsSchema = map[string]any{
 			},
 			"additionalProperties": false,
 		},
-		"downstream": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"downstream_client_timeout_ms":           map[string]any{"type": "number"},
-				"downstream_close_browser_on_disconnect": map[string]any{"type": "boolean"},
-			},
-			"additionalProperties": false,
-		},
-		"server_browser_token": map[string]any{"type": "string"},
-		"custom_commands":      map[string]any{"type": "array", "items": modCommandRegistrationSchema},
-		"custom_events":        map[string]any{"type": "array", "items": modEventRegistrationSchema},
-		"custom_middlewares":   map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
+		"custom_commands":    map[string]any{"type": "array", "items": modCommandRegistrationSchema},
+		"custom_events":      map[string]any{"type": "array", "items": modEventRegistrationSchema},
+		"custom_middlewares": map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
 	},
 	"additionalProperties": false,
 }
@@ -334,17 +320,25 @@ var defaultBuiltinEvents = []CustomEvent{
 
 func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, customMiddlewares []CustomMiddleware) *CDPTypes {
 	types := &CDPTypes{
-		CustomCommands:    map[string]CustomCommand{},
-		CustomEvents:      map[string]CustomEvent{},
-		CustomMiddlewares: []CustomMiddleware{},
-		commandSchemas:    map[string]CDPCommandSchema{},
-		nativeCommands:    map[string]bool{},
-		eventSchemas:      map[string]map[string]any{},
+		CustomCommands:       map[string]CustomCommand{},
+		CustomEvents:         map[string]CustomEvent{},
+		CustomMiddlewares:    []CustomMiddleware{},
+		commandSchemas:       map[string]CDPCommandSchema{},
+		commandParamsSchemas: map[string]map[string]any{},
+		commandResultSchemas: map[string]map[string]any{},
+		nativeCommands:       map[string]bool{},
+		eventSchemas:         map[string]map[string]any{},
 	}
 	types.hydrateNativeProtocolSchemas()
 	types.mu.Lock()
-	for method := range types.commandSchemas {
+	for method, schema := range types.commandSchemas {
 		types.nativeCommands[method] = true
+		if schema.Params != nil {
+			types.commandParamsSchemas[method] = schema.Params
+		}
+		if schema.Result != nil {
+			types.commandResultSchemas[method] = schema.Result
+		}
 	}
 	types.mu.Unlock()
 	for _, command := range defaultBuiltinCommands {
@@ -412,8 +406,8 @@ func (types *CDPTypes) ToJSON() map[string]any {
 		"custom_commands":        len(types.CustomCommands),
 		"custom_events":          len(types.CustomEvents),
 		"custom_middlewares":     len(types.CustomMiddlewares),
-		"command_params_schemas": len(types.commandSchemas),
-		"command_result_schemas": len(types.commandSchemas),
+		"command_params_schemas": len(types.commandParamsSchemas),
+		"command_result_schemas": len(types.commandResultSchemas),
 		"event_schemas":          len(types.eventSchemas),
 	}
 	types.mu.RUnlock()
@@ -497,31 +491,32 @@ func (types *CDPTypes) NativeCommandSchema(method string) map[string]any {
 	if !types.nativeCommands[method] {
 		return nil
 	}
-	schema, ok := types.commandSchemas[method]
-	if !ok {
+	params := types.commandParamsSchemas[method]
+	result := types.commandResultSchemas[method]
+	if params == nil && result == nil {
 		return nil
 	}
-	return map[string]any{"params": schema.Params, "result": schema.Result}
+	return map[string]any{"params": params, "result": result}
 }
 
 func (types *CDPTypes) CommandParamsSchema(method string) (map[string]any, bool) {
 	types.mu.RLock()
 	defer types.mu.RUnlock()
-	schema, ok := types.commandSchemas[method]
-	if !ok || schema.Params == nil {
+	schema, ok := types.commandParamsSchemas[method]
+	if !ok || schema == nil {
 		return nil, false
 	}
-	return schema.Params, true
+	return schema, true
 }
 
 func (types *CDPTypes) CommandResultSchema(method string) (map[string]any, bool) {
 	types.mu.RLock()
 	defer types.mu.RUnlock()
-	schema, ok := types.commandSchemas[method]
-	if !ok || schema.Result == nil {
+	schema, ok := types.commandResultSchemas[method]
+	if !ok || schema == nil {
 		return nil, false
 	}
-	return schema.Result, true
+	return schema, true
 }
 
 func (types *CDPTypes) EventPayloadSchema(event string) (map[string]any, bool) {
@@ -570,18 +565,16 @@ func (types *CDPTypes) AddCustomCommand(command CustomCommand) (string, bool, er
 	}
 	types.mu.Lock()
 	defer types.mu.Unlock()
-	existing := types.commandSchemas[name]
 	if command.ParamsSchema != nil {
 		if schema := cloneSchema(command.ParamsSchema); schema != nil {
-			existing.Params = schema
+			types.commandParamsSchemas[name] = schema
 		}
 	}
 	if command.ResultSchema != nil {
 		if schema := cloneSchema(command.ResultSchema); schema != nil {
-			existing.Result = schema
+			types.commandResultSchemas[name] = schema
 		}
 	}
-	types.commandSchemas[name] = existing
 	command.Name = name
 	if command.ParamsSchema != nil {
 		command.ParamsSchema = cloneSchema(command.ParamsSchema)

@@ -54,7 +54,10 @@ class BBExtensionInjector(ExtensionInjector):
             self.config.injector_service_worker_ready_timeout_ms,
             matched_only=self.config.injector_trust_service_worker_target,
         )
-        return {**discovered, "source": "bb"} if discovered else None
+        if discovered is None:
+            return None
+        discovered.source = "bb"
+        return discovered
 
     def close(self) -> None:
         if self.cleanup_dir:

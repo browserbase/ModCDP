@@ -107,68 +107,18 @@ func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.
 	}
 }
 
-func TestLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeaksCDPOverTheReturnedPipes(t *testing.T) {
-	headless := true
-	launcher := NewLocalBrowserLauncher(LauncherConfig{
-		LauncherLocalHeadless:             &headless,
-		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	})
-	chrome, err := launcher.Launch(LauncherConfig{LauncherLocalCDPTransport: "pipe"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer chrome.Close()
-	if launcher.Launched != chrome {
-		t.Fatal("expected launcher to retain launched browser")
-	}
-	transportConfig := launcher.ConfigForUpstream()
-	if transportConfig["upstream_ws_cdp_url"] != nil {
-		t.Fatalf("transport cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
-	}
-	if transportConfig["upstream_pipe_read"] != chrome.PipeRead {
-		t.Fatalf("transport pipe read = %v", transportConfig["upstream_pipe_read"])
-	}
-	if transportConfig["upstream_pipe_write"] != chrome.PipeWrite {
-		t.Fatalf("transport pipe write = %v", transportConfig["upstream_pipe_write"])
-	}
-	if chrome.CDPURL != "" {
-		t.Fatalf("CDPURL = %q", chrome.CDPURL)
-	}
-	if chrome.LoopbackCDPURL != "" {
-		t.Fatalf("LoopbackCDPURL = %q", chrome.LoopbackCDPURL)
-	}
-	if chrome.PipeRead == nil || chrome.PipeWrite == nil {
-		t.Fatal("expected pipe handles")
-	}
-	if err := WritePipeMessage(chrome.PipeWrite, map[string]any{"id": 10, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
-		t.Fatal(err)
-	}
-	response, err := ReadPipeMessage(chrome.PipeRead)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if response["id"] != float64(10) {
-		t.Fatalf("response id = %v", response["id"])
-	}
-	result, _ := response["result"].(map[string]any)
-	product, _ := result["product"].(string)
-	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
-		t.Fatalf("product = %q", product)
-	}
-}
-
-func TestLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpointOnlyWhenRequested(t *testing.T) {
+func TestLaunchesARealBrowserWithAnAuxiliaryLoopbackCDPEndpointWhenRequested(t *testing.T) {
 	headless := true
 	loopbackCDP := true
 	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	}).Launch(LauncherConfig{LauncherLocalCDPTransport: "pipe", LauncherLocalLoopbackCDP: &loopbackCDP})
+	}).Launch(LauncherConfig{LauncherLocalLoopbackCDP: &loopbackCDP})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chrome.Close()
-	if chrome.CDPURL != "" {
+	if !strings.HasPrefix(chrome.CDPURL, "ws://127.0.0.1:") {
 		t.Fatalf("CDPURL = %q", chrome.CDPURL)
 	}
 	if !strings.HasPrefix(chrome.LoopbackCDPURL, "ws://127.0.0.1:") {

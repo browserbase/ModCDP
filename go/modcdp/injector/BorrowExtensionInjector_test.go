@@ -7,10 +7,11 @@
 package injector_test
 
 import (
-	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
-	. "github.com/browserbase/modcdp/go/modcdp/injector"
 	"path/filepath"
 	"testing"
+
+	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
+	. "github.com/browserbase/modcdp/go/modcdp/injector"
 )
 
 func TestBorrowExtensionInjectorBootstrapsModCDPInsideALiveExtensionServiceWorker(t *testing.T) {

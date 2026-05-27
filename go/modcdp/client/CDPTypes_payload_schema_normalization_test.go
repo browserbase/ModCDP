@@ -64,10 +64,7 @@ func TestCDPTypesSerializesBuiltinModCommandSchemasThroughTheSameWirePath(t *tes
 
 	parsedConfig, err := types.ParseCommandParams("Mod.configure", map[string]any{
 		"client_config": map[string]any{"client_hydrate_aliases": false},
-		"downstream": map[string]any{
-			"downstream_client_timeout_ms":           1234,
-			"downstream_close_browser_on_disconnect": true,
-		},
+		"upstream":      map[string]any{"upstream_mode": "ws", "upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/test"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,19 +73,19 @@ func TestCDPTypesSerializesBuiltinModCommandSchemasThroughTheSameWirePath(t *tes
 	if !ok || clientConfig["client_hydrate_aliases"] != false {
 		t.Fatalf("client_config = %#v", parsedConfig["client_config"])
 	}
-	downstream, ok := parsedConfig["downstream"].(map[string]any)
+	upstream, ok := parsedConfig["upstream"].(map[string]any)
 	if !ok {
-		t.Fatalf("downstream = %#v", parsedConfig["downstream"])
+		t.Fatalf("upstream = %#v", parsedConfig["upstream"])
 	}
-	if downstream["downstream_client_timeout_ms"] != 1234 || downstream["downstream_close_browser_on_disconnect"] != true {
-		t.Fatalf("downstream = %#v", downstream)
+	if upstream["upstream_mode"] != "ws" || upstream["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/test" {
+		t.Fatalf("upstream = %#v", upstream)
 	}
 	_, err = types.ParseCommandParams("Mod.configure", map[string]any{
-		"downstream": map[string]any{
-			"closeBrowser": "not allowed over the wire",
+		"upstream": map[string]any{
+			"upstream_mode": "nats",
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "closeBrowser") {
-		t.Fatalf("expected closeBrowser to be rejected, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "enum") {
+		t.Fatalf("expected unsupported upstream mode to be rejected, got %v", err)
 	}
 }
