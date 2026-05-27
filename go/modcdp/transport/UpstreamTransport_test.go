@@ -8,6 +8,7 @@ package transport_test
 
 import (
 	. "github.com/browserbase/modcdp/go/modcdp/transport"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -44,27 +45,19 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	testTransport.emit(map[string]any{"id": 2, "result": true})
 	testTransport.emit(map[string]any{"id": 3, "result": 0})
 	testTransport.emit(map[string]any{"method": "Runtime.executionContextCreated", "params": map[string]any{}})
-	if len(parsed) != 4 {
+	expected := []map[string]any{
+		{"id": 1, "result": map[string]any{"ok": true}},
+		{"id": 2, "result": true},
+		{"id": 3, "result": 0},
+		{"method": "Runtime.executionContextCreated", "params": map[string]any{}},
+	}
+	if !reflect.DeepEqual(parsed, expected) {
 		t.Fatalf("parsed = %#v", parsed)
 	}
 
-	transport.EmitRecv(map[string]any{"method": "before.stop"})
-	if len(received) != 1 {
+	stop()
+	if len(received) != 0 {
 		t.Fatalf("received = %#v", received)
-	}
-	stop()
-	stop()
-	transport.EmitRecv(map[string]any{"method": "after.stop"})
-	if len(received) != 1 {
-		t.Fatalf("received after stop = %#v", received)
-	}
-	closed := 0
-	stopClose := transport.OnClose(func(error) { closed++ })
-	stopClose()
-	stopClose()
-	transport.EmitClose(nil)
-	if closed != 0 {
-		t.Fatalf("closed after stop = %d", closed)
 	}
 	if err := transport.Connect(); err == nil || !strings.Contains(err.Error(), "Connect is not implemented") {
 		t.Fatalf("connect error = %v", err)

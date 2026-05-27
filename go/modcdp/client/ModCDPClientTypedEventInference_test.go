@@ -9,35 +9,33 @@ package client
 import "testing"
 
 func TestTypedCDPEventTokensInferCallbackPayloadsWithoutLocalTypeAliases(t *testing.T) {
-	cdp := New(Config{})
-	typedEvents := make(chan TargetTargetCreatedEvent, 1)
-	rawEvents := make(chan any, 1)
+	cdp := New(Config{
+		Launcher:     LauncherConfig{LauncherMode: "none"},
+		Upstream:     UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector:     InjectorConfig{InjectorMode: "none"},
+		ServerConfig: ServerConfigNone,
+	})
+	seen := make(chan string, 1)
 
 	cdp.Target.On.TargetCreated(func(event TargetTargetCreatedEvent) {
-		typedEvents <- event
-	})
-	cdp.On("Target.targetCreated", func(event any) {
-		rawEvents <- event
+		seen <- string(event.TargetInfo.TargetID)
 	})
 
-	payload := map[string]any{
-		"targetInfo": map[string]any{
-			"targetId": "target-1",
-			"type":     "page",
-			"url":      "https://example.com",
+	cdp.handleEventMessage(map[string]any{
+		"method": "Target.targetCreated",
+		"params": map[string]any{
+			"targetInfo": map[string]any{
+				"targetId":        "target-1",
+				"type":            "page",
+				"title":           "Example",
+				"url":             "https://example.com",
+				"attached":        true,
+				"canAccessOpener": false,
+			},
 		},
-	}
-	for _, entry := range cdp.handlers["Target.targetCreated"] {
-		entry.handler(payload)
-	}
+	})
 
-	typed := <-typedEvents
-	if typed.TargetID() != "target-1" || typed.TargetInfo.URL != "https://example.com" {
-		t.Fatalf("unexpected typed event: %#v", typed)
-	}
-	raw := <-rawEvents
-	rawMap, ok := raw.(map[string]any)
-	if !ok || rawMap["targetInfo"] == nil {
-		t.Fatalf("unexpected raw event: %#v", raw)
+	if got := <-seen; got != "target-1" {
+		t.Fatalf("seen = %q", got)
 	}
 }

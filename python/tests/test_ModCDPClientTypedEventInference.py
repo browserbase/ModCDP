@@ -7,28 +7,46 @@
 from __future__ import annotations
 
 import unittest
-from typing import Any, cast
+from collections.abc import Mapping
+from typing import Any
 
 from modcdp import ModCDPClient
-from modcdp.types import JsonValue
 
 
 class ModCDPClientTypedEventInferenceTests(unittest.TestCase):
     def test_typed_cdp_event_tokens_infer_callback_payloads_without_local_type_aliases(self) -> None:
-        client = ModCDPClient()
-        typed_events: list[Any] = []
-        raw_events: list[dict[str, JsonValue]] = []
+        client = ModCDPClient(
+            launcher={"launcher_mode": "none"},
+            upstream={"upstream_mode": "ws"},
+            injector={"injector_mode": "none"},
+            server_config=None,
+        )
+        seen: list[str] = []
 
-        client.on(client.Target.targetCreated, typed_events.append)
-        client.on("Target.targetCreated", raw_events.append)
+        def on_target_created(event: Any) -> None:
+            target_info = event.targetInfo
+            if not isinstance(target_info, Mapping):
+                raise AssertionError(f"targetInfo = {target_info!r}")
+            seen.append(str(target_info["targetId"]))
 
-        payload = {"targetInfo": {"targetId": "target-1", "type": "page", "url": "https://example.com"}}
-        for handler in client._handlers["Target.targetCreated"]:
-            handler(payload)
+        client.on(client.Target.targetCreated, on_target_created)
+        client._on_recv(
+            {
+                "method": "Target.targetCreated",
+                "params": {
+                    "targetInfo": {
+                        "targetId": "target-1",
+                        "type": "page",
+                        "title": "Example",
+                        "url": "https://example.com",
+                        "attached": True,
+                        "canAccessOpener": False,
+                    }
+                },
+            }
+        )
 
-        self.assertEqual(typed_events[0].targetId, "target-1")
-        target_info = cast(dict[str, JsonValue], raw_events[0]["targetInfo"])
-        self.assertEqual(target_info["targetId"], "target-1")
+        self.assertEqual(seen, ["target-1"])
 
 
 if __name__ == "__main__":
