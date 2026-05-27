@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.ModCDPClientCustomFlatNamespace.ts
+// - ./python/tests/test_ModCDPClientCustomFlatNamespace.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package client
 
 import (
@@ -20,7 +26,7 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
@@ -32,12 +38,12 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientOptions: ClientOptions{ClientRoutes: map[string]string{
+		ClientConfig: ClientConfig{ClientRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		ServerOptions: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		ServerConfig: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 
@@ -78,7 +84,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
@@ -90,12 +96,12 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientOptions: ClientOptions{ClientRoutes: map[string]string{
+		ClientConfig: ClientConfig{ClientRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		ServerOptions: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		ServerConfig: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 
@@ -136,7 +142,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 }
 
 func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
 		Name: "Custom.clientOnly",
 		ParamsSchema: map[string]any{
@@ -153,10 +159,10 @@ func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
 	if !ok || registration["name"] != "Custom.clientOnly" || registration["registered"] != true {
 		t.Fatalf("unexpected schema-only registration result: %#v", result)
 	}
-	if err := cdp.validateCommandParams("Custom.clientOnly", map[string]any{"tabId": 1}); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.clientOnly", map[string]any{"tabId": 1}); err != nil {
 		t.Fatalf("expected registered schema to validate params, got %v", err)
 	}
-	if err := cdp.validateCommandParams("Custom.clientOnly", map[string]any{"tabId": "1"}); err == nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.clientOnly", map[string]any{"tabId": "1"}); err == nil {
 		t.Fatal("expected registered schema to reject wrong params")
 	}
 }
@@ -169,7 +175,7 @@ func TestTypedCustomCommandRegistrationBuildsSchemas(t *testing.T) {
 		Success bool `json:"success"`
 	}
 
-	cdp := New(Options{})
+	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
 		Name:         "Custom.doSomething",
 		ParamsSchema: abxjsonschema.SchemaFor[ParamsSchema](),
@@ -186,16 +192,16 @@ func TestTypedCustomCommandRegistrationBuildsSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cdp.validateCommandParams("Custom.doSomething", params); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.doSomething", params); err != nil {
 		t.Fatalf("expected typed params schema to validate: %v", err)
 	}
-	if err := cdp.validateCommandParams("Custom.doSomething", map[string]any{"id": 123}); err == nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.doSomething", map[string]any{"id": 123}); err == nil {
 		t.Fatal("expected typed params schema to reject wrong id type")
 	}
-	if err := cdp.validateCommandResult("Custom.doSomething", ResultSchema{Success: true}); err != nil {
+	if _, err := cdp.Types.ParseCommandResult("Custom.doSomething", ResultSchema{Success: true}); err != nil {
 		t.Fatalf("expected typed result schema to validate: %v", err)
 	}
-	if err := cdp.validateCommandResult("Custom.doSomething", map[string]any{"success": "yes"}); err == nil {
+	if _, err := cdp.Types.ParseCommandResult("Custom.doSomething", map[string]any{"success": "yes"}); err == nil {
 		t.Fatal("expected typed result schema to reject wrong success type")
 	}
 }
@@ -205,7 +211,7 @@ func TestTypedCustomEventRegistrationAndHandler(t *testing.T) {
 		Data string `json:"data"`
 	}
 
-	cdp := New(Options{})
+	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomEvent(CustomEvent{
 		Name:        "Custom.someEvent",
 		EventSchema: abxjsonschema.SchemaFor[EventSchema](),
@@ -222,7 +228,7 @@ func TestTypedCustomEventRegistrationAndHandler(t *testing.T) {
 		event := data.(map[string]any)
 		seen <- event["data"].(string)
 	})
-	if data, ok := cdp.validateEventData("Custom.someEvent", map[string]any{"data": "ok"}); ok {
+	if data, ok := cdp.Types.ParseEventPayload("Custom.someEvent", map[string]any{"data": "ok"}); ok {
 		for _, entry := range cdp.handlers["Custom.someEvent"] {
 			entry.handler(data)
 		}
@@ -232,7 +238,7 @@ func TestTypedCustomEventRegistrationAndHandler(t *testing.T) {
 	if got := <-seen; got != "ok" {
 		t.Fatalf("unexpected typed event data %q", got)
 	}
-	expectPanic(t, func() { cdp.validateEventData("Custom.someEvent", map[string]any{"data": 123}) })
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.someEvent", map[string]any{"data": 123}) })
 }
 
 func expectPanic(t *testing.T, fn func()) {

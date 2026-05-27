@@ -11,7 +11,7 @@ import urllib.request
 from typing import Any
 from websocket import create_connection
 
-from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser
+from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser, _launcher_config
 
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
@@ -20,18 +20,18 @@ DEFAULT_BROWSERBASE_VIEWPORT = {"width": 1288, "height": 711}
 
 class BBBrowserLauncher(BrowserLauncher):
     def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
-        merged = {**self.options, **dict(options or {})}
-        browserbase_api_key = _first_string(merged.get("launcher_bb_api_key"), os.environ.get("BROWSERBASE_API_KEY"))
+        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+        browserbase_api_key = _first_string(merged.launcher_bb_api_key, os.environ.get("BROWSERBASE_API_KEY"))
         if not browserbase_api_key:
             raise RuntimeError("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")
 
         base_url = _first_string(
-            merged.get("launcher_bb_base_url"),
+            merged.launcher_bb_base_url,
             os.environ.get("BROWSERBASE_BASE_URL"),
         ) or DEFAULT_BROWSERBASE_BASE_URL
-        resume_session_id = _first_string(merged.get("launcher_bb_session_id"))
-        keep_alive = _first_bool(merged.get("launcher_bb_keep_alive")) or False
-        close_session_on_close = _first_bool(merged.get("launcher_bb_close_session_on_close"))
+        resume_session_id = _first_string(merged.launcher_bb_session_id)
+        keep_alive = _first_bool(merged.launcher_bb_keep_alive) or False
+        close_session_on_close = _first_bool(merged.launcher_bb_close_session_on_close)
         if close_session_on_close is None:
             close_session_on_close = not keep_alive
 
@@ -44,27 +44,27 @@ class BBBrowserLauncher(BrowserLauncher):
                 pathname=f"/v1/sessions/{resume_session_id}",
             )
         else:
-            session_create_params = _object_value(merged.get("launcher_bb_session_create_params"))
+            session_create_params = _object_value(merged.launcher_bb_session_create_params)
             browser_settings = {
                 **_object_value(session_create_params.get("browserSettings")),
-                **_object_value(merged.get("launcher_bb_browser_settings")),
+                **_object_value(merged.launcher_bb_browser_settings),
             }
             user_metadata = {
                 **_object_value(session_create_params.get("userMetadata")),
-                **_object_value(merged.get("launcher_bb_user_metadata")),
+                **_object_value(merged.launcher_bb_user_metadata),
             }
             extension_id = _first_string(
-                merged.get("launcher_bb_extension_id"),
+                merged.launcher_bb_extension_id,
                 session_create_params.get("extensionId"),
                 _object_value(session_create_params.get("browserSettings")).get("extensionId"),
             )
-            region = _first_string(merged.get("launcher_bb_region"), session_create_params.get("region"))
+            region = _first_string(merged.launcher_bb_region, session_create_params.get("region"))
             viewport = _object_value(browser_settings.get("viewport"))
             body: dict[str, Any] = {
                 **session_create_params,
                 **({"keepAlive": True} if keep_alive else {}),
                 **({"region": region} if region else {}),
-                **({"timeout": merged.get("launcher_bb_timeout")} if isinstance(merged.get("launcher_bb_timeout"), int) else {}),
+                **({"timeout": merged.launcher_bb_timeout} if isinstance(merged.launcher_bb_timeout, int) else {}),
                 **({"extensionId": extension_id} if extension_id else {}),
                 "browserSettings": {
                     **browser_settings,

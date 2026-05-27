@@ -258,7 +258,10 @@ const ModCDPDownstreamConfigSchema = z
   .object({
     downstream_client_timeout_ms: z.number().positive().default(DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS),
     downstream_close_browser_on_disconnect: z.boolean().default(false),
-    closeBrowser: z.custom<() => void | Promise<void>>((value) => typeof value === "function").default(() => () => {}),
+    closeBrowser: z
+      .custom<() => void | Promise<void>>((value) => typeof value === "function")
+      .meta({ modcdp_wire: "omit" })
+      .optional(),
   })
   .strict();
 type ModCDPDownstreamConfig = z.infer<typeof ModCDPDownstreamConfigSchema>;
@@ -267,7 +270,7 @@ const ModCDPServerConfigSchema = z
   .object({
     upstream: ModCDPUpstreamConfigSchema.optional(),
     router: ModCDPRouterConfigSchema.optional(),
-    client_options: ModCDPClientConfigSchema.optional(),
+    client_config: ModCDPClientConfigSchema.optional(),
     downstream: ModCDPDownstreamConfigSchema.optional(),
     server_browser_token: z.string().optional(),
     custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
@@ -403,7 +406,7 @@ const ModCDPAddMiddlewareResponseSchema = z.object({
 });
 type ModCDPAddMiddlewareResponse = z.infer<typeof ModCDPAddMiddlewareResponseSchema>;
 
-const ModCDPConfigureResponseSchema = z.object({});
+const ModCDPConfigureResponseSchema = z.object({}).passthrough();
 type ModCDPConfigureResponse = z.infer<typeof ModCDPConfigureResponseSchema>;
 
 const ModCDPPingResponseSchema = z.object({
@@ -432,7 +435,7 @@ const ProtocolParamsSchema = z.union([CdpCommandParamsSchema, ModCDPCommandParam
 type ProtocolParams = z.infer<typeof ProtocolParamsSchema>;
 
 const ProtocolResultSchema = z.union([CdpCommandResultSchema, ModCDPCommandResultSchema]);
-type ProtocolResult = z.infer<typeof ProtocolResultSchema>;
+type ProtocolResult = CdpCommandResult;
 
 const ProtocolEventParamsSchema = z.union([CdpEventParamsSchema, ModCDPPongEventSchema, ModCDPCustomPayloadSchema]);
 type ProtocolEventParams = z.infer<typeof ProtocolEventParamsSchema>;

@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./python/tests/test_ModCDPClientRoutedDefaultOverrides.py
+// - ./go/modcdp/client/ModCDPClientRoutedDefaultOverrides_test.go
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import path from "node:path";
@@ -51,7 +57,7 @@ async (payload, next) => {
   const visit = async value => {
     if (!value || typeof value !== "object" || seen.has(value)) return;
     seen.add(value);
-    if (!Array.isArray(value) && typeof value.targetId === "string" && value.tabId == null) {
+    if (!Array.isArray(value) && typeof value.targetId === "string" && typeof value.type === "string" && value.tabId == null) {
       const { tabId } = await cdp.send("Custom.tabIdFromTargetId", { targetId: value.targetId });
       if (tabId != null) value.tabId = tabId;
     }
@@ -95,7 +101,7 @@ test(
           "Target.setDiscoverTargets": "service_worker",
         },
       },
-      server_options: {
+      server_config: {
         upstream: { upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
         router: { router_routes: { "*.*": "loopback_cdp" } },
       },
@@ -104,7 +110,7 @@ test(
     try {
       await cdp.connect();
       assert.equal(cdp.upstream.config.upstream_ws_cdp_url, owner.upstream.config.upstream_ws_cdp_url);
-      assert.equal(cdp.server_options?.upstream?.upstream_ws_cdp_url, owner.upstream.config.upstream_ws_cdp_url);
+      assert.equal(cdp.server_config?.upstream?.upstream_ws_cdp_url, owner.upstream.config.upstream_ws_cdp_url);
 
       const rawTargets = (await cdp.send("Target.getTargets")) as { targetInfos: { type?: string; tabId?: number }[] };
       assert.ok(rawTargets.targetInfos?.length > 0, "expected raw Target.getTargets targetInfos");
@@ -149,9 +155,9 @@ test(
       };
       assert.ok(enrichedTargets.targetInfos?.length > 0, "expected enriched Target.getTargets targetInfos");
       assert.equal(
-        enrichedTargets.targetInfos.every((targetInfo) => targetInfo.tabId != null),
+        enrichedTargets.targetInfos.every((targetInfo) => "tabId" in targetInfo),
         true,
-        "every routed TargetInfo should include a tabId property",
+        "the custom Target.getTargets override should add a tabId property",
       );
       assert.ok(
         enrichedTargets.targetInfos.some(

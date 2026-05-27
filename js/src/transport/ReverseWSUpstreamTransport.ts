@@ -5,7 +5,7 @@ import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import { DEFAULT_UPSTREAM_REVERSEWS_BIND, DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS } from "../types/modcdp.js";
-import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { parseHostPort, UpstreamTransport, type UpstreamPeerWaitOptions, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
 
 type ReverseHello = {
@@ -19,10 +19,12 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
   endpoint_url: string;
   private reversews_listener: WsServer | null = null;
   private socket: WsSocket | null = null;
+  private peer_connected_at: number | null = null;
   private peer_waiters = new Set<{
     resolve: () => void;
     reject: (error: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
+    connected_after_ms: number | null;
   }>();
   peer_info: ReverseHello | null = null;
 
@@ -93,20 +95,26 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     });
   }
 
-  async waitForPeer() {
-    if (this.socket && this.socket.readyState === this.socket.OPEN) return;
+  async waitForPeer({ connected_after_ms = null }: UpstreamPeerWaitOptions = {}) {
+    if (
+      this.socket &&
+      this.socket.readyState === this.socket.OPEN &&
+      (connected_after_ms == null || (this.peer_connected_at != null && this.peer_connected_at >= connected_after_ms))
+    )
+      return;
     await new Promise<void>((resolve, reject) => {
       let waiter!: {
         resolve: () => void;
         reject: (error: Error) => void;
         timeout: ReturnType<typeof setTimeout>;
+        connected_after_ms: number | null;
       };
       const wait_timeout_ms = this.config.upstream_reversews_wait_timeout_ms;
       const timeout = setTimeout(() => {
         this.peer_waiters.delete(waiter);
         reject(new Error(`Timed out waiting ${wait_timeout_ms}ms for reverse ModCDP extension connection.`));
       }, wait_timeout_ms);
-      waiter = { resolve, reject, timeout };
+      waiter = { resolve, reject, timeout, connected_after_ms };
       this.peer_waiters.add(waiter);
     });
   }
@@ -116,6 +124,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
       this.socket?.close();
     } catch {}
     this.socket = null;
+    this.peer_connected_at = null;
     this.peer_info = null;
     if (this.reversews_listener) await new Promise<void>((resolve) => this.reversews_listener?.close(() => resolve()));
     this.reversews_listener = null;
@@ -150,11 +159,13 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
         } catch {}
       }
       this.socket = socket;
+      this.peer_connected_at = Date.now();
       this.peer_info = hello;
       socket.on("message", (data: unknown) => this.parseAndEmitRecv(data));
       socket.on("close", (code, reason) => {
         if (this.socket !== socket) return;
         this.socket = null;
+        this.peer_connected_at = null;
         this.peer_info = null;
         const suffix = code || reason.length ? ` (code=${code}, reason=${reason.toString()})` : "";
         this.emitClose(new Error(`Reverse ModCDP websocket closed${suffix}`));
@@ -162,14 +173,16 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
       socket.on("error", () => {
         if (this.socket !== socket) return;
         this.socket = null;
+        this.peer_connected_at = null;
         this.peer_info = null;
         this.emitClose(new Error("Reverse ModCDP websocket error"));
       });
       for (const waiter of this.peer_waiters) {
+        if (waiter.connected_after_ms != null && this.peer_connected_at < waiter.connected_after_ms) continue;
         clearTimeout(waiter.timeout);
         waiter.resolve();
+        this.peer_waiters.delete(waiter);
       }
-      this.peer_waiters.clear();
     });
   }
 
@@ -180,6 +193,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
       state: {
         ...json.state,
         connected: this.socket?.readyState === this.socket?.OPEN,
+        peer_connected_at: this.peer_connected_at,
         peer_waiters: this.peer_waiters.size,
         has_peer_info: this.peer_info != null,
       },

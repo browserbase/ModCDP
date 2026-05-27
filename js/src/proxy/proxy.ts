@@ -27,7 +27,7 @@ import { PipeUpstreamTransport } from "../transport/PipeUpstreamTransport.js";
 import { ReverseWSUpstreamTransport } from "../transport/ReverseWSUpstreamTransport.js";
 import type { UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
 import { CdpCommandMessageSchema } from "../types/modcdp.js";
-import type { ModCDPClientOptions } from "../client/ModCDPClient.js";
+import type { ModCDPClientConfig } from "../client/ModCDPClient.js";
 
 browser_launcher_constructors.set("local", LocalBrowserLauncher);
 browser_launcher_constructors.set("remote", RemoteBrowserLauncher);
@@ -58,10 +58,10 @@ type StartProxyOptions = {
   proxy_listen_port?: number;
   launcher?: LauncherConfig;
   upstream?: UpstreamTransportConfig;
-  injector?: ModCDPClientOptions["injector"];
-  router?: ModCDPClientOptions["router"];
-  client_options?: ModCDPClientOptions["client_options"];
-  server_options?: ModCDPClientOptions["server_options"];
+  injector?: ModCDPClientConfig["injector"];
+  router?: ModCDPClientConfig["router"];
+  client_config?: ModCDPClientConfig["client_config"];
+  server_config?: ModCDPClientConfig["server_config"];
   forward_mirrored_upstream_events?: boolean;
   upstream_monitor_interval_ms?: number;
 };
@@ -73,8 +73,8 @@ async function startProxy({
   upstream = { upstream_mode: "ws", upstream_ws_cdp_url: DEFAULT_UPSTREAM },
   injector = { injector_mode: "none" },
   router = {},
-  client_options = {},
-  server_options = {},
+  client_config = {},
+  server_config = {},
 }: StartProxyOptions = {}) {
   const { WebSocketServer } = await loadWsForProxy();
   const active_clients = new Set<ModCDPClient>();
@@ -120,8 +120,8 @@ async function startProxy({
             ...(router.router_routes ?? {}),
           },
         },
-        client_options,
-        server_options,
+        client_config,
+        server_config,
       },
       active_clients,
     );
@@ -142,12 +142,12 @@ async function startProxy({
   };
 }
 
-async function connectDownstream(socket: WebSocket, options: ModCDPClientOptions, active_clients: Set<ModCDPClient>) {
+async function connectDownstream(socket: WebSocket, options: ModCDPClientConfig, active_clients: Set<ModCDPClient>) {
   const queued_raw_messages: RawData[] = [];
   let connected = false;
   const cdp = new ModCDPClient({
     ...options,
-    client_options: { client_hydrate_aliases: false, ...(options.client_options ?? {}) },
+    client_config: { client_hydrate_aliases: false, ...(options.client_config ?? {}) },
   });
   active_clients.add(cdp);
   socket.on("message", (raw) => {
@@ -215,8 +215,8 @@ function runProxyCli(args = process.argv.slice(2)) {
     upstream: configGroup(argv, "upstream"),
     injector: configGroup(argv, "injector"),
     router: configGroup(argv, "router"),
-    client_options: configGroup(argv, "client_options", "client"),
-    server_options: configGroup(argv, "server_options", "server"),
+    client_config: configGroup(argv, "client_config", "client"),
+    server_config: configGroup(argv, "server_config", "server"),
   });
   const shutdown = async () => {
     try {

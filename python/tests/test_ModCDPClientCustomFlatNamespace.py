@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.ModCDPClientCustomFlatNamespace.ts
+# - ./go/modcdp/client/ModCDPClientCustomFlatNamespace_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import asyncio
@@ -34,8 +40,8 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
 
         async def run() -> None:
@@ -75,13 +81,13 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
         seen: Queue[str] = Queue()
 
-        async def callback(event: EventSchema) -> None:
-            seen.put(event.data)
+        async def callback(event: dict[str, str]) -> None:
+            seen.put(event["data"])
 
         async def run() -> None:
             client.connect()
@@ -114,9 +120,9 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
         )
 
         self.assertEqual(result, {"name": "Custom.schemaOnly", "registered": True})
-        self.assertEqual(client._validate_event_payload("Custom.schemaOnly", {"ok": True}), {"ok": True})
+        self.assertEqual(client.types.parseEventPayload("Custom.schemaOnly", {"ok": True}), {"ok": True})
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Custom.schemaOnly", {"ok": True, "extra": True})
+            client.types.parseEventPayload("Custom.schemaOnly", {"ok": True, "extra": True})
 
 
 if __name__ == "__main__":

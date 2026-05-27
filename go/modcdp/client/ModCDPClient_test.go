@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.ModCDPClient.ts
+// - ./python/tests/test_ModCDPClient.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package client
 
 import (
@@ -24,7 +30,7 @@ func boolPtr(value bool) *bool {
 }
 
 func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:                "local",
 			LauncherLocalExecutablePath: "/tmp/chrome",
@@ -50,66 +56,66 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 			InjectorServiceWorkerPollIntervalMS: 76,
 			InjectorTargetSessionPollIntervalMS: 87,
 		},
-		ClientOptions: ClientOptions{
+		ClientConfig: ClientConfig{
 			ClientRoutes:               map[string]string{"*.*": "direct_cdp"},
 			ClientHydrateAliases:       boolPtr(false),
 			ClientMirrorUpstreamEvents: boolPtr(false),
 			ClientCDPSendTimeoutMS:     1234,
 			ClientEventWaitTimeoutMS:   2345,
 		},
-		ServerOptions: &ServerConfig{
+		ServerConfig: &ServerConfig{
 			Router:             RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}, LoopbackExecutionContextTimeoutMS: 8765},
-			ClientOptions:      ClientOptions{ClientCDPSendTimeoutMS: 9876},
+			ClientConfig:       ClientConfig{ClientCDPSendTimeoutMS: 9876},
 			Upstream:           UpstreamTransportOptions{UpstreamWSConnectErrorSettleTimeoutMS: 7654},
 			ServerBrowserToken: "token-1",
 		},
 	})
 
-	if cdp.Launcher.LauncherLocalExecutablePath != "/tmp/chrome" {
-		t.Fatalf("Launcher.LauncherLocalExecutablePath = %q", cdp.Launcher.LauncherLocalExecutablePath)
+	if cdp.Config.Launcher.LauncherLocalExecutablePath != "/tmp/chrome" {
+		t.Fatalf("Launcher.LauncherLocalExecutablePath = %q", cdp.Config.Launcher.LauncherLocalExecutablePath)
 	}
-	if cdp.Launcher.LauncherLocalUserDataDir != "/tmp/profile" {
-		t.Fatalf("Launcher.LauncherLocalUserDataDir = %q", cdp.Launcher.LauncherLocalUserDataDir)
+	if cdp.Config.Launcher.LauncherLocalUserDataDir != "/tmp/profile" {
+		t.Fatalf("Launcher.LauncherLocalUserDataDir = %q", cdp.Config.Launcher.LauncherLocalUserDataDir)
 	}
-	if cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 321 {
-		t.Fatalf("Upstream.UpstreamWSConnectErrorSettleTimeoutMS = %d", cdp.Upstream.UpstreamWSConnectErrorSettleTimeoutMS)
+	if cdp.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 321 {
+		t.Fatalf("Upstream.UpstreamWSConnectErrorSettleTimeoutMS = %d", cdp.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS)
 	}
-	if cdp.Injector.InjectorExecutionContextTimeoutMS != 4321 {
-		t.Fatalf("Injector.InjectorExecutionContextTimeoutMS = %d", cdp.Injector.InjectorExecutionContextTimeoutMS)
+	if cdp.Config.Injector.InjectorExecutionContextTimeoutMS != 4321 {
+		t.Fatalf("Injector.InjectorExecutionContextTimeoutMS = %d", cdp.Config.Injector.InjectorExecutionContextTimeoutMS)
 	}
-	if cdp.Injector.InjectorServiceWorkerProbeTimeoutMS != 5432 {
-		t.Fatalf("Injector.InjectorServiceWorkerProbeTimeoutMS = %d", cdp.Injector.InjectorServiceWorkerProbeTimeoutMS)
+	if cdp.Config.Injector.InjectorServiceWorkerProbeTimeoutMS != 5432 {
+		t.Fatalf("Injector.InjectorServiceWorkerProbeTimeoutMS = %d", cdp.Config.Injector.InjectorServiceWorkerProbeTimeoutMS)
 	}
-	if cdp.Injector.InjectorServiceWorkerReadyTimeoutMS != 6543 {
-		t.Fatalf("Injector.InjectorServiceWorkerReadyTimeoutMS = %d", cdp.Injector.InjectorServiceWorkerReadyTimeoutMS)
+	if cdp.Config.Injector.InjectorServiceWorkerReadyTimeoutMS != 6543 {
+		t.Fatalf("Injector.InjectorServiceWorkerReadyTimeoutMS = %d", cdp.Config.Injector.InjectorServiceWorkerReadyTimeoutMS)
 	}
-	if cdp.Injector.InjectorServiceWorkerPollIntervalMS != 76 {
-		t.Fatalf("Injector.InjectorServiceWorkerPollIntervalMS = %d", cdp.Injector.InjectorServiceWorkerPollIntervalMS)
+	if cdp.Config.Injector.InjectorServiceWorkerPollIntervalMS != 76 {
+		t.Fatalf("Injector.InjectorServiceWorkerPollIntervalMS = %d", cdp.Config.Injector.InjectorServiceWorkerPollIntervalMS)
 	}
-	if cdp.Injector.InjectorTargetSessionPollIntervalMS != 87 {
-		t.Fatalf("Injector.InjectorTargetSessionPollIntervalMS = %d", cdp.Injector.InjectorTargetSessionPollIntervalMS)
+	if cdp.Config.Injector.InjectorTargetSessionPollIntervalMS != 87 {
+		t.Fatalf("Injector.InjectorTargetSessionPollIntervalMS = %d", cdp.Config.Injector.InjectorTargetSessionPollIntervalMS)
 	}
-	if cdp.ClientOptions.ClientRoutes["*.*"] != "direct_cdp" {
-		t.Fatalf("ClientOptions.ClientRoutes[*.*] = %q", cdp.ClientOptions.ClientRoutes["*.*"])
+	if cdp.Config.ClientConfig.ClientRoutes["*.*"] != "direct_cdp" {
+		t.Fatalf("ClientConfig.ClientRoutes[*.*] = %q", cdp.Config.ClientConfig.ClientRoutes["*.*"])
 	}
-	if cdp.ClientOptions.ClientHydrateAliases == nil || *cdp.ClientOptions.ClientHydrateAliases {
-		t.Fatalf("ClientOptions.ClientHydrateAliases = %#v", cdp.ClientOptions.ClientHydrateAliases)
+	if cdp.Config.ClientConfig.ClientHydrateAliases == nil || *cdp.Config.ClientConfig.ClientHydrateAliases {
+		t.Fatalf("ClientConfig.ClientHydrateAliases = %#v", cdp.Config.ClientConfig.ClientHydrateAliases)
 	}
 	if _, err := cdp.Browser.GetVersion(); err == nil || !strings.Contains(err.Error(), "client_hydrate_aliases is false") {
 		t.Fatalf("Browser.GetVersion with aliases disabled error = %v", err)
 	}
-	if cdp.ClientOptions.ClientMirrorUpstreamEvents == nil || *cdp.ClientOptions.ClientMirrorUpstreamEvents {
-		t.Fatalf("ClientOptions.ClientMirrorUpstreamEvents = %#v", cdp.ClientOptions.ClientMirrorUpstreamEvents)
+	if cdp.Config.ClientConfig.ClientMirrorUpstreamEvents == nil || *cdp.Config.ClientConfig.ClientMirrorUpstreamEvents {
+		t.Fatalf("ClientConfig.ClientMirrorUpstreamEvents = %#v", cdp.Config.ClientConfig.ClientMirrorUpstreamEvents)
 	}
-	if cdp.ClientOptions.ClientCDPSendTimeoutMS != 1234 {
-		t.Fatalf("ClientOptions.ClientCDPSendTimeoutMS = %d", cdp.ClientOptions.ClientCDPSendTimeoutMS)
+	if cdp.Config.ClientConfig.ClientCDPSendTimeoutMS != 1234 {
+		t.Fatalf("ClientConfig.ClientCDPSendTimeoutMS = %d", cdp.Config.ClientConfig.ClientCDPSendTimeoutMS)
 	}
-	if cdp.ClientOptions.ClientEventWaitTimeoutMS != 2345 {
-		t.Fatalf("ClientOptions.ClientEventWaitTimeoutMS = %d", cdp.ClientOptions.ClientEventWaitTimeoutMS)
+	if cdp.Config.ClientConfig.ClientEventWaitTimeoutMS != 2345 {
+		t.Fatalf("ClientConfig.ClientEventWaitTimeoutMS = %d", cdp.Config.ClientConfig.ClientEventWaitTimeoutMS)
 	}
 	params := cdp.serverConfigureParams(nil, nil, nil)
-	clientOptionsConfig := params["client_options"].(map[string]any)
-	routes := clientOptionsConfig["client_routes"].(map[string]string)
+	clientConfigConfig := params["client_config"].(map[string]any)
+	routes := clientConfigConfig["client_routes"].(map[string]string)
 	routerConfig := params["router"].(map[string]any)
 	upstreamConfig := params["upstream"].(map[string]any)
 	if routes["*.*"] != "direct_cdp" {
@@ -118,8 +124,8 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if params["server_browser_token"] != "token-1" {
 		t.Fatalf("configure browser_token = %#v", params["server_browser_token"])
 	}
-	if clientOptionsConfig["client_cdp_send_timeout_ms"] != 9876 {
-		t.Fatalf("configure cdp_send_timeout_ms = %#v", clientOptionsConfig["client_cdp_send_timeout_ms"])
+	if clientConfigConfig["client_cdp_send_timeout_ms"] != 9876 {
+		t.Fatalf("configure cdp_send_timeout_ms = %#v", clientConfigConfig["client_cdp_send_timeout_ms"])
 	}
 	if routerConfig["loopback_execution_context_timeout_ms"] != 8765 {
 		t.Fatalf("configure loopback_execution_context_timeout_ms = %#v", routerConfig["loopback_execution_context_timeout_ms"])
@@ -130,7 +136,7 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 }
 
 func TestModCDPClientDispatchesRootEventsBeforeExtensionSessionAttached(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 	seen := make(chan string, 1)
 	cdp.On("Target.targetCreated", func(payload any) {
 		event, _ := payload.(map[string]any)
@@ -164,7 +170,7 @@ func TestModCDPClientDispatchesRootEventsBeforeExtensionSessionAttached(t *testi
 }
 
 func TestModCDPClientEventDispatchSnapshotsHandlersWhenOnceRemovesItself(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 	cdp.ExtSessionID = "ext-session"
 	seen := make(chan string, 3)
 	cdp.Once("Target.targetCreated", func(payload any) {
@@ -230,8 +236,8 @@ func TestModCDPClientEventDispatchSnapshotsHandlersWhenOnceRemovesItself(t *test
 	}
 }
 
-func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
-	encoded, err := json.Marshal(Options{
+func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
+	encoded, err := json.Marshal(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:                      "local",
 			LauncherLocalExecutablePath:       "/tmp/chrome",
@@ -254,13 +260,13 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 			InjectorServiceWorkerReadyExpression: "Boolean(globalThis.ModCDP)",
 			InjectorExecutionContextTimeoutMS:    4_321,
 		},
-		ClientOptions: ClientOptions{
+		ClientConfig: ClientConfig{
 			ClientRoutes:               map[string]string{"*.*": "service_worker"},
 			ClientHydrateAliases:       boolPtr(false),
 			ClientMirrorUpstreamEvents: boolPtr(false),
 			ClientCDPSendTimeoutMS:     987,
 		},
-		ServerOptions: &ServerConfig{
+		ServerConfig: &ServerConfig{
 			Upstream: UpstreamTransportOptions{UpstreamWSCDPURL: "http://127.0.0.1:9222"},
 		},
 		CustomCommands: []CustomCommand{{Name: "Custom.echo", Expression: "async () => null"}},
@@ -297,7 +303,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 		`"injector_require_service_worker_target"`,
 		`"injector_service_worker_ready_expression"`,
 		`"injector_execution_context_timeout_ms"`,
-		`"client_options"`,
+		`"client_config"`,
 		`"client_hydrate_aliases"`,
 		`"client_mirror_upstream_events"`,
 		`"client_cdp_send_timeout_ms"`,
@@ -309,28 +315,28 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	}
 }
 
-func TestModCDPClientOptionsUnmarshalNullServerOptionsDisablesServerConfig(t *testing.T) {
-	var options Options
-	if err := json.Unmarshal([]byte(`{"server_options": null}`), &options); err != nil {
+func TestModCDPClientConfigUnmarshalNullServerConfigDisablesServerConfig(t *testing.T) {
+	var config Config
+	if err := json.Unmarshal([]byte(`{"server_config": null}`), &config); err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(options)
+	cdp := New(config)
 
-	if cdp.ServerOptions != nil {
-		t.Fatalf("ServerOptions = %#v", cdp.ServerOptions)
+	if cdp.Config.ServerConfig != nil {
+		t.Fatalf("ServerConfig = %#v", cdp.Config.ServerConfig)
 	}
 }
 
 func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.T) {
-	cdp := New(Options{
+	cdp := New(Config{
 		Injector: InjectorOptions{
 			InjectorMode:                     "borrow",
 			InjectorServiceWorkerURLSuffixes: []string{},
 		},
 	})
 
-	if len(cdp.Injector.InjectorServiceWorkerURLSuffixes) != 0 {
-		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Injector.InjectorServiceWorkerURLSuffixes)
+	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 0 {
+		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Config.Injector.InjectorServiceWorkerURLSuffixes)
 	}
 	injectorConfig := cdp.baseInjectorOptions(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 0 {
@@ -338,19 +344,19 @@ func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.
 	}
 }
 
-func TestModCDPClientPreservesExplicitNoneServerOptionsConfig(t *testing.T) {
-	cdp := New(Options{ServerOptions: ServerOptionsNone})
+func TestModCDPClientPreservesExplicitNoneServerConfigConfig(t *testing.T) {
+	cdp := New(Config{ServerConfig: ServerConfigNone})
 
-	if cdp.ServerOptions != nil {
-		t.Fatalf("ServerOptions = %#v", cdp.ServerOptions)
+	if cdp.Config.ServerConfig != nil {
+		t.Fatalf("ServerConfig = %#v", cdp.Config.ServerConfig)
 	}
 }
 
 func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 
-	if len(cdp.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
-		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Injector.InjectorServiceWorkerURLSuffixes)
+	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Config.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
+		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Config.Injector.InjectorServiceWorkerURLSuffixes)
 	}
 	injectorConfig := cdp.baseInjectorOptions(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 1 || injectorConfig.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
@@ -358,8 +364,8 @@ func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.
 	}
 }
 
-func TestModCDPClientOrdersLocalAutoInjectionAsLaunchFlagThenLoadUnpackedFallback(t *testing.T) {
-	cdp := New(Options{
+func TestModCDPClientUsesConfiguredInjectorOnly(t *testing.T) {
+	cdp := New(Config{
 		Launcher: LaunchOptions{LauncherMode: "local"},
 		Injector: InjectorOptions{InjectorMode: "cli"},
 	})
@@ -379,12 +385,7 @@ func TestModCDPClientOrdersLocalAutoInjectionAsLaunchFlagThenLoadUnpackedFallbac
 			got = append(got, fmt.Sprintf("%T", injector))
 		}
 	}
-	want := []string{
-		"CLIExtensionInjector",
-		"CDPExtensionInjector",
-		"DiscoverExtensionInjector",
-		"BorrowExtensionInjector",
-	}
+	want := []string{"CLIExtensionInjector"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("injector order = %#v", got)
 	}
@@ -398,12 +399,12 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 	}{
 		{
 			name: "upstream",
-			cdp:  New(Options{Upstream: UpstreamTransportOptions{UpstreamMode: "bogus"}}),
+			cdp:  New(Config{Upstream: UpstreamTransportOptions{UpstreamMode: "bogus"}}),
 			want: "unknown upstream.upstream_mode=bogus",
 		},
 		{
 			name: "launch",
-			cdp: New(Options{
+			cdp: New(Config{
 				Launcher: LaunchOptions{LauncherMode: "bogus"},
 				Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
 			}),
@@ -411,7 +412,7 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 		},
 		{
 			name: "injector",
-			cdp: New(Options{
+			cdp: New(Config{
 				Launcher: LaunchOptions{LauncherMode: "none"},
 				Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
 				Injector: InjectorOptions{InjectorMode: "bogus"},
@@ -432,7 +433,7 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:                      "local",
 			LauncherLocalHeadless:             boolPtr(headless),
@@ -446,12 +447,12 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 			InjectorTrustServiceWorkerTarget:    true,
 			InjectorServiceWorkerProbeTimeoutMS: 30_000,
 		},
-		ClientOptions: ClientOptions{
+		ClientConfig: ClientConfig{
 			ClientRoutes:             map[string]string{"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"},
 			ClientCDPSendTimeoutMS:   30_000,
 			ClientEventWaitTimeoutMS: 30_000,
 		},
-		ServerOptions: &ServerConfig{
+		ServerConfig: &ServerConfig{
 			Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
 		},
 	})
@@ -610,7 +611,7 @@ func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer rawConn.Close()
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: chrome.CDPURL},
 		Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: chrome.CDPURL},
 		Injector: InjectorOptions{
@@ -621,7 +622,7 @@ func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) 
 			InjectorServiceWorkerReadyTimeoutMS: 30_000,
 			InjectorServiceWorkerProbeTimeoutMS: 30_000,
 		},
-		ClientOptions: ClientOptions{ClientRoutes: map[string]string{"*.*": "direct_cdp"}},
+		ClientConfig: ClientConfig{ClientRoutes: map[string]string{"*.*": "direct_cdp"}},
 	})
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
@@ -658,7 +659,7 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
@@ -676,7 +677,7 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ServerOptions: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		ServerConfig: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 
@@ -724,7 +725,7 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 }
 
 func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
@@ -858,7 +859,7 @@ func maxPathNumber(value string) int {
 }
 
 func TestCustomCommandSchemasValidateParamsAndResults(t *testing.T) {
-	cdp := New(Options{
+	cdp := New(Config{
 		CustomCommands: []CustomCommand{
 			{
 				Name: "Custom.echo",
@@ -878,22 +879,22 @@ func TestCustomCommandSchemasValidateParamsAndResults(t *testing.T) {
 		},
 	})
 
-	if err := cdp.validateCommandParams("Custom.echo", map[string]any{"value": "ok"}); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"value": "ok"}); err != nil {
 		t.Fatalf("expected valid params, got %v", err)
 	}
-	if err := cdp.validateCommandParams("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "params_schema") {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "params_schema") {
 		t.Fatalf("expected params schema error, got %v", err)
 	}
-	if err := cdp.validateCommandResult("Custom.echo", map[string]any{"value": "ok"}); err != nil {
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"value": "ok"}); err != nil {
 		t.Fatalf("expected valid result, got %v", err)
 	}
-	if err := cdp.validateCommandResult("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "result_schema") {
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "result_schema") {
 		t.Fatalf("expected result schema error, got %v", err)
 	}
 }
 
 func TestCustomEventSchemasValidatePayloads(t *testing.T) {
-	cdp := New(Options{
+	cdp := New(Config{
 		CustomEvents: []CustomEvent{
 			{
 				Name: "Custom.changed",
@@ -907,14 +908,14 @@ func TestCustomEventSchemasValidatePayloads(t *testing.T) {
 		},
 	})
 
-	if _, ok := cdp.validateEventData("Custom.changed", map[string]any{"targetId": "target-1"}); !ok {
+	if _, ok := cdp.Types.ParseEventPayload("Custom.changed", map[string]any{"targetId": "target-1"}); !ok {
 		t.Fatal("expected valid event payload")
 	}
-	expectPanic(t, func() { cdp.validateEventData("Custom.changed", map[string]any{"targetId": 1}) })
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.changed", map[string]any{"targetId": 1}) })
 }
 
 func TestTypedCDPSurfaceInitializesAndEncodesParams(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 	if cdp.Target.client != cdp {
 		t.Fatal("expected Target domain to be initialized with the client")
 	}

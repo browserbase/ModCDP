@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.ModCDPClientRoutedDefaultOverrides.ts
+// - ./python/tests/test_ModCDPClientRoutedDefaultOverrides.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package client
 
 import (
@@ -64,7 +70,7 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner := New(Options{
+	owner := New(Config{
 		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: &headless,
@@ -80,7 +86,7 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	if err := owner.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	cdp := New(Options{
+	cdp := New(Config{
 		Launcher: LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
 		Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
 		Injector: InjectorOptions{
@@ -88,14 +94,14 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientOptions: ClientOptions{
+		ClientConfig: ClientConfig{
 			ClientRoutes: map[string]string{
 				"Target.getTargets":         "service_worker",
 				"Target.createTarget":       "service_worker",
 				"Target.setDiscoverTargets": "service_worker",
 			},
 		},
-		ServerOptions: &ServerConfig{
+		ServerConfig: &ServerConfig{
 			Upstream: UpstreamTransportOptions{UpstreamWSCDPURL: owner.CDPURL},
 			Router:   RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
 		},
@@ -109,8 +115,8 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	if cdp.CDPURL != owner.CDPURL {
 		t.Fatalf("CDPURL = %q, expected %q", cdp.CDPURL, owner.CDPURL)
 	}
-	if cdp.ServerOptions.Upstream.UpstreamWSCDPURL != owner.CDPURL {
-		t.Fatalf("server_options upstream cdp url = %q, expected %q", cdp.ServerOptions.Upstream.UpstreamWSCDPURL, owner.CDPURL)
+	if cdp.Config.ServerConfig.Upstream.UpstreamWSCDPURL != owner.CDPURL {
+		t.Fatalf("server_config upstream cdp url = %q, expected %q", cdp.Config.ServerConfig.Upstream.UpstreamWSCDPURL, owner.CDPURL)
 	}
 
 	rawTargets, err := cdp.Send("Target.getTargets", nil)

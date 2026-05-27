@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.BorrowExtensionInjector.ts
+// - ./python/tests/test_BorrowExtensionInjector.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package injector_test
 
 import (
@@ -13,7 +19,7 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker
 		t.Fatal(err)
 	}
 	headless := true
-	owner := modcdp.New(modcdp.Options{
+	owner := modcdp.New(modcdp.Config{
 		Launcher: modcdp.LaunchOptions{LauncherMode: "local", LauncherLocalHeadless: &headless},
 		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorOptions{
@@ -28,7 +34,7 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker
 	if err := owner.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	cdp := modcdp.New(modcdp.Options{
+	cdp := modcdp.New(modcdp.Config{
 		Launcher: modcdp.LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
 		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
 		Injector: modcdp.InjectorOptions{

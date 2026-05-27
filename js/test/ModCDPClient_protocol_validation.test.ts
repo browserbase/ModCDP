@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./python/tests/test_ModCDPClient_protocol_validation.py
+// - ./go/modcdp/client/ModCDPClient_protocol_validation_test.go
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { z } from "zod";
@@ -12,7 +18,7 @@ test("native CDP schemas validate method params, return values, and event payloa
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
   const runtime_params: cdp.types.ts.Runtime.EvaluateParams = {
     expression: "1 + 1",
@@ -77,7 +83,7 @@ test("Mod schemas validate method params, return values, event payloads, and mid
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
   const ping_params: cdp.types.ts.Mod.PingParams = { sent_at: 123 };
   const ping_result: cdp.types.ts.Mod.PingResponse = { ok: true };
@@ -159,7 +165,7 @@ test("constructor custom schemas validate command params, return values, events,
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
     types: {
       custom_commands: {
         "Custom.sum": {
@@ -246,7 +252,7 @@ test("dynamic Mod registration updates custom command, event, and middleware val
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
 
   assert.deepEqual(
@@ -304,7 +310,7 @@ test("client.types update replaces the registry with extended runtime validation
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
   const updated_types = client.types.update({
     custom_commands: {
@@ -328,7 +334,7 @@ test("client.types update replaces the registry with extended runtime validation
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
     types: updated_types,
   });
   client.types = updated_types;

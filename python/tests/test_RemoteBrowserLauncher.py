@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.RemoteBrowserLauncher.ts
+# - ./go/modcdp/launcher/RemoteBrowserLauncher_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import json
@@ -27,7 +33,7 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
             if not isinstance(from_http_cdp_url, str):
                 self.fail(f"cdp_url = {from_http_cdp_url!r}")
             ws = create_connection(from_http_cdp_url, timeout=10)
-            _expect_cdp_browser_surface(ws)
+            expect_cdp_browser_surface(ws)
             from_http["close"]()
 
             from_host_port = RemoteBrowserLauncher({"launcher_remote_cdp_url": f"127.0.0.1:{port}"}).launch()
@@ -44,7 +50,7 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
 
             from_ws = RemoteBrowserLauncher().launch({"launcher_remote_cdp_url": local["cdp_url"]})
             self.assertEqual(from_ws["cdp_url"], local["cdp_url"])
-            _expect_cdp_browser_surface(ws)
+            expect_cdp_browser_surface(ws)
             from_ws["close"]()
         finally:
             if ws is not None:
@@ -58,10 +64,14 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
         launched["close"]()
 
 
-def _expect_cdp_browser_surface(ws) -> None:
+# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+# Keep the setup semantics above 1:1 with translated tests; helpers here only send real CDP messages to real browser endpoints.
+def expect_cdp_browser_surface(ws) -> None:
     ws.send(json.dumps({"id": 1, "method": "Browser.getVersion", "params": {}}))
     message = json.loads(ws.recv())
-    if not isinstance(message.get("result", {}).get("product"), str):
+    result = message.get("result", {}) if isinstance(message, dict) else {}
+    product = result.get("product") if isinstance(result, dict) else None
+    if not isinstance(product, str) or ("Chrome" not in product and "Chromium" not in product):
         raise AssertionError(f"Browser.getVersion result = {message!r}")
 
 

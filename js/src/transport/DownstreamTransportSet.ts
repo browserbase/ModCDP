@@ -39,7 +39,7 @@ class DownstreamTransportSet {
   private downstream_client_lease: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
-    this.config = ModCDPDownstreamConfigSchema.parse(options);
+    this.config = ModCDPDownstreamConfigSchema.parse({ closeBrowser: () => {}, ...options });
   }
 
   update(config: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
@@ -136,7 +136,14 @@ class DownstreamTransportSet {
   }
 
   /** Mirror all CDP-shaped ModCDPClient events into downstream transports. */
-  mirrorEventsFrom(client: ModCDPClient) {
+  mirrorEventsFrom(
+    client: ModCDPClient,
+    {
+      transformEvent,
+    }: {
+      transformEvent?: (message: CdpEventMessage) => CdpEventMessage | null | Promise<CdpEventMessage | null>;
+    } = {},
+  ) {
     const listener = (event_name: unknown, payload: unknown, cdpSessionId: unknown) => {
       if (typeof event_name !== "string" || !event_name.includes(".")) return;
       const message: CdpEventMessage = {
@@ -144,7 +151,10 @@ class DownstreamTransportSet {
         params: (payload ?? {}) as CdpEventMessage["params"],
       };
       if (typeof cdpSessionId === "string") message.sessionId = cdpSessionId;
-      this.sendEvent(message);
+      void (async () => {
+        const transformed_message = transformEvent ? await transformEvent(message) : message;
+        if (transformed_message != null) this.sendEvent(transformed_message);
+      })();
     };
     client.on("*", listener);
     return { remove: () => client.off("*", listener) };

@@ -1,30 +1,22 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.BBExtensionInjector.ts
+# - ./go/modcdp/injector/BBExtensionInjector_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import patch
 
 from modcdp import ModCDPClient
-from modcdp.injector.BBExtensionInjector import BBExtensionInjector
 
 HERE = Path(__file__).resolve().parent
 EXTENSION_PATH = HERE.parents[1] / "dist" / "extension"
 
 
 class BBExtensionInjectorTests(unittest.TestCase):
-    def test_prepares_default_packaged_extension_zip_when_path_is_omitted(self) -> None:
-        injector = BBExtensionInjector()
-        try:
-            with patch.object(injector, "_uploadExtension", return_value="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") as upload:
-                injector.prepare()
-            self.assertTrue(str(injector.options.get("injector_cli_extension_path", "")).endswith("extension.zip"))
-            self.assertTrue(str(injector.zip_path or "").endswith("extension.zip"))
-            upload.assert_called_once_with(injector.zip_path)
-            self.assertEqual(injector.configForLauncher(), {"injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
-        finally:
-            injector.close()
-
     def test_uploads_real_extension_and_launches_browserbase_browser_with_it_installed(self) -> None:
         if not os.environ.get("BROWSERBASE_API_KEY", "").strip():
             self.fail("BROWSERBASE_API_KEY is required for live Browserbase tests")

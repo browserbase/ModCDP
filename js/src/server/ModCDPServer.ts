@@ -88,8 +88,8 @@ class ModCDPServer {
           ...(options.router?.router_routes ?? {}),
         },
       },
-      client_options: options.client_options ?? {},
-      server_options: null,
+      client_config: options.client_config ?? {},
+      server_config: null,
       types: {
         custom_commands: options.custom_commands ?? [],
         custom_events: options.custom_events ?? [],
@@ -128,7 +128,19 @@ class ModCDPServer {
       ]) {
         this.downstream.add(transport);
       }
-      this.downstream.mirrorEventsFrom(this.client);
+      this.downstream.mirrorEventsFrom(this.client, {
+        transformEvent: async (message) => {
+          const cdpSessionId = message.sessionId ?? null;
+          const params = await this.runMiddleware("event", message.method, message.params ?? {}, {
+            cdpSessionId,
+            event: message,
+          });
+          return {
+            ...message,
+            params: this.types.parseEventPayload(message.method, params ?? {}),
+          };
+        },
+      });
       this.downstream.onRequest(async (message): Promise<CdpResponseMessage> => {
         try {
           return {
@@ -266,6 +278,19 @@ class ModCDPServer {
 
     const types = this.types;
     params = types.parseCommandParams(method, params);
+    if (method === "Mod.configure") {
+      /*
+       * Mod.configure is the bootstrap command for the service-worker server.
+       * It may be the first request received over a downstream-only transport
+       * such as reversews/nativemessaging/nats, before this server has applied
+       * the caller's upstream/router config. Params and results still go
+       * through CDPTypes exactly like every other command; only execution is
+       * handled directly so the configure payload can install the remote
+       * registry entries used by later service-worker commands.
+       */
+      await this.configure(ModCDPConfigureParamsSchema.parse(params));
+      return types.parseCommandResult(method, {}) as ProtocolResult;
+    }
     let result;
     const command = types.custom_commands.get(method);
     if (command) {

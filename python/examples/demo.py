@@ -87,7 +87,7 @@ def parse_args(argv):
     return mode, live, upstream_mode
 
 
-def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
+def client_config_for(mode, upstream_mode, cdp_url, launch_options=None):
     upstream: ProtocolPayload = {"upstream_mode": upstream_mode, "upstream_ws_cdp_url": cdp_url}
     injector: ProtocolPayload = {
         "injector_mode": "discover" if cdp_url else "cli",
@@ -102,17 +102,17 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
             "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
             "upstream": upstream,
             "injector": injector,
-            "client_options": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
+            "client_config": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
         }
-    server_options = {
+    server_config = {
         "router": {"router_routes": server_router_routes_for(mode, upstream_mode), "loopback_execution_context_timeout_ms": DEMO_EXECUTION_CONTEXT_TIMEOUT_MS},
     }
     return {
         "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
         "upstream": upstream,
         "injector": injector,
-        "client_options": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
-        "server_options": server_options,
+        "client_config": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
+        "server_config": server_config,
     }
 
 
@@ -154,7 +154,7 @@ def main():
             if os.environ.get("CHROME_PATH"):
                 launch_options["launcher_local_executable_path"] = os.environ["CHROME_PATH"]
 
-        cdp = ModCDPClient(**client_options_for(mode, upstream_mode, cdp_url, launch_options))
+        cdp = ModCDPClient(**client_config_for(mode, upstream_mode, cdp_url, launch_options))
 
         cdp.connect()
         print(f"upstream cdp: {cdp.cdp_url}")
@@ -167,7 +167,7 @@ def main():
                 "router_routes": server_router_routes_for(mode, upstream_mode),
                 "loopback_execution_context_timeout_ms": DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
             },
-            "client_options": {"client_routes": client_routes_for(mode)},
+            "client_config": {"client_routes": client_routes_for(mode)},
         }
         configure_result = expect_object(cdp.send("Mod.configure", configure_params), "Mod.configure")
         if expect_object(expect_object(configure_result.get("router"), "Mod.configure.router").get("router_routes"), "Mod.configure.router.router_routes").get("*.*") != server_router_routes_for(mode, upstream_mode)["*.*"]:

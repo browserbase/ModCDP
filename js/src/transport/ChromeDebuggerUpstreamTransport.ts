@@ -77,7 +77,10 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     this.installEventListener();
     if (!chrome_api?.debugger?.getTargets) throw new Error("chrome.debugger is unavailable.");
     const targetInfos = (await chrome_api.debugger.getTargets()).map((target) => {
-      if (typeof target.tabId === "number") this.targetId_from_tabId.set(target.tabId, target.id);
+      if (typeof target.tabId === "number") {
+        this.targetId_from_tabId.set(target.tabId, target.id);
+        this.debuggee_from_targetId.set(target.id, { tabId: target.tabId });
+      }
       return {
         targetId: target.id,
         type: target.type,
@@ -85,7 +88,6 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
         url: target.url,
         attached: target.attached,
         canAccessOpener: false,
-        ...(typeof target.tabId === "number" ? { tabId: target.tabId } : {}),
       };
     });
     return Target.GetTargetsResult.parse({ targetInfos }).targetInfos;
@@ -195,8 +197,7 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     const targets = await this.getTargets();
     const target = targets.find((candidate) => candidate.targetId === targetId);
     if (!target) throw new Error(`chromedebugger could not resolve targetId=${targetId}.`);
-    const tabId = typeof target.tabId === "number" ? target.tabId : null;
-    return tabId == null ? { targetId } : { tabId };
+    return this.debuggee_from_targetId.get(targetId) ?? { targetId };
   }
 
   private async defaultDebuggee() {

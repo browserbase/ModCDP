@@ -130,7 +130,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
       router: {
         router_routes: clientRoutesFor(mode),
       },
-      client_options: {
+      client_config: {
         client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
       },
     };
@@ -142,10 +142,10 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     router: {
       router_routes: clientRoutesFor(mode),
     },
-    client_options: {
+    client_config: {
       client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
     },
-    server_options: {
+    server_config: {
       router: {
         router_routes: serverRoutesFor(mode, upstream_mode),
         loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,

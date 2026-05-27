@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.BBBrowserLauncher.ts
+# - ./go/modcdp/launcher/BBBrowserLauncher_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import json
@@ -45,9 +51,9 @@ class BBBrowserLauncherTests(unittest.TestCase):
                 self.fail(f"cdp_url = {cdp_url!r}")
             self.assertRegex(cdp_url, r"^wss://")
             ws = create_connection(cdp_url, timeout=LIVE_BROWSERBASE_TIMEOUT_S)
-            _expect_cdp_browser_surface(ws)
+            expect_cdp_browser_surface(ws)
 
-            retrieved = _retrieve_browserbase_session(session_id)
+            retrieved = retrieve_browserbase_session(session_id)
             self.assertEqual(retrieved.get("id"), session_id)
             self.assertEqual(retrieved.get("status"), "RUNNING")
 
@@ -59,7 +65,7 @@ class BBBrowserLauncherTests(unittest.TestCase):
             ).launch()
             self.assertEqual(resumed.get("browserbase_session_id"), session_id)
             self.assertRegex(resumed.get("cdp_url") or "", r"^wss://")
-            _expect_cdp_browser_surface(ws)
+            expect_cdp_browser_surface(ws)
         finally:
             if ws is not None:
                 ws.close()
@@ -70,15 +76,17 @@ class BBBrowserLauncherTests(unittest.TestCase):
 
         deadline = time.time() + 30
         while time.time() < deadline:
-            if _retrieve_browserbase_session(session_id).get("status") != "RUNNING":
+            if retrieve_browserbase_session(session_id).get("status") != "RUNNING":
                 return
             time.sleep(1)
         self.fail("Browserbase session did not leave RUNNING status after release")
 
 
-def _retrieve_browserbase_session(session_id: str) -> dict:
+# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+# Keep the setup semantics above 1:1 with translated tests; helpers here only call real Browserbase APIs and real CDP endpoints.
+def retrieve_browserbase_session(session_id: str) -> dict:
     request = urllib.request.Request(
-        _browserbase_api_url(f"/v1/sessions/{session_id}"),
+        browserbase_api_url(f"/v1/sessions/{session_id}"),
         headers={"x-bb-api-key": os.environ["BROWSERBASE_API_KEY"]},
     )
     with urllib.request.urlopen(request, timeout=60) as response:
@@ -87,15 +95,17 @@ def _retrieve_browserbase_session(session_id: str) -> dict:
         return json.loads(response.read())
 
 
-def _browserbase_api_url(pathname: str) -> str:
+def browserbase_api_url(pathname: str) -> str:
     base_url = os.environ.get("BROWSERBASE_BASE_URL", "https://api.browserbase.com").rstrip("/")
     return f"{base_url}/{pathname.lstrip('/')}"
 
 
-def _expect_cdp_browser_surface(ws) -> None:
+def expect_cdp_browser_surface(ws) -> None:
     ws.send(json.dumps({"id": 1, "method": "Browser.getVersion", "params": {}}))
     message = json.loads(ws.recv())
-    if not isinstance(message.get("result", {}).get("product"), str):
+    result = message.get("result", {}) if isinstance(message, dict) else {}
+    product = result.get("product") if isinstance(result, dict) else None
+    if not isinstance(product, str) or ("Chrome" not in product and "Chromium" not in product):
         raise AssertionError(f"Browser.getVersion result = {message!r}")
 
 

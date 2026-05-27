@@ -40,7 +40,7 @@ func NewBBBrowserLauncher(options LaunchOptions) *BBBrowserLauncher {
 }
 
 func (l *BBBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
-	merged := mergeLaunchOptions(l.Options, options)
+	merged := mergeLaunchOptions(l.Config, options)
 	browserbaseAPIKey := firstString(merged.LauncherBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
 	if browserbaseAPIKey == "" {
 		return nil, fmt.Errorf("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key")

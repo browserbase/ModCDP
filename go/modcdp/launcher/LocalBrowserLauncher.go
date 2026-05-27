@@ -39,7 +39,7 @@ func (l *LocalBrowserLauncher) FreePort() (int, error) {
 }
 
 func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
-	options = mergeLaunchOptions(l.Options, options)
+	options = mergeLaunchOptions(l.Config, options)
 
 	executablePath, err := l.FindChromeBinary(options.LauncherLocalExecutablePath)
 	if err != nil {
@@ -439,7 +439,7 @@ func findChromeBinary(explicit string) (string, error) {
 			tried = append(tried, candidate)
 		}
 	}
-	return "", fmt.Errorf("no Chrome/Chromium binary found. Tried: %s. Set CHROME_PATH or pass Launch.Options.LauncherLocalExecutablePath", strings.Join(tried, ", "))
+	return "", fmt.Errorf("no Chrome/Chromium binary found. Tried: %s. Set CHROME_PATH or pass Launch.Config.LauncherLocalExecutablePath", strings.Join(tried, ", "))
 }
 
 func candidatePaths() []string {

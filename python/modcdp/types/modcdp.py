@@ -166,7 +166,7 @@ class ModCDPDownstreamConfig(TypedDict, total=False):
 class ModCDPServerConfig(TypedDict, total=False):
     upstream: dict[str, JsonValue]
     router: ModCDPRouterConfig
-    client_options: ModCDPClientConfig
+    client_config: ModCDPClientConfig
     downstream: ModCDPDownstreamConfig
     server_browser_token: str | None
     custom_commands: list[ModCDPAddCustomCommandParams]

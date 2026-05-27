@@ -100,22 +100,22 @@ type LaunchedBrowser struct {
 }
 
 type BrowserLauncher struct {
-	Options  LaunchOptions
+	Config   LaunchOptions
 	Launched *LaunchedBrowser
 }
 
 func NewBrowserLauncher(options LaunchOptions) BrowserLauncher {
-	return BrowserLauncher{Options: options}
+	return BrowserLauncher{Config: options}
 }
 
 func (l *BrowserLauncher) Update(config LaunchOptions) *BrowserLauncher {
-	l.Options = mergeLaunchOptions(l.Options, config)
+	l.Config = mergeLaunchOptions(l.Config, config)
 	return l
 }
 
 func (l BrowserLauncher) ConfigForUpstream() map[string]any {
 	return map[string]any{
-		"upstream_ws_cdp_url": firstString(launchedCDPURL(l.Launched), l.Options.LauncherRemoteCDPURL),
+		"upstream_ws_cdp_url": firstString(launchedCDPURL(l.Launched), l.Config.LauncherRemoteCDPURL),
 	}
 }
 
@@ -128,9 +128,9 @@ func (l BrowserLauncher) ConfigForServer() map[string]any {
 
 func (l BrowserLauncher) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{
-		InjectorBBAPIKey:      l.Options.LauncherBBAPIKey,
-		InjectorBBBaseURL:     l.Options.LauncherBBBaseURL,
-		InjectorBBExtensionID: l.Options.LauncherBBExtensionID,
+		InjectorBBAPIKey:      l.Config.LauncherBBAPIKey,
+		InjectorBBBaseURL:     l.Config.LauncherBBBaseURL,
+		InjectorBBExtensionID: l.Config.LauncherBBExtensionID,
 	}
 }
 

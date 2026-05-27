@@ -22,7 +22,7 @@ func NewCDPExtensionInjector(options InjectorOptions) CDPExtensionInjector {
 }
 
 func (i *CDPExtensionInjector) Prepare() error {
-	extensionPath := i.Options.InjectorCDPExtensionPath
+	extensionPath := i.Config.InjectorCDPExtensionPath
 	if i.UnpackedExtensionPath != "" {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 	if i.UnpackedExtensionPath == "" {
 		return nil, nil
 	}
-	loadResult, err := i.sendWithTimeout("Extensions.loadUnpacked", map[string]any{"path": i.UnpackedExtensionPath}, "", i.Options.InjectorCDPSendTimeoutMS)
+	loadResult, err := i.sendWithTimeout("Extensions.loadUnpacked", map[string]any{"path": i.UnpackedExtensionPath}, "", i.Config.InjectorCDPSendTimeoutMS)
 	if err != nil {
 		if strings.Contains(err.Error(), "Method not available") || strings.Contains(err.Error(), "Method not found") || strings.Contains(err.Error(), "wasn't found") {
 			i.LastError = err
@@ -54,10 +54,10 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 	if extensionID == "" {
 		return nil, fmt.Errorf("Extensions.loadUnpacked returned no extension id")
 	}
-	i.Options.InjectorCDPExtensionID = extensionID
-	i.Options.InjectorServiceWorkerExtensionID = extensionID
+	i.Config.InjectorCDPExtensionID = extensionID
+	i.Config.InjectorServiceWorkerExtensionID = extensionID
 	swURLPrefix := "chrome-extension://" + extensionID + "/"
-	deadline := time.Now().Add(time.Duration(i.Options.InjectorServiceWorkerReadyTimeoutMS) * time.Millisecond)
+	deadline := time.Now().Add(time.Duration(i.Config.InjectorServiceWorkerReadyTimeoutMS) * time.Millisecond)
 	for time.Now().Before(deadline) {
 		targets, err := i.targetInfos()
 		if err != nil {
@@ -69,7 +69,7 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 			if targetType != "service_worker" || !strings.HasPrefix(targetURL, swURLPrefix) {
 				continue
 			}
-			probed, err := i.probeTarget(target, i.Options.InjectorServiceWorkerProbeTimeoutMS, true)
+			probed, err := i.probeTarget(target, i.Config.InjectorServiceWorkerProbeTimeoutMS, true)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +79,7 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 				return probed, nil
 			}
 		}
-		time.Sleep(time.Duration(i.Options.InjectorServiceWorkerPollIntervalMS) * time.Millisecond)
+		time.Sleep(time.Duration(i.Config.InjectorServiceWorkerPollIntervalMS) * time.Millisecond)
 	}
 	return nil, fmt.Errorf("timed out waiting for service worker target for extension %s", extensionID)
 }

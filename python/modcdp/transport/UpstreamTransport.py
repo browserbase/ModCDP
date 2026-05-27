@@ -6,17 +6,24 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict
 
 
 UpstreamMode = Literal["ws"]
 
 
-class UpstreamTransportOptions(TypedDict, total=False):
-    upstream_mode: UpstreamMode
-    upstream_ws_cdp_url: str | None
-    upstream_ws_connect_error_settle_timeout_ms: int | None
-    upstream_cdp_send_timeout_ms: int | None
+class UpstreamTransportConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    upstream_mode: UpstreamMode = "ws"
+    upstream_ws_cdp_url: str | None = None
+    upstream_ws_connect_error_settle_timeout_ms: int = 250
+    upstream_cdp_send_timeout_ms: int = 10_000
+
+
+UpstreamTransportOptions = UpstreamTransportConfig | dict[str, Any]
 
 
 class UpstreamTransport:
@@ -24,21 +31,16 @@ class UpstreamTransport:
     url: str | None = None
 
     def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
-        options = cast(UpstreamTransportOptions, dict(options or {}))
-        self.upstream_ws_cdp_url = options.get("upstream_ws_cdp_url")
-        self.upstream_ws_connect_error_settle_timeout_ms = options.get("upstream_ws_connect_error_settle_timeout_ms")
-        self.upstream_cdp_send_timeout_ms = options.get("upstream_cdp_send_timeout_ms") or 10_000
+        self.config = _upstream_transport_config(options)
         self._recv_listeners: list[Callable[[dict[str, Any]], None]] = []
         self._close_listeners: list[Callable[[Exception], None]] = []
 
     def connect(self) -> None:
         raise NotImplementedError(f"{type(self).__name__}.connect is not implemented.")
 
-    def update(self, config: dict[str, Any] | None = None) -> "UpstreamTransport":
-        config = config or {}
-        self.upstream_ws_cdp_url = config.get("upstream_ws_cdp_url") or self.upstream_ws_cdp_url
-        self.upstream_ws_connect_error_settle_timeout_ms = config.get("upstream_ws_connect_error_settle_timeout_ms") or self.upstream_ws_connect_error_settle_timeout_ms
-        self.upstream_cdp_send_timeout_ms = config.get("upstream_cdp_send_timeout_ms") or self.upstream_cdp_send_timeout_ms
+    def update(self, config: UpstreamTransportOptions | None = None) -> "UpstreamTransport":
+        incoming = _upstream_transport_config(config)
+        self.config = UpstreamTransportConfig.model_validate({**self.config.model_dump(), **incoming.model_dump(exclude_unset=True)})
         return self
 
     def configForLauncher(self) -> dict[str, Any]:
@@ -109,3 +111,9 @@ class UpstreamTransport:
                 self._emit_recv(parsed)
         except Exception:
             return
+
+
+def _upstream_transport_config(options: UpstreamTransportOptions | None = None) -> UpstreamTransportConfig:
+    if isinstance(options, UpstreamTransportConfig):
+        return options
+    return UpstreamTransportConfig.model_validate(options or {})

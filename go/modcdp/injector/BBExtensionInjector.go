@@ -31,14 +31,14 @@ func NewBBExtensionInjector(options InjectorOptions) BBExtensionInjector {
 }
 
 func (i *BBExtensionInjector) Prepare() error {
-	if i.Options.InjectorBBExtensionID != "" {
-		i.ExtensionID = i.Options.InjectorBBExtensionID
+	if i.Config.InjectorBBExtensionID != "" {
+		i.ExtensionID = i.Config.InjectorBBExtensionID
 		return nil
 	}
 	if i.ExtensionID != "" {
 		return nil
 	}
-	extensionPath := i.Options.InjectorBBExtensionPath
+	extensionPath := i.Config.InjectorBBExtensionPath
 	if extensionPath == "" {
 		return nil
 	} else if strings.HasSuffix(extensionPath, ".zip") {
@@ -57,7 +57,7 @@ func (i *BBExtensionInjector) Prepare() error {
 		return err
 	}
 	i.ExtensionID = extensionID
-	i.Options.InjectorBBExtensionID = extensionID
+	i.Config.InjectorBBExtensionID = extensionID
 	return nil
 }
 
@@ -69,11 +69,11 @@ func (i *BBExtensionInjector) ConfigForLauncher() LaunchOptions {
 }
 
 func (i *BBExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
-	extensionID := i.Options.InjectorServiceWorkerExtensionID
-	i.Options.InjectorServiceWorkerExtensionID = ""
-	defer func() { i.Options.InjectorServiceWorkerExtensionID = extensionID }()
+	extensionID := i.Config.InjectorServiceWorkerExtensionID
+	i.Config.InjectorServiceWorkerExtensionID = ""
+	defer func() { i.Config.InjectorServiceWorkerExtensionID = extensionID }()
 
-	discovered, err := i.waitForReadyServiceWorker(i.Options.InjectorServiceWorkerReadyTimeoutMS, i.Options.InjectorTrustServiceWorkerTarget)
+	discovered, err := i.waitForReadyServiceWorker(i.Config.InjectorServiceWorkerReadyTimeoutMS, i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || discovered == nil {
 		return discovered, err
 	}
@@ -90,11 +90,11 @@ func (i *BBExtensionInjector) Close() error {
 }
 
 func (i *BBExtensionInjector) uploadExtension(zipPath string) (string, error) {
-	browserbaseAPIKey := firstNonEmptyString(i.Options.InjectorBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
+	browserbaseAPIKey := firstNonEmptyString(i.Config.InjectorBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
 	if browserbaseAPIKey == "" {
 		return "", fmt.Errorf("BBExtensionInjector requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key")
 	}
-	baseURL := firstNonEmptyString(i.Options.InjectorBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseBaseURL)
+	baseURL := firstNonEmptyString(i.Config.InjectorBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseBaseURL)
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	fileWriter, err := writer.CreateFormFile("file", filepath.Base(zipPath))

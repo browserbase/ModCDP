@@ -1,3 +1,8 @@
+// MODCDP_TS_ONLY_TEST: DO NOT TRANSLATE THIS TEST FILE TO OTHER LANGUAGES.
+// PipeUpstreamTransport: TS-only pipe upstream transport coverage.
+// If a translated sibling is added, all test cases, descriptions, covered edge cases, and setup must be kept perfectly 1:1 in sync.
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -74,7 +79,7 @@ test("pipe upstream launches a real browser without a CDP URL", async () => {
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server_options: { router: { router_routes: { "*.*": "chromedebugger" } } },
+    server_config: { router: { router_routes: { "*.*": "chromedebugger" } } },
   });
 
   try {

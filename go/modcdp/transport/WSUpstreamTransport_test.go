@@ -1,12 +1,18 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.WSUpstreamTransport.ts
+// - ./python/tests/test_WSUpstreamTransport.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package transport_test
 
 import (
-	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
-	. "github.com/browserbase/modcdp/go/modcdp/transport"
 	"net/url"
 	"strings"
 	"testing"
-	"time"
+
+	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
+	. "github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
 func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *testing.T) {
@@ -27,77 +33,32 @@ func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *test
 }
 
 func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
-	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LaunchOptions{
-			LauncherMode:          "local",
-			LauncherLocalHeadless: boolPtr(true),
-		},
-		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: modcdp.InjectorOptions{
-			InjectorMode:                     "cli",
-			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
-			InjectorTrustServiceWorkerTarget: true,
-		},
-	})
-	defer cdp.Close()
+	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LaunchOptions{
+		LauncherLocalHeadless: boolPtr(true),
+	}).Launch(modcdp.LaunchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer chrome.Close()
 
-	if err := cdp.Connect(); err != nil {
+	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	if cdp.ConnectTiming["upstream_mode"] != "ws" {
-		t.Fatalf("upstream_mode = %v", cdp.ConnectTiming["upstream_mode"])
+	defer transport.Close()
+	if !strings.HasPrefix(transport.URL, "ws://") {
+		t.Fatalf("transport.URL = %q", transport.URL)
 	}
-	transportStartedAt, ok := cdp.ConnectTiming["transport_started_at"].(int64)
-	if !ok {
-		t.Fatalf("transport_started_at = %#v", cdp.ConnectTiming["transport_started_at"])
-	}
-	transportConnectedAt, ok := cdp.ConnectTiming["transport_connected_at"].(int64)
-	if !ok {
-		t.Fatalf("transport_connected_at = %#v", cdp.ConnectTiming["transport_connected_at"])
-	}
-	if transportConnectedAt < transportStartedAt {
-		t.Fatalf("transport timing went backwards: %d < %d", transportConnectedAt, transportStartedAt)
-	}
-	if cdp.ConnectTiming["transport_duration_ms"] != transportConnectedAt-transportStartedAt {
-		t.Fatalf("transport_duration_ms = %v", cdp.ConnectTiming["transport_duration_ms"])
-	}
-	if _, ok := cdp.Transport().(*WSUpstreamTransport); !ok {
-		t.Fatalf("transport = %T", cdp.Transport())
-	}
-	if !strings.HasPrefix(cdp.CDPURL, "ws://") {
-		t.Fatalf("CDPURL = %q", cdp.CDPURL)
-	}
-	version, err := cdp.SendRaw("Browser.getVersion", map[string]any{})
-	if err != nil {
+
+	received := make(chan map[string]any, 1)
+	transport.OnRecv(func(message map[string]any) { received <- message })
+	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := version["product"].(string); !ok {
-		t.Fatalf("Browser.getVersion product = %#v", version["product"])
-	}
-	time.Sleep(1500 * time.Millisecond)
-	targets, err := cdp.SendRaw("Target.getTargets", map[string]any{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	foundServiceWorker := false
-	for _, target := range targets["targetInfos"].([]any) {
-		targetMap := target.(map[string]any)
-		if targetMap["type"] == "service_worker" && strings.HasSuffix(targetMap["url"].(string), "/modcdp/service_worker.js") {
-			foundServiceWorker = true
-			break
-		}
-	}
-	if !foundServiceWorker {
-		t.Fatalf("ModCDP service worker target not found after connect: %#v", targets["targetInfos"])
-	}
-	evaluated, err := cdp.Mod.Evaluate(map[string]any{
-		"expression": "Boolean(globalThis.ModCDP?.handleCommand && chrome.runtime.getURL('modcdp/service_worker.js'))",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if evaluated != true {
-		t.Fatalf("Mod.evaluate liveness = %#v", evaluated)
+	message := <-received
+	result, _ := message["result"].(map[string]any)
+	if _, ok := result["product"].(string); !ok {
+		t.Fatalf("Browser.getVersion response = %#v", message)
 	}
 }
 

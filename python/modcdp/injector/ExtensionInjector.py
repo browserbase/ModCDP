@@ -16,8 +16,9 @@ import zipfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
+from pydantic import BaseModel, ConfigDict, Field
 from ..launcher.BrowserLauncher import LauncherOptions
 from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
 
@@ -37,30 +38,36 @@ DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20
 SendCDP = Callable[[str, ProtocolParams | None, str | None], ProtocolResult]
 
 
-class InjectorOptions(TypedDict, total=False):
-    send: SendCDP | None
-    injector_cli_extension_path: str | None
-    injector_cli_extension_id: str | None
-    injector_cdp_extension_path: str | None
-    injector_cdp_extension_id: str | None
-    injector_bb_extension_path: str | None
-    injector_bb_extension_id: str | None
-    injector_discover_extension_path: str | None
-    injector_borrow_extension_path: str | None
-    injector_service_worker_extension_id: str | None
-    injector_service_worker_url_includes: list[str]
-    injector_service_worker_url_suffixes: list[str]
-    injector_trust_service_worker_target: bool
-    injector_require_service_worker_target: bool
-    injector_service_worker_ready_expression: str | None
-    injector_cdp_send_timeout_ms: int
-    injector_execution_context_timeout_ms: int
-    injector_service_worker_probe_timeout_ms: int
-    injector_service_worker_ready_timeout_ms: int
-    injector_service_worker_poll_interval_ms: int
-    injector_target_session_poll_interval_ms: int
-    injector_bb_api_key: str | None
-    injector_bb_base_url: str | None
+class InjectorConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    injector_mode: Literal["cli", "cdp", "bb", "discover", "borrow", "none"] = "none"
+    send: Any | None = None
+    injector_cli_extension_path: str | None = None
+    injector_cli_extension_id: str | None = None
+    injector_cdp_extension_path: str | None = None
+    injector_cdp_extension_id: str | None = None
+    injector_bb_extension_path: str | None = None
+    injector_bb_extension_id: str | None = None
+    injector_discover_extension_path: str | None = None
+    injector_borrow_extension_path: str | None = None
+    injector_service_worker_extension_id: str | None = None
+    injector_service_worker_url_includes: list[str] = Field(default_factory=list)
+    injector_service_worker_url_suffixes: list[str] = Field(default_factory=lambda: [*DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES])
+    injector_trust_service_worker_target: bool = False
+    injector_require_service_worker_target: bool = False
+    injector_service_worker_ready_expression: str = MODCDP_READY_EXPRESSION
+    injector_cdp_send_timeout_ms: int = DEFAULT_CDP_SEND_TIMEOUT_MS
+    injector_execution_context_timeout_ms: int = DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS
+    injector_service_worker_probe_timeout_ms: int = DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS
+    injector_service_worker_ready_timeout_ms: int = DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS
+    injector_service_worker_poll_interval_ms: int = DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS
+    injector_target_session_poll_interval_ms: int = DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS
+    injector_bb_api_key: str | None = None
+    injector_bb_base_url: str = "https://api.browserbase.com"
+
+
+InjectorOptions = InjectorConfig | dict[str, Any]
 
 
 def defaultModCDPExtensionPath() -> str | None:
@@ -127,55 +134,21 @@ class ExtensionInjectionResult(TypedDict):
 
 class ExtensionInjector:
     def __init__(self, options: InjectorOptions | None = None) -> None:
-        self.options = cast(InjectorOptions, {
-            "send": None,
-            "injector_cli_extension_path": None,
-            "injector_cli_extension_id": None,
-            "injector_cdp_extension_path": None,
-            "injector_cdp_extension_id": None,
-            "injector_bb_extension_path": None,
-            "injector_bb_extension_id": None,
-            "injector_discover_extension_path": None,
-            "injector_borrow_extension_path": None,
-            "injector_service_worker_extension_id": None,
-            "injector_service_worker_url_includes": [],
-            "injector_service_worker_url_suffixes": [],
-            "injector_trust_service_worker_target": False,
-            "injector_require_service_worker_target": False,
-            "injector_service_worker_ready_expression": None,
-            "injector_cdp_send_timeout_ms": DEFAULT_CDP_SEND_TIMEOUT_MS,
-            "injector_execution_context_timeout_ms": DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
-            "injector_service_worker_probe_timeout_ms": DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
-            "injector_service_worker_ready_timeout_ms": DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
-            "injector_service_worker_poll_interval_ms": DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
-            "injector_target_session_poll_interval_ms": DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS,
-            "injector_bb_api_key": None,
-            "injector_bb_base_url": None,
-            **dict(options or {}),
-        })
+        self.config = _injector_config(options)
         self.unusable_target_ids: set[str] = set()
+        self.source: str | None = None
+        self.extension_id: str | None = None
+        self.target_id: str | None = None
+        self.url: str | None = None
+        self.session_id: str | None = None
 
     def update(self, config: InjectorOptions | None = None) -> "ExtensionInjector":
-        config = cast(InjectorOptions, dict(config or {}))
-        self.options = cast(
-            InjectorOptions,
-            {
-                **self.options,
-                **config,
-                "injector_service_worker_url_includes": config.get(
-                    "injector_service_worker_url_includes",
-                    self.options.get("injector_service_worker_url_includes") or [],
-                ),
-                "injector_service_worker_url_suffixes": config.get(
-                    "injector_service_worker_url_suffixes",
-                    self.options.get("injector_service_worker_url_suffixes") or [],
-                ),
-            },
-        )
+        incoming = _injector_config(config)
+        self.config = InjectorConfig.model_validate({**self.config.model_dump(), **incoming.model_dump(exclude_unset=True)})
         return self
 
     def configForInjector(self) -> InjectorOptions:
-        return cast(InjectorOptions, dict(self.options))
+        return self.config
 
     def configForLauncher(self) -> LauncherOptions:
         return {}
@@ -192,9 +165,17 @@ class ExtensionInjector:
     def inject(self) -> ExtensionInjectionResult | None:
         raise NotImplementedError(f"{type(self).__name__}.inject is not implemented.")
 
+    def recordInjectionResult(self, result: ExtensionInjectionResult) -> "ExtensionInjector":
+        self.source = result["source"]
+        self.extension_id = result.get("extension_id")
+        self.target_id = result["target_id"]
+        self.url = result.get("url")
+        self.session_id = result["session_id"]
+        return self
+
     def _readyExpression(self) -> str:
-        expression = self.options.get("injector_service_worker_ready_expression")
-        if not expression:
+        expression = self.config.injector_service_worker_ready_expression
+        if expression == MODCDP_READY_EXPRESSION:
             return MODCDP_READY_EXPRESSION
         return f"({MODCDP_READY_EXPRESSION}) && Boolean({expression})"
 
@@ -205,11 +186,11 @@ class ExtensionInjector:
         session_id: str | None = None,
         timeout_ms: int | None = None,
     ) -> ProtocolResult:
-        send = self.options.get("send")
+        send = self.config.send
         if send is None:
             raise RuntimeError(f"{type(self).__name__} requires a CDP send function.")
         effective_timeout_ms = _defaulted(
-            timeout_ms if timeout_ms is not None else self.options.get("injector_cdp_send_timeout_ms"),
+            timeout_ms if timeout_ms is not None else self.config.injector_cdp_send_timeout_ms,
             DEFAULT_CDP_SEND_TIMEOUT_MS,
         )
         if effective_timeout_ms <= 0:
@@ -296,18 +277,18 @@ class ExtensionInjector:
 
     def _discoverReadyServiceWorker(self, *, matched_only: bool = False) -> ExtensionInjectionResult | None:
         target_infos = self._targetInfos()
-        if self.options.get("injector_trust_service_worker_target"):
+        if self.config.injector_trust_service_worker_target:
             for candidate in target_infos:
                 if not self._serviceWorkerTargetMatches(candidate):
                     continue
                 probed = self._probeTarget(
                     candidate,
-                    _defaulted(self.options.get("injector_service_worker_probe_timeout_ms"), DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS),
+                    self.config.injector_service_worker_probe_timeout_ms,
                     allow_attach=True,
                 )
                 if probed:
                     return {**probed, "source": "trusted"}
-        if self.options.get("injector_trust_service_worker_target") or matched_only:
+        if self.config.injector_trust_service_worker_target or matched_only:
             return None
         for candidate in target_infos:
             if candidate["type"] != "service_worker":
@@ -317,7 +298,7 @@ class ExtensionInjector:
             try:
                 probed = self._probeTarget(
                     candidate,
-                    _defaulted(self.options.get("injector_service_worker_probe_timeout_ms"), DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS),
+                    self.config.injector_service_worker_probe_timeout_ms,
                 )
             except Exception:
                 continue
@@ -331,7 +312,7 @@ class ExtensionInjector:
             discovered = self._discoverReadyServiceWorker(matched_only=matched_only)
             if discovered:
                 return discovered
-            time.sleep(_defaulted(self.options.get("injector_service_worker_poll_interval_ms"), DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS) / 1000)
+            time.sleep(self.config.injector_service_worker_poll_interval_ms / 1000)
         return None
 
     def _serviceWorkerTargetMatches(self, candidate: Mapping[str, object]) -> bool:
@@ -341,14 +322,20 @@ class ExtensionInjector:
             return False
         if not target_url.startswith("chrome-extension://"):
             return False
-        extension_id = self.options.get("injector_service_worker_extension_id")
+        extension_id = self.config.injector_service_worker_extension_id
         has_extension_id = bool(extension_id)
         if extension_id and not target_url.startswith(f"chrome-extension://{extension_id}/"):
             return False
-        includes = self.options.get("injector_service_worker_url_includes") or []
-        suffixes = self.options.get("injector_service_worker_url_suffixes") or []
+        includes = self.config.injector_service_worker_url_includes
+        suffixes = self.config.injector_service_worker_url_suffixes
         if includes and not all(part in target_url for part in includes):
             return False
         if suffixes and not any(target_url.endswith(suffix) for suffix in suffixes):
             return False
         return bool(has_extension_id or includes or suffixes)
+
+
+def _injector_config(options: InjectorOptions | None = None) -> InjectorConfig:
+    if isinstance(options, InjectorConfig):
+        return options
+    return InjectorConfig.model_validate(options or {})

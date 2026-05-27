@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.ModCDPClientRoutedDefaultOverrides.ts
+# - ./go/modcdp/client/ModCDPClientRoutedDefaultOverrides_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 from pathlib import Path
@@ -93,22 +99,21 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client_options={
-                "client_routes": {
+            router={"router_routes": {
                     "Target.getTargets": "service_worker",
                     "Target.createTarget": "service_worker",
                     "Target.setDiscoverTargets": "service_worker",
                 }
             },
-            server_options={"upstream": {"upstream_ws_cdp_url": owner.cdp_url}, "router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            server_config={"upstream": {"upstream_ws_cdp_url": owner.cdp_url}, "router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
 
         try:
             cdp.connect()
             self.assertEqual(cdp.cdp_url, owner.cdp_url)
-            self.assertIsNotNone(cdp.server_options)
-            server_options = cast(dict[str, Any], cdp.server_options)
-            self.assertEqual(server_options["upstream"]["upstream_ws_cdp_url"], owner.cdp_url)
+            self.assertIsNotNone(cdp.server_config)
+            server_config = cast(dict[str, Any], cdp.server_config)
+            self.assertEqual(server_config["upstream"]["upstream_ws_cdp_url"], owner.cdp_url)
 
             raw_targets = cdp.send("Target.getTargets")
             raw_target_infos = target_infos_from_result(raw_targets)

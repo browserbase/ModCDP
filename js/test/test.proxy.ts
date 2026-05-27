@@ -1,3 +1,8 @@
+// MODCDP_TS_ONLY_TEST: DO NOT TRANSLATE THIS TEST FILE TO OTHER LANGUAGES.
+// proxy: TS-only proxy process coverage.
+// If a translated sibling is added, all test cases, descriptions, covered edge cases, and setup must be kept perfectly 1:1 in sync.
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
@@ -11,7 +16,7 @@ import { test } from "vitest";
 import { ModCDPClient } from "../src/index.js";
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { startProxy } from "../src/proxy/proxy.js";
-import { CdpSocket } from "./helpers.BrowserLauncher.js";
+import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -62,9 +67,10 @@ async function removeTree(pathname: string) {
 }
 
 async function expectProxyCdpWorks(proxy_url: string, transport: string) {
-  const cdp = await CdpSocket.connect(proxy_url);
+  const cdp = new WSUpstreamTransport({ upstream_ws_cdp_url: proxy_url });
   let target_id: string | null = null;
   try {
+    await cdp.connect();
     const evaluated = await cdp.send("Mod.evaluate", {
       expression: `({ ok: true, transport: ${JSON.stringify(transport)} })`,
     });
@@ -117,7 +123,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
       injector_mode: "cli",
       injector_cli_extension_path: EXTENSION_PATH,
     },
-    server_options: {
+    server_config: {
       router: { router_routes: { "*.*": "loopback_cdp" } },
     },
   });
@@ -142,7 +148,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
       injector_mode: "cli",
       injector_cli_extension_path: EXTENSION_PATH,
     },
-    server_options: {
+    server_config: {
       router: { router_routes: { "*.*": "chromedebugger" } },
     },
   });

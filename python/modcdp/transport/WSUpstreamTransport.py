@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import Any, cast
+from typing import Any
 
 from websocket import create_connection
 
@@ -19,17 +19,15 @@ class WSUpstreamTransport(UpstreamTransport):
 
     def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
         super().__init__(options)
-        options = cast(UpstreamTransportOptions, dict(options or {}))
-        self.url = str(options.get("upstream_ws_cdp_url") or "")
+        self.url = self.config.upstream_ws_cdp_url or ""
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None
         self._generation = 0
 
-    def update(self, config: dict[str, Any] | None = None) -> "WSUpstreamTransport":
-        config = config or {}
-        cdp_url = config.get("upstream_ws_cdp_url")
-        if cdp_url:
-            self.url = str(cdp_url)
+    def update(self, config: UpstreamTransportOptions | None = None) -> "WSUpstreamTransport":
+        super().update(config)
+        if self.config.upstream_ws_cdp_url:
+            self.url = self.config.upstream_ws_cdp_url
         return self
 
     def connect(self) -> None:

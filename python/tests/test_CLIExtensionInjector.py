@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.CLIExtensionInjector.ts
+# - ./go/modcdp/injector/CLIExtensionInjector_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import unittest
@@ -40,7 +46,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
-            self.assertEqual(injector.options.get("injector_service_worker_extension_id"), DEFAULT_MODCDP_EXTENSION_ID)
+            self.assertEqual(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()
 
@@ -54,7 +60,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertIn("modcdp-extension-", unpacked_extension_path)
             self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
-            self.assertEqual(injector.options.get("injector_service_worker_extension_id"), DEFAULT_MODCDP_EXTENSION_ID)
+            self.assertEqual(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()
 

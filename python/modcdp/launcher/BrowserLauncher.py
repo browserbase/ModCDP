@@ -8,37 +8,43 @@ import json
 import re
 import urllib.request
 from collections.abc import Callable
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired
 
 
-class LauncherOptions(TypedDict, total=False):
-    launcher_mode: str
-    launcher_local_executable_path: str | None
-    launcher_local_user_data_dir: str | None
-    launcher_local_cdp_listen_port: int | None
-    launcher_remote_cdp_url: str | None
-    launcher_local_headless: bool
-    launcher_local_sandbox: bool
-    launcher_local_args: list[str]
-    launcher_local_extra_args: list[str]
-    launcher_local_cdp_transport: str
-    launcher_local_loopback_cdp: bool
-    launcher_local_cleanup_user_data_dir: bool
-    launcher_local_chrome_ready_timeout_ms: int
-    launcher_local_chrome_ready_poll_interval_ms: int
-    launcher_bb_api_key: str | None
-    launcher_bb_base_url: str | None
-    launcher_bb_session_id: str | None
-    launcher_bb_keep_alive: bool
-    launcher_bb_close_session_on_close: bool
-    launcher_bb_region: str | None
-    launcher_bb_timeout: int | None
-    launcher_bb_extension_id: str | None
-    launcher_bb_browser_settings: dict[str, Any] | None
-    launcher_bb_user_metadata: dict[str, Any] | None
-    launcher_bb_session_create_params: dict[str, Any] | None
+class LauncherConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    launcher_mode: Literal["local", "remote", "bb", "none"] = "none"
+    launcher_local_executable_path: str | None = None
+    launcher_local_user_data_dir: str | None = None
+    launcher_local_cdp_listen_port: int | None = None
+    launcher_remote_cdp_url: str | None = None
+    launcher_local_headless: bool | None = None
+    launcher_local_sandbox: bool | None = None
+    launcher_local_args: list[str] = Field(default_factory=list)
+    launcher_local_extra_args: list[str] = Field(default_factory=list)
+    launcher_local_cdp_transport: str = "port"
+    launcher_local_loopback_cdp: bool = False
+    launcher_local_cleanup_user_data_dir: bool = False
+    launcher_local_chrome_ready_timeout_ms: int = 45_000
+    launcher_local_chrome_ready_poll_interval_ms: int = 100
+    launcher_bb_api_key: str | None = None
+    launcher_bb_base_url: str = "https://api.browserbase.com"
+    launcher_bb_session_id: str | None = None
+    launcher_bb_keep_alive: bool = False
+    launcher_bb_close_session_on_close: bool | None = None
+    launcher_bb_region: str | None = None
+    launcher_bb_timeout: int | None = None
+    launcher_bb_extension_id: str | None = None
+    launcher_bb_browser_settings: dict[str, Any] = Field(default_factory=lambda: {"viewport": {"width": 1288, "height": 711}})
+    launcher_bb_user_metadata: dict[str, Any] = Field(default_factory=dict)
+    launcher_bb_session_create_params: dict[str, Any] = Field(default_factory=lambda: {"userMetadata": {}})
+
+
+LauncherOptions = LauncherConfig | dict[str, Any]
 
 
 class LaunchedBrowser(TypedDict):
@@ -65,29 +71,22 @@ class BrowserLauncher:
     launched: LaunchedBrowser | None
 
     def __init__(self, options: LauncherOptions | None = None) -> None:
-        self.options = cast(LauncherOptions, dict(options or {}))
+        self.config = _launcher_config(options)
         self.launched = None
 
     def update(self, config: LauncherOptions | None = None) -> "BrowserLauncher":
-        config = cast(LauncherOptions, dict(config or {}))
-        self.options = cast(
-            LauncherOptions,
-            {
-                **self.options,
-                **config,
-                **({"launcher_local_args": merge_chrome_args(self.options.get("launcher_local_args"), config["launcher_local_args"])} if "launcher_local_args" in config else {}),
-                **(
-                    {"launcher_local_extra_args": merge_chrome_args(self.options.get("launcher_local_extra_args"), config["launcher_local_extra_args"])}
-                    if "launcher_local_extra_args" in config
-                    else {}
-                ),
-            },
-        )
+        incoming = _launcher_config(config)
+        updates = incoming.model_dump(exclude_unset=True)
+        if "launcher_local_args" in incoming.model_fields_set:
+            updates["launcher_local_args"] = merge_chrome_args(self.config.launcher_local_args, incoming.launcher_local_args)
+        if "launcher_local_extra_args" in incoming.model_fields_set:
+            updates["launcher_local_extra_args"] = merge_chrome_args(self.config.launcher_local_extra_args, incoming.launcher_local_extra_args)
+        self.config = LauncherConfig.model_validate({**self.config.model_dump(), **updates})
         return self
 
     def configForUpstream(self) -> dict[str, Any]:
         return {
-            "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.options.get("launcher_remote_cdp_url"),
+            "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.config.launcher_remote_cdp_url,
         }
 
     def configForServer(self) -> dict[str, Any]:
@@ -96,13 +95,19 @@ class BrowserLauncher:
 
     def configForInjector(self) -> dict[str, Any]:
         return {
-            "injector_bb_api_key": self.options.get("launcher_bb_api_key"),
-            "injector_bb_base_url": self.options.get("launcher_bb_base_url"),
-            "injector_bb_extension_id": self.options.get("launcher_bb_extension_id"),
+            "injector_bb_api_key": self.config.launcher_bb_api_key,
+            "injector_bb_base_url": self.config.launcher_bb_base_url,
+            "injector_bb_extension_id": self.config.launcher_bb_extension_id,
         }
 
     def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")
+
+    def close(self) -> None:
+        launched = self.launched
+        self.launched = None
+        if launched is not None:
+            launched["close"]()
 
 
 def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | None = None) -> list[str]:
@@ -124,6 +129,12 @@ def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | N
         else:
             merged.insert(first_url_index, load_extension_arg)
     return merged
+
+
+def _launcher_config(options: LauncherOptions | None = None) -> LauncherConfig:
+    if isinstance(options, LauncherConfig):
+        return options
+    return LauncherConfig.model_validate(options or {})
 
 
 def resolveCdpWebSocketUrl(endpoint: str, name: str = "launcher_remote_cdp_url") -> str:

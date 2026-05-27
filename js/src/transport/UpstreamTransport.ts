@@ -33,6 +33,7 @@ type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
   sessionId?: cdp.types.ts.Target.SessionID | null;
 };
+type UpstreamPeerWaitOptions = { connected_after_ms?: number | null };
 
 type UpstreamEventListener = (
   payload: ProtocolPayload,
@@ -248,7 +249,7 @@ class UpstreamTransport {
     }
   }
 
-  async waitForPeer() {}
+  async waitForPeer(_options: UpstreamPeerWaitOptions = {}) {}
 
   toJSON() {
     const { upstream_pipe_read, upstream_pipe_write, ...config } = this.config;
@@ -273,4 +274,11 @@ function parseHostPort(value: string, defaultHost: string, defaultPort: number) 
 }
 
 export { UpstreamTransport, parseHostPort };
-export type { UpstreamMode, UpstreamNatsRole, UpstreamTransportConfig, TargetRoute, UpstreamEventListener };
+export type {
+  UpstreamMode,
+  UpstreamNatsRole,
+  UpstreamTransportConfig,
+  TargetRoute,
+  UpstreamPeerWaitOptions,
+  UpstreamEventListener,
+};

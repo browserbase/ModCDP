@@ -10,9 +10,6 @@ from pathlib import Path
 from typing import Any, Mapping, cast
 
 from ..injector.ExtensionInjector import (
-    DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
-    DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
-    DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
     EXT_ID_FROM_URL_RE,
     MODCDP_READY_EXPRESSION,
     ExtensionInjectionResult,
@@ -43,7 +40,7 @@ class BorrowExtensionInjector(ExtensionInjector):
         if self.bootstrap_modcdp_server_expression is not None:
             super().prepare()
             return
-        extension_path = self.options.get("injector_borrow_extension_path") or defaultModCDPExtensionPath()
+        extension_path = self.config.injector_borrow_extension_path or defaultModCDPExtensionPath()
         if not extension_path:
             raise FileNotFoundError("Unable to locate bundled ModCDP extension for borrow injector.")
         self.unpacked_extension_path, self.cleanup = prepareUnpackedExtension(extension_path)
@@ -77,14 +74,14 @@ class BorrowExtensionInjector(ExtensionInjector):
             self.cleanup = None
 
     def inject(self) -> ExtensionInjectionResult | None:
-        deadline = time.monotonic() + (self.options.get("injector_service_worker_ready_timeout_ms") or DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS) / 1000
+        deadline = time.monotonic() + self.config.injector_service_worker_ready_timeout_ms / 1000
         while True:
             borrowed = self._borrowVisibleServiceWorkers()
             if borrowed:
                 return borrowed
             if time.monotonic() >= deadline:
                 return None
-            time.sleep((self.options.get("injector_service_worker_poll_interval_ms") or DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS) / 1000)
+            time.sleep(self.config.injector_service_worker_poll_interval_ms / 1000)
 
     def _borrowVisibleServiceWorkers(self) -> ExtensionInjectionResult | None:
         borrowed: list[tuple[ExtensionInjectionResult, bool, bool]] = []
@@ -94,9 +91,9 @@ class BorrowExtensionInjector(ExtensionInjector):
             if target.get("type") == "service_worker" and isinstance(target.get("url"), str) and target["url"].startswith("chrome-extension://")
         ]
         has_configured_matcher = bool(
-            self.options.get("injector_service_worker_extension_id")
-            or self.options.get("injector_service_worker_url_includes")
-            or self.options.get("injector_service_worker_url_suffixes")
+            self.config.injector_service_worker_extension_id
+            or self.config.injector_service_worker_url_includes
+            or self.config.injector_service_worker_url_suffixes
         )
         candidates = [target for target in visible_service_workers if self._serviceWorkerTargetMatches(target)] if has_configured_matcher else visible_service_workers
         for target in candidates:
@@ -114,7 +111,7 @@ class BorrowExtensionInjector(ExtensionInjector):
             "Target.attachToTarget",
             {"targetId": target["targetId"], "flatten": True},
             None,
-            self.options.get("injector_service_worker_probe_timeout_ms") or DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
+            self.config.injector_service_worker_probe_timeout_ms,
         )
         session_id = attached.get("sessionId")
         if not isinstance(session_id, str) or not session_id:

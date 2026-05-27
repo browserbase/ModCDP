@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/ModCDPClient_protocol_validation.test.ts
+// - ./python/tests/test_ModCDPClient_protocol_validation.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package client
 
 import (
@@ -19,7 +25,7 @@ type protocolValidationCustomReadyEvent struct {
 }
 
 func TestProtocolValidationCoversNativeMethodsNativeEventsCustomMethodsCustomEventsAndNativeOverrides(t *testing.T) {
-	cdp := New(Options{})
+	cdp := New(Config{})
 
 	runtimeParams := RuntimeEvaluateParams{Expression: "1 + 1", ReturnByValue: Bool(true)}
 	runtimeResult := RuntimeEvaluateResult{Result: RuntimeRemoteObject{Type: "number", Value: 2}}
@@ -37,22 +43,22 @@ func TestProtocolValidationCoversNativeMethodsNativeEventsCustomMethodsCustomEve
 	customResult := protocolValidationCustomEchoResult{OK: true}
 	customEvent := protocolValidationCustomReadyEvent{OK: true}
 
-	if err := cdp.validateCommandParams("Runtime.evaluate", mustParamsMap(t, runtimeParams)); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Runtime.evaluate", mustParamsMap(t, runtimeParams)); err != nil {
 		t.Fatalf("native Runtime.evaluate params should validate: %v", err)
 	}
-	if err := cdp.validateCommandResult("Runtime.evaluate", runtimeResult); err != nil {
+	if _, err := cdp.Types.ParseCommandResult("Runtime.evaluate", runtimeResult); err != nil {
 		t.Fatalf("native Runtime.evaluate result should validate: %v", err)
 	}
-	if _, ok := cdp.validateEventData("Target.targetCreated", nativeEvent); !ok {
+	if _, ok := cdp.Types.ParseEventPayload("Target.targetCreated", nativeEvent); !ok {
 		t.Fatal("native Target.targetCreated event should validate")
 	}
-	if err := cdp.validateCommandParams("Runtime.evaluate", map[string]any{}); err == nil {
+	if _, err := cdp.Types.ParseCommandParams("Runtime.evaluate", map[string]any{}); err == nil {
 		t.Fatal("expected Runtime.evaluate params validation to reject missing expression")
 	}
-	if err := cdp.validateCommandResult("Runtime.evaluate", map[string]any{}); err == nil {
+	if _, err := cdp.Types.ParseCommandResult("Runtime.evaluate", map[string]any{}); err == nil {
 		t.Fatal("expected Runtime.evaluate result validation to reject missing result")
 	}
-	expectPanic(t, func() { cdp.validateEventData("Target.targetCreated", map[string]any{}) })
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Target.targetCreated", map[string]any{}) })
 
 	if _, err := cdp.Mod.AddCustomCommand(CustomCommand{
 		Name:         "Custom.echo",
@@ -68,22 +74,22 @@ func TestProtocolValidationCoversNativeMethodsNativeEventsCustomMethodsCustomEve
 		t.Fatal(err)
 	}
 
-	if err := cdp.validateCommandParams("Custom.echo", mustParamsMap(t, customParams)); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", mustParamsMap(t, customParams)); err != nil {
 		t.Fatalf("custom params should validate: %v", err)
 	}
-	if err := cdp.validateCommandResult("Custom.echo", customResult); err != nil {
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", customResult); err != nil {
 		t.Fatalf("custom result should validate: %v", err)
 	}
-	if _, ok := cdp.validateEventData("Custom.ready", customEvent); !ok {
+	if _, ok := cdp.Types.ParseEventPayload("Custom.ready", customEvent); !ok {
 		t.Fatal("custom event should validate")
 	}
-	if err := cdp.validateCommandParams("Custom.echo", map[string]any{"text": 1}); err == nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"text": 1}); err == nil {
 		t.Fatal("expected custom params validation to reject wrong text type")
 	}
-	if err := cdp.validateCommandResult("Custom.echo", map[string]any{"ok": "yes"}); err == nil {
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"ok": "yes"}); err == nil {
 		t.Fatal("expected custom result validation to reject wrong ok type")
 	}
-	expectPanic(t, func() { cdp.validateEventData("Custom.ready", map[string]any{"ok": "yes"}) })
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": "yes"}) })
 
 	if _, err := cdp.Mod.AddCustomCommand(CustomCommand{
 		Name: "Target.getTargets",
@@ -127,10 +133,10 @@ func TestProtocolValidationCoversNativeMethodsNativeEventsCustomMethodsCustomEve
 		"canAccessOpener": false,
 		"tabId":           7,
 	}
-	if err := cdp.validateCommandResult("Target.getTargets", map[string]any{"targetInfos": []any{extendedTargetInfo}}); err != nil {
+	if _, err := cdp.Types.ParseCommandResult("Target.getTargets", map[string]any{"targetInfos": []any{extendedTargetInfo}}); err != nil {
 		t.Fatalf("extended native command result should validate: %v", err)
 	}
-	if _, ok := cdp.validateEventData("Target.targetCreated", map[string]any{"targetInfo": extendedTargetInfo}); !ok {
+	if _, ok := cdp.Types.ParseEventPayload("Target.targetCreated", map[string]any{"targetInfo": extendedTargetInfo}); !ok {
 		t.Fatal("extended native event should validate")
 	}
 }

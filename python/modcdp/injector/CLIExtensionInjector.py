@@ -24,11 +24,11 @@ class CLIExtensionInjector(ExtensionInjector):
         self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
 
     def prepare(self) -> None:
-        extension_path = self.options.get("injector_cli_extension_path") or defaultModCDPExtensionPath()
+        extension_path = self.config.injector_cli_extension_path or defaultModCDPExtensionPath()
         if not extension_path or self.unpacked_extension_path:
             super().prepare()
             return
-        self.options["injector_cli_extension_path"] = extension_path
+        self.update({"injector_cli_extension_path": extension_path})
         self.unpacked_extension_path, self.cleanup_dir = prepareUnpackedExtension(extension_path)
         self._resolveExtensionId()
         super().prepare()
@@ -40,7 +40,7 @@ class CLIExtensionInjector(ExtensionInjector):
 
     def inject(self) -> ExtensionInjectionResult | None:
         discovered = self._discoverReadyServiceWorker(
-            matched_only=bool(self.options.get("injector_trust_service_worker_target")),
+            matched_only=self.config.injector_trust_service_worker_target,
         )
         return {**discovered, "source": "cli"} if discovered else None
 
@@ -53,12 +53,11 @@ class CLIExtensionInjector(ExtensionInjector):
     def _resolveExtensionId(self) -> str | None:
         if self.extension_id:
             return self.extension_id
-        configured_extension_id = self.options.get("injector_cli_extension_id")
+        configured_extension_id = self.config.injector_cli_extension_id
         if configured_extension_id:
             self.extension_id = configured_extension_id
         elif self.unpacked_extension_path:
             self.extension_id = extensionIdFromManifestKey(self.unpacked_extension_path)
         if self.extension_id:
-            self.options["injector_cli_extension_id"] = self.extension_id
-            self.options["injector_service_worker_extension_id"] = self.extension_id
+            self.update({"injector_cli_extension_id": self.extension_id, "injector_service_worker_extension_id": self.extension_id})
         return self.extension_id

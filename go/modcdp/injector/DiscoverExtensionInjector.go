@@ -20,8 +20,8 @@ func NewDiscoverExtensionInjector(options InjectorOptions) DiscoverExtensionInje
 }
 
 func (i *DiscoverExtensionInjector) Prepare() error {
-	extensionPath := i.Options.InjectorDiscoverExtensionPath
-	if i.Options.InjectorServiceWorkerExtensionID == "" && extensionPath != "" {
+	extensionPath := i.Config.InjectorDiscoverExtensionPath
+	if i.Config.InjectorServiceWorkerExtensionID == "" && extensionPath != "" {
 		manifestPath := extensionPath
 		if strings.HasSuffix(extensionPath, ".zip") {
 			unpackedPath, cleanupPath, err := prepareUnpackedExtension(extensionPath)
@@ -35,7 +35,7 @@ func (i *DiscoverExtensionInjector) Prepare() error {
 		if err != nil {
 			return err
 		}
-		i.Options.InjectorServiceWorkerExtensionID = extensionID
+		i.Config.InjectorServiceWorkerExtensionID = extensionID
 	}
 	return nil
 }
@@ -48,8 +48,8 @@ func (i *DiscoverExtensionInjector) Inject() (*ExtensionInjectionResult, error) 
 		}
 		return discovered, err
 	}
-	if i.Options.InjectorTrustServiceWorkerTarget {
-		waited, err := i.waitForReadyServiceWorker(i.Options.InjectorServiceWorkerProbeTimeoutMS, true)
+	if i.Config.InjectorTrustServiceWorkerTarget {
+		waited, err := i.waitForReadyServiceWorker(i.Config.InjectorServiceWorkerProbeTimeoutMS, true)
 		if err != nil || waited != nil {
 			if waited != nil {
 				waited.Source = "discover"
@@ -57,17 +57,17 @@ func (i *DiscoverExtensionInjector) Inject() (*ExtensionInjectionResult, error) 
 			return waited, err
 		}
 	}
-	if !i.Options.InjectorRequireServiceWorkerTarget {
+	if !i.Config.InjectorRequireServiceWorkerTarget {
 		return nil, nil
 	}
-	waited, err := i.waitForReadyServiceWorker(i.Options.InjectorServiceWorkerReadyTimeoutMS, i.Options.InjectorTrustServiceWorkerTarget)
+	waited, err := i.waitForReadyServiceWorker(i.Config.InjectorServiceWorkerReadyTimeoutMS, i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || waited != nil {
 		if waited != nil {
 			waited.Source = "discover"
 		}
 		return waited, err
 	}
-	matchers := append(append([]string{}, i.Options.InjectorServiceWorkerURLIncludes...), i.Options.InjectorServiceWorkerURLSuffixes...)
+	matchers := append(append([]string{}, i.Config.InjectorServiceWorkerURLIncludes...), i.Config.InjectorServiceWorkerURLSuffixes...)
 	matcherText := strings.Join(matchers, ", ")
 	if matcherText == "" {
 		matcherText = "no matcher"

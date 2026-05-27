@@ -25,6 +25,7 @@ from ..launcher.BrowserLauncher import (
     LauncherOptions,
     BrowserLauncher,
     LaunchedBrowser,
+    _launcher_config,
 )
 
 
@@ -43,18 +44,18 @@ class LocalBrowserLauncher(BrowserLauncher):
         return _free_port()
 
     def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
-        merged = cast(LauncherOptions, {**self.options, **dict(options or {})})
-        executable_path = self.findChromeBinary(merged.get("launcher_local_executable_path"))
-        use_pipe = merged.get("launcher_local_cdp_transport") == "pipe"
-        use_loopback_cdp = (not use_pipe) or bool(merged.get("launcher_local_loopback_cdp")) or merged.get("launcher_local_cdp_listen_port") is not None
-        requested_port = merged.get("launcher_local_cdp_listen_port")
+        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+        executable_path = self.findChromeBinary(merged.launcher_local_executable_path)
+        use_pipe = merged.launcher_local_cdp_transport == "pipe"
+        use_loopback_cdp = (not use_pipe) or merged.launcher_local_loopback_cdp or merged.launcher_local_cdp_listen_port is not None
+        requested_port = merged.launcher_local_cdp_listen_port
         port = int(requested_port) if use_loopback_cdp and requested_port is not None else (0 if use_loopback_cdp else None)
         temp_profile_dir: tempfile.TemporaryDirectory[str] | None = None
-        profile_dir = merged.get("launcher_local_user_data_dir")
+        profile_dir = merged.launcher_local_user_data_dir
         if not profile_dir:
             temp_profile_dir = tempfile.TemporaryDirectory(prefix="modcdp.")
             profile_dir = temp_profile_dir.name
-        cleanup_profile_dir = str(profile_dir) if merged.get("launcher_local_cleanup_user_data_dir") else None
+        cleanup_profile_dir = str(profile_dir) if merged.launcher_local_cleanup_user_data_dir else None
         args = [
             "--enable-unsafe-extension-debugging",
             "--remote-allow-origins=*",
@@ -78,13 +79,14 @@ class LocalBrowserLauncher(BrowserLauncher):
         ]
         args = [arg for arg in args if arg is not None]
         default_headless = sys.platform.startswith("linux") and not os.environ.get("DISPLAY")
-        if merged.get("launcher_local_headless", default_headless):
+        headless = merged.launcher_local_headless if merged.launcher_local_headless is not None else default_headless
+        if headless:
             args.append("--headless=new")
         default_sandbox = not sys.platform.startswith("linux")
-        if merged.get("launcher_local_sandbox", default_sandbox) is False:
+        if (merged.launcher_local_sandbox if merged.launcher_local_sandbox is not None else default_sandbox) is False:
             args.append("--no-sandbox")
-        args.extend(list(merged.get("launcher_local_args") or []))
-        args.extend(list(merged.get("launcher_local_extra_args") or []))
+        args.extend(list(merged.launcher_local_args))
+        args.extend(list(merged.launcher_local_extra_args))
         args.append("about:blank")
         if use_pipe:
             parent_read, child_write = os.pipe()
@@ -99,20 +101,20 @@ class LocalBrowserLauncher(BrowserLauncher):
             pipe_read = os.fdopen(parent_read, "rb", buffering=0)
             pipe_write = os.fdopen(parent_write, "wb", buffering=0)
             try:
-                _wait_for_pipe_ready(pipe_read, pipe_write, int(merged.get("launcher_local_chrome_ready_timeout_ms") or DEFAULT_CHROME_READY_TIMEOUT_MS))
+                _wait_for_pipe_ready(pipe_read, pipe_write, merged.launcher_local_chrome_ready_timeout_ms)
                 loopback_cdp_url = (
                     (
                         _wait_for_browser_selected_cdp_websocket_url(
                             str(profile_dir),
-                            int(merged.get("launcher_local_chrome_ready_timeout_ms") or DEFAULT_CHROME_READY_TIMEOUT_MS),
-                            int(merged.get("launcher_local_chrome_ready_poll_interval_ms") or DEFAULT_CHROME_READY_POLL_INTERVAL_MS),
+                            merged.launcher_local_chrome_ready_timeout_ms,
+                            merged.launcher_local_chrome_ready_poll_interval_ms,
                             process,
                         )
                         if port == 0
                         else _wait_for_cdp_websocket_url(
                             f"http://127.0.0.1:{port}",
-                            int(merged.get("launcher_local_chrome_ready_timeout_ms") or DEFAULT_CHROME_READY_TIMEOUT_MS),
-                            int(merged.get("launcher_local_chrome_ready_poll_interval_ms") or DEFAULT_CHROME_READY_POLL_INTERVAL_MS),
+                            merged.launcher_local_chrome_ready_timeout_ms,
+                            merged.launcher_local_chrome_ready_poll_interval_ms,
                         )
                     )
                     if port is not None
@@ -148,8 +150,8 @@ class LocalBrowserLauncher(BrowserLauncher):
             stderr=subprocess.DEVNULL,
             start_new_session=not sys.platform.startswith("win"),
         )
-        timeout_s = int(merged.get("launcher_local_chrome_ready_timeout_ms") or DEFAULT_CHROME_READY_TIMEOUT_MS) / 1000
-        poll_s = int(merged.get("launcher_local_chrome_ready_poll_interval_ms") or DEFAULT_CHROME_READY_POLL_INTERVAL_MS) / 1000
+        timeout_s = merged.launcher_local_chrome_ready_timeout_ms / 1000
+        poll_s = merged.launcher_local_chrome_ready_poll_interval_ms / 1000
         deadline = time.time() + timeout_s
         active_port: int | None = None
         while time.time() < deadline:

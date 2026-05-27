@@ -39,8 +39,8 @@ const cdp = new ModCDPClient({
   launcher: { launcher_mode: "remote" },
   upstream: { upstream_mode: "ws", upstream_ws_cdp_url },
   injector: { injector_mode: "discover" },
-  client_options: { client_routes: { "Target.getTargets": "service_worker" } },
-  server_options: {
+  client_config: { client_routes: { "Target.getTargets": "service_worker" } },
+  server_config: {
     upstream: { upstream_ws_cdp_url },
     router: { router_routes: { "*.*": "loopback_cdp" } },
   },
@@ -173,7 +173,7 @@ Reverse mode is intentionally scoped to one local browser and one reverse extens
 | `--debugger`  | client → SW → `chrome.debugger.sendCommand` against the active tab | The browser exposes no remote CDP port and you only have extension permissions. |
 | `--direct`    | client → sends non-ModCDP commands to browser CDP directly         | You already have a CDP endpoint and don't need extension interception.          |
 
-Pass via `client_options: { client_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server_options: { router: { router_routes: { "*.*": "loopback_cdp" | "chromedebugger" } } }`. The demos default to `--loopback` (the most powerful mode).
+Pass via `client_config: { client_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server_config: { router: { router_routes: { "*.*": "loopback_cdp" | "chromedebugger" } } }`. The demos default to `--loopback` (the most powerful mode).
 
 ## Repository layout
 
@@ -283,7 +283,7 @@ const server_router_routes = { "Mod.*": "service_worker", "Custom.*": "service_w
 
 Route resolution is **deterministic across all three language clients**: exact-method match → longest-prefix wildcard → `*.*` fallback. This avoids map-iteration nondeterminism (Go) and key-insertion-order shadowing (JS/Python).
 
-When server-side `auto` routing tries loopback CDP discovery, the SW only trusts `127.0.0.1:9222` after verifying a per-connection `server_options.server_browser_token` against its own service-worker target. It will not accidentally route loopback commands through a different browser that happens to have the same extension installed.
+When server-side `auto` routing tries loopback CDP discovery, the SW only trusts `127.0.0.1:9222` after verifying a per-connection `server_config.server_browser_token` against its own service-worker target. It will not accidentally route loopback commands through a different browser that happens to have the same extension installed.
 
 </details>
 

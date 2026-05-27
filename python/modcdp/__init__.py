@@ -13,6 +13,7 @@ from .injector.CDPExtensionInjector import CDPExtensionInjector
 from .injector.CLIExtensionInjector import CLIExtensionInjector
 from .launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from .client.ModCDPClient import ModCDPClient
+from .types.CDPTypes import CDPTypes
 from .launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from .launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 from .transport.UpstreamTransport import UpstreamTransport
@@ -32,6 +33,7 @@ __all__ = [
     "CLIExtensionInjector",
     "LocalBrowserLauncher",
     "ModCDPClient",
+    "CDPTypes",
     "NoneBrowserLauncher",
     "RemoteBrowserLauncher",
     "UpstreamTransport",

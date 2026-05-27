@@ -1,11 +1,17 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.NoneBrowserLauncher.ts
+// - ./python/tests/test_NoneBrowserLauncher.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package launcher
 
 import "testing"
 
 func TestNoneBrowserLauncherConstructorLaunchAndConfigMatchTSShape(t *testing.T) {
 	launcher := NewNoneBrowserLauncher(LaunchOptions{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/initial"})
-	if launcher.Options.LauncherRemoteCDPURL != "ws://127.0.0.1:9222/devtools/browser/initial" {
-		t.Fatalf("Options.LauncherRemoteCDPURL = %q", launcher.Options.LauncherRemoteCDPURL)
+	if launcher.Config.LauncherRemoteCDPURL != "ws://127.0.0.1:9222/devtools/browser/initial" {
+		t.Fatalf("Options.LauncherRemoteCDPURL = %q", launcher.Config.LauncherRemoteCDPURL)
 	}
 	if transportConfig := launcher.ConfigForUpstream(); transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/initial" {
 		t.Fatalf("transport config before launch = %#v", transportConfig)

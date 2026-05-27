@@ -13,7 +13,8 @@ SendCDP = Callable[[str, dict[str, Any], str | None], dict[str, Any]]
 
 
 class AutoSessionRouter:
-    def __init__(self, send: SendCDP, defaultExecutionContextTimeoutMs: Callable[[], int]) -> None:
+    def __init__(self, send: SendCDP, defaultExecutionContextTimeoutMs: Callable[[], int], config: dict[str, Any] | None = None) -> None:
+        self.config = config or {}
         self.send = send
         self.defaultExecutionContextTimeoutMs = defaultExecutionContextTimeoutMs
         self.sessionId_from_targetId: dict[str, str] = {}

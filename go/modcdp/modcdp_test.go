@@ -1,3 +1,8 @@
+// MODCDP_GO_ONLY_TEST: DO NOT TRANSLATE THIS TEST FILE TO OTHER LANGUAGES.
+// Go package re-export compile checks are Go-only and have no TS/Python test sibling.
+// If a translated sibling is added, all test cases, descriptions, covered edge cases, and setup must be kept perfectly 1:1 in sync.
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package modcdp
 
 import "testing"
@@ -24,7 +29,7 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	borrowedInjector := NewBorrowExtensionInjector(InjectorOptions{})
 	_ = []any{extensionInjector, discoveredInjector, bbInjector, localLaunchInjector, loadUnpackedInjector, borrowedInjector}
 
-	if NewUpstreamTransport(UpstreamTransportOptions{}).Options.UpstreamMode != "" {
+	if NewUpstreamTransport(UpstreamTransportOptions{}).Config.UpstreamMode != "" {
 		t.Fatal("NewUpstreamTransport returned non-empty mode")
 	}
 	if NewWSUpstreamTransport(UpstreamTransportOptions{}) == nil {

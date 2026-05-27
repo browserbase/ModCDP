@@ -26,6 +26,7 @@ import {
   type ModCDPAddMiddlewareParams,
   type ModCDPNamedValue,
   type ModCDPPayloadSchemaSpec,
+  type ProtocolEventParams,
   type ProtocolParams,
   type ProtocolResult,
   type TranslatedStep,
@@ -161,15 +162,53 @@ function hasCommandExpression(
   return typeof command.expression === "string" && command.expression.length > 0;
 }
 
+const wire_omit_schema = Symbol("wire_omit_schema");
+
+function sanitizeSerializableJsonSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeSerializableJsonSchema(item));
+  if (value == null || typeof value !== "object") return value;
+  const source = value as Record<string, unknown>;
+  if (source.modcdp_wire === "omit") return wire_omit_schema;
+  const sanitized: Record<string, unknown> = {};
+  const omitted_properties = new Set<string>();
+  const properties =
+    source.properties != null && typeof source.properties === "object" && !Array.isArray(source.properties)
+      ? (source.properties as Record<string, unknown>)
+      : null;
+  if (properties) {
+    const sanitized_properties: Record<string, unknown> = {};
+    for (const [property_name, property_schema] of Object.entries(properties)) {
+      const sanitized_property_schema = sanitizeSerializableJsonSchema(property_schema);
+      if (sanitized_property_schema === wire_omit_schema) {
+        omitted_properties.add(property_name);
+      } else {
+        sanitized_properties[property_name] = sanitized_property_schema;
+      }
+    }
+    sanitized.properties = sanitized_properties;
+  }
+  for (const [key, child_value] of Object.entries(source)) {
+    if (key === "modcdp_wire" || key === "properties") continue;
+    if (key === "required" && Array.isArray(child_value)) {
+      const required = child_value.filter(
+        (property_name): property_name is string =>
+          typeof property_name === "string" && !omitted_properties.has(property_name),
+      );
+      if (required.length > 0) sanitized.required = required;
+      continue;
+    }
+    const sanitized_child_value = sanitizeSerializableJsonSchema(child_value);
+    if (sanitized_child_value !== wire_omit_schema) sanitized[key] = sanitized_child_value;
+  }
+  return sanitized;
+}
+
 function serializablePayloadSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
   if (!schema) return null;
   const normalized_schema = validateZodSchema(schema);
   if (!normalized_schema) return null;
-  try {
-    return z.toJSONSchema(normalized_schema) as ModCDPPayloadSchemaSpec;
-  } catch {
-    return null;
-  }
+  const json_schema = z.toJSONSchema(normalized_schema, { unrepresentable: "any" });
+  return sanitizeSerializableJsonSchema(json_schema) as ModCDPPayloadSchemaSpec;
 }
 
 /**
@@ -313,13 +352,13 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     return (this.command_params_schemas.get(method)?.parse(params ?? {}) ?? params ?? {}) as ProtocolParams;
   }
 
-  parseCommandResult(method: string, result: unknown) {
+  parseCommandResult(method: string, result: unknown): ProtocolResult {
     const result_schema = this.command_result_schemas.get(method);
-    return result_schema ? result_schema.parse(result) : result;
+    return (result_schema ? result_schema.parse(result) : (result ?? {})) as ProtocolResult;
   }
 
   parseEventPayload(event_name: string, payload: unknown = {}) {
-    return this.event_schemas.get(event_name)?.parse(payload) ?? payload;
+    return (this.event_schemas.get(event_name)?.parse(payload ?? {}) ?? payload ?? {}) as ProtocolEventParams;
   }
 
   serviceWorkerCommandStep(

@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/test.ModCDPClient.ts
+# - ./go/modcdp/client/ModCDPClient_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import asyncio
@@ -49,35 +55,34 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_poll_interval_ms": 76,
                 "injector_target_session_poll_interval_ms": 87,
             },
-            client_options={
-                "client_routes": {"*.*": "direct_cdp"},
+            router={"router_routes": {"*.*": "direct_cdp"},
                 "client_hydrate_aliases": False,
                 "client_mirror_upstream_events": False,
                 "client_cdp_send_timeout_ms": 1234,
                 "client_event_wait_timeout_ms": 2345,
             },
-            server_options={
+            server_config={
                 "router": {"router_routes": {"*.*": "loopback_cdp"}, "loopback_execution_context_timeout_ms": 8765},
                 "server_browser_token": "token-1",
-                "client_options": {"client_cdp_send_timeout_ms": 9876},
+                "client_config": {"client_cdp_send_timeout_ms": 9876},
                 "upstream": {"upstream_ws_connect_error_settle_timeout_ms": 7654},
             },
         )
 
-        self.assertEqual(cdp.launcher["launcher_local_headless"], True)
-        self.assertEqual(cdp._launch_options().get("launcher_local_executable_path"), "/tmp/chrome")
-        self.assertEqual(cdp._launch_options().get("launcher_local_user_data_dir"), "/tmp/profile")
-        self.assertEqual(cdp.upstream.get("upstream_ws_connect_error_settle_timeout_ms"), 321)
-        self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 4321)
-        self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 5432)
-        self.assertEqual(cdp.injector["injector_service_worker_ready_timeout_ms"], 6543)
-        self.assertEqual(cdp.injector["injector_service_worker_poll_interval_ms"], 76)
-        self.assertEqual(cdp.injector["injector_target_session_poll_interval_ms"], 87)
-        self.assertEqual(cdp.client_options["client_routes"]["*.*"], "direct_cdp")
-        self.assertEqual(cdp.client_options["client_hydrate_aliases"], False)
-        self.assertEqual(cdp.client_options["client_mirror_upstream_events"], False)
-        self.assertEqual(cdp.client_options["client_cdp_send_timeout_ms"], 1234)
-        self.assertEqual(cdp.client_options["client_event_wait_timeout_ms"], 2345)
+        self.assertEqual(cdp.launcher.config.launcher_local_headless, True)
+        self.assertEqual(cdp.launcher.config.launcher_local_executable_path, "/tmp/chrome")
+        self.assertEqual(cdp.launcher.config.launcher_local_user_data_dir, "/tmp/profile")
+        self.assertEqual(cdp.upstream.config.upstream_ws_connect_error_settle_timeout_ms, 321)
+        self.assertEqual(cdp.injector.config.injector_execution_context_timeout_ms, 4321)
+        self.assertEqual(cdp.injector.config.injector_service_worker_probe_timeout_ms, 5432)
+        self.assertEqual(cdp.injector.config.injector_service_worker_ready_timeout_ms, 6543)
+        self.assertEqual(cdp.injector.config.injector_service_worker_poll_interval_ms, 76)
+        self.assertEqual(cdp.injector.config.injector_target_session_poll_interval_ms, 87)
+        self.assertEqual(cdp.config.client_routes["*.*"], "direct_cdp")
+        self.assertEqual(cdp.config.client_hydrate_aliases, False)
+        self.assertEqual(cdp.config.client_mirror_upstream_events, False)
+        self.assertEqual(cdp.config.client_cdp_send_timeout_ms, 1234)
+        self.assertEqual(cdp.config.client_event_wait_timeout_ms, 2345)
         self.assertNotIn("Browser", cdp.__dict__)
         with self.assertRaises(AttributeError):
             _ = cdp.Browser
@@ -86,9 +91,9 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertNotIn("service_worker_probe_timeout_ms", cdp.__dict__)
 
         params = cast(dict[str, Any], cdp._server_configure_params())
-        self.assertEqual(params["client_options"]["client_routes"]["*.*"], "direct_cdp")
+        self.assertEqual(params["client_config"]["client_routes"]["*.*"], "direct_cdp")
         self.assertEqual(params["server_browser_token"], "token-1")
-        self.assertEqual(params["client_options"]["client_cdp_send_timeout_ms"], 9876)
+        self.assertEqual(params["client_config"]["client_cdp_send_timeout_ms"], 9876)
         self.assertEqual(params["router"]["loopback_execution_context_timeout_ms"], 8765)
         self.assertEqual(params["upstream"]["upstream_ws_connect_error_settle_timeout_ms"], 7654)
 
@@ -104,40 +109,40 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_poll_interval_ms": 0,
                 "injector_target_session_poll_interval_ms": 0,
             },
-            client_options={
+            client_config={
                 "client_cdp_send_timeout_ms": 0,
                 "client_event_wait_timeout_ms": 0,
             },
         )
 
-        self.assertEqual(cdp.upstream.get("upstream_ws_connect_error_settle_timeout_ms"), 0)
-        self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 0)
-        self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 0)
-        self.assertEqual(cdp.injector["injector_service_worker_ready_timeout_ms"], 0)
-        self.assertEqual(cdp.injector["injector_service_worker_poll_interval_ms"], 0)
-        self.assertEqual(cdp.injector["injector_target_session_poll_interval_ms"], 0)
-        self.assertEqual(cdp.client_options["client_cdp_send_timeout_ms"], 0)
-        self.assertEqual(cdp.client_options["client_event_wait_timeout_ms"], 0)
+        self.assertEqual(cdp.upstream.config.upstream_ws_connect_error_settle_timeout_ms, 0)
+        self.assertEqual(cdp.injector.config.injector_execution_context_timeout_ms, 0)
+        self.assertEqual(cdp.injector.config.injector_service_worker_probe_timeout_ms, 0)
+        self.assertEqual(cdp.injector.config.injector_service_worker_ready_timeout_ms, 0)
+        self.assertEqual(cdp.injector.config.injector_service_worker_poll_interval_ms, 0)
+        self.assertEqual(cdp.injector.config.injector_target_session_poll_interval_ms, 0)
+        self.assertEqual(cdp.config.client_cdp_send_timeout_ms, 0)
+        self.assertEqual(cdp.config.client_event_wait_timeout_ms, 0)
 
     def test_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
 
-        self.assertEqual(cdp.injector["injector_service_worker_url_suffixes"], [])
+        self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, [])
         self.assertEqual(cdp._base_extension_injector_config(None).get("injector_service_worker_url_suffixes"), [])
 
     def test_defaults_service_worker_suffix_config_to_modcdp_worker(self) -> None:
         cdp = ModCDPClient()
 
-        self.assertEqual(cdp.injector["injector_service_worker_url_suffixes"], ["/modcdp/service_worker.js"])
+        self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
         self.assertEqual(
             cdp._base_extension_injector_config(None).get("injector_service_worker_url_suffixes"),
             ["/modcdp/service_worker.js"],
         )
 
     def test_preserves_explicit_none_server_config(self) -> None:
-        cdp = ModCDPClient(server_options=None)
+        cdp = ModCDPClient(server_config=None)
 
-        self.assertIsNone(cdp.server_options)
+        self.assertIsNone(cdp.server_config)
 
     def test_orders_local_auto_injection_as_launch_flag_then_cdp_fallback(self) -> None:
         cdp = ModCDPClient(
@@ -174,7 +179,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_trust_service_worker_target": True,
                 "injector_service_worker_probe_timeout_ms": 30_000,
             },
-            client_options={
+            client_config={
                 "client_cdp_send_timeout_ms": 30_000,
                 "client_event_wait_timeout_ms": 30_000,
             },
@@ -261,7 +266,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_ready_timeout_ms": 30_000,
                 "injector_service_worker_probe_timeout_ms": 30_000,
             },
-            client_options={"client_routes": {"*.*": "direct_cdp"}},
+            router={"router_routes": {"*.*": "direct_cdp"}},
         )
 
         try:
@@ -291,7 +296,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
 
         try:
@@ -358,8 +363,8 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
         target_ids: list[str] = []
 
@@ -411,8 +416,8 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
         target_ids = []
         client.connect()
@@ -533,14 +538,14 @@ class ModCDPClientTests(unittest.TestCase):
         )
 
         self.assertEqual(result, {"name": "Custom.echo", "registered": True})
-        self.assertEqual(client._validate_command_params("Custom.echo", {"text": "ok"}), {"text": "ok"})
+        self.assertEqual(client.types.parseCommandParams("Custom.echo", {"text": "ok"}), {"text": "ok"})
         with self.assertRaises(ValueError):
-            client._validate_command_params("Custom.echo", {"text": ""})
+            client.types.parseCommandParams("Custom.echo", {"text": ""})
         with self.assertRaises(ValueError):
-            client._validate_command_params("Custom.echo", {"text": "ok", "extra": True})
-        self.assertEqual(client._validate_command_result("Custom.echo", {"text": "ok"}), {"text": "ok"})
+            client.types.parseCommandParams("Custom.echo", {"text": "ok", "extra": True})
+        self.assertEqual(client.types.parseCommandResult("Custom.echo", {"text": "ok"}), {"text": "ok"})
         with self.assertRaises(ValueError):
-            client._validate_command_result("Custom.echo", {"text": 123})
+            client.types.parseCommandResult("Custom.echo", {"text": 123})
 
     def test_constructor_custom_command_schemas_validate_nested_json(self) -> None:
         client = ModCDPClient(
@@ -572,11 +577,11 @@ class ModCDPClientTests(unittest.TestCase):
         )
 
         valid: dict[str, JsonValue] = {"items": [{"id": "a", "count": 1}]}
-        self.assertEqual(client._validate_command_params("Custom.collect", valid), valid)
+        self.assertEqual(client.types.parseCommandParams("Custom.collect", valid), valid)
         with self.assertRaises(ValueError):
-            client._validate_command_params("Custom.collect", {"items": [{"id": "a", "count": 0}]})
+            client.types.parseCommandParams("Custom.collect", {"items": [{"id": "a", "count": 0}]})
         with self.assertRaises(ValueError):
-            client._validate_command_params("Custom.collect", {"items": []})
+            client.types.parseCommandParams("Custom.collect", {"items": []})
 
     def test_custom_event_schema_validates_payload_before_handlers(self) -> None:
         client = ModCDPClient(
@@ -597,18 +602,18 @@ class ModCDPClientTests(unittest.TestCase):
         )
 
         payload: dict[str, JsonValue] = {"url": "https://example.com", "ready": True}
-        self.assertEqual(client._validate_event_payload("Custom.ready", payload), payload)
+        self.assertEqual(client.types.parseEventPayload("Custom.ready", payload), payload)
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Custom.ready", {"url": "http://example.com", "ready": True})
+            client.types.parseEventPayload("Custom.ready", {"url": "http://example.com", "ready": True})
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Custom.ready", {"url": "https://example.com", "ready": True, "x": 1})
+            client.types.parseEventPayload("Custom.ready", {"url": "https://example.com", "ready": True, "x": 1})
 
     def test_scalar_event_schema_validates_value_payloads(self) -> None:
         client = ModCDPClient(custom_events=[{"name": "Custom.count", "event_schema": {"type": "integer", "minimum": 1}}])
 
-        self.assertEqual(client._validate_event_payload("Custom.count", {"value": 3}), {"value": 3})
+        self.assertEqual(client.types.parseEventPayload("Custom.count", {"value": 3}), {"value": 3})
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Custom.count", {"value": 0})
+            client.types.parseEventPayload("Custom.count", {"value": 0})
 
 
 if __name__ == "__main__":

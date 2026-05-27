@@ -41,7 +41,7 @@ func (i *BorrowExtensionInjector) Prepare() error {
 	if i.BootstrapModCDPServerExpression != "" {
 		return nil
 	}
-	unpackedPath, cleanupPath, err := prepareUnpackedExtension(i.Options.InjectorBorrowExtensionPath)
+	unpackedPath, cleanupPath, err := prepareUnpackedExtension(i.Config.InjectorBorrowExtensionPath)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (i *BorrowExtensionInjector) Close() error {
 }
 
 func (i *BorrowExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
-	deadline := time.Now().Add(time.Duration(i.Options.InjectorServiceWorkerReadyTimeoutMS) * time.Millisecond)
+	deadline := time.Now().Add(time.Duration(i.Config.InjectorServiceWorkerReadyTimeoutMS) * time.Millisecond)
 	for {
 		borrowed, err := i.borrowVisibleServiceWorkers()
 		if err != nil || borrowed != nil {
@@ -88,7 +88,7 @@ func (i *BorrowExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 		if time.Now().After(deadline) {
 			return nil, nil
 		}
-		time.Sleep(time.Duration(i.Options.InjectorServiceWorkerPollIntervalMS) * time.Millisecond)
+		time.Sleep(time.Duration(i.Config.InjectorServiceWorkerPollIntervalMS) * time.Millisecond)
 	}
 }
 
@@ -97,7 +97,7 @@ func (i *BorrowExtensionInjector) borrowVisibleServiceWorkers() (*ExtensionInjec
 	if err != nil {
 		return nil, err
 	}
-	hasConfiguredMatcher := i.Options.InjectorServiceWorkerExtensionID != "" || len(i.Options.InjectorServiceWorkerURLIncludes) > 0 || len(i.Options.InjectorServiceWorkerURLSuffixes) > 0
+	hasConfiguredMatcher := i.Config.InjectorServiceWorkerExtensionID != "" || len(i.Config.InjectorServiceWorkerURLIncludes) > 0 || len(i.Config.InjectorServiceWorkerURLSuffixes) > 0
 	candidates := []map[string]any{}
 	for _, target := range targets {
 		targetType, _ := target["type"].(string)
@@ -132,7 +132,7 @@ func (i *BorrowExtensionInjector) borrowVisibleServiceWorkers() (*ExtensionInjec
 func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borrowedExtensionCandidate, error) {
 	targetID, _ := target["targetId"].(string)
 	targetURL, _ := target["url"].(string)
-	attached, err := i.sendWithTimeout("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "", i.Options.InjectorServiceWorkerProbeTimeoutMS)
+	attached, err := i.sendWithTimeout("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "", i.Config.InjectorServiceWorkerProbeTimeoutMS)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +141,13 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 		return nil, fmt.Errorf("Target.attachToTarget returned no sessionId for targetId=%s", targetID)
 	}
 	detach := func() {
-		_, _ = i.sendWithTimeout("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, "", i.Options.InjectorCDPSendTimeoutMS)
+		_, _ = i.sendWithTimeout("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, "", i.Config.InjectorCDPSendTimeoutMS)
 	}
-	_, _ = i.sendWithTimeout("Runtime.enable", map[string]any{}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
+	_, _ = i.sendWithTimeout("Runtime.enable", map[string]any{}, sessionID, i.Config.InjectorCDPSendTimeoutMS)
 	status, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
 		"expression":    borrowBootstrapStatusExpression,
 		"returnByValue": true,
-	}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
+	}, sessionID, i.Config.InjectorCDPSendTimeoutMS)
 	if err != nil {
 		detach()
 		return nil, err
@@ -171,7 +171,7 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 			"expression":    fmt.Sprintf("(%s)()", i.BootstrapModCDPServerExpression),
 			"awaitPromise":  true,
 			"returnByValue": true,
-		}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
+		}, sessionID, i.Config.InjectorCDPSendTimeoutMS)
 		if err != nil {
 			detach()
 			return nil, err
@@ -192,7 +192,7 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 		readyProbe, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
 			"expression":    i.readyExpression(),
 			"returnByValue": true,
-		}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
+		}, sessionID, i.Config.InjectorCDPSendTimeoutMS)
 		if err != nil {
 			detach()
 			return nil, err

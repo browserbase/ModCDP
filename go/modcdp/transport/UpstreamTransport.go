@@ -53,7 +53,7 @@ const (
 )
 
 type UpstreamTransport struct {
-	Options        UpstreamTransportOptions
+	Config         UpstreamTransportOptions
 	recvListeners  []recvListener
 	closeListeners []closeListener
 	listenerMu     sync.Mutex
@@ -71,7 +71,7 @@ type closeListener struct {
 }
 
 func NewUpstreamTransport(options UpstreamTransportOptions) UpstreamTransport {
-	return UpstreamTransport{Options: options}
+	return UpstreamTransport{Config: options}
 }
 
 func (e *UpstreamTransport) Update(config map[string]any) {
@@ -79,13 +79,13 @@ func (e *UpstreamTransport) Update(config map[string]any) {
 		return
 	}
 	if value, ok := config["upstream_ws_cdp_url"].(string); ok {
-		e.Options.UpstreamWSCDPURL = value
+		e.Config.UpstreamWSCDPURL = value
 	}
 	if value, ok := intFromConfig(config["upstream_ws_connect_error_settle_timeout_ms"]); ok {
-		e.Options.UpstreamWSConnectErrorSettleTimeoutMS = value
+		e.Config.UpstreamWSConnectErrorSettleTimeoutMS = value
 	}
 	if value, ok := intFromConfig(config["upstream_cdp_send_timeout_ms"]); ok {
-		e.Options.UpstreamCDPSendTimeoutMS = value
+		e.Config.UpstreamCDPSendTimeoutMS = value
 	}
 }
 

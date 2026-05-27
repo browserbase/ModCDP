@@ -29,7 +29,7 @@ import (
 const demoCDPSendTimeoutMS = 60_000
 const demoExecutionContextTimeoutMS = 60_000
 
-func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
+func configFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Config {
 	upstream := modcdp.UpstreamTransportOptions{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
 	launcher := launchOptions
 	if cdpURL != "" {
@@ -48,25 +48,25 @@ func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions 
 		injector.InjectorDiscoverExtensionPath = extensionPath
 	}
 	if mode == "direct" {
-		return modcdp.Options{
-			Launcher:      launcher,
-			Upstream:      upstream,
-			Injector:      injector,
-			ClientOptions: modcdp.ClientOptions{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+		return modcdp.Config{
+			Launcher:     launcher,
+			Upstream:     upstream,
+			Injector:     injector,
+			ClientConfig: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		}
 	}
-	server_options := &modcdp.ServerConfig{
+	server_config := &modcdp.ServerConfig{
 		Router: modcdp.RouterOptions{
 			RouterRoutes:                      serverRoutesFor(mode, upstreamMode),
 			LoopbackExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
 		},
 	}
-	return modcdp.Options{
-		Launcher:      launcher,
-		Upstream:      upstream,
-		Injector:      injector,
-		ClientOptions: modcdp.ClientOptions{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
-		ServerOptions: server_options,
+	return modcdp.Config{
+		Launcher:     launcher,
+		Upstream:     upstream,
+		Injector:     injector,
+		ClientConfig: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+		ServerConfig: server_config,
 	}
 }
 
@@ -215,7 +215,7 @@ func main() {
 		}
 	}
 
-	cdp := modcdp.New(optionsFor(mode, upstreamMode, cdpURL, extensionPath, launchOptions))
+	cdp := modcdp.New(configFor(mode, upstreamMode, cdpURL, extensionPath, launchOptions))
 
 	if err := cdp.Connect(); err != nil {
 		log.Fatalf("connect: %v", err)
@@ -228,9 +228,9 @@ func main() {
 	}
 
 	configureParams := map[string]any{
-		"upstream":       map[string]any{"upstream_mode": upstreamMode},
-		"router":         map[string]any{"router_routes": serverRoutesFor(mode, upstreamMode), "loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS},
-		"client_options": map[string]any{"client_routes": clientRoutesFor(mode)},
+		"upstream":      map[string]any{"upstream_mode": upstreamMode},
+		"router":        map[string]any{"router_routes": serverRoutesFor(mode, upstreamMode), "loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS},
+		"client_config": map[string]any{"client_routes": clientRoutesFor(mode)},
 	}
 	configureRaw, err := cdp.Mod.Configure(configureParams)
 	if err != nil {

@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./js/test/test.BBBrowserLauncher.ts
+// - ./python/tests/test_BBBrowserLauncher.py
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 package launcher
 
 import (
@@ -13,8 +19,6 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 )
-
-const liveBrowserbaseTimeout = 120 * time.Second
 
 func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("BROWSERBASE_API_KEY")) == "" {
@@ -110,9 +114,11 @@ func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testin
 	t.Fatal("Browserbase session did not leave RUNNING status after release")
 }
 
+// MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+// Keep the setup semantics above 1:1 with translated tests; helpers here only call real Browserbase APIs and real CDP endpoints.
 func connectBrowserbaseCDP(t *testing.T, rawURL string) io.ReadWriteCloser {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), liveBrowserbaseTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	conn, _, _, err := ws.Dial(ctx, rawURL)
 	if err != nil {
@@ -136,7 +142,8 @@ func expectCDPBrowserSurface(t *testing.T, conn io.ReadWriter) {
 		t.Fatal(err)
 	}
 	result, _ := message["result"].(map[string]any)
-	if _, ok := result["product"].(string); !ok {
+	product, _ := result["product"].(string)
+	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
 		t.Fatalf("Browser.getVersion result = %#v", message)
 	}
 }

@@ -1,3 +1,9 @@
+# MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+# - ./js/test/ModCDPClient_protocol_validation.test.ts
+# - ./go/modcdp/client/ModCDPClient_protocol_validation_test.go
+# NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+# USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
 import unittest
@@ -62,28 +68,28 @@ class ModCDPClientProtocolValidationTests(unittest.TestCase):
         }
         native_event_payload: ProtocolPayload = {"targetInfo": native_target_info}
 
-        self.assertEqual(client._validate_command_params("Runtime.evaluate", runtime_params), runtime_params)
-        self.assertEqual(client._validate_command_result("Runtime.evaluate", runtime_result_payload), runtime_result_payload)
-        self.assertEqual(client._validate_event_payload("Target.targetCreated", native_event_payload), native_event_payload)
+        self.assertEqual(client.types.parseCommandParams("Runtime.evaluate", runtime_params), runtime_params)
+        self.assertEqual(client.types.parseCommandResult("Runtime.evaluate", runtime_result_payload), runtime_result_payload)
+        self.assertEqual(client.types.parseEventPayload("Target.targetCreated", native_event_payload), native_event_payload)
         with self.assertRaises(ValueError):
-            client._validate_command_params("Runtime.evaluate", {})
+            client.types.parseCommandParams("Runtime.evaluate", {})
         with self.assertRaises(ValueError):
-            client._validate_command_result("Runtime.evaluate", {})
+            client.types.parseCommandResult("Runtime.evaluate", {})
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Target.targetCreated", {})
+            client.types.parseEventPayload("Target.targetCreated", {})
 
         client.Mod.addCustomCommand("Custom.echo", params_schema=CustomEchoParams, result_schema=CustomEchoResult)
         client.Mod.addCustomEvent("Custom.ready", event_schema=CustomReadyEvent)
 
-        self.assertEqual(client._validate_command_params("Custom.echo", {"text": "ok"}), {"text": "ok"})
-        self.assertEqual(client._validate_command_result("Custom.echo", {"ok": True}), True)
-        self.assertEqual(client._validate_event_payload("Custom.ready", {"ok": True}), CustomReadyEvent(ok=True))
+        self.assertEqual(client.types.parseCommandParams("Custom.echo", {"text": "ok"}), {"text": "ok"})
+        self.assertEqual(client.types.parseCommandResult("Custom.echo", {"ok": True}), {"ok": True})
+        self.assertEqual(client.types.parseEventPayload("Custom.ready", {"ok": True}), {"ok": True})
         with self.assertRaises(ValueError):
-            client._validate_command_params("Custom.echo", {"text": 1})
+            client.types.parseCommandParams("Custom.echo", {"text": 1})
         with self.assertRaises(ValueError):
-            client._validate_command_result("Custom.echo", {"ok": "yes"})
+            client.types.parseCommandResult("Custom.echo", {"ok": "yes"})
         with self.assertRaises(ValueError):
-            client._validate_event_payload("Custom.ready", {"ok": "yes"})
+            client.types.parseEventPayload("Custom.ready", {"ok": "yes"})
 
         client.Mod.addCustomCommand(
             "Target.getTargets",
@@ -115,9 +121,9 @@ class ModCDPClientProtocolValidationTests(unittest.TestCase):
         client.Mod.addCustomEvent("Target.targetCreated")
 
         extended_target_info = {**native_target_info, "tabId": 7}
-        self.assertEqual(client._validate_command_result("Target.getTargets", {"targetInfos": [extended_target_info]}), {"targetInfos": [extended_target_info]})
+        self.assertEqual(client.types.parseCommandResult("Target.getTargets", {"targetInfos": [extended_target_info]}), {"targetInfos": [extended_target_info]})
         self.assertEqual(
-            client._validate_event_payload("Target.targetCreated", {"targetInfo": extended_target_info}),
+            client.types.parseEventPayload("Target.targetCreated", {"targetInfo": extended_target_info}),
             {"targetInfo": extended_target_info},
         )
 

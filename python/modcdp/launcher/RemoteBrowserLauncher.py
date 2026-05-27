@@ -6,13 +6,13 @@ from __future__ import annotations
 
 from typing import cast
 
-from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser, resolveCdpWebSocketUrl
+from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser, resolveCdpWebSocketUrl, _launcher_config
 
 
 class RemoteBrowserLauncher(BrowserLauncher):
     def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
-        merged = {**self.options, **dict(options or {})}
-        cdp_url = merged.get("launcher_remote_cdp_url")
+        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+        cdp_url = merged.launcher_remote_cdp_url
         if not cdp_url:
             raise RuntimeError("launcher.launcher_mode=remote requires launcher_remote_cdp_url.")
         # cdp_url is resolved here so downstream transports can dial it directly.

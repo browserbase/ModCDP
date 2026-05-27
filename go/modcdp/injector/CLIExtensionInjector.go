@@ -20,7 +20,7 @@ func NewCLIExtensionInjector(options InjectorOptions) CLIExtensionInjector {
 }
 
 func (i *CLIExtensionInjector) Prepare() error {
-	extensionPath := i.Options.InjectorCLIExtensionPath
+	extensionPath := i.Config.InjectorCLIExtensionPath
 	if i.UnpackedExtensionPath != "" {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (i *CLIExtensionInjector) ConfigForLauncher() LaunchOptions {
 }
 
 func (i *CLIExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
-	discovered, err := i.discoverReadyServiceWorker(i.Options.InjectorTrustServiceWorkerTarget)
+	discovered, err := i.discoverReadyServiceWorker(i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || discovered == nil {
 		return discovered, err
 	}
@@ -62,8 +62,8 @@ func (i *CLIExtensionInjector) resolveExtensionID() (string, error) {
 	if i.ExtensionID != "" {
 		return i.ExtensionID, nil
 	}
-	if i.Options.InjectorCLIExtensionID != "" {
-		i.ExtensionID = i.Options.InjectorCLIExtensionID
+	if i.Config.InjectorCLIExtensionID != "" {
+		i.ExtensionID = i.Config.InjectorCLIExtensionID
 	} else if i.UnpackedExtensionPath != "" {
 		extensionID, err := extensionIDFromManifestKey(i.UnpackedExtensionPath)
 		if err != nil {
@@ -72,8 +72,8 @@ func (i *CLIExtensionInjector) resolveExtensionID() (string, error) {
 		i.ExtensionID = extensionID
 	}
 	if i.ExtensionID != "" {
-		i.Options.InjectorCLIExtensionID = i.ExtensionID
-		i.Options.InjectorServiceWorkerExtensionID = i.ExtensionID
+		i.Config.InjectorCLIExtensionID = i.ExtensionID
+		i.Config.InjectorServiceWorkerExtensionID = i.ExtensionID
 	}
 	return i.ExtensionID, nil
 }

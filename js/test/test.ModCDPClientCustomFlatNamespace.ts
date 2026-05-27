@@ -1,3 +1,9 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./python/tests/test_ModCDPClientCustomFlatNamespace.py
+// - ./go/modcdp/client/ModCDPClientCustomFlatNamespace_test.go
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +38,7 @@ test("custom commands install flat namespace methods through a real service work
         "*.*": "direct_cdp",
       },
     },
-    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_config: { router: { router_routes: { "*.*": "loopback_cdp" } } },
     types: {
       custom_commands: {
         "Custom.doSomething": {
@@ -103,7 +109,7 @@ test("custom events validate raw string handlers through a real service worker",
         "*.*": "direct_cdp",
       },
     },
-    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_config: { router: { router_routes: { "*.*": "loopback_cdp" } } },
     types: {
       custom_events: {
         "Custom.someEvent": { event_schema: EventSchema },
@@ -152,7 +158,7 @@ test("dynamic custom command, event, and middleware registration validates throu
         "*.*": "direct_cdp",
       },
     },
-    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_config: { router: { router_routes: { "*.*": "loopback_cdp" } } },
   });
   const seen: string[] = [];
 
@@ -263,7 +269,7 @@ test("assigned type registry validates updated custom command, event, and middle
         "*.*": "direct_cdp",
       },
     },
-    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_config: { router: { router_routes: { "*.*": "loopback_cdp" } } },
   });
   const updated_types = cdp.types.update({
     custom_commands: {
@@ -293,7 +299,7 @@ test("assigned type registry validates updated custom command, event, and middle
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
     types: updated_types,
   });
   cdp.types = updated_types;
@@ -347,7 +353,7 @@ test("schema-only custom commands register without a websocket", async () => {
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
 
   const result = await cdp.send("Mod.addCustomCommand", {
@@ -381,7 +387,7 @@ test("constructor custom command and event schemas validate nested payloads", ()
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
     types: {
       custom_commands: [
         {
@@ -448,7 +454,7 @@ test("assigned type registry updates runtime validation and aliases", () => {
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server_options: null,
+    server_config: null,
   });
 
   cdp.types = cdp.types.update({

@@ -12,15 +12,16 @@ import (
 )
 
 type ModCDPClient = client.ModCDPClient
-type Options = client.Options
+type Config = client.Config
 type LaunchOptions = client.LaunchOptions
-type ClientOptions = client.ClientOptions
+type ClientConfig = client.ClientConfig
 type ServerConfig = client.ServerConfig
 type RouterOptions = client.RouterOptions
 type DownstreamOptions = client.DownstreamOptions
 type CustomCommand = client.CustomCommand
 type CustomEvent = client.CustomEvent
 type CustomMiddleware = client.CustomMiddleware
+type CDPTypes = client.CDPTypes
 type CDPEvent = client.CDPEvent
 type LaunchedBrowser = launcher.LaunchedBrowser
 type BrowserLauncher = launcher.BrowserLauncher
@@ -43,6 +44,7 @@ type WSUpstreamTransport = transport.WSUpstreamTransport
 type AutoSessionRouter = client.AutoSessionRouter
 
 var New = client.New
+var NewCDPTypes = client.NewCDPTypes
 var Bool = client.Bool
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
 var NewRemoteBrowserLauncher = launcher.NewRemoteBrowserLauncher

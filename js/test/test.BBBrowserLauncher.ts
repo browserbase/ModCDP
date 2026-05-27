@@ -1,25 +1,15 @@
+// MODCDP_TRANSLATE_TEST: KEEP THIS TEST FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// All test cases, descriptions, covered edge cases, and setup should be kept perfectly 1:1 in sync between:
+// - ./python/tests/test_BBBrowserLauncher.py
+// - ./go/modcdp/launcher/BBBrowserLauncher_test.go
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import { describe, expect, it } from "vitest";
 
 import { BBBrowserLauncher } from "../src/launcher/BBBrowserLauncher.js";
-import { CdpSocket, expectCdpBrowserSurface } from "./helpers.BrowserLauncher.js";
+import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
 
 const LIVE_BROWSERBASE_TIMEOUT_MS = 120_000;
-
-function browserbaseApiUrl(pathname: string) {
-  return new URL(
-    pathname,
-    `${(process.env.BROWSERBASE_BASE_URL ?? "https://api.browserbase.com").replace(/\/$/, "")}/`,
-  );
-}
-
-async function retrieveBrowserbaseSession(session_id: string) {
-  const response = await fetch(browserbaseApiUrl(`/v1/sessions/${session_id}`), {
-    headers: { "x-bb-api-key": process.env.BROWSERBASE_API_KEY! },
-  });
-  expect(response.status).toBeGreaterThanOrEqual(200);
-  expect(response.status).toBeLessThan(300);
-  return (await response.json()) as Record<string, unknown>;
-}
 
 describe("BBBrowserLauncher", () => {
   it(
@@ -42,15 +32,15 @@ describe("BBBrowserLauncher", () => {
         },
       });
       const browser = await launcher.launch();
+      const cdp = new WSUpstreamTransport({ upstream_ws_cdp_url: browser.cdp_url });
       let resumed: Awaited<ReturnType<BBBrowserLauncher["launch"]>> | null = null;
-      let cdp: CdpSocket | null = null;
       const session_id = browser.browserbase_session_id;
 
       try {
         expect(session_id).toEqual(expect.any(String));
         expect(browser.browserbase_session_url).toContain(session_id);
         expect(browser.cdp_url).toEqual(expect.stringMatching(/^wss:\/\//));
-        cdp = await CdpSocket.connect(browser.cdp_url!);
+        await cdp.connect();
         await expectCdpBrowserSurface(cdp);
 
         const retrieved = await retrieveBrowserbaseSession(session_id!);
@@ -65,7 +55,7 @@ describe("BBBrowserLauncher", () => {
         expect(resumed.cdp_url).toEqual(expect.stringMatching(/^wss:\/\//));
         await expectCdpBrowserSurface(cdp);
       } finally {
-        await cdp?.close();
+        await cdp.close();
         await resumed?.close();
         await browser.close();
         await browser.close();
@@ -77,3 +67,46 @@ describe("BBBrowserLauncher", () => {
     },
   );
 });
+
+// MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+// Keep the setup semantics above 1:1 with translated tests; helpers here only use real ModCDP transports and real Browserbase APIs.
+async function expectCdpBrowserSurface(cdp: WSUpstreamTransport) {
+  const version = await cdp.send("Browser.getVersion");
+  expect(version.product).toEqual(expect.stringMatching(/Chrome|Chromium/));
+  expect(version.protocolVersion).toEqual(expect.any(String));
+
+  const created = await cdp.send("Target.createTarget", { url: "about:blank#modcdp-launcher-test" });
+  expect(created.targetId).toEqual(expect.any(String));
+  const targetId = created.targetId as string;
+
+  try {
+    const attached = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
+    expect(attached.sessionId).toEqual(expect.any(String));
+    const sessionId = attached.sessionId as string;
+    await cdp.send("Runtime.enable", {}, sessionId);
+    const evaluated = await cdp.send(
+      "Runtime.evaluate",
+      { expression: "(() => ({ ok: true, value: 42 }))()", returnByValue: true },
+      sessionId,
+    );
+    expect(evaluated.result).toMatchObject({ type: "object", value: { ok: true, value: 42 } });
+  } finally {
+    await cdp.send("Target.closeTarget", { targetId }).catch(() => ({}));
+  }
+}
+
+function browserbaseApiUrl(pathname: string) {
+  return new URL(
+    pathname,
+    `${(process.env.BROWSERBASE_BASE_URL ?? "https://api.browserbase.com").replace(/\/$/, "")}/`,
+  );
+}
+
+async function retrieveBrowserbaseSession(session_id: string) {
+  const response = await fetch(browserbaseApiUrl(`/v1/sessions/${session_id}`), {
+    headers: { "x-bb-api-key": process.env.BROWSERBASE_API_KEY! },
+  });
+  expect(response.status).toBeGreaterThanOrEqual(200);
+  expect(response.status).toBeLessThan(300);
+  return (await response.json()) as Record<string, unknown>;
+}

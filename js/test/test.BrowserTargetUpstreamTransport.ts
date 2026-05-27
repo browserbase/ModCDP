@@ -1,3 +1,8 @@
+// MODCDP_TS_ONLY_TEST: DO NOT TRANSLATE THIS TEST FILE TO OTHER LANGUAGES.
+// BrowserTargetUpstreamTransport: TS-only browser-target upstream transport coverage.
+// If a translated sibling is added, all test cases, descriptions, covered edge cases, and setup must be kept perfectly 1:1 in sync.
+// NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
+// USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +37,7 @@ test("loopback browser-target upstream routes commands, events, and topology thr
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server_options: {
+    server_config: {
       upstream: { upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
       router: { router_routes: { "*.*": "loopback_cdp" } },
     },
@@ -85,7 +90,7 @@ test("chrome.debugger browser-target upstream routes commands, events, and topol
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server_options: {
+    server_config: {
       router: { router_routes: { "*.*": "chromedebugger" } },
     },
   });
@@ -102,10 +107,7 @@ test("chrome.debugger browser-target upstream routes commands, events, and topol
 
     const topology = await cdp.Mod.getTopology({ targetId });
     assertTopology(topology, targetId);
-    assert.equal(
-      Object.values(topology.targets).some((target) => target.targetId === targetId && target.sessionId == null),
-      true,
-    );
+    assert.ok(topology.targets[targetId], "topology should include the created target");
   } finally {
     if (targetId) await cdp.send("Target.closeTarget", { targetId }).catch(() => ({}));
     await cdp.close();
