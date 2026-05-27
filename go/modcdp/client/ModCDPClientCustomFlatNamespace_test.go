@@ -14,7 +14,7 @@ import (
 	abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
 )
 
-func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T) {
+func TestCustomCommandsInstallFlatNamespaceMethodsThroughARealServiceWorker(t *testing.T) {
 	type ParamsSchema struct {
 		ID     string `json:"id"`
 		Suffix string `json:"suffix,omitempty"`
@@ -161,7 +161,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 	}
 }
 
-func TestDynamicCustomCommandEventAndMiddlewareRegistrationValidatesThroughRealServiceWorker(t *testing.T) {
+func TestDynamicCustomCommandEventAndMiddlewareRegistrationValidatesThroughARealServiceWorker(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)

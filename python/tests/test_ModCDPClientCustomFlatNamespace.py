@@ -166,7 +166,7 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
         finally:
             client.close()
 
-    def test_dynamic_custom_command_event_and_middleware_registration_validates_through_real_service_worker(self) -> None:
+    def test_dynamic_custom_command_event_and_middleware_registration_validates_through_a_real_service_worker(self) -> None:
         client = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
