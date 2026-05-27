@@ -4,7 +4,10 @@
 // - ./python/modcdp/types/toJSON.py
 package types
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 type ModCDPJSONChild interface {
 	ToJSON() map[string]any
@@ -77,6 +80,10 @@ func simpleState(input any) map[string]any {
 }
 
 func addSimpleStateValue(state map[string]any, key string, value any) {
+	normalizedKey := strings.ToLower(key)
+	if key == "Config" || key == "config" || strings.Contains(normalizedKey, "token") || strings.Contains(normalizedKey, "secret") || strings.Contains(normalizedKey, "api_key") || strings.Contains(normalizedKey, "apikey") {
+		return
+	}
 	switch typed := value.(type) {
 	case string:
 		state[key] = typed
