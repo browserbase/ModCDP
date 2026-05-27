@@ -24,6 +24,7 @@ class TranslateTests(unittest.TestCase):
     def test_routes_wraps_and_unwraps_modcdp_protocol_messages_deterministically(self) -> None:
         self.assertEqual(route_for("Browser.getVersion", {"Browser.*": "direct_cdp", "*.*": "service_worker"}), "direct_cdp")
         self.assertEqual(route_for("Target.getTargets", {"Browser.*": "direct_cdp", "*.*": "service_worker"}), "service_worker")
+        self.assertEqual(route_for("Browser.getVersion"), "direct_cdp")
 
         direct = wrap_command_if_needed("Browser.getVersion", {}, routes={"*.*": "direct_cdp"})
         self.assertEqual(direct["target"], "direct_cdp")

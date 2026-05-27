@@ -29,7 +29,7 @@ DEFAULT_CLIENT_ROUTES: ModCDPRoutes = {
 }
 
 
-def route_for(method: str, routes: ModCDPRoutes) -> str:
+def route_for(method: str, routes: ModCDPRoutes | None = None) -> str:
     routes = routes or {}
     if method in routes:
         return routes[method]
