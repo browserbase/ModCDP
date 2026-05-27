@@ -76,7 +76,7 @@ class BrowserLauncher {
     return this;
   }
 
-  async launch(_options: LauncherConfig = {}): Promise<LaunchedBrowser> {
+  async launch(_config: LauncherConfig = {}): Promise<LaunchedBrowser> {
     throw new Error(`${this.constructor.name}.launch is not implemented.`);
   }
 

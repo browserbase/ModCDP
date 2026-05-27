@@ -245,7 +245,7 @@ class UpstreamTransport {
     }
   }
 
-  async waitForPeer(_options: UpstreamPeerWaitConfig = {}) {}
+  async waitForPeer(_config: UpstreamPeerWaitConfig = {}) {}
 
   toJSON() {
     const { upstream_pipe_read, upstream_pipe_write, ...config } = this.config;

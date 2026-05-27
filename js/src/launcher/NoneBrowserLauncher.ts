@@ -9,7 +9,7 @@ class NoneBrowserLauncher extends BrowserLauncher {
     super({ ...config, launcher_mode: "none" });
   }
 
-  async launch(_options: LauncherConfig = {}): Promise<LaunchedBrowser> {
+  async launch(_config: LauncherConfig = {}): Promise<LaunchedBrowser> {
     this.launched = { cdp_url: null, close: async () => {} };
     return this.launched;
   }
