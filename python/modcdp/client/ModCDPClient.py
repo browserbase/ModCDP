@@ -370,7 +370,8 @@ class ModCDPClient(CDPSurfaceMixin):
                 "completed_at": completed_at,
                 "duration_ms": completed_at - started_at,
             }
-            return AwaitableDict(preparation.local_result)
+            result = self.types.parseCommandResult(method, preparation.local_result) if validate_custom_schema else preparation.local_result
+            return AwaitableDict(dict(result)) if isinstance(result, Mapping) else AwaitableValue(result)
         command_params = preparation.params
 
         command = wrap_command_if_needed(
@@ -420,7 +421,7 @@ class ModCDPClient(CDPSurfaceMixin):
         params: Mapping[str, Any] | None = None,
         session_id: str | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        result = self._send_command(method, params, session_id=session_id, validate_custom_schema=False)
+        result = self._send_command(method, params, session_id=session_id)
         if isinstance(result, AwaitableDict):
             return result
         if isinstance(result, AwaitableValue):
