@@ -385,9 +385,16 @@ async function main() {
                 return { emitted: true };
               }`
             : `async () => {
+                const params = await ModCDP.runMiddleware("event", "Custom.demoEvent", { value: "custom-event-ok" }, {
+                  cdpSessionId,
+                  event: {
+                    method: "Custom.demoEvent",
+                    params: { value: "custom-event-ok" },
+                  },
+                });
                 const sent = downstream.sendEvent({
                   method: "Custom.demoEvent",
-                  params: { value: "custom-event-ok" },
+                  params,
                 });
                 return { emitted: sent > 0 };
               }`,

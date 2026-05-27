@@ -123,6 +123,7 @@ class DownstreamTransportSet {
   sendEvent(message: CdpEventMessage) {
     const binding_name = nativeEventSchemas[message.method] ? UPSTREAM_EVENT_BINDING_NAME : CUSTOM_EVENT_BINDING_NAME;
     const binding = Reflect.get(globalThis, binding_name);
+    let sent_count = 0;
     if (typeof binding === "function") {
       binding(
         JSON.stringify({
@@ -131,8 +132,9 @@ class DownstreamTransportSet {
           cdpSessionId: message.sessionId ?? null,
         }),
       );
+      sent_count += 1;
     }
-    return [...this.transports.values()].reduce((count, transport) => count + transport.sendEvent(message), 0);
+    return [...this.transports.values()].reduce((count, transport) => count + transport.sendEvent(message), sent_count);
   }
 
   /** Mirror all CDP-shaped ModCDPClient events into downstream transports. */
