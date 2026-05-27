@@ -8,7 +8,7 @@ import { DEFAULT_UPSTREAM_REVERSEWS_BIND, DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOU
 import {
   parseHostPort,
   UpstreamTransport,
-  type UpstreamPeerWaitOptions,
+  type UpstreamPeerWaitConfig,
   type UpstreamTransportConfig,
 } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
@@ -33,8 +33,8 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
   }>();
   peer_info: ReverseHello | null = null;
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    super({ ...options, upstream_mode: "reversews" });
+  constructor(config: UpstreamTransportConfig = {}) {
+    super({ ...config, upstream_mode: "reversews" });
     this.endpoint_url = endpointFromBind(this.config.upstream_reversews_bind);
   }
 
@@ -43,7 +43,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: string | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,
@@ -62,7 +62,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
-    options: { timeout_ms?: number | null } = {},
+    config: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command !== "string" && "method" in command) {
       if (!this.socket || this.socket.readyState !== this.socket.OPEN) {
@@ -76,7 +76,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
         command,
         params as ProtocolPayload,
         typeof route_or_sessionId === "string" ? route_or_sessionId : null,
-        options,
+        config,
       );
     }
     return super.send(command, params as z.input<Params>, route_or_sessionId);
@@ -100,7 +100,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     });
   }
 
-  async waitForPeer({ connected_after_ms = null }: UpstreamPeerWaitOptions = {}) {
+  async waitForPeer({ connected_after_ms = null }: UpstreamPeerWaitConfig = {}) {
     if (
       this.socket &&
       this.socket.readyState === this.socket.OPEN &&

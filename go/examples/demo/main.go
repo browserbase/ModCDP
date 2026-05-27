@@ -29,16 +29,16 @@ import (
 const demoCDPSendTimeoutMS = 60_000
 const demoExecutionContextTimeoutMS = 60_000
 
-func configFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Config {
-	upstream := modcdp.UpstreamTransportOptions{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
-	launcher := launchOptions
+func configFor(mode, upstreamMode, cdpURL, extensionPath string, launchConfig modcdp.LauncherConfig) modcdp.Config {
+	upstream := modcdp.UpstreamTransportConfig{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
+	launcher := launchConfig
 	if cdpURL != "" {
 		launcher.LauncherMode = "remote"
 		launcher.LauncherRemoteCDPURL = cdpURL
 	} else {
 		launcher.LauncherMode = "local"
 	}
-	injector := modcdp.InjectorOptions{
+	injector := modcdp.InjectorConfig{
 		InjectorMode:                      "cli",
 		InjectorCLIExtensionPath:          extensionPath,
 		InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
@@ -52,11 +52,12 @@ func configFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions m
 			Launcher:     launcher,
 			Upstream:     upstream,
 			Injector:     injector,
-			ClientConfig: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+			Router:       modcdp.RouterConfig{RouterRoutes: clientRoutesFor(mode)},
+			ClientConfig: modcdp.ClientConfig{ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		}
 	}
 	server_config := &modcdp.ServerConfig{
-		Router: modcdp.RouterOptions{
+		Router: modcdp.RouterConfig{
 			RouterRoutes:                      serverRoutesFor(mode, upstreamMode),
 			LoopbackExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
 		},
@@ -65,7 +66,8 @@ func configFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions m
 		Launcher:     launcher,
 		Upstream:     upstream,
 		Injector:     injector,
-		ClientConfig: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+		Router:       modcdp.RouterConfig{RouterRoutes: clientRoutesFor(mode)},
+		ClientConfig: modcdp.ClientConfig{ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		ServerConfig: server_config,
 	}
 }
@@ -194,7 +196,7 @@ func main() {
 	root, _ := filepath.Abs(filepath.Join(filepath.Dir(thisFile), "..", "..", ".."))
 	extensionPath := filepath.Join(root, "dist", "extension")
 	var cdpURL string
-	launchOptions := modcdp.LaunchOptions{}
+	launchConfig := modcdp.LauncherConfig{}
 	if live {
 		var err error
 		cdpURL, err = waitForLiveCDPURL()
@@ -207,7 +209,7 @@ func main() {
 		if runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" {
 			headless = true
 		}
-		launchOptions = modcdp.LaunchOptions{
+		launchConfig = modcdp.LauncherConfig{
 			LauncherLocalExecutablePath:       chromePath,
 			LauncherLocalChromeReadyTimeoutMS: 60_000,
 			LauncherLocalHeadless:             &headless,
@@ -215,7 +217,7 @@ func main() {
 		}
 	}
 
-	cdp := modcdp.New(configFor(mode, upstreamMode, cdpURL, extensionPath, launchOptions))
+	cdp := modcdp.New(configFor(mode, upstreamMode, cdpURL, extensionPath, launchConfig))
 
 	if err := cdp.Connect(); err != nil {
 		log.Fatalf("connect: %v", err)
@@ -228,9 +230,7 @@ func main() {
 	}
 
 	configureParams := map[string]any{
-		"upstream":      map[string]any{"upstream_mode": upstreamMode},
-		"router":        map[string]any{"router_routes": serverRoutesFor(mode, upstreamMode), "loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS},
-		"client_config": map[string]any{"client_routes": clientRoutesFor(mode)},
+		"router": map[string]any{"router_routes": serverRoutesFor(mode, upstreamMode), "loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS},
 	}
 	configureRaw, err := cdp.Mod.Configure(configureParams)
 	if err != nil {

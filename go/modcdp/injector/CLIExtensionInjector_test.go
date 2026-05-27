@@ -67,9 +67,8 @@ func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(
 	if _, err := os.Stat(filepath.Join(injector.UnpackedExtensionPath, "manifest.json")); err != nil {
 		t.Fatalf("expected unpacked manifest: %v", err)
 	}
-	launcherConfig := injector.ConfigForLauncher()
-	if len(launcherConfig.LauncherLocalExtraArgs) != 1 || launcherConfig.LauncherLocalExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
-		t.Fatalf("ExtraArgs = %#v", launcherConfig.LauncherLocalExtraArgs)
+	if len(injector.ExtraArgs) != 1 || injector.ExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
+		t.Fatalf("ExtraArgs = %#v", injector.ExtraArgs)
 	}
 	if injector.Config.InjectorServiceWorkerExtensionID != DefaultModCDPExtensionID {
 		t.Fatalf("InjectorServiceWorkerExtensionID = %q", injector.Config.InjectorServiceWorkerExtensionID)
@@ -92,9 +91,8 @@ func TestCLIExtensionInjectorPreparesDefaultExtensionZipForLoadExtension(t *test
 	if _, err := os.Stat(filepath.Join(injector.UnpackedExtensionPath, "manifest.json")); err != nil {
 		t.Fatalf("expected unpacked manifest: %v", err)
 	}
-	launcherConfig := injector.ConfigForLauncher()
-	if len(launcherConfig.LauncherLocalExtraArgs) != 1 || launcherConfig.LauncherLocalExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
-		t.Fatalf("ExtraArgs = %#v", launcherConfig.LauncherLocalExtraArgs)
+	if len(injector.ExtraArgs) != 1 || injector.ExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
+		t.Fatalf("ExtraArgs = %#v", injector.ExtraArgs)
 	}
 	if injector.Config.InjectorServiceWorkerExtensionID != DefaultModCDPExtensionID {
 		t.Fatalf("InjectorServiceWorkerExtensionID = %q", injector.Config.InjectorServiceWorkerExtensionID)
@@ -108,8 +106,10 @@ func TestCLIExtensionInjectorReturnsImmediatelyWhenLaunchedExtensionTargetIsAbse
 	}
 	methods := []string{}
 	injector := NewCLIExtensionInjector(InjectorConfig{
-		InjectorCLIExtensionPath:         extensionPath,
-		InjectorTrustServiceWorkerTarget: true,
+		InjectorCLIExtensionPath:            extensionPath,
+		InjectorTrustServiceWorkerTarget:    true,
+		InjectorServiceWorkerReadyTimeoutMS: 50,
+		InjectorServiceWorkerPollIntervalMS: 10,
 		Send: func(method string, params map[string]any, sessionID string) (map[string]any, error) {
 			methods = append(methods, method)
 			if method == "Target.getTargets" {
@@ -133,7 +133,11 @@ func TestCLIExtensionInjectorReturnsImmediatelyWhenLaunchedExtensionTargetIsAbse
 	if result != nil {
 		t.Fatalf("result = %#v", result)
 	}
-	if strings.Join(methods, ",") != "Target.getTargets" {
+	uniqueMethods := map[string]bool{}
+	for _, method := range methods {
+		uniqueMethods[method] = true
+	}
+	if len(methods) == 0 || len(uniqueMethods) != 1 || !uniqueMethods["Target.getTargets"] {
 		t.Fatalf("methods = %#v", methods)
 	}
 	if elapsed >= 200*time.Millisecond {

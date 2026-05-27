@@ -57,8 +57,8 @@ class BrowserLauncher {
   // runtime state
   launched: LaunchedBrowser | null = null;
 
-  constructor(options: LauncherConfig = {}) {
-    this.config = ModCDPLauncherConfigSchema.parse(options);
+  constructor(config: LauncherConfig = {}) {
+    this.config = ModCDPLauncherConfigSchema.parse(config);
   }
 
   update(config: LauncherConfig = {}) {

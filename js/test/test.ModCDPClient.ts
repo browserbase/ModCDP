@@ -91,7 +91,7 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal("routes" in cdp, false);
   assert.equal("cdp_send_timeout_ms" in cdp, false);
   assert.equal("service_worker_probe_timeout_ms" in cdp, false);
-  assert.equal("launcher_options" in cdp.launcher, false);
+  assert.equal("launcher_config" in cdp.launcher, false);
   assert.equal("headless" in cdp.launcher, false);
   assert.equal("executable_path" in cdp.launcher, false);
   assert.equal("user_data_dir" in cdp.launcher, false);
@@ -105,7 +105,7 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal(params.downstream?.downstream_client_timeout_ms, 4567);
 });
 
-test("ModCDPClient constructs chrome debugger upstream transport from upstream options", () => {
+test("ModCDPClient constructs chrome debugger upstream transport from upstream config", () => {
   const upstream = ModCDPUpstreamConfigSchema.parse({
     upstream_mode: "chromedebugger",
   });

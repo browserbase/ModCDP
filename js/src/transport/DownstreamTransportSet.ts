@@ -38,8 +38,8 @@ class DownstreamTransportSet {
   private readonly transports = new Map<DownstreamTransportName, DownstreamTransport>();
   private downstream_client_lease: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(options: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
-    this.config = ModCDPDownstreamConfigSchema.parse({ closeBrowser: () => {}, ...options });
+  constructor(config: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
+    this.config = ModCDPDownstreamConfigSchema.parse({ closeBrowser: () => {}, ...config });
   }
 
   update(config: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {

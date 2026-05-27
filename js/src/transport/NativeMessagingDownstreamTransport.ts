@@ -73,9 +73,9 @@ class NativeMessagingDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the nativemessaging downstream connection. */
-  start(hostName?: string, options: z.input<typeof NativeMessagingDownstreamTransportConfigSchema> = {}) {
+  start(hostName?: string, config: z.input<typeof NativeMessagingDownstreamTransportConfigSchema> = {}) {
     this.config = NativeMessagingDownstreamTransportConfigSchema.parse({
-      ...options,
+      ...config,
       upstream_nativemessaging_host_name: hostName,
     });
     this.started = true;

@@ -137,7 +137,7 @@ const aliases = [
   `  onCustomCommand?: (name: string, params_schema?: z.ZodType | null, result_schema?: z.ZodType | null) => void;`,
   `  onCustomEvent?: (name: string, event_schema?: z.ZodType | null) => void;`,
   `};`,
-  `export type ModCustomCommandOptions<TParamsSchema = unknown, TResultSchema = unknown> = {`,
+  `export type ModCustomCommandConfig<TParamsSchema = unknown, TResultSchema = unknown> = {`,
   `  params_schema?: TParamsSchema | null;`,
   `  result_schema?: TResultSchema | null;`,
   `  expression?: string | null;`,
@@ -198,9 +198,9 @@ const aliases = [
   `};`,
   `type ModAliasOverrides = {`,
   `  Mod: {`,
-  `    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(name: TName, options?: ModCustomCommandOptions<TParamsSchema, TResultSchema>): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;`,
+  `    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(name: TName, config?: ModCustomCommandConfig<TParamsSchema, TResultSchema>): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;`,
   `    addCustomCommand(params: z.input<typeof Mod.AddCustomCommandParams>): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;`,
-  `    addCustomEvent<TName extends string, TEventSchema>(name: TName, options?: { event_schema?: TEventSchema | null }): Promise<z.output<typeof Mod.AddCustomEventResponse>>;`,
+  `    addCustomEvent<TName extends string, TEventSchema>(name: TName, config?: { event_schema?: TEventSchema | null }): Promise<z.output<typeof Mod.AddCustomEventResponse>>;`,
   `    addCustomEvent(params: z.input<typeof Mod.AddCustomEventParams>): Promise<z.output<typeof Mod.AddCustomEventResponse>>;`,
   `  };`,
   `};`,
@@ -261,14 +261,14 @@ for (const base of modcdpTypes
   const lines =
     base === "AddCustomCommand"
       ? [
-          `      ${methodName}: withCdpName(async (params_or_name?: cdp.types.ts.Mod.${base}Params | string, options: ModCustomCommandOptions = {}) => {`,
-          `        const input = typeof params_or_name === "string" ? { name: params_or_name, expression: options.expression ?? null, params_schema: options.params_schema ?? null, result_schema: options.result_schema ?? null } : params_or_name;`,
+          `      ${methodName}: withCdpName(async (params_or_name?: cdp.types.ts.Mod.${base}Params | string, config: ModCustomCommandConfig = {}) => {`,
+          `        const input = typeof params_or_name === "string" ? { name: params_or_name, expression: config.expression ?? null, params_schema: config.params_schema ?? null, result_schema: config.result_schema ?? null } : params_or_name;`,
           `        const parsed = Mod.${base}Params.parse(input ?? {});`,
         ]
       : base === "AddCustomEvent"
         ? [
-            `      ${methodName}: withCdpName(async (params_or_name?: cdp.types.ts.Mod.${base}Params | string, options: { event_schema?: z.ZodType | null } = {}) => {`,
-            `        const input = typeof params_or_name === "string" ? { name: params_or_name, event_schema: options.event_schema ?? null } : params_or_name;`,
+            `      ${methodName}: withCdpName(async (params_or_name?: cdp.types.ts.Mod.${base}Params | string, config: { event_schema?: z.ZodType | null } = {}) => {`,
+            `        const input = typeof params_or_name === "string" ? { name: params_or_name, event_schema: config.event_schema ?? null } : params_or_name;`,
             `        const parsed = Mod.${base}Params.parse(input ?? {});`,
           ]
         : [

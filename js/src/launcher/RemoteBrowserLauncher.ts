@@ -10,12 +10,12 @@ import {
 } from "./BrowserLauncher.js";
 
 class RemoteBrowserLauncher extends BrowserLauncher {
-  constructor(options: LauncherConfig = {}) {
-    super({ ...options, launcher_mode: "remote" });
+  constructor(config: LauncherConfig = {}) {
+    super({ ...config, launcher_mode: "remote" });
   }
 
-  async launch(options: LauncherConfig = {}): Promise<LaunchedBrowser> {
-    const endpoint = options.launcher_remote_cdp_url ?? this.config.launcher_remote_cdp_url;
+  async launch(config: LauncherConfig = {}): Promise<LaunchedBrowser> {
+    const endpoint = config.launcher_remote_cdp_url ?? this.config.launcher_remote_cdp_url;
     if (!endpoint) throw new Error("launcher_mode=remote requires launcher_remote_cdp_url.");
     // cdp_url is resolved here so downstream transports can dial it directly.
     const cdp_url = await resolveCdpWebSocketUrl(endpoint, "launcher_remote_cdp_url");

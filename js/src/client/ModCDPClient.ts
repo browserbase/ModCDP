@@ -33,7 +33,7 @@ import {
   type CDPEventMapPayloads,
   type CDPEventNameInput,
   type CDPEventPayload,
-  type CDPTypesOptions,
+  type CDPTypesConfig,
 } from "../types/CDPTypes.js";
 import { ChromeDebuggerUpstreamTransport } from "../transport/ChromeDebuggerUpstreamTransport.js";
 import { WSUpstreamTransport } from "../transport/WSUpstreamTransport.js";
@@ -76,7 +76,7 @@ type ModCDPClientConfig<TCommands extends CDPCommandMap = {}, TEvents extends CD
   router?: z.input<typeof ModCDPRouterConfigSchema>;
   client_config?: z.input<typeof ModCDPClientConfigSchema>;
   server_config?: z.input<typeof ModCDPServerConfigSchema> | null;
-  types?: CDPTypesOptions<TCommands, TEvents> | CDPTypes<TCommands, TEvents>;
+  types?: CDPTypesConfig<TCommands, TEvents> | CDPTypes<TCommands, TEvents>;
 };
 const upstream_transport_constructors = new Map<
   NonNullable<UpstreamTransportConfig["upstream_mode"]>,
@@ -164,10 +164,10 @@ export class ModCDPClient<
     types = {},
   }: ModCDPClientConfig<TCommands, TEvents> = {}) {
     super();
-    const upstream_options = ModCDPUpstreamConfigSchema.parse(upstream);
-    const launcher_options = ModCDPLauncherConfigSchema.parse(launcher);
-    const injector_options = InjectorConfigSchema.parse(injector);
-    const router_options = ModCDPRouterConfigSchema.parse({
+    const upstream_config = ModCDPUpstreamConfigSchema.parse(upstream);
+    const launcher_config = ModCDPLauncherConfigSchema.parse(launcher);
+    const injector_config = InjectorConfigSchema.parse(injector);
+    const router_config = ModCDPRouterConfigSchema.parse({
       ...router,
       router_routes: {
         ...DEFAULT_CLIENT_ROUTER_ROUTES,
@@ -176,22 +176,22 @@ export class ModCDPClient<
     });
     const parsed_client_config = ModCDPClientConfigSchema.parse(client_config);
     const parsed_server_config = server_config === null ? null : ModCDPServerConfigSchema.parse(server_config ?? {});
-    const upstream_mode = upstream_options.upstream_mode;
-    const launcher_mode = launcher_options.launcher_mode;
-    const injector_mode = injector_options.injector_mode;
+    const upstream_mode = upstream_config.upstream_mode;
+    const launcher_mode = launcher_config.launcher_mode;
+    const injector_mode = injector_config.injector_mode;
     const Upstream = upstream_transport_constructors.get(upstream_mode);
     if (!Upstream) throw new Error(`unknown upstream_mode=${upstream_mode}`);
-    this.upstream = new Upstream(upstream_options);
+    this.upstream = new Upstream(upstream_config);
 
     const Launcher = browser_launcher_constructors.get(launcher_mode);
     if (!Launcher) throw new Error(`unknown launcher_mode=${launcher_mode}`);
-    this.launcher = new Launcher(launcher_options);
+    this.launcher = new Launcher(launcher_config);
 
     if (injector_mode === "none") this.injector = null;
     else {
       const Injector = extension_injector_constructors.get(injector_mode);
       if (!Injector) throw new Error(`unknown injector.injector_mode=${injector_mode}`);
-      this.injector = new Injector(injector_options);
+      this.injector = new Injector(injector_config);
     }
     this.config = parsed_client_config;
     this.upstream.update({
@@ -227,7 +227,7 @@ export class ModCDPClient<
       this.emit("error", error);
     };
     this.router = new AutoSessionRouter({
-      ...router_options,
+      ...router_config,
       upstream: this.upstream,
       types: this.types,
     });

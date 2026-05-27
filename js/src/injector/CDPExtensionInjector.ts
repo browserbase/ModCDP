@@ -11,8 +11,8 @@ class CDPExtensionInjector extends ExtensionInjector {
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...options, injector_mode: "cdp" });
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...config, injector_mode: "cdp" });
   }
 
   async prepare() {

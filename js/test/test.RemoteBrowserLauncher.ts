@@ -44,11 +44,11 @@ describe("RemoteBrowserLauncher", () => {
         expect(fromBare.cdp_url).toBe(local.cdp_url);
         await fromBare.close();
 
-        const fromOptions = await new RemoteBrowserLauncher({
+        const fromConfig = await new RemoteBrowserLauncher({
           launcher_remote_cdp_url: local.cdp_url,
         }).launch();
-        expect(fromOptions.cdp_url).toBe(local.cdp_url);
-        await fromOptions.close();
+        expect(fromConfig.cdp_url).toBe(local.cdp_url);
+        await fromConfig.close();
 
         const fromWs = await new RemoteBrowserLauncher().launch({
           launcher_remote_cdp_url: local.cdp_url,
@@ -63,7 +63,7 @@ describe("RemoteBrowserLauncher", () => {
     },
   );
 
-  it("lets launch options override constructor cdp_url", { timeout: LIVE_BROWSER_TIMEOUT_MS }, async () => {
+  it("lets launch config override constructor cdp_url", { timeout: LIVE_BROWSER_TIMEOUT_MS }, async () => {
     const first = await new LocalBrowserLauncher().launch({
       launcher_local_cdp_listen_port: await LocalBrowserLauncher.freePort(),
       launcher_local_headless: true,

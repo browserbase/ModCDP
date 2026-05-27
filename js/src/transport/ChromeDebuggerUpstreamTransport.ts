@@ -62,8 +62,8 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   // Non-null means native detach events are clearing attached-debuggee state.
   private debugger_onDetach_listener: ((source: chrome.debugger.Debuggee, reason?: string) => void) | null = null;
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    super({ ...options, upstream_mode: "chromedebugger" });
+  constructor(config: UpstreamTransportConfig = {}) {
+    super({ ...config, upstream_mode: "chromedebugger" });
   }
 
   /** Install chrome.debugger listeners for this service-worker lifetime. */
@@ -132,7 +132,7 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: string | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,

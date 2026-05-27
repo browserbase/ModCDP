@@ -39,7 +39,7 @@ const cdp = new ModCDPClient({
   launcher: { launcher_mode: "remote" },
   upstream: { upstream_mode: "ws", upstream_ws_cdp_url },
   injector: { injector_mode: "discover" },
-  client_config: { client_routes: { "Target.getTargets": "service_worker" } },
+  router: { router_routes: { "Target.getTargets": "service_worker" } },
   server_config: {
     upstream: { upstream_ws_cdp_url },
     router: { router_routes: { "*.*": "loopback_cdp" } },
@@ -173,7 +173,7 @@ Reverse mode is intentionally scoped to one local browser and one reverse extens
 | `--debugger`  | client → SW → `chrome.debugger.sendCommand` against the active tab | The browser exposes no remote CDP port and you only have extension permissions. |
 | `--direct`    | client → sends non-ModCDP commands to browser CDP directly         | You already have a CDP endpoint and don't need extension interception.          |
 
-Pass via `client_config: { client_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server_config: { router: { router_routes: { "*.*": "loopback_cdp" | "chromedebugger" } } }`. The demos default to `--loopback` (the most powerful mode).
+Pass via `router: { router_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server_config: { router: { router_routes: { "*.*": "loopback_cdp" | "chromedebugger" } } }`. The demos default to `--loopback` (the most powerful mode).
 
 ## Repository layout
 

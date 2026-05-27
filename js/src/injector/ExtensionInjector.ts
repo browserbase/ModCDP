@@ -98,8 +98,8 @@ class ExtensionInjector {
   extra_args: string[];
   protected unusable_target_ids = new Set<string>();
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    this.config = InjectorConfigSchema.parse(options);
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    this.config = InjectorConfigSchema.parse(config);
     this.source = null;
     this.extension_id = null;
     this.service_worker_extension_id = null;

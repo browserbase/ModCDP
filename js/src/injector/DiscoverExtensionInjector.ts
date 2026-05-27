@@ -9,8 +9,8 @@ import { extensionIdFromManifestKey, prepareUnpackedExtension, type PreparedExte
 class DiscoverExtensionInjector extends ExtensionInjector {
   private prepared_extension: PreparedExtension | null = null;
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...options, injector_mode: "discover" });
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...config, injector_mode: "discover" });
   }
 
   async prepare() {

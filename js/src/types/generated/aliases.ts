@@ -5,16 +5,23 @@ import { commands, events, types as runtimeTypes } from "./zod.js";
 import { Mod, normalizeModCDPName, validateZodSchema } from "../modcdp.js";
 import type { ProtocolParams, ProtocolPayload, ProtocolResult } from "../modcdp.js";
 
-export type CdpNamedValue<Name extends string = string, Kind extends string = string> = { readonly id: Name; readonly name: Name; readonly kind: Kind; meta(): { id: Name; name: Name; kind: Kind } };
-export type CdpCommandAlias<Params, Result, Name extends string> = ((params: Params) => Promise<Result>) & CdpNamedValue<Name, "command">;
-export type CdpOptionalCommandAlias<Params, Result, Name extends string> = ((params?: Params) => Promise<Result>) & CdpNamedValue<Name, "command">;
+export type CdpNamedValue<Name extends string = string, Kind extends string = string> = {
+  readonly id: Name;
+  readonly name: Name;
+  readonly kind: Kind;
+  meta(): { id: Name; name: Name; kind: Kind };
+};
+export type CdpCommandAlias<Params, Result, Name extends string> = ((params: Params) => Promise<Result>) &
+  CdpNamedValue<Name, "command">;
+export type CdpOptionalCommandAlias<Params, Result, Name extends string> = ((params?: Params) => Promise<Result>) &
+  CdpNamedValue<Name, "command">;
 export type CdpEventAlias<Payload, Name extends string> = z.ZodType<Payload> & CdpNamedValue<Name, "event">;
 export type CdpAliasSend = (method: string, params?: unknown) => Promise<unknown>;
 export type CdpAliasHooks = {
   onCustomCommand?: (name: string, params_schema?: z.ZodType | null, result_schema?: z.ZodType | null) => void;
   onCustomEvent?: (name: string, event_schema?: z.ZodType | null) => void;
 };
-export type ModCustomCommandOptions<TParamsSchema = unknown, TResultSchema = unknown> = {
+export type ModCustomCommandConfig<TParamsSchema = unknown, TResultSchema = unknown> = {
   params_schema?: TParamsSchema | null;
   result_schema?: TResultSchema | null;
   expression?: string | null;
@@ -30,55 +37,123 @@ export type CdpEventMap = Record<string, CdpEventSpec>;
 
 type DomainName<TName extends string> = TName extends `${infer TDomain}.${string}` ? TDomain : never;
 type MemberName<TName extends string> = TName extends `${string}.${infer TMember}` ? TMember : never;
-type RequiredKeys<TValue> = TValue extends object ? { [TKey in keyof TValue]-?: {} extends Pick<TValue, TKey> ? never : TKey }[keyof TValue] : keyof TValue;
-type HasRequiredParams<TParams> = TParams extends object ? [RequiredKeys<TParams>] extends [never] ? false : true : true;
-type NativeCommandAliasSpec<TCommand> = TCommand extends { params: infer TParams extends z.ZodType; result: infer TResult extends z.ZodType } ? { params: z.input<TParams>; result: z.output<TResult> } : never;
+type RequiredKeys<TValue> = TValue extends object
+  ? { [TKey in keyof TValue]-?: {} extends Pick<TValue, TKey> ? never : TKey }[keyof TValue]
+  : keyof TValue;
+type HasRequiredParams<TParams> = TParams extends object
+  ? [RequiredKeys<TParams>] extends [never]
+    ? false
+    : true
+  : true;
+type NativeCommandAliasSpec<TCommand> = TCommand extends {
+  params: infer TParams extends z.ZodType;
+  result: infer TResult extends z.ZodType;
+}
+  ? { params: z.input<TParams>; result: z.output<TResult> }
+  : never;
 type NativeEventAliasSpec<TEvent> = TEvent extends z.ZodType ? z.output<TEvent> : never;
 type CustomCommandAliasSpec<TCommand extends CdpCommandSpec> = {
   params: TCommand["params_schema"] extends z.ZodType ? z.input<TCommand["params_schema"]> : ProtocolParams;
   result: TCommand["result_schema"] extends z.ZodType ? z.output<TCommand["result_schema"]> : ProtocolResult;
 };
-type CustomEventAliasSpec<TEvent extends CdpEventSpec> = TEvent["event_schema"] extends z.ZodType ? z.output<TEvent["event_schema"]> : ProtocolPayload;
-type ModCommandBase = Extract<keyof typeof Mod, `${string}Params`> extends infer TKey ? TKey extends `${infer TBase}Params` ? `${TBase}Response` extends keyof typeof Mod ? TBase : never : never : never;
-type ModEventBase = Extract<keyof typeof Mod, `${string}Event`> extends infer TKey ? TKey extends `${infer TBase}Event` ? TBase : never : never;
-type ModParamsSchema<TBase extends string> = Extract<(typeof Mod)[Extract<`${TBase}Params`, keyof typeof Mod>], z.ZodType>;
-type ModResponseSchema<TBase extends string> = Extract<(typeof Mod)[Extract<`${TBase}Response`, keyof typeof Mod>], z.ZodType>;
-type ModEventSchema<TBase extends string> = Extract<(typeof Mod)[Extract<`${TBase}Event`, keyof typeof Mod>], z.ZodType>;
-type NativeCommandAliasSpecs = { [TName in keyof typeof commands & string]: NativeCommandAliasSpec<(typeof commands)[TName]> };
+type CustomEventAliasSpec<TEvent extends CdpEventSpec> = TEvent["event_schema"] extends z.ZodType
+  ? z.output<TEvent["event_schema"]>
+  : ProtocolPayload;
+type ModCommandBase =
+  Extract<keyof typeof Mod, `${string}Params`> extends infer TKey
+    ? TKey extends `${infer TBase}Params`
+      ? `${TBase}Response` extends keyof typeof Mod
+        ? TBase
+        : never
+      : never
+    : never;
+type ModEventBase =
+  Extract<keyof typeof Mod, `${string}Event`> extends infer TKey
+    ? TKey extends `${infer TBase}Event`
+      ? TBase
+      : never
+    : never;
+type ModParamsSchema<TBase extends string> = Extract<
+  (typeof Mod)[Extract<`${TBase}Params`, keyof typeof Mod>],
+  z.ZodType
+>;
+type ModResponseSchema<TBase extends string> = Extract<
+  (typeof Mod)[Extract<`${TBase}Response`, keyof typeof Mod>],
+  z.ZodType
+>;
+type ModEventSchema<TBase extends string> = Extract<
+  (typeof Mod)[Extract<`${TBase}Event`, keyof typeof Mod>],
+  z.ZodType
+>;
+type NativeCommandAliasSpecs = {
+  [TName in keyof typeof commands & string]: NativeCommandAliasSpec<(typeof commands)[TName]>;
+};
 type NativeEventAliasSpecs = { [TName in keyof typeof events & string]: NativeEventAliasSpec<(typeof events)[TName]> };
-type ModCommandAliasSpecs = { [TBase in ModCommandBase as `Mod.${Uncapitalize<TBase>}`]: { params: z.input<ModParamsSchema<TBase>>; result: z.output<ModResponseSchema<TBase>> } };
+type ModCommandAliasSpecs = {
+  [TBase in ModCommandBase as `Mod.${Uncapitalize<TBase>}`]: {
+    params: z.input<ModParamsSchema<TBase>>;
+    result: z.output<ModResponseSchema<TBase>>;
+  };
+};
 type ModEventAliasSpecs = { [TBase in ModEventBase as `Mod.${Uncapitalize<TBase>}`]: z.output<ModEventSchema<TBase>> };
-type CustomCommandAliasSpecs<TCommands extends CdpCommandMap> = { [TName in keyof TCommands & string]: CustomCommandAliasSpec<TCommands[TName]> };
-type CustomEventAliasSpecs<TEvents extends CdpEventMap> = { [TName in keyof TEvents & string]: CustomEventAliasSpec<TEvents[TName]> };
-type CommandAliasSpecs<TCommands extends CdpCommandMap> = NativeCommandAliasSpecs & ModCommandAliasSpecs & CustomCommandAliasSpecs<TCommands>;
-type EventAliasSpecs<TEvents extends CdpEventMap> = NativeEventAliasSpecs & ModEventAliasSpecs & CustomEventAliasSpecs<TEvents>;
-type CommandAlias<TSpec extends { params: unknown; result: unknown }, TName extends string> = HasRequiredParams<TSpec["params"]> extends true ? CdpCommandAlias<TSpec["params"], TSpec["result"], TName> : CdpOptionalCommandAlias<TSpec["params"], TSpec["result"], TName>;
+type CustomCommandAliasSpecs<TCommands extends CdpCommandMap> = {
+  [TName in keyof TCommands & string]: CustomCommandAliasSpec<TCommands[TName]>;
+};
+type CustomEventAliasSpecs<TEvents extends CdpEventMap> = {
+  [TName in keyof TEvents & string]: CustomEventAliasSpec<TEvents[TName]>;
+};
+type CommandAliasSpecs<TCommands extends CdpCommandMap> = NativeCommandAliasSpecs &
+  ModCommandAliasSpecs &
+  CustomCommandAliasSpecs<TCommands>;
+type EventAliasSpecs<TEvents extends CdpEventMap> = NativeEventAliasSpecs &
+  ModEventAliasSpecs &
+  CustomEventAliasSpecs<TEvents>;
+type CommandAlias<TSpec extends { params: unknown; result: unknown }, TName extends string> =
+  HasRequiredParams<TSpec["params"]> extends true
+    ? CdpCommandAlias<TSpec["params"], TSpec["result"], TName>
+    : CdpOptionalCommandAlias<TSpec["params"], TSpec["result"], TName>;
 type CommandAliases<TSpecs extends Record<string, { params: unknown; result: unknown }>> = {
   [TDomain in DomainName<Extract<keyof TSpecs, string>>]: {
-    [TName in Extract<keyof TSpecs, `${TDomain}.${string}`> as MemberName<Extract<TName, string>>]: CommandAlias<TSpecs[TName], Extract<TName, string>>;
+    [TName in Extract<keyof TSpecs, `${TDomain}.${string}`> as MemberName<Extract<TName, string>>]: CommandAlias<
+      TSpecs[TName],
+      Extract<TName, string>
+    >;
   };
 };
 type EventAliases<TSpecs extends Record<string, unknown>> = {
   [TDomain in DomainName<Extract<keyof TSpecs, string>>]: {
-    [TName in Extract<keyof TSpecs, `${TDomain}.${string}`> as MemberName<Extract<TName, string>>]: CdpEventAlias<TSpecs[TName], Extract<TName, string>>;
+    [TName in Extract<keyof TSpecs, `${TDomain}.${string}`> as MemberName<Extract<TName, string>>]: CdpEventAlias<
+      TSpecs[TName],
+      Extract<TName, string>
+    >;
   };
 };
 type MergeDomainAliases<TCommands extends CdpCommandMap, TEvents extends CdpEventMap> = {
-  [TDomain in keyof (CommandAliases<CommandAliasSpecs<TCommands>> & EventAliases<EventAliasSpecs<TEvents>>)]:
-    TDomain extends keyof CommandAliases<CommandAliasSpecs<TCommands>>
-      ? TDomain extends keyof EventAliases<EventAliasSpecs<TEvents>>
-        ? CommandAliases<CommandAliasSpecs<TCommands>>[TDomain] & EventAliases<EventAliasSpecs<TEvents>>[TDomain]
-        : CommandAliases<CommandAliasSpecs<TCommands>>[TDomain]
-      : TDomain extends keyof EventAliases<EventAliasSpecs<TEvents>>
-        ? EventAliases<EventAliasSpecs<TEvents>>[TDomain]
-        : never;
+  [TDomain in keyof (CommandAliases<CommandAliasSpecs<TCommands>> &
+    EventAliases<EventAliasSpecs<TEvents>>)]: TDomain extends keyof CommandAliases<CommandAliasSpecs<TCommands>>
+    ? TDomain extends keyof EventAliases<EventAliasSpecs<TEvents>>
+      ? CommandAliases<CommandAliasSpecs<TCommands>>[TDomain] & EventAliases<EventAliasSpecs<TEvents>>[TDomain]
+      : CommandAliases<CommandAliasSpecs<TCommands>>[TDomain]
+    : TDomain extends keyof EventAliases<EventAliasSpecs<TEvents>>
+      ? EventAliases<EventAliasSpecs<TEvents>>[TDomain]
+      : never;
 };
 type ModAliasOverrides = {
   Mod: {
-    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(name: TName, options?: ModCustomCommandOptions<TParamsSchema, TResultSchema>): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;
-    addCustomCommand(params: z.input<typeof Mod.AddCustomCommandParams>): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;
-    addCustomEvent<TName extends string, TEventSchema>(name: TName, options?: { event_schema?: TEventSchema | null }): Promise<z.output<typeof Mod.AddCustomEventResponse>>;
-    addCustomEvent(params: z.input<typeof Mod.AddCustomEventParams>): Promise<z.output<typeof Mod.AddCustomEventResponse>>;
+    addCustomCommand<TName extends string, TParamsSchema, TResultSchema>(
+      name: TName,
+      config?: ModCustomCommandConfig<TParamsSchema, TResultSchema>,
+    ): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;
+    addCustomCommand(
+      params: z.input<typeof Mod.AddCustomCommandParams>,
+    ): Promise<z.output<typeof Mod.AddCustomCommandResponse>>;
+    addCustomEvent<TName extends string, TEventSchema>(
+      name: TName,
+      config?: { event_schema?: TEventSchema | null },
+    ): Promise<z.output<typeof Mod.AddCustomEventResponse>>;
+    addCustomEvent(
+      params: z.input<typeof Mod.AddCustomEventParams>,
+    ): Promise<z.output<typeof Mod.AddCustomEventResponse>>;
   };
 };
 export type CdpEventPayloads<TEvents extends CdpEventMap = {}> = EventAliasSpecs<TEvents>;
@@ -90,15 +165,21 @@ export type CdpAliases<TCommands extends CdpCommandMap = {}, TEvents extends Cdp
   readonly REQUEST: "request";
   readonly RESPONSE: "response";
   readonly EVENT: "event";
-} & MergeDomainAliases<TCommands, TEvents> & ModAliasOverrides;
+} & MergeDomainAliases<TCommands, TEvents> &
+  ModAliasOverrides;
 
-function withCdpName<T extends object, Name extends string, Kind extends string>(value: T, id: Name, kind: Kind): T & CdpNamedValue<Name, Kind> {
+function withCdpName<T extends object, Name extends string, Kind extends string>(
+  value: T,
+  id: Name,
+  kind: Kind,
+): T & CdpNamedValue<Name, Kind> {
   Object.defineProperties(value, {
     id: { value: id, enumerable: true, configurable: true },
     name: { value: id, configurable: true },
     kind: { value: kind, enumerable: true, configurable: true },
   });
-  if (!("meta" in value)) Object.defineProperty(value, "meta", { value: () => ({ id, name: id, kind }), configurable: true });
+  if (!("meta" in value))
+    Object.defineProperty(value, "meta", { value: () => ({ id, name: id, kind }), configurable: true });
   return value as T & CdpNamedValue<Name, Kind>;
 }
 
@@ -111,205 +192,1454 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
     RESPONSE: "response",
     EVENT: "event",
     Accessibility: {
-      disable: withCdpName(async (params?: cdp.types.ts.Accessibility.DisableParams) => commands["Accessibility.disable"].result.parse(await send("Accessibility.disable", commands["Accessibility.disable"].params.parse(params ?? {}))), "Accessibility.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Accessibility.EnableParams) => commands["Accessibility.enable"].result.parse(await send("Accessibility.enable", commands["Accessibility.enable"].params.parse(params ?? {}))), "Accessibility.enable", "command"),
-      getPartialAXTree: withCdpName(async (params?: cdp.types.ts.Accessibility.GetPartialAXTreeParams) => commands["Accessibility.getPartialAXTree"].result.parse(await send("Accessibility.getPartialAXTree", commands["Accessibility.getPartialAXTree"].params.parse(params ?? {}))), "Accessibility.getPartialAXTree", "command"),
-      getFullAXTree: withCdpName(async (params?: cdp.types.ts.Accessibility.GetFullAXTreeParams) => commands["Accessibility.getFullAXTree"].result.parse(await send("Accessibility.getFullAXTree", commands["Accessibility.getFullAXTree"].params.parse(params ?? {}))), "Accessibility.getFullAXTree", "command"),
-      getRootAXNode: withCdpName(async (params?: cdp.types.ts.Accessibility.GetRootAXNodeParams) => commands["Accessibility.getRootAXNode"].result.parse(await send("Accessibility.getRootAXNode", commands["Accessibility.getRootAXNode"].params.parse(params ?? {}))), "Accessibility.getRootAXNode", "command"),
-      getAXNodeAndAncestors: withCdpName(async (params?: cdp.types.ts.Accessibility.GetAXNodeAndAncestorsParams) => commands["Accessibility.getAXNodeAndAncestors"].result.parse(await send("Accessibility.getAXNodeAndAncestors", commands["Accessibility.getAXNodeAndAncestors"].params.parse(params ?? {}))), "Accessibility.getAXNodeAndAncestors", "command"),
-      getChildAXNodes: withCdpName(async (params?: cdp.types.ts.Accessibility.GetChildAXNodesParams) => commands["Accessibility.getChildAXNodes"].result.parse(await send("Accessibility.getChildAXNodes", commands["Accessibility.getChildAXNodes"].params.parse(params ?? {}))), "Accessibility.getChildAXNodes", "command"),
-      queryAXTree: withCdpName(async (params?: cdp.types.ts.Accessibility.QueryAXTreeParams) => commands["Accessibility.queryAXTree"].result.parse(await send("Accessibility.queryAXTree", commands["Accessibility.queryAXTree"].params.parse(params ?? {}))), "Accessibility.queryAXTree", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.DisableParams) =>
+          commands["Accessibility.disable"].result.parse(
+            await send("Accessibility.disable", commands["Accessibility.disable"].params.parse(params ?? {})),
+          ),
+        "Accessibility.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.EnableParams) =>
+          commands["Accessibility.enable"].result.parse(
+            await send("Accessibility.enable", commands["Accessibility.enable"].params.parse(params ?? {})),
+          ),
+        "Accessibility.enable",
+        "command",
+      ),
+      getPartialAXTree: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.GetPartialAXTreeParams) =>
+          commands["Accessibility.getPartialAXTree"].result.parse(
+            await send(
+              "Accessibility.getPartialAXTree",
+              commands["Accessibility.getPartialAXTree"].params.parse(params ?? {}),
+            ),
+          ),
+        "Accessibility.getPartialAXTree",
+        "command",
+      ),
+      getFullAXTree: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.GetFullAXTreeParams) =>
+          commands["Accessibility.getFullAXTree"].result.parse(
+            await send(
+              "Accessibility.getFullAXTree",
+              commands["Accessibility.getFullAXTree"].params.parse(params ?? {}),
+            ),
+          ),
+        "Accessibility.getFullAXTree",
+        "command",
+      ),
+      getRootAXNode: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.GetRootAXNodeParams) =>
+          commands["Accessibility.getRootAXNode"].result.parse(
+            await send(
+              "Accessibility.getRootAXNode",
+              commands["Accessibility.getRootAXNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "Accessibility.getRootAXNode",
+        "command",
+      ),
+      getAXNodeAndAncestors: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.GetAXNodeAndAncestorsParams) =>
+          commands["Accessibility.getAXNodeAndAncestors"].result.parse(
+            await send(
+              "Accessibility.getAXNodeAndAncestors",
+              commands["Accessibility.getAXNodeAndAncestors"].params.parse(params ?? {}),
+            ),
+          ),
+        "Accessibility.getAXNodeAndAncestors",
+        "command",
+      ),
+      getChildAXNodes: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.GetChildAXNodesParams) =>
+          commands["Accessibility.getChildAXNodes"].result.parse(
+            await send(
+              "Accessibility.getChildAXNodes",
+              commands["Accessibility.getChildAXNodes"].params.parse(params ?? {}),
+            ),
+          ),
+        "Accessibility.getChildAXNodes",
+        "command",
+      ),
+      queryAXTree: withCdpName(
+        async (params?: cdp.types.ts.Accessibility.QueryAXTreeParams) =>
+          commands["Accessibility.queryAXTree"].result.parse(
+            await send("Accessibility.queryAXTree", commands["Accessibility.queryAXTree"].params.parse(params ?? {})),
+          ),
+        "Accessibility.queryAXTree",
+        "command",
+      ),
       loadComplete: withCdpName(events["Accessibility.loadComplete"], "Accessibility.loadComplete", "event"),
       nodesUpdated: withCdpName(events["Accessibility.nodesUpdated"], "Accessibility.nodesUpdated", "event"),
     },
     Animation: {
-      disable: withCdpName(async (params?: cdp.types.ts.Animation.DisableParams) => commands["Animation.disable"].result.parse(await send("Animation.disable", commands["Animation.disable"].params.parse(params ?? {}))), "Animation.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Animation.EnableParams) => commands["Animation.enable"].result.parse(await send("Animation.enable", commands["Animation.enable"].params.parse(params ?? {}))), "Animation.enable", "command"),
-      getCurrentTime: withCdpName(async (params?: cdp.types.ts.Animation.GetCurrentTimeParams) => commands["Animation.getCurrentTime"].result.parse(await send("Animation.getCurrentTime", commands["Animation.getCurrentTime"].params.parse(params ?? {}))), "Animation.getCurrentTime", "command"),
-      getPlaybackRate: withCdpName(async (params?: cdp.types.ts.Animation.GetPlaybackRateParams) => commands["Animation.getPlaybackRate"].result.parse(await send("Animation.getPlaybackRate", commands["Animation.getPlaybackRate"].params.parse(params ?? {}))), "Animation.getPlaybackRate", "command"),
-      releaseAnimations: withCdpName(async (params?: cdp.types.ts.Animation.ReleaseAnimationsParams) => commands["Animation.releaseAnimations"].result.parse(await send("Animation.releaseAnimations", commands["Animation.releaseAnimations"].params.parse(params ?? {}))), "Animation.releaseAnimations", "command"),
-      resolveAnimation: withCdpName(async (params?: cdp.types.ts.Animation.ResolveAnimationParams) => commands["Animation.resolveAnimation"].result.parse(await send("Animation.resolveAnimation", commands["Animation.resolveAnimation"].params.parse(params ?? {}))), "Animation.resolveAnimation", "command"),
-      seekAnimations: withCdpName(async (params?: cdp.types.ts.Animation.SeekAnimationsParams) => commands["Animation.seekAnimations"].result.parse(await send("Animation.seekAnimations", commands["Animation.seekAnimations"].params.parse(params ?? {}))), "Animation.seekAnimations", "command"),
-      setPaused: withCdpName(async (params?: cdp.types.ts.Animation.SetPausedParams) => commands["Animation.setPaused"].result.parse(await send("Animation.setPaused", commands["Animation.setPaused"].params.parse(params ?? {}))), "Animation.setPaused", "command"),
-      setPlaybackRate: withCdpName(async (params?: cdp.types.ts.Animation.SetPlaybackRateParams) => commands["Animation.setPlaybackRate"].result.parse(await send("Animation.setPlaybackRate", commands["Animation.setPlaybackRate"].params.parse(params ?? {}))), "Animation.setPlaybackRate", "command"),
-      setTiming: withCdpName(async (params?: cdp.types.ts.Animation.SetTimingParams) => commands["Animation.setTiming"].result.parse(await send("Animation.setTiming", commands["Animation.setTiming"].params.parse(params ?? {}))), "Animation.setTiming", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Animation.DisableParams) =>
+          commands["Animation.disable"].result.parse(
+            await send("Animation.disable", commands["Animation.disable"].params.parse(params ?? {})),
+          ),
+        "Animation.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Animation.EnableParams) =>
+          commands["Animation.enable"].result.parse(
+            await send("Animation.enable", commands["Animation.enable"].params.parse(params ?? {})),
+          ),
+        "Animation.enable",
+        "command",
+      ),
+      getCurrentTime: withCdpName(
+        async (params?: cdp.types.ts.Animation.GetCurrentTimeParams) =>
+          commands["Animation.getCurrentTime"].result.parse(
+            await send("Animation.getCurrentTime", commands["Animation.getCurrentTime"].params.parse(params ?? {})),
+          ),
+        "Animation.getCurrentTime",
+        "command",
+      ),
+      getPlaybackRate: withCdpName(
+        async (params?: cdp.types.ts.Animation.GetPlaybackRateParams) =>
+          commands["Animation.getPlaybackRate"].result.parse(
+            await send("Animation.getPlaybackRate", commands["Animation.getPlaybackRate"].params.parse(params ?? {})),
+          ),
+        "Animation.getPlaybackRate",
+        "command",
+      ),
+      releaseAnimations: withCdpName(
+        async (params?: cdp.types.ts.Animation.ReleaseAnimationsParams) =>
+          commands["Animation.releaseAnimations"].result.parse(
+            await send(
+              "Animation.releaseAnimations",
+              commands["Animation.releaseAnimations"].params.parse(params ?? {}),
+            ),
+          ),
+        "Animation.releaseAnimations",
+        "command",
+      ),
+      resolveAnimation: withCdpName(
+        async (params?: cdp.types.ts.Animation.ResolveAnimationParams) =>
+          commands["Animation.resolveAnimation"].result.parse(
+            await send("Animation.resolveAnimation", commands["Animation.resolveAnimation"].params.parse(params ?? {})),
+          ),
+        "Animation.resolveAnimation",
+        "command",
+      ),
+      seekAnimations: withCdpName(
+        async (params?: cdp.types.ts.Animation.SeekAnimationsParams) =>
+          commands["Animation.seekAnimations"].result.parse(
+            await send("Animation.seekAnimations", commands["Animation.seekAnimations"].params.parse(params ?? {})),
+          ),
+        "Animation.seekAnimations",
+        "command",
+      ),
+      setPaused: withCdpName(
+        async (params?: cdp.types.ts.Animation.SetPausedParams) =>
+          commands["Animation.setPaused"].result.parse(
+            await send("Animation.setPaused", commands["Animation.setPaused"].params.parse(params ?? {})),
+          ),
+        "Animation.setPaused",
+        "command",
+      ),
+      setPlaybackRate: withCdpName(
+        async (params?: cdp.types.ts.Animation.SetPlaybackRateParams) =>
+          commands["Animation.setPlaybackRate"].result.parse(
+            await send("Animation.setPlaybackRate", commands["Animation.setPlaybackRate"].params.parse(params ?? {})),
+          ),
+        "Animation.setPlaybackRate",
+        "command",
+      ),
+      setTiming: withCdpName(
+        async (params?: cdp.types.ts.Animation.SetTimingParams) =>
+          commands["Animation.setTiming"].result.parse(
+            await send("Animation.setTiming", commands["Animation.setTiming"].params.parse(params ?? {})),
+          ),
+        "Animation.setTiming",
+        "command",
+      ),
       animationCanceled: withCdpName(events["Animation.animationCanceled"], "Animation.animationCanceled", "event"),
       animationCreated: withCdpName(events["Animation.animationCreated"], "Animation.animationCreated", "event"),
       animationStarted: withCdpName(events["Animation.animationStarted"], "Animation.animationStarted", "event"),
       animationUpdated: withCdpName(events["Animation.animationUpdated"], "Animation.animationUpdated", "event"),
     },
     Audits: {
-      getEncodedResponse: withCdpName(async (params?: cdp.types.ts.Audits.GetEncodedResponseParams) => commands["Audits.getEncodedResponse"].result.parse(await send("Audits.getEncodedResponse", commands["Audits.getEncodedResponse"].params.parse(params ?? {}))), "Audits.getEncodedResponse", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Audits.DisableParams) => commands["Audits.disable"].result.parse(await send("Audits.disable", commands["Audits.disable"].params.parse(params ?? {}))), "Audits.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Audits.EnableParams) => commands["Audits.enable"].result.parse(await send("Audits.enable", commands["Audits.enable"].params.parse(params ?? {}))), "Audits.enable", "command"),
-      checkFormsIssues: withCdpName(async (params?: cdp.types.ts.Audits.CheckFormsIssuesParams) => commands["Audits.checkFormsIssues"].result.parse(await send("Audits.checkFormsIssues", commands["Audits.checkFormsIssues"].params.parse(params ?? {}))), "Audits.checkFormsIssues", "command"),
+      getEncodedResponse: withCdpName(
+        async (params?: cdp.types.ts.Audits.GetEncodedResponseParams) =>
+          commands["Audits.getEncodedResponse"].result.parse(
+            await send("Audits.getEncodedResponse", commands["Audits.getEncodedResponse"].params.parse(params ?? {})),
+          ),
+        "Audits.getEncodedResponse",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Audits.DisableParams) =>
+          commands["Audits.disable"].result.parse(
+            await send("Audits.disable", commands["Audits.disable"].params.parse(params ?? {})),
+          ),
+        "Audits.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Audits.EnableParams) =>
+          commands["Audits.enable"].result.parse(
+            await send("Audits.enable", commands["Audits.enable"].params.parse(params ?? {})),
+          ),
+        "Audits.enable",
+        "command",
+      ),
+      checkFormsIssues: withCdpName(
+        async (params?: cdp.types.ts.Audits.CheckFormsIssuesParams) =>
+          commands["Audits.checkFormsIssues"].result.parse(
+            await send("Audits.checkFormsIssues", commands["Audits.checkFormsIssues"].params.parse(params ?? {})),
+          ),
+        "Audits.checkFormsIssues",
+        "command",
+      ),
       issueAdded: withCdpName(events["Audits.issueAdded"], "Audits.issueAdded", "event"),
     },
     Autofill: {
-      trigger: withCdpName(async (params?: cdp.types.ts.Autofill.TriggerParams) => commands["Autofill.trigger"].result.parse(await send("Autofill.trigger", commands["Autofill.trigger"].params.parse(params ?? {}))), "Autofill.trigger", "command"),
-      setAddresses: withCdpName(async (params?: cdp.types.ts.Autofill.SetAddressesParams) => commands["Autofill.setAddresses"].result.parse(await send("Autofill.setAddresses", commands["Autofill.setAddresses"].params.parse(params ?? {}))), "Autofill.setAddresses", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Autofill.DisableParams) => commands["Autofill.disable"].result.parse(await send("Autofill.disable", commands["Autofill.disable"].params.parse(params ?? {}))), "Autofill.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Autofill.EnableParams) => commands["Autofill.enable"].result.parse(await send("Autofill.enable", commands["Autofill.enable"].params.parse(params ?? {}))), "Autofill.enable", "command"),
+      trigger: withCdpName(
+        async (params?: cdp.types.ts.Autofill.TriggerParams) =>
+          commands["Autofill.trigger"].result.parse(
+            await send("Autofill.trigger", commands["Autofill.trigger"].params.parse(params ?? {})),
+          ),
+        "Autofill.trigger",
+        "command",
+      ),
+      setAddresses: withCdpName(
+        async (params?: cdp.types.ts.Autofill.SetAddressesParams) =>
+          commands["Autofill.setAddresses"].result.parse(
+            await send("Autofill.setAddresses", commands["Autofill.setAddresses"].params.parse(params ?? {})),
+          ),
+        "Autofill.setAddresses",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Autofill.DisableParams) =>
+          commands["Autofill.disable"].result.parse(
+            await send("Autofill.disable", commands["Autofill.disable"].params.parse(params ?? {})),
+          ),
+        "Autofill.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Autofill.EnableParams) =>
+          commands["Autofill.enable"].result.parse(
+            await send("Autofill.enable", commands["Autofill.enable"].params.parse(params ?? {})),
+          ),
+        "Autofill.enable",
+        "command",
+      ),
       addressFormFilled: withCdpName(events["Autofill.addressFormFilled"], "Autofill.addressFormFilled", "event"),
     },
     BackgroundService: {
-      startObserving: withCdpName(async (params?: cdp.types.ts.BackgroundService.StartObservingParams) => commands["BackgroundService.startObserving"].result.parse(await send("BackgroundService.startObserving", commands["BackgroundService.startObserving"].params.parse(params ?? {}))), "BackgroundService.startObserving", "command"),
-      stopObserving: withCdpName(async (params?: cdp.types.ts.BackgroundService.StopObservingParams) => commands["BackgroundService.stopObserving"].result.parse(await send("BackgroundService.stopObserving", commands["BackgroundService.stopObserving"].params.parse(params ?? {}))), "BackgroundService.stopObserving", "command"),
-      setRecording: withCdpName(async (params?: cdp.types.ts.BackgroundService.SetRecordingParams) => commands["BackgroundService.setRecording"].result.parse(await send("BackgroundService.setRecording", commands["BackgroundService.setRecording"].params.parse(params ?? {}))), "BackgroundService.setRecording", "command"),
-      clearEvents: withCdpName(async (params?: cdp.types.ts.BackgroundService.ClearEventsParams) => commands["BackgroundService.clearEvents"].result.parse(await send("BackgroundService.clearEvents", commands["BackgroundService.clearEvents"].params.parse(params ?? {}))), "BackgroundService.clearEvents", "command"),
-      recordingStateChanged: withCdpName(events["BackgroundService.recordingStateChanged"], "BackgroundService.recordingStateChanged", "event"),
-      backgroundServiceEventReceived: withCdpName(events["BackgroundService.backgroundServiceEventReceived"], "BackgroundService.backgroundServiceEventReceived", "event"),
+      startObserving: withCdpName(
+        async (params?: cdp.types.ts.BackgroundService.StartObservingParams) =>
+          commands["BackgroundService.startObserving"].result.parse(
+            await send(
+              "BackgroundService.startObserving",
+              commands["BackgroundService.startObserving"].params.parse(params ?? {}),
+            ),
+          ),
+        "BackgroundService.startObserving",
+        "command",
+      ),
+      stopObserving: withCdpName(
+        async (params?: cdp.types.ts.BackgroundService.StopObservingParams) =>
+          commands["BackgroundService.stopObserving"].result.parse(
+            await send(
+              "BackgroundService.stopObserving",
+              commands["BackgroundService.stopObserving"].params.parse(params ?? {}),
+            ),
+          ),
+        "BackgroundService.stopObserving",
+        "command",
+      ),
+      setRecording: withCdpName(
+        async (params?: cdp.types.ts.BackgroundService.SetRecordingParams) =>
+          commands["BackgroundService.setRecording"].result.parse(
+            await send(
+              "BackgroundService.setRecording",
+              commands["BackgroundService.setRecording"].params.parse(params ?? {}),
+            ),
+          ),
+        "BackgroundService.setRecording",
+        "command",
+      ),
+      clearEvents: withCdpName(
+        async (params?: cdp.types.ts.BackgroundService.ClearEventsParams) =>
+          commands["BackgroundService.clearEvents"].result.parse(
+            await send(
+              "BackgroundService.clearEvents",
+              commands["BackgroundService.clearEvents"].params.parse(params ?? {}),
+            ),
+          ),
+        "BackgroundService.clearEvents",
+        "command",
+      ),
+      recordingStateChanged: withCdpName(
+        events["BackgroundService.recordingStateChanged"],
+        "BackgroundService.recordingStateChanged",
+        "event",
+      ),
+      backgroundServiceEventReceived: withCdpName(
+        events["BackgroundService.backgroundServiceEventReceived"],
+        "BackgroundService.backgroundServiceEventReceived",
+        "event",
+      ),
     },
     BluetoothEmulation: {
-      enable: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.EnableParams) => commands["BluetoothEmulation.enable"].result.parse(await send("BluetoothEmulation.enable", commands["BluetoothEmulation.enable"].params.parse(params ?? {}))), "BluetoothEmulation.enable", "command"),
-      setSimulatedCentralState: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SetSimulatedCentralStateParams) => commands["BluetoothEmulation.setSimulatedCentralState"].result.parse(await send("BluetoothEmulation.setSimulatedCentralState", commands["BluetoothEmulation.setSimulatedCentralState"].params.parse(params ?? {}))), "BluetoothEmulation.setSimulatedCentralState", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.DisableParams) => commands["BluetoothEmulation.disable"].result.parse(await send("BluetoothEmulation.disable", commands["BluetoothEmulation.disable"].params.parse(params ?? {}))), "BluetoothEmulation.disable", "command"),
-      simulatePreconnectedPeripheral: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulatePreconnectedPeripheralParams) => commands["BluetoothEmulation.simulatePreconnectedPeripheral"].result.parse(await send("BluetoothEmulation.simulatePreconnectedPeripheral", commands["BluetoothEmulation.simulatePreconnectedPeripheral"].params.parse(params ?? {}))), "BluetoothEmulation.simulatePreconnectedPeripheral", "command"),
-      simulateAdvertisement: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulateAdvertisementParams) => commands["BluetoothEmulation.simulateAdvertisement"].result.parse(await send("BluetoothEmulation.simulateAdvertisement", commands["BluetoothEmulation.simulateAdvertisement"].params.parse(params ?? {}))), "BluetoothEmulation.simulateAdvertisement", "command"),
-      simulateGATTOperationResponse: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulateGATTOperationResponseParams) => commands["BluetoothEmulation.simulateGATTOperationResponse"].result.parse(await send("BluetoothEmulation.simulateGATTOperationResponse", commands["BluetoothEmulation.simulateGATTOperationResponse"].params.parse(params ?? {}))), "BluetoothEmulation.simulateGATTOperationResponse", "command"),
-      simulateCharacteristicOperationResponse: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulateCharacteristicOperationResponseParams) => commands["BluetoothEmulation.simulateCharacteristicOperationResponse"].result.parse(await send("BluetoothEmulation.simulateCharacteristicOperationResponse", commands["BluetoothEmulation.simulateCharacteristicOperationResponse"].params.parse(params ?? {}))), "BluetoothEmulation.simulateCharacteristicOperationResponse", "command"),
-      simulateDescriptorOperationResponse: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulateDescriptorOperationResponseParams) => commands["BluetoothEmulation.simulateDescriptorOperationResponse"].result.parse(await send("BluetoothEmulation.simulateDescriptorOperationResponse", commands["BluetoothEmulation.simulateDescriptorOperationResponse"].params.parse(params ?? {}))), "BluetoothEmulation.simulateDescriptorOperationResponse", "command"),
-      addService: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.AddServiceParams) => commands["BluetoothEmulation.addService"].result.parse(await send("BluetoothEmulation.addService", commands["BluetoothEmulation.addService"].params.parse(params ?? {}))), "BluetoothEmulation.addService", "command"),
-      removeService: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.RemoveServiceParams) => commands["BluetoothEmulation.removeService"].result.parse(await send("BluetoothEmulation.removeService", commands["BluetoothEmulation.removeService"].params.parse(params ?? {}))), "BluetoothEmulation.removeService", "command"),
-      addCharacteristic: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.AddCharacteristicParams) => commands["BluetoothEmulation.addCharacteristic"].result.parse(await send("BluetoothEmulation.addCharacteristic", commands["BluetoothEmulation.addCharacteristic"].params.parse(params ?? {}))), "BluetoothEmulation.addCharacteristic", "command"),
-      removeCharacteristic: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.RemoveCharacteristicParams) => commands["BluetoothEmulation.removeCharacteristic"].result.parse(await send("BluetoothEmulation.removeCharacteristic", commands["BluetoothEmulation.removeCharacteristic"].params.parse(params ?? {}))), "BluetoothEmulation.removeCharacteristic", "command"),
-      addDescriptor: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.AddDescriptorParams) => commands["BluetoothEmulation.addDescriptor"].result.parse(await send("BluetoothEmulation.addDescriptor", commands["BluetoothEmulation.addDescriptor"].params.parse(params ?? {}))), "BluetoothEmulation.addDescriptor", "command"),
-      removeDescriptor: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.RemoveDescriptorParams) => commands["BluetoothEmulation.removeDescriptor"].result.parse(await send("BluetoothEmulation.removeDescriptor", commands["BluetoothEmulation.removeDescriptor"].params.parse(params ?? {}))), "BluetoothEmulation.removeDescriptor", "command"),
-      simulateGATTDisconnection: withCdpName(async (params?: cdp.types.ts.BluetoothEmulation.SimulateGATTDisconnectionParams) => commands["BluetoothEmulation.simulateGATTDisconnection"].result.parse(await send("BluetoothEmulation.simulateGATTDisconnection", commands["BluetoothEmulation.simulateGATTDisconnection"].params.parse(params ?? {}))), "BluetoothEmulation.simulateGATTDisconnection", "command"),
-      gattOperationReceived: withCdpName(events["BluetoothEmulation.gattOperationReceived"], "BluetoothEmulation.gattOperationReceived", "event"),
-      characteristicOperationReceived: withCdpName(events["BluetoothEmulation.characteristicOperationReceived"], "BluetoothEmulation.characteristicOperationReceived", "event"),
-      descriptorOperationReceived: withCdpName(events["BluetoothEmulation.descriptorOperationReceived"], "BluetoothEmulation.descriptorOperationReceived", "event"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.EnableParams) =>
+          commands["BluetoothEmulation.enable"].result.parse(
+            await send("BluetoothEmulation.enable", commands["BluetoothEmulation.enable"].params.parse(params ?? {})),
+          ),
+        "BluetoothEmulation.enable",
+        "command",
+      ),
+      setSimulatedCentralState: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SetSimulatedCentralStateParams) =>
+          commands["BluetoothEmulation.setSimulatedCentralState"].result.parse(
+            await send(
+              "BluetoothEmulation.setSimulatedCentralState",
+              commands["BluetoothEmulation.setSimulatedCentralState"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.setSimulatedCentralState",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.DisableParams) =>
+          commands["BluetoothEmulation.disable"].result.parse(
+            await send("BluetoothEmulation.disable", commands["BluetoothEmulation.disable"].params.parse(params ?? {})),
+          ),
+        "BluetoothEmulation.disable",
+        "command",
+      ),
+      simulatePreconnectedPeripheral: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulatePreconnectedPeripheralParams) =>
+          commands["BluetoothEmulation.simulatePreconnectedPeripheral"].result.parse(
+            await send(
+              "BluetoothEmulation.simulatePreconnectedPeripheral",
+              commands["BluetoothEmulation.simulatePreconnectedPeripheral"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulatePreconnectedPeripheral",
+        "command",
+      ),
+      simulateAdvertisement: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulateAdvertisementParams) =>
+          commands["BluetoothEmulation.simulateAdvertisement"].result.parse(
+            await send(
+              "BluetoothEmulation.simulateAdvertisement",
+              commands["BluetoothEmulation.simulateAdvertisement"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulateAdvertisement",
+        "command",
+      ),
+      simulateGATTOperationResponse: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulateGATTOperationResponseParams) =>
+          commands["BluetoothEmulation.simulateGATTOperationResponse"].result.parse(
+            await send(
+              "BluetoothEmulation.simulateGATTOperationResponse",
+              commands["BluetoothEmulation.simulateGATTOperationResponse"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulateGATTOperationResponse",
+        "command",
+      ),
+      simulateCharacteristicOperationResponse: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulateCharacteristicOperationResponseParams) =>
+          commands["BluetoothEmulation.simulateCharacteristicOperationResponse"].result.parse(
+            await send(
+              "BluetoothEmulation.simulateCharacteristicOperationResponse",
+              commands["BluetoothEmulation.simulateCharacteristicOperationResponse"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulateCharacteristicOperationResponse",
+        "command",
+      ),
+      simulateDescriptorOperationResponse: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulateDescriptorOperationResponseParams) =>
+          commands["BluetoothEmulation.simulateDescriptorOperationResponse"].result.parse(
+            await send(
+              "BluetoothEmulation.simulateDescriptorOperationResponse",
+              commands["BluetoothEmulation.simulateDescriptorOperationResponse"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulateDescriptorOperationResponse",
+        "command",
+      ),
+      addService: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.AddServiceParams) =>
+          commands["BluetoothEmulation.addService"].result.parse(
+            await send(
+              "BluetoothEmulation.addService",
+              commands["BluetoothEmulation.addService"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.addService",
+        "command",
+      ),
+      removeService: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.RemoveServiceParams) =>
+          commands["BluetoothEmulation.removeService"].result.parse(
+            await send(
+              "BluetoothEmulation.removeService",
+              commands["BluetoothEmulation.removeService"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.removeService",
+        "command",
+      ),
+      addCharacteristic: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.AddCharacteristicParams) =>
+          commands["BluetoothEmulation.addCharacteristic"].result.parse(
+            await send(
+              "BluetoothEmulation.addCharacteristic",
+              commands["BluetoothEmulation.addCharacteristic"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.addCharacteristic",
+        "command",
+      ),
+      removeCharacteristic: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.RemoveCharacteristicParams) =>
+          commands["BluetoothEmulation.removeCharacteristic"].result.parse(
+            await send(
+              "BluetoothEmulation.removeCharacteristic",
+              commands["BluetoothEmulation.removeCharacteristic"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.removeCharacteristic",
+        "command",
+      ),
+      addDescriptor: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.AddDescriptorParams) =>
+          commands["BluetoothEmulation.addDescriptor"].result.parse(
+            await send(
+              "BluetoothEmulation.addDescriptor",
+              commands["BluetoothEmulation.addDescriptor"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.addDescriptor",
+        "command",
+      ),
+      removeDescriptor: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.RemoveDescriptorParams) =>
+          commands["BluetoothEmulation.removeDescriptor"].result.parse(
+            await send(
+              "BluetoothEmulation.removeDescriptor",
+              commands["BluetoothEmulation.removeDescriptor"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.removeDescriptor",
+        "command",
+      ),
+      simulateGATTDisconnection: withCdpName(
+        async (params?: cdp.types.ts.BluetoothEmulation.SimulateGATTDisconnectionParams) =>
+          commands["BluetoothEmulation.simulateGATTDisconnection"].result.parse(
+            await send(
+              "BluetoothEmulation.simulateGATTDisconnection",
+              commands["BluetoothEmulation.simulateGATTDisconnection"].params.parse(params ?? {}),
+            ),
+          ),
+        "BluetoothEmulation.simulateGATTDisconnection",
+        "command",
+      ),
+      gattOperationReceived: withCdpName(
+        events["BluetoothEmulation.gattOperationReceived"],
+        "BluetoothEmulation.gattOperationReceived",
+        "event",
+      ),
+      characteristicOperationReceived: withCdpName(
+        events["BluetoothEmulation.characteristicOperationReceived"],
+        "BluetoothEmulation.characteristicOperationReceived",
+        "event",
+      ),
+      descriptorOperationReceived: withCdpName(
+        events["BluetoothEmulation.descriptorOperationReceived"],
+        "BluetoothEmulation.descriptorOperationReceived",
+        "event",
+      ),
     },
     Browser: {
-      setPermission: withCdpName(async (params?: cdp.types.ts.Browser.SetPermissionParams) => commands["Browser.setPermission"].result.parse(await send("Browser.setPermission", commands["Browser.setPermission"].params.parse(params ?? {}))), "Browser.setPermission", "command"),
-      grantPermissions: withCdpName(async (params?: cdp.types.ts.Browser.GrantPermissionsParams) => commands["Browser.grantPermissions"].result.parse(await send("Browser.grantPermissions", commands["Browser.grantPermissions"].params.parse(params ?? {}))), "Browser.grantPermissions", "command"),
-      resetPermissions: withCdpName(async (params?: cdp.types.ts.Browser.ResetPermissionsParams) => commands["Browser.resetPermissions"].result.parse(await send("Browser.resetPermissions", commands["Browser.resetPermissions"].params.parse(params ?? {}))), "Browser.resetPermissions", "command"),
-      setDownloadBehavior: withCdpName(async (params?: cdp.types.ts.Browser.SetDownloadBehaviorParams) => commands["Browser.setDownloadBehavior"].result.parse(await send("Browser.setDownloadBehavior", commands["Browser.setDownloadBehavior"].params.parse(params ?? {}))), "Browser.setDownloadBehavior", "command"),
-      cancelDownload: withCdpName(async (params?: cdp.types.ts.Browser.CancelDownloadParams) => commands["Browser.cancelDownload"].result.parse(await send("Browser.cancelDownload", commands["Browser.cancelDownload"].params.parse(params ?? {}))), "Browser.cancelDownload", "command"),
-      close: withCdpName(async (params?: cdp.types.ts.Browser.CloseParams) => commands["Browser.close"].result.parse(await send("Browser.close", commands["Browser.close"].params.parse(params ?? {}))), "Browser.close", "command"),
-      crash: withCdpName(async (params?: cdp.types.ts.Browser.CrashParams) => commands["Browser.crash"].result.parse(await send("Browser.crash", commands["Browser.crash"].params.parse(params ?? {}))), "Browser.crash", "command"),
-      crashGpuProcess: withCdpName(async (params?: cdp.types.ts.Browser.CrashGpuProcessParams) => commands["Browser.crashGpuProcess"].result.parse(await send("Browser.crashGpuProcess", commands["Browser.crashGpuProcess"].params.parse(params ?? {}))), "Browser.crashGpuProcess", "command"),
-      getVersion: withCdpName(async (params?: cdp.types.ts.Browser.GetVersionParams) => commands["Browser.getVersion"].result.parse(await send("Browser.getVersion", commands["Browser.getVersion"].params.parse(params ?? {}))), "Browser.getVersion", "command"),
-      getBrowserCommandLine: withCdpName(async (params?: cdp.types.ts.Browser.GetBrowserCommandLineParams) => commands["Browser.getBrowserCommandLine"].result.parse(await send("Browser.getBrowserCommandLine", commands["Browser.getBrowserCommandLine"].params.parse(params ?? {}))), "Browser.getBrowserCommandLine", "command"),
-      getHistograms: withCdpName(async (params?: cdp.types.ts.Browser.GetHistogramsParams) => commands["Browser.getHistograms"].result.parse(await send("Browser.getHistograms", commands["Browser.getHistograms"].params.parse(params ?? {}))), "Browser.getHistograms", "command"),
-      getHistogram: withCdpName(async (params?: cdp.types.ts.Browser.GetHistogramParams) => commands["Browser.getHistogram"].result.parse(await send("Browser.getHistogram", commands["Browser.getHistogram"].params.parse(params ?? {}))), "Browser.getHistogram", "command"),
-      getWindowBounds: withCdpName(async (params?: cdp.types.ts.Browser.GetWindowBoundsParams) => commands["Browser.getWindowBounds"].result.parse(await send("Browser.getWindowBounds", commands["Browser.getWindowBounds"].params.parse(params ?? {}))), "Browser.getWindowBounds", "command"),
-      getWindowForTarget: withCdpName(async (params?: cdp.types.ts.Browser.GetWindowForTargetParams) => commands["Browser.getWindowForTarget"].result.parse(await send("Browser.getWindowForTarget", commands["Browser.getWindowForTarget"].params.parse(params ?? {}))), "Browser.getWindowForTarget", "command"),
-      setWindowBounds: withCdpName(async (params?: cdp.types.ts.Browser.SetWindowBoundsParams) => commands["Browser.setWindowBounds"].result.parse(await send("Browser.setWindowBounds", commands["Browser.setWindowBounds"].params.parse(params ?? {}))), "Browser.setWindowBounds", "command"),
-      setContentsSize: withCdpName(async (params?: cdp.types.ts.Browser.SetContentsSizeParams) => commands["Browser.setContentsSize"].result.parse(await send("Browser.setContentsSize", commands["Browser.setContentsSize"].params.parse(params ?? {}))), "Browser.setContentsSize", "command"),
-      setDockTile: withCdpName(async (params?: cdp.types.ts.Browser.SetDockTileParams) => commands["Browser.setDockTile"].result.parse(await send("Browser.setDockTile", commands["Browser.setDockTile"].params.parse(params ?? {}))), "Browser.setDockTile", "command"),
-      executeBrowserCommand: withCdpName(async (params?: cdp.types.ts.Browser.ExecuteBrowserCommandParams) => commands["Browser.executeBrowserCommand"].result.parse(await send("Browser.executeBrowserCommand", commands["Browser.executeBrowserCommand"].params.parse(params ?? {}))), "Browser.executeBrowserCommand", "command"),
-      addPrivacySandboxEnrollmentOverride: withCdpName(async (params?: cdp.types.ts.Browser.AddPrivacySandboxEnrollmentOverrideParams) => commands["Browser.addPrivacySandboxEnrollmentOverride"].result.parse(await send("Browser.addPrivacySandboxEnrollmentOverride", commands["Browser.addPrivacySandboxEnrollmentOverride"].params.parse(params ?? {}))), "Browser.addPrivacySandboxEnrollmentOverride", "command"),
-      addPrivacySandboxCoordinatorKeyConfig: withCdpName(async (params?: cdp.types.ts.Browser.AddPrivacySandboxCoordinatorKeyConfigParams) => commands["Browser.addPrivacySandboxCoordinatorKeyConfig"].result.parse(await send("Browser.addPrivacySandboxCoordinatorKeyConfig", commands["Browser.addPrivacySandboxCoordinatorKeyConfig"].params.parse(params ?? {}))), "Browser.addPrivacySandboxCoordinatorKeyConfig", "command"),
+      setPermission: withCdpName(
+        async (params?: cdp.types.ts.Browser.SetPermissionParams) =>
+          commands["Browser.setPermission"].result.parse(
+            await send("Browser.setPermission", commands["Browser.setPermission"].params.parse(params ?? {})),
+          ),
+        "Browser.setPermission",
+        "command",
+      ),
+      grantPermissions: withCdpName(
+        async (params?: cdp.types.ts.Browser.GrantPermissionsParams) =>
+          commands["Browser.grantPermissions"].result.parse(
+            await send("Browser.grantPermissions", commands["Browser.grantPermissions"].params.parse(params ?? {})),
+          ),
+        "Browser.grantPermissions",
+        "command",
+      ),
+      resetPermissions: withCdpName(
+        async (params?: cdp.types.ts.Browser.ResetPermissionsParams) =>
+          commands["Browser.resetPermissions"].result.parse(
+            await send("Browser.resetPermissions", commands["Browser.resetPermissions"].params.parse(params ?? {})),
+          ),
+        "Browser.resetPermissions",
+        "command",
+      ),
+      setDownloadBehavior: withCdpName(
+        async (params?: cdp.types.ts.Browser.SetDownloadBehaviorParams) =>
+          commands["Browser.setDownloadBehavior"].result.parse(
+            await send(
+              "Browser.setDownloadBehavior",
+              commands["Browser.setDownloadBehavior"].params.parse(params ?? {}),
+            ),
+          ),
+        "Browser.setDownloadBehavior",
+        "command",
+      ),
+      cancelDownload: withCdpName(
+        async (params?: cdp.types.ts.Browser.CancelDownloadParams) =>
+          commands["Browser.cancelDownload"].result.parse(
+            await send("Browser.cancelDownload", commands["Browser.cancelDownload"].params.parse(params ?? {})),
+          ),
+        "Browser.cancelDownload",
+        "command",
+      ),
+      close: withCdpName(
+        async (params?: cdp.types.ts.Browser.CloseParams) =>
+          commands["Browser.close"].result.parse(
+            await send("Browser.close", commands["Browser.close"].params.parse(params ?? {})),
+          ),
+        "Browser.close",
+        "command",
+      ),
+      crash: withCdpName(
+        async (params?: cdp.types.ts.Browser.CrashParams) =>
+          commands["Browser.crash"].result.parse(
+            await send("Browser.crash", commands["Browser.crash"].params.parse(params ?? {})),
+          ),
+        "Browser.crash",
+        "command",
+      ),
+      crashGpuProcess: withCdpName(
+        async (params?: cdp.types.ts.Browser.CrashGpuProcessParams) =>
+          commands["Browser.crashGpuProcess"].result.parse(
+            await send("Browser.crashGpuProcess", commands["Browser.crashGpuProcess"].params.parse(params ?? {})),
+          ),
+        "Browser.crashGpuProcess",
+        "command",
+      ),
+      getVersion: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetVersionParams) =>
+          commands["Browser.getVersion"].result.parse(
+            await send("Browser.getVersion", commands["Browser.getVersion"].params.parse(params ?? {})),
+          ),
+        "Browser.getVersion",
+        "command",
+      ),
+      getBrowserCommandLine: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetBrowserCommandLineParams) =>
+          commands["Browser.getBrowserCommandLine"].result.parse(
+            await send(
+              "Browser.getBrowserCommandLine",
+              commands["Browser.getBrowserCommandLine"].params.parse(params ?? {}),
+            ),
+          ),
+        "Browser.getBrowserCommandLine",
+        "command",
+      ),
+      getHistograms: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetHistogramsParams) =>
+          commands["Browser.getHistograms"].result.parse(
+            await send("Browser.getHistograms", commands["Browser.getHistograms"].params.parse(params ?? {})),
+          ),
+        "Browser.getHistograms",
+        "command",
+      ),
+      getHistogram: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetHistogramParams) =>
+          commands["Browser.getHistogram"].result.parse(
+            await send("Browser.getHistogram", commands["Browser.getHistogram"].params.parse(params ?? {})),
+          ),
+        "Browser.getHistogram",
+        "command",
+      ),
+      getWindowBounds: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetWindowBoundsParams) =>
+          commands["Browser.getWindowBounds"].result.parse(
+            await send("Browser.getWindowBounds", commands["Browser.getWindowBounds"].params.parse(params ?? {})),
+          ),
+        "Browser.getWindowBounds",
+        "command",
+      ),
+      getWindowForTarget: withCdpName(
+        async (params?: cdp.types.ts.Browser.GetWindowForTargetParams) =>
+          commands["Browser.getWindowForTarget"].result.parse(
+            await send("Browser.getWindowForTarget", commands["Browser.getWindowForTarget"].params.parse(params ?? {})),
+          ),
+        "Browser.getWindowForTarget",
+        "command",
+      ),
+      setWindowBounds: withCdpName(
+        async (params?: cdp.types.ts.Browser.SetWindowBoundsParams) =>
+          commands["Browser.setWindowBounds"].result.parse(
+            await send("Browser.setWindowBounds", commands["Browser.setWindowBounds"].params.parse(params ?? {})),
+          ),
+        "Browser.setWindowBounds",
+        "command",
+      ),
+      setContentsSize: withCdpName(
+        async (params?: cdp.types.ts.Browser.SetContentsSizeParams) =>
+          commands["Browser.setContentsSize"].result.parse(
+            await send("Browser.setContentsSize", commands["Browser.setContentsSize"].params.parse(params ?? {})),
+          ),
+        "Browser.setContentsSize",
+        "command",
+      ),
+      setDockTile: withCdpName(
+        async (params?: cdp.types.ts.Browser.SetDockTileParams) =>
+          commands["Browser.setDockTile"].result.parse(
+            await send("Browser.setDockTile", commands["Browser.setDockTile"].params.parse(params ?? {})),
+          ),
+        "Browser.setDockTile",
+        "command",
+      ),
+      executeBrowserCommand: withCdpName(
+        async (params?: cdp.types.ts.Browser.ExecuteBrowserCommandParams) =>
+          commands["Browser.executeBrowserCommand"].result.parse(
+            await send(
+              "Browser.executeBrowserCommand",
+              commands["Browser.executeBrowserCommand"].params.parse(params ?? {}),
+            ),
+          ),
+        "Browser.executeBrowserCommand",
+        "command",
+      ),
+      addPrivacySandboxEnrollmentOverride: withCdpName(
+        async (params?: cdp.types.ts.Browser.AddPrivacySandboxEnrollmentOverrideParams) =>
+          commands["Browser.addPrivacySandboxEnrollmentOverride"].result.parse(
+            await send(
+              "Browser.addPrivacySandboxEnrollmentOverride",
+              commands["Browser.addPrivacySandboxEnrollmentOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Browser.addPrivacySandboxEnrollmentOverride",
+        "command",
+      ),
+      addPrivacySandboxCoordinatorKeyConfig: withCdpName(
+        async (params?: cdp.types.ts.Browser.AddPrivacySandboxCoordinatorKeyConfigParams) =>
+          commands["Browser.addPrivacySandboxCoordinatorKeyConfig"].result.parse(
+            await send(
+              "Browser.addPrivacySandboxCoordinatorKeyConfig",
+              commands["Browser.addPrivacySandboxCoordinatorKeyConfig"].params.parse(params ?? {}),
+            ),
+          ),
+        "Browser.addPrivacySandboxCoordinatorKeyConfig",
+        "command",
+      ),
       downloadWillBegin: withCdpName(events["Browser.downloadWillBegin"], "Browser.downloadWillBegin", "event"),
       downloadProgress: withCdpName(events["Browser.downloadProgress"], "Browser.downloadProgress", "event"),
     },
     CacheStorage: {
-      deleteCache: withCdpName(async (params?: cdp.types.ts.CacheStorage.DeleteCacheParams) => commands["CacheStorage.deleteCache"].result.parse(await send("CacheStorage.deleteCache", commands["CacheStorage.deleteCache"].params.parse(params ?? {}))), "CacheStorage.deleteCache", "command"),
-      deleteEntry: withCdpName(async (params?: cdp.types.ts.CacheStorage.DeleteEntryParams) => commands["CacheStorage.deleteEntry"].result.parse(await send("CacheStorage.deleteEntry", commands["CacheStorage.deleteEntry"].params.parse(params ?? {}))), "CacheStorage.deleteEntry", "command"),
-      requestCacheNames: withCdpName(async (params?: cdp.types.ts.CacheStorage.RequestCacheNamesParams) => commands["CacheStorage.requestCacheNames"].result.parse(await send("CacheStorage.requestCacheNames", commands["CacheStorage.requestCacheNames"].params.parse(params ?? {}))), "CacheStorage.requestCacheNames", "command"),
-      requestCachedResponse: withCdpName(async (params?: cdp.types.ts.CacheStorage.RequestCachedResponseParams) => commands["CacheStorage.requestCachedResponse"].result.parse(await send("CacheStorage.requestCachedResponse", commands["CacheStorage.requestCachedResponse"].params.parse(params ?? {}))), "CacheStorage.requestCachedResponse", "command"),
-      requestEntries: withCdpName(async (params?: cdp.types.ts.CacheStorage.RequestEntriesParams) => commands["CacheStorage.requestEntries"].result.parse(await send("CacheStorage.requestEntries", commands["CacheStorage.requestEntries"].params.parse(params ?? {}))), "CacheStorage.requestEntries", "command"),
+      deleteCache: withCdpName(
+        async (params?: cdp.types.ts.CacheStorage.DeleteCacheParams) =>
+          commands["CacheStorage.deleteCache"].result.parse(
+            await send("CacheStorage.deleteCache", commands["CacheStorage.deleteCache"].params.parse(params ?? {})),
+          ),
+        "CacheStorage.deleteCache",
+        "command",
+      ),
+      deleteEntry: withCdpName(
+        async (params?: cdp.types.ts.CacheStorage.DeleteEntryParams) =>
+          commands["CacheStorage.deleteEntry"].result.parse(
+            await send("CacheStorage.deleteEntry", commands["CacheStorage.deleteEntry"].params.parse(params ?? {})),
+          ),
+        "CacheStorage.deleteEntry",
+        "command",
+      ),
+      requestCacheNames: withCdpName(
+        async (params?: cdp.types.ts.CacheStorage.RequestCacheNamesParams) =>
+          commands["CacheStorage.requestCacheNames"].result.parse(
+            await send(
+              "CacheStorage.requestCacheNames",
+              commands["CacheStorage.requestCacheNames"].params.parse(params ?? {}),
+            ),
+          ),
+        "CacheStorage.requestCacheNames",
+        "command",
+      ),
+      requestCachedResponse: withCdpName(
+        async (params?: cdp.types.ts.CacheStorage.RequestCachedResponseParams) =>
+          commands["CacheStorage.requestCachedResponse"].result.parse(
+            await send(
+              "CacheStorage.requestCachedResponse",
+              commands["CacheStorage.requestCachedResponse"].params.parse(params ?? {}),
+            ),
+          ),
+        "CacheStorage.requestCachedResponse",
+        "command",
+      ),
+      requestEntries: withCdpName(
+        async (params?: cdp.types.ts.CacheStorage.RequestEntriesParams) =>
+          commands["CacheStorage.requestEntries"].result.parse(
+            await send(
+              "CacheStorage.requestEntries",
+              commands["CacheStorage.requestEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "CacheStorage.requestEntries",
+        "command",
+      ),
     },
     Cast: {
-      enable: withCdpName(async (params?: cdp.types.ts.Cast.EnableParams) => commands["Cast.enable"].result.parse(await send("Cast.enable", commands["Cast.enable"].params.parse(params ?? {}))), "Cast.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Cast.DisableParams) => commands["Cast.disable"].result.parse(await send("Cast.disable", commands["Cast.disable"].params.parse(params ?? {}))), "Cast.disable", "command"),
-      setSinkToUse: withCdpName(async (params?: cdp.types.ts.Cast.SetSinkToUseParams) => commands["Cast.setSinkToUse"].result.parse(await send("Cast.setSinkToUse", commands["Cast.setSinkToUse"].params.parse(params ?? {}))), "Cast.setSinkToUse", "command"),
-      startDesktopMirroring: withCdpName(async (params?: cdp.types.ts.Cast.StartDesktopMirroringParams) => commands["Cast.startDesktopMirroring"].result.parse(await send("Cast.startDesktopMirroring", commands["Cast.startDesktopMirroring"].params.parse(params ?? {}))), "Cast.startDesktopMirroring", "command"),
-      startTabMirroring: withCdpName(async (params?: cdp.types.ts.Cast.StartTabMirroringParams) => commands["Cast.startTabMirroring"].result.parse(await send("Cast.startTabMirroring", commands["Cast.startTabMirroring"].params.parse(params ?? {}))), "Cast.startTabMirroring", "command"),
-      stopCasting: withCdpName(async (params?: cdp.types.ts.Cast.StopCastingParams) => commands["Cast.stopCasting"].result.parse(await send("Cast.stopCasting", commands["Cast.stopCasting"].params.parse(params ?? {}))), "Cast.stopCasting", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Cast.EnableParams) =>
+          commands["Cast.enable"].result.parse(
+            await send("Cast.enable", commands["Cast.enable"].params.parse(params ?? {})),
+          ),
+        "Cast.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Cast.DisableParams) =>
+          commands["Cast.disable"].result.parse(
+            await send("Cast.disable", commands["Cast.disable"].params.parse(params ?? {})),
+          ),
+        "Cast.disable",
+        "command",
+      ),
+      setSinkToUse: withCdpName(
+        async (params?: cdp.types.ts.Cast.SetSinkToUseParams) =>
+          commands["Cast.setSinkToUse"].result.parse(
+            await send("Cast.setSinkToUse", commands["Cast.setSinkToUse"].params.parse(params ?? {})),
+          ),
+        "Cast.setSinkToUse",
+        "command",
+      ),
+      startDesktopMirroring: withCdpName(
+        async (params?: cdp.types.ts.Cast.StartDesktopMirroringParams) =>
+          commands["Cast.startDesktopMirroring"].result.parse(
+            await send("Cast.startDesktopMirroring", commands["Cast.startDesktopMirroring"].params.parse(params ?? {})),
+          ),
+        "Cast.startDesktopMirroring",
+        "command",
+      ),
+      startTabMirroring: withCdpName(
+        async (params?: cdp.types.ts.Cast.StartTabMirroringParams) =>
+          commands["Cast.startTabMirroring"].result.parse(
+            await send("Cast.startTabMirroring", commands["Cast.startTabMirroring"].params.parse(params ?? {})),
+          ),
+        "Cast.startTabMirroring",
+        "command",
+      ),
+      stopCasting: withCdpName(
+        async (params?: cdp.types.ts.Cast.StopCastingParams) =>
+          commands["Cast.stopCasting"].result.parse(
+            await send("Cast.stopCasting", commands["Cast.stopCasting"].params.parse(params ?? {})),
+          ),
+        "Cast.stopCasting",
+        "command",
+      ),
       sinksUpdated: withCdpName(events["Cast.sinksUpdated"], "Cast.sinksUpdated", "event"),
       issueUpdated: withCdpName(events["Cast.issueUpdated"], "Cast.issueUpdated", "event"),
     },
     Console: {
-      clearMessages: withCdpName(async (params?: cdp.types.ts.Console.ClearMessagesParams) => commands["Console.clearMessages"].result.parse(await send("Console.clearMessages", commands["Console.clearMessages"].params.parse(params ?? {}))), "Console.clearMessages", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Console.DisableParams) => commands["Console.disable"].result.parse(await send("Console.disable", commands["Console.disable"].params.parse(params ?? {}))), "Console.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Console.EnableParams) => commands["Console.enable"].result.parse(await send("Console.enable", commands["Console.enable"].params.parse(params ?? {}))), "Console.enable", "command"),
+      clearMessages: withCdpName(
+        async (params?: cdp.types.ts.Console.ClearMessagesParams) =>
+          commands["Console.clearMessages"].result.parse(
+            await send("Console.clearMessages", commands["Console.clearMessages"].params.parse(params ?? {})),
+          ),
+        "Console.clearMessages",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Console.DisableParams) =>
+          commands["Console.disable"].result.parse(
+            await send("Console.disable", commands["Console.disable"].params.parse(params ?? {})),
+          ),
+        "Console.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Console.EnableParams) =>
+          commands["Console.enable"].result.parse(
+            await send("Console.enable", commands["Console.enable"].params.parse(params ?? {})),
+          ),
+        "Console.enable",
+        "command",
+      ),
       messageAdded: withCdpName(events["Console.messageAdded"], "Console.messageAdded", "event"),
     },
     CrashReportContext: {
-      getEntries: withCdpName(async (params?: cdp.types.ts.CrashReportContext.GetEntriesParams) => commands["CrashReportContext.getEntries"].result.parse(await send("CrashReportContext.getEntries", commands["CrashReportContext.getEntries"].params.parse(params ?? {}))), "CrashReportContext.getEntries", "command"),
+      getEntries: withCdpName(
+        async (params?: cdp.types.ts.CrashReportContext.GetEntriesParams) =>
+          commands["CrashReportContext.getEntries"].result.parse(
+            await send(
+              "CrashReportContext.getEntries",
+              commands["CrashReportContext.getEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "CrashReportContext.getEntries",
+        "command",
+      ),
     },
     CSS: {
-      addRule: withCdpName(async (params?: cdp.types.ts.CSS.AddRuleParams) => commands["CSS.addRule"].result.parse(await send("CSS.addRule", commands["CSS.addRule"].params.parse(params ?? {}))), "CSS.addRule", "command"),
-      collectClassNames: withCdpName(async (params?: cdp.types.ts.CSS.CollectClassNamesParams) => commands["CSS.collectClassNames"].result.parse(await send("CSS.collectClassNames", commands["CSS.collectClassNames"].params.parse(params ?? {}))), "CSS.collectClassNames", "command"),
-      createStyleSheet: withCdpName(async (params?: cdp.types.ts.CSS.CreateStyleSheetParams) => commands["CSS.createStyleSheet"].result.parse(await send("CSS.createStyleSheet", commands["CSS.createStyleSheet"].params.parse(params ?? {}))), "CSS.createStyleSheet", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.CSS.DisableParams) => commands["CSS.disable"].result.parse(await send("CSS.disable", commands["CSS.disable"].params.parse(params ?? {}))), "CSS.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.CSS.EnableParams) => commands["CSS.enable"].result.parse(await send("CSS.enable", commands["CSS.enable"].params.parse(params ?? {}))), "CSS.enable", "command"),
-      forcePseudoState: withCdpName(async (params?: cdp.types.ts.CSS.ForcePseudoStateParams) => commands["CSS.forcePseudoState"].result.parse(await send("CSS.forcePseudoState", commands["CSS.forcePseudoState"].params.parse(params ?? {}))), "CSS.forcePseudoState", "command"),
-      forceStartingStyle: withCdpName(async (params?: cdp.types.ts.CSS.ForceStartingStyleParams) => commands["CSS.forceStartingStyle"].result.parse(await send("CSS.forceStartingStyle", commands["CSS.forceStartingStyle"].params.parse(params ?? {}))), "CSS.forceStartingStyle", "command"),
-      getBackgroundColors: withCdpName(async (params?: cdp.types.ts.CSS.GetBackgroundColorsParams) => commands["CSS.getBackgroundColors"].result.parse(await send("CSS.getBackgroundColors", commands["CSS.getBackgroundColors"].params.parse(params ?? {}))), "CSS.getBackgroundColors", "command"),
-      getComputedStyleForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetComputedStyleForNodeParams) => commands["CSS.getComputedStyleForNode"].result.parse(await send("CSS.getComputedStyleForNode", commands["CSS.getComputedStyleForNode"].params.parse(params ?? {}))), "CSS.getComputedStyleForNode", "command"),
-      resolveValues: withCdpName(async (params?: cdp.types.ts.CSS.ResolveValuesParams) => commands["CSS.resolveValues"].result.parse(await send("CSS.resolveValues", commands["CSS.resolveValues"].params.parse(params ?? {}))), "CSS.resolveValues", "command"),
-      getLonghandProperties: withCdpName(async (params?: cdp.types.ts.CSS.GetLonghandPropertiesParams) => commands["CSS.getLonghandProperties"].result.parse(await send("CSS.getLonghandProperties", commands["CSS.getLonghandProperties"].params.parse(params ?? {}))), "CSS.getLonghandProperties", "command"),
-      getInlineStylesForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetInlineStylesForNodeParams) => commands["CSS.getInlineStylesForNode"].result.parse(await send("CSS.getInlineStylesForNode", commands["CSS.getInlineStylesForNode"].params.parse(params ?? {}))), "CSS.getInlineStylesForNode", "command"),
-      getAnimatedStylesForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetAnimatedStylesForNodeParams) => commands["CSS.getAnimatedStylesForNode"].result.parse(await send("CSS.getAnimatedStylesForNode", commands["CSS.getAnimatedStylesForNode"].params.parse(params ?? {}))), "CSS.getAnimatedStylesForNode", "command"),
-      getMatchedStylesForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetMatchedStylesForNodeParams) => commands["CSS.getMatchedStylesForNode"].result.parse(await send("CSS.getMatchedStylesForNode", commands["CSS.getMatchedStylesForNode"].params.parse(params ?? {}))), "CSS.getMatchedStylesForNode", "command"),
-      getEnvironmentVariables: withCdpName(async (params?: cdp.types.ts.CSS.GetEnvironmentVariablesParams) => commands["CSS.getEnvironmentVariables"].result.parse(await send("CSS.getEnvironmentVariables", commands["CSS.getEnvironmentVariables"].params.parse(params ?? {}))), "CSS.getEnvironmentVariables", "command"),
-      getMediaQueries: withCdpName(async (params?: cdp.types.ts.CSS.GetMediaQueriesParams) => commands["CSS.getMediaQueries"].result.parse(await send("CSS.getMediaQueries", commands["CSS.getMediaQueries"].params.parse(params ?? {}))), "CSS.getMediaQueries", "command"),
-      getPlatformFontsForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetPlatformFontsForNodeParams) => commands["CSS.getPlatformFontsForNode"].result.parse(await send("CSS.getPlatformFontsForNode", commands["CSS.getPlatformFontsForNode"].params.parse(params ?? {}))), "CSS.getPlatformFontsForNode", "command"),
-      getStyleSheetText: withCdpName(async (params?: cdp.types.ts.CSS.GetStyleSheetTextParams) => commands["CSS.getStyleSheetText"].result.parse(await send("CSS.getStyleSheetText", commands["CSS.getStyleSheetText"].params.parse(params ?? {}))), "CSS.getStyleSheetText", "command"),
-      getLayersForNode: withCdpName(async (params?: cdp.types.ts.CSS.GetLayersForNodeParams) => commands["CSS.getLayersForNode"].result.parse(await send("CSS.getLayersForNode", commands["CSS.getLayersForNode"].params.parse(params ?? {}))), "CSS.getLayersForNode", "command"),
-      getLocationForSelector: withCdpName(async (params?: cdp.types.ts.CSS.GetLocationForSelectorParams) => commands["CSS.getLocationForSelector"].result.parse(await send("CSS.getLocationForSelector", commands["CSS.getLocationForSelector"].params.parse(params ?? {}))), "CSS.getLocationForSelector", "command"),
-      trackComputedStyleUpdatesForNode: withCdpName(async (params?: cdp.types.ts.CSS.TrackComputedStyleUpdatesForNodeParams) => commands["CSS.trackComputedStyleUpdatesForNode"].result.parse(await send("CSS.trackComputedStyleUpdatesForNode", commands["CSS.trackComputedStyleUpdatesForNode"].params.parse(params ?? {}))), "CSS.trackComputedStyleUpdatesForNode", "command"),
-      trackComputedStyleUpdates: withCdpName(async (params?: cdp.types.ts.CSS.TrackComputedStyleUpdatesParams) => commands["CSS.trackComputedStyleUpdates"].result.parse(await send("CSS.trackComputedStyleUpdates", commands["CSS.trackComputedStyleUpdates"].params.parse(params ?? {}))), "CSS.trackComputedStyleUpdates", "command"),
-      takeComputedStyleUpdates: withCdpName(async (params?: cdp.types.ts.CSS.TakeComputedStyleUpdatesParams) => commands["CSS.takeComputedStyleUpdates"].result.parse(await send("CSS.takeComputedStyleUpdates", commands["CSS.takeComputedStyleUpdates"].params.parse(params ?? {}))), "CSS.takeComputedStyleUpdates", "command"),
-      setEffectivePropertyValueForNode: withCdpName(async (params?: cdp.types.ts.CSS.SetEffectivePropertyValueForNodeParams) => commands["CSS.setEffectivePropertyValueForNode"].result.parse(await send("CSS.setEffectivePropertyValueForNode", commands["CSS.setEffectivePropertyValueForNode"].params.parse(params ?? {}))), "CSS.setEffectivePropertyValueForNode", "command"),
-      setPropertyRulePropertyName: withCdpName(async (params?: cdp.types.ts.CSS.SetPropertyRulePropertyNameParams) => commands["CSS.setPropertyRulePropertyName"].result.parse(await send("CSS.setPropertyRulePropertyName", commands["CSS.setPropertyRulePropertyName"].params.parse(params ?? {}))), "CSS.setPropertyRulePropertyName", "command"),
-      setKeyframeKey: withCdpName(async (params?: cdp.types.ts.CSS.SetKeyframeKeyParams) => commands["CSS.setKeyframeKey"].result.parse(await send("CSS.setKeyframeKey", commands["CSS.setKeyframeKey"].params.parse(params ?? {}))), "CSS.setKeyframeKey", "command"),
-      setMediaText: withCdpName(async (params?: cdp.types.ts.CSS.SetMediaTextParams) => commands["CSS.setMediaText"].result.parse(await send("CSS.setMediaText", commands["CSS.setMediaText"].params.parse(params ?? {}))), "CSS.setMediaText", "command"),
-      setContainerQueryText: withCdpName(async (params?: cdp.types.ts.CSS.SetContainerQueryTextParams) => commands["CSS.setContainerQueryText"].result.parse(await send("CSS.setContainerQueryText", commands["CSS.setContainerQueryText"].params.parse(params ?? {}))), "CSS.setContainerQueryText", "command"),
-      setSupportsText: withCdpName(async (params?: cdp.types.ts.CSS.SetSupportsTextParams) => commands["CSS.setSupportsText"].result.parse(await send("CSS.setSupportsText", commands["CSS.setSupportsText"].params.parse(params ?? {}))), "CSS.setSupportsText", "command"),
-      setNavigationText: withCdpName(async (params?: cdp.types.ts.CSS.SetNavigationTextParams) => commands["CSS.setNavigationText"].result.parse(await send("CSS.setNavigationText", commands["CSS.setNavigationText"].params.parse(params ?? {}))), "CSS.setNavigationText", "command"),
-      setScopeText: withCdpName(async (params?: cdp.types.ts.CSS.SetScopeTextParams) => commands["CSS.setScopeText"].result.parse(await send("CSS.setScopeText", commands["CSS.setScopeText"].params.parse(params ?? {}))), "CSS.setScopeText", "command"),
-      setRuleSelector: withCdpName(async (params?: cdp.types.ts.CSS.SetRuleSelectorParams) => commands["CSS.setRuleSelector"].result.parse(await send("CSS.setRuleSelector", commands["CSS.setRuleSelector"].params.parse(params ?? {}))), "CSS.setRuleSelector", "command"),
-      setStyleSheetText: withCdpName(async (params?: cdp.types.ts.CSS.SetStyleSheetTextParams) => commands["CSS.setStyleSheetText"].result.parse(await send("CSS.setStyleSheetText", commands["CSS.setStyleSheetText"].params.parse(params ?? {}))), "CSS.setStyleSheetText", "command"),
-      setStyleTexts: withCdpName(async (params?: cdp.types.ts.CSS.SetStyleTextsParams) => commands["CSS.setStyleTexts"].result.parse(await send("CSS.setStyleTexts", commands["CSS.setStyleTexts"].params.parse(params ?? {}))), "CSS.setStyleTexts", "command"),
-      startRuleUsageTracking: withCdpName(async (params?: cdp.types.ts.CSS.StartRuleUsageTrackingParams) => commands["CSS.startRuleUsageTracking"].result.parse(await send("CSS.startRuleUsageTracking", commands["CSS.startRuleUsageTracking"].params.parse(params ?? {}))), "CSS.startRuleUsageTracking", "command"),
-      stopRuleUsageTracking: withCdpName(async (params?: cdp.types.ts.CSS.StopRuleUsageTrackingParams) => commands["CSS.stopRuleUsageTracking"].result.parse(await send("CSS.stopRuleUsageTracking", commands["CSS.stopRuleUsageTracking"].params.parse(params ?? {}))), "CSS.stopRuleUsageTracking", "command"),
-      takeCoverageDelta: withCdpName(async (params?: cdp.types.ts.CSS.TakeCoverageDeltaParams) => commands["CSS.takeCoverageDelta"].result.parse(await send("CSS.takeCoverageDelta", commands["CSS.takeCoverageDelta"].params.parse(params ?? {}))), "CSS.takeCoverageDelta", "command"),
-      setLocalFontsEnabled: withCdpName(async (params?: cdp.types.ts.CSS.SetLocalFontsEnabledParams) => commands["CSS.setLocalFontsEnabled"].result.parse(await send("CSS.setLocalFontsEnabled", commands["CSS.setLocalFontsEnabled"].params.parse(params ?? {}))), "CSS.setLocalFontsEnabled", "command"),
+      addRule: withCdpName(
+        async (params?: cdp.types.ts.CSS.AddRuleParams) =>
+          commands["CSS.addRule"].result.parse(
+            await send("CSS.addRule", commands["CSS.addRule"].params.parse(params ?? {})),
+          ),
+        "CSS.addRule",
+        "command",
+      ),
+      collectClassNames: withCdpName(
+        async (params?: cdp.types.ts.CSS.CollectClassNamesParams) =>
+          commands["CSS.collectClassNames"].result.parse(
+            await send("CSS.collectClassNames", commands["CSS.collectClassNames"].params.parse(params ?? {})),
+          ),
+        "CSS.collectClassNames",
+        "command",
+      ),
+      createStyleSheet: withCdpName(
+        async (params?: cdp.types.ts.CSS.CreateStyleSheetParams) =>
+          commands["CSS.createStyleSheet"].result.parse(
+            await send("CSS.createStyleSheet", commands["CSS.createStyleSheet"].params.parse(params ?? {})),
+          ),
+        "CSS.createStyleSheet",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.CSS.DisableParams) =>
+          commands["CSS.disable"].result.parse(
+            await send("CSS.disable", commands["CSS.disable"].params.parse(params ?? {})),
+          ),
+        "CSS.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.CSS.EnableParams) =>
+          commands["CSS.enable"].result.parse(
+            await send("CSS.enable", commands["CSS.enable"].params.parse(params ?? {})),
+          ),
+        "CSS.enable",
+        "command",
+      ),
+      forcePseudoState: withCdpName(
+        async (params?: cdp.types.ts.CSS.ForcePseudoStateParams) =>
+          commands["CSS.forcePseudoState"].result.parse(
+            await send("CSS.forcePseudoState", commands["CSS.forcePseudoState"].params.parse(params ?? {})),
+          ),
+        "CSS.forcePseudoState",
+        "command",
+      ),
+      forceStartingStyle: withCdpName(
+        async (params?: cdp.types.ts.CSS.ForceStartingStyleParams) =>
+          commands["CSS.forceStartingStyle"].result.parse(
+            await send("CSS.forceStartingStyle", commands["CSS.forceStartingStyle"].params.parse(params ?? {})),
+          ),
+        "CSS.forceStartingStyle",
+        "command",
+      ),
+      getBackgroundColors: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetBackgroundColorsParams) =>
+          commands["CSS.getBackgroundColors"].result.parse(
+            await send("CSS.getBackgroundColors", commands["CSS.getBackgroundColors"].params.parse(params ?? {})),
+          ),
+        "CSS.getBackgroundColors",
+        "command",
+      ),
+      getComputedStyleForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetComputedStyleForNodeParams) =>
+          commands["CSS.getComputedStyleForNode"].result.parse(
+            await send(
+              "CSS.getComputedStyleForNode",
+              commands["CSS.getComputedStyleForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.getComputedStyleForNode",
+        "command",
+      ),
+      resolveValues: withCdpName(
+        async (params?: cdp.types.ts.CSS.ResolveValuesParams) =>
+          commands["CSS.resolveValues"].result.parse(
+            await send("CSS.resolveValues", commands["CSS.resolveValues"].params.parse(params ?? {})),
+          ),
+        "CSS.resolveValues",
+        "command",
+      ),
+      getLonghandProperties: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetLonghandPropertiesParams) =>
+          commands["CSS.getLonghandProperties"].result.parse(
+            await send("CSS.getLonghandProperties", commands["CSS.getLonghandProperties"].params.parse(params ?? {})),
+          ),
+        "CSS.getLonghandProperties",
+        "command",
+      ),
+      getInlineStylesForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetInlineStylesForNodeParams) =>
+          commands["CSS.getInlineStylesForNode"].result.parse(
+            await send("CSS.getInlineStylesForNode", commands["CSS.getInlineStylesForNode"].params.parse(params ?? {})),
+          ),
+        "CSS.getInlineStylesForNode",
+        "command",
+      ),
+      getAnimatedStylesForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetAnimatedStylesForNodeParams) =>
+          commands["CSS.getAnimatedStylesForNode"].result.parse(
+            await send(
+              "CSS.getAnimatedStylesForNode",
+              commands["CSS.getAnimatedStylesForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.getAnimatedStylesForNode",
+        "command",
+      ),
+      getMatchedStylesForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetMatchedStylesForNodeParams) =>
+          commands["CSS.getMatchedStylesForNode"].result.parse(
+            await send(
+              "CSS.getMatchedStylesForNode",
+              commands["CSS.getMatchedStylesForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.getMatchedStylesForNode",
+        "command",
+      ),
+      getEnvironmentVariables: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetEnvironmentVariablesParams) =>
+          commands["CSS.getEnvironmentVariables"].result.parse(
+            await send(
+              "CSS.getEnvironmentVariables",
+              commands["CSS.getEnvironmentVariables"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.getEnvironmentVariables",
+        "command",
+      ),
+      getMediaQueries: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetMediaQueriesParams) =>
+          commands["CSS.getMediaQueries"].result.parse(
+            await send("CSS.getMediaQueries", commands["CSS.getMediaQueries"].params.parse(params ?? {})),
+          ),
+        "CSS.getMediaQueries",
+        "command",
+      ),
+      getPlatformFontsForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetPlatformFontsForNodeParams) =>
+          commands["CSS.getPlatformFontsForNode"].result.parse(
+            await send(
+              "CSS.getPlatformFontsForNode",
+              commands["CSS.getPlatformFontsForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.getPlatformFontsForNode",
+        "command",
+      ),
+      getStyleSheetText: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetStyleSheetTextParams) =>
+          commands["CSS.getStyleSheetText"].result.parse(
+            await send("CSS.getStyleSheetText", commands["CSS.getStyleSheetText"].params.parse(params ?? {})),
+          ),
+        "CSS.getStyleSheetText",
+        "command",
+      ),
+      getLayersForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetLayersForNodeParams) =>
+          commands["CSS.getLayersForNode"].result.parse(
+            await send("CSS.getLayersForNode", commands["CSS.getLayersForNode"].params.parse(params ?? {})),
+          ),
+        "CSS.getLayersForNode",
+        "command",
+      ),
+      getLocationForSelector: withCdpName(
+        async (params?: cdp.types.ts.CSS.GetLocationForSelectorParams) =>
+          commands["CSS.getLocationForSelector"].result.parse(
+            await send("CSS.getLocationForSelector", commands["CSS.getLocationForSelector"].params.parse(params ?? {})),
+          ),
+        "CSS.getLocationForSelector",
+        "command",
+      ),
+      trackComputedStyleUpdatesForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.TrackComputedStyleUpdatesForNodeParams) =>
+          commands["CSS.trackComputedStyleUpdatesForNode"].result.parse(
+            await send(
+              "CSS.trackComputedStyleUpdatesForNode",
+              commands["CSS.trackComputedStyleUpdatesForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.trackComputedStyleUpdatesForNode",
+        "command",
+      ),
+      trackComputedStyleUpdates: withCdpName(
+        async (params?: cdp.types.ts.CSS.TrackComputedStyleUpdatesParams) =>
+          commands["CSS.trackComputedStyleUpdates"].result.parse(
+            await send(
+              "CSS.trackComputedStyleUpdates",
+              commands["CSS.trackComputedStyleUpdates"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.trackComputedStyleUpdates",
+        "command",
+      ),
+      takeComputedStyleUpdates: withCdpName(
+        async (params?: cdp.types.ts.CSS.TakeComputedStyleUpdatesParams) =>
+          commands["CSS.takeComputedStyleUpdates"].result.parse(
+            await send(
+              "CSS.takeComputedStyleUpdates",
+              commands["CSS.takeComputedStyleUpdates"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.takeComputedStyleUpdates",
+        "command",
+      ),
+      setEffectivePropertyValueForNode: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetEffectivePropertyValueForNodeParams) =>
+          commands["CSS.setEffectivePropertyValueForNode"].result.parse(
+            await send(
+              "CSS.setEffectivePropertyValueForNode",
+              commands["CSS.setEffectivePropertyValueForNode"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.setEffectivePropertyValueForNode",
+        "command",
+      ),
+      setPropertyRulePropertyName: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetPropertyRulePropertyNameParams) =>
+          commands["CSS.setPropertyRulePropertyName"].result.parse(
+            await send(
+              "CSS.setPropertyRulePropertyName",
+              commands["CSS.setPropertyRulePropertyName"].params.parse(params ?? {}),
+            ),
+          ),
+        "CSS.setPropertyRulePropertyName",
+        "command",
+      ),
+      setKeyframeKey: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetKeyframeKeyParams) =>
+          commands["CSS.setKeyframeKey"].result.parse(
+            await send("CSS.setKeyframeKey", commands["CSS.setKeyframeKey"].params.parse(params ?? {})),
+          ),
+        "CSS.setKeyframeKey",
+        "command",
+      ),
+      setMediaText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetMediaTextParams) =>
+          commands["CSS.setMediaText"].result.parse(
+            await send("CSS.setMediaText", commands["CSS.setMediaText"].params.parse(params ?? {})),
+          ),
+        "CSS.setMediaText",
+        "command",
+      ),
+      setContainerQueryText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetContainerQueryTextParams) =>
+          commands["CSS.setContainerQueryText"].result.parse(
+            await send("CSS.setContainerQueryText", commands["CSS.setContainerQueryText"].params.parse(params ?? {})),
+          ),
+        "CSS.setContainerQueryText",
+        "command",
+      ),
+      setSupportsText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetSupportsTextParams) =>
+          commands["CSS.setSupportsText"].result.parse(
+            await send("CSS.setSupportsText", commands["CSS.setSupportsText"].params.parse(params ?? {})),
+          ),
+        "CSS.setSupportsText",
+        "command",
+      ),
+      setNavigationText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetNavigationTextParams) =>
+          commands["CSS.setNavigationText"].result.parse(
+            await send("CSS.setNavigationText", commands["CSS.setNavigationText"].params.parse(params ?? {})),
+          ),
+        "CSS.setNavigationText",
+        "command",
+      ),
+      setScopeText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetScopeTextParams) =>
+          commands["CSS.setScopeText"].result.parse(
+            await send("CSS.setScopeText", commands["CSS.setScopeText"].params.parse(params ?? {})),
+          ),
+        "CSS.setScopeText",
+        "command",
+      ),
+      setRuleSelector: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetRuleSelectorParams) =>
+          commands["CSS.setRuleSelector"].result.parse(
+            await send("CSS.setRuleSelector", commands["CSS.setRuleSelector"].params.parse(params ?? {})),
+          ),
+        "CSS.setRuleSelector",
+        "command",
+      ),
+      setStyleSheetText: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetStyleSheetTextParams) =>
+          commands["CSS.setStyleSheetText"].result.parse(
+            await send("CSS.setStyleSheetText", commands["CSS.setStyleSheetText"].params.parse(params ?? {})),
+          ),
+        "CSS.setStyleSheetText",
+        "command",
+      ),
+      setStyleTexts: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetStyleTextsParams) =>
+          commands["CSS.setStyleTexts"].result.parse(
+            await send("CSS.setStyleTexts", commands["CSS.setStyleTexts"].params.parse(params ?? {})),
+          ),
+        "CSS.setStyleTexts",
+        "command",
+      ),
+      startRuleUsageTracking: withCdpName(
+        async (params?: cdp.types.ts.CSS.StartRuleUsageTrackingParams) =>
+          commands["CSS.startRuleUsageTracking"].result.parse(
+            await send("CSS.startRuleUsageTracking", commands["CSS.startRuleUsageTracking"].params.parse(params ?? {})),
+          ),
+        "CSS.startRuleUsageTracking",
+        "command",
+      ),
+      stopRuleUsageTracking: withCdpName(
+        async (params?: cdp.types.ts.CSS.StopRuleUsageTrackingParams) =>
+          commands["CSS.stopRuleUsageTracking"].result.parse(
+            await send("CSS.stopRuleUsageTracking", commands["CSS.stopRuleUsageTracking"].params.parse(params ?? {})),
+          ),
+        "CSS.stopRuleUsageTracking",
+        "command",
+      ),
+      takeCoverageDelta: withCdpName(
+        async (params?: cdp.types.ts.CSS.TakeCoverageDeltaParams) =>
+          commands["CSS.takeCoverageDelta"].result.parse(
+            await send("CSS.takeCoverageDelta", commands["CSS.takeCoverageDelta"].params.parse(params ?? {})),
+          ),
+        "CSS.takeCoverageDelta",
+        "command",
+      ),
+      setLocalFontsEnabled: withCdpName(
+        async (params?: cdp.types.ts.CSS.SetLocalFontsEnabledParams) =>
+          commands["CSS.setLocalFontsEnabled"].result.parse(
+            await send("CSS.setLocalFontsEnabled", commands["CSS.setLocalFontsEnabled"].params.parse(params ?? {})),
+          ),
+        "CSS.setLocalFontsEnabled",
+        "command",
+      ),
       fontsUpdated: withCdpName(events["CSS.fontsUpdated"], "CSS.fontsUpdated", "event"),
-      mediaQueryResultChanged: withCdpName(events["CSS.mediaQueryResultChanged"], "CSS.mediaQueryResultChanged", "event"),
+      mediaQueryResultChanged: withCdpName(
+        events["CSS.mediaQueryResultChanged"],
+        "CSS.mediaQueryResultChanged",
+        "event",
+      ),
       styleSheetAdded: withCdpName(events["CSS.styleSheetAdded"], "CSS.styleSheetAdded", "event"),
       styleSheetChanged: withCdpName(events["CSS.styleSheetChanged"], "CSS.styleSheetChanged", "event"),
       styleSheetRemoved: withCdpName(events["CSS.styleSheetRemoved"], "CSS.styleSheetRemoved", "event"),
       computedStyleUpdated: withCdpName(events["CSS.computedStyleUpdated"], "CSS.computedStyleUpdated", "event"),
     },
     Debugger: {
-      continueToLocation: withCdpName(async (params?: cdp.types.ts.Debugger.ContinueToLocationParams) => commands["Debugger.continueToLocation"].result.parse(await send("Debugger.continueToLocation", commands["Debugger.continueToLocation"].params.parse(params ?? {}))), "Debugger.continueToLocation", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Debugger.DisableParams) => commands["Debugger.disable"].result.parse(await send("Debugger.disable", commands["Debugger.disable"].params.parse(params ?? {}))), "Debugger.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Debugger.EnableParams) => commands["Debugger.enable"].result.parse(await send("Debugger.enable", commands["Debugger.enable"].params.parse(params ?? {}))), "Debugger.enable", "command"),
-      evaluateOnCallFrame: withCdpName(async (params?: cdp.types.ts.Debugger.EvaluateOnCallFrameParams) => commands["Debugger.evaluateOnCallFrame"].result.parse(await send("Debugger.evaluateOnCallFrame", commands["Debugger.evaluateOnCallFrame"].params.parse(params ?? {}))), "Debugger.evaluateOnCallFrame", "command"),
-      getPossibleBreakpoints: withCdpName(async (params?: cdp.types.ts.Debugger.GetPossibleBreakpointsParams) => commands["Debugger.getPossibleBreakpoints"].result.parse(await send("Debugger.getPossibleBreakpoints", commands["Debugger.getPossibleBreakpoints"].params.parse(params ?? {}))), "Debugger.getPossibleBreakpoints", "command"),
-      getScriptSource: withCdpName(async (params?: cdp.types.ts.Debugger.GetScriptSourceParams) => commands["Debugger.getScriptSource"].result.parse(await send("Debugger.getScriptSource", commands["Debugger.getScriptSource"].params.parse(params ?? {}))), "Debugger.getScriptSource", "command"),
-      disassembleWasmModule: withCdpName(async (params?: cdp.types.ts.Debugger.DisassembleWasmModuleParams) => commands["Debugger.disassembleWasmModule"].result.parse(await send("Debugger.disassembleWasmModule", commands["Debugger.disassembleWasmModule"].params.parse(params ?? {}))), "Debugger.disassembleWasmModule", "command"),
-      nextWasmDisassemblyChunk: withCdpName(async (params?: cdp.types.ts.Debugger.NextWasmDisassemblyChunkParams) => commands["Debugger.nextWasmDisassemblyChunk"].result.parse(await send("Debugger.nextWasmDisassemblyChunk", commands["Debugger.nextWasmDisassemblyChunk"].params.parse(params ?? {}))), "Debugger.nextWasmDisassemblyChunk", "command"),
-      getWasmBytecode: withCdpName(async (params?: cdp.types.ts.Debugger.GetWasmBytecodeParams) => commands["Debugger.getWasmBytecode"].result.parse(await send("Debugger.getWasmBytecode", commands["Debugger.getWasmBytecode"].params.parse(params ?? {}))), "Debugger.getWasmBytecode", "command"),
-      getStackTrace: withCdpName(async (params?: cdp.types.ts.Debugger.GetStackTraceParams) => commands["Debugger.getStackTrace"].result.parse(await send("Debugger.getStackTrace", commands["Debugger.getStackTrace"].params.parse(params ?? {}))), "Debugger.getStackTrace", "command"),
-      pause: withCdpName(async (params?: cdp.types.ts.Debugger.PauseParams) => commands["Debugger.pause"].result.parse(await send("Debugger.pause", commands["Debugger.pause"].params.parse(params ?? {}))), "Debugger.pause", "command"),
-      pauseOnAsyncCall: withCdpName(async (params?: cdp.types.ts.Debugger.PauseOnAsyncCallParams) => commands["Debugger.pauseOnAsyncCall"].result.parse(await send("Debugger.pauseOnAsyncCall", commands["Debugger.pauseOnAsyncCall"].params.parse(params ?? {}))), "Debugger.pauseOnAsyncCall", "command"),
-      removeBreakpoint: withCdpName(async (params?: cdp.types.ts.Debugger.RemoveBreakpointParams) => commands["Debugger.removeBreakpoint"].result.parse(await send("Debugger.removeBreakpoint", commands["Debugger.removeBreakpoint"].params.parse(params ?? {}))), "Debugger.removeBreakpoint", "command"),
-      restartFrame: withCdpName(async (params?: cdp.types.ts.Debugger.RestartFrameParams) => commands["Debugger.restartFrame"].result.parse(await send("Debugger.restartFrame", commands["Debugger.restartFrame"].params.parse(params ?? {}))), "Debugger.restartFrame", "command"),
-      resume: withCdpName(async (params?: cdp.types.ts.Debugger.ResumeParams) => commands["Debugger.resume"].result.parse(await send("Debugger.resume", commands["Debugger.resume"].params.parse(params ?? {}))), "Debugger.resume", "command"),
-      searchInContent: withCdpName(async (params?: cdp.types.ts.Debugger.SearchInContentParams) => commands["Debugger.searchInContent"].result.parse(await send("Debugger.searchInContent", commands["Debugger.searchInContent"].params.parse(params ?? {}))), "Debugger.searchInContent", "command"),
-      setAsyncCallStackDepth: withCdpName(async (params?: cdp.types.ts.Debugger.SetAsyncCallStackDepthParams) => commands["Debugger.setAsyncCallStackDepth"].result.parse(await send("Debugger.setAsyncCallStackDepth", commands["Debugger.setAsyncCallStackDepth"].params.parse(params ?? {}))), "Debugger.setAsyncCallStackDepth", "command"),
-      setBlackboxExecutionContexts: withCdpName(async (params?: cdp.types.ts.Debugger.SetBlackboxExecutionContextsParams) => commands["Debugger.setBlackboxExecutionContexts"].result.parse(await send("Debugger.setBlackboxExecutionContexts", commands["Debugger.setBlackboxExecutionContexts"].params.parse(params ?? {}))), "Debugger.setBlackboxExecutionContexts", "command"),
-      setBlackboxPatterns: withCdpName(async (params?: cdp.types.ts.Debugger.SetBlackboxPatternsParams) => commands["Debugger.setBlackboxPatterns"].result.parse(await send("Debugger.setBlackboxPatterns", commands["Debugger.setBlackboxPatterns"].params.parse(params ?? {}))), "Debugger.setBlackboxPatterns", "command"),
-      setBlackboxedRanges: withCdpName(async (params?: cdp.types.ts.Debugger.SetBlackboxedRangesParams) => commands["Debugger.setBlackboxedRanges"].result.parse(await send("Debugger.setBlackboxedRanges", commands["Debugger.setBlackboxedRanges"].params.parse(params ?? {}))), "Debugger.setBlackboxedRanges", "command"),
-      setBreakpoint: withCdpName(async (params?: cdp.types.ts.Debugger.SetBreakpointParams) => commands["Debugger.setBreakpoint"].result.parse(await send("Debugger.setBreakpoint", commands["Debugger.setBreakpoint"].params.parse(params ?? {}))), "Debugger.setBreakpoint", "command"),
-      setInstrumentationBreakpoint: withCdpName(async (params?: cdp.types.ts.Debugger.SetInstrumentationBreakpointParams) => commands["Debugger.setInstrumentationBreakpoint"].result.parse(await send("Debugger.setInstrumentationBreakpoint", commands["Debugger.setInstrumentationBreakpoint"].params.parse(params ?? {}))), "Debugger.setInstrumentationBreakpoint", "command"),
-      setBreakpointByUrl: withCdpName(async (params?: cdp.types.ts.Debugger.SetBreakpointByUrlParams) => commands["Debugger.setBreakpointByUrl"].result.parse(await send("Debugger.setBreakpointByUrl", commands["Debugger.setBreakpointByUrl"].params.parse(params ?? {}))), "Debugger.setBreakpointByUrl", "command"),
-      setBreakpointOnFunctionCall: withCdpName(async (params?: cdp.types.ts.Debugger.SetBreakpointOnFunctionCallParams) => commands["Debugger.setBreakpointOnFunctionCall"].result.parse(await send("Debugger.setBreakpointOnFunctionCall", commands["Debugger.setBreakpointOnFunctionCall"].params.parse(params ?? {}))), "Debugger.setBreakpointOnFunctionCall", "command"),
-      setBreakpointsActive: withCdpName(async (params?: cdp.types.ts.Debugger.SetBreakpointsActiveParams) => commands["Debugger.setBreakpointsActive"].result.parse(await send("Debugger.setBreakpointsActive", commands["Debugger.setBreakpointsActive"].params.parse(params ?? {}))), "Debugger.setBreakpointsActive", "command"),
-      setPauseOnExceptions: withCdpName(async (params?: cdp.types.ts.Debugger.SetPauseOnExceptionsParams) => commands["Debugger.setPauseOnExceptions"].result.parse(await send("Debugger.setPauseOnExceptions", commands["Debugger.setPauseOnExceptions"].params.parse(params ?? {}))), "Debugger.setPauseOnExceptions", "command"),
-      setReturnValue: withCdpName(async (params?: cdp.types.ts.Debugger.SetReturnValueParams) => commands["Debugger.setReturnValue"].result.parse(await send("Debugger.setReturnValue", commands["Debugger.setReturnValue"].params.parse(params ?? {}))), "Debugger.setReturnValue", "command"),
-      setScriptSource: withCdpName(async (params?: cdp.types.ts.Debugger.SetScriptSourceParams) => commands["Debugger.setScriptSource"].result.parse(await send("Debugger.setScriptSource", commands["Debugger.setScriptSource"].params.parse(params ?? {}))), "Debugger.setScriptSource", "command"),
-      setSkipAllPauses: withCdpName(async (params?: cdp.types.ts.Debugger.SetSkipAllPausesParams) => commands["Debugger.setSkipAllPauses"].result.parse(await send("Debugger.setSkipAllPauses", commands["Debugger.setSkipAllPauses"].params.parse(params ?? {}))), "Debugger.setSkipAllPauses", "command"),
-      setVariableValue: withCdpName(async (params?: cdp.types.ts.Debugger.SetVariableValueParams) => commands["Debugger.setVariableValue"].result.parse(await send("Debugger.setVariableValue", commands["Debugger.setVariableValue"].params.parse(params ?? {}))), "Debugger.setVariableValue", "command"),
-      stepInto: withCdpName(async (params?: cdp.types.ts.Debugger.StepIntoParams) => commands["Debugger.stepInto"].result.parse(await send("Debugger.stepInto", commands["Debugger.stepInto"].params.parse(params ?? {}))), "Debugger.stepInto", "command"),
-      stepOut: withCdpName(async (params?: cdp.types.ts.Debugger.StepOutParams) => commands["Debugger.stepOut"].result.parse(await send("Debugger.stepOut", commands["Debugger.stepOut"].params.parse(params ?? {}))), "Debugger.stepOut", "command"),
-      stepOver: withCdpName(async (params?: cdp.types.ts.Debugger.StepOverParams) => commands["Debugger.stepOver"].result.parse(await send("Debugger.stepOver", commands["Debugger.stepOver"].params.parse(params ?? {}))), "Debugger.stepOver", "command"),
+      continueToLocation: withCdpName(
+        async (params?: cdp.types.ts.Debugger.ContinueToLocationParams) =>
+          commands["Debugger.continueToLocation"].result.parse(
+            await send(
+              "Debugger.continueToLocation",
+              commands["Debugger.continueToLocation"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.continueToLocation",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Debugger.DisableParams) =>
+          commands["Debugger.disable"].result.parse(
+            await send("Debugger.disable", commands["Debugger.disable"].params.parse(params ?? {})),
+          ),
+        "Debugger.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Debugger.EnableParams) =>
+          commands["Debugger.enable"].result.parse(
+            await send("Debugger.enable", commands["Debugger.enable"].params.parse(params ?? {})),
+          ),
+        "Debugger.enable",
+        "command",
+      ),
+      evaluateOnCallFrame: withCdpName(
+        async (params?: cdp.types.ts.Debugger.EvaluateOnCallFrameParams) =>
+          commands["Debugger.evaluateOnCallFrame"].result.parse(
+            await send(
+              "Debugger.evaluateOnCallFrame",
+              commands["Debugger.evaluateOnCallFrame"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.evaluateOnCallFrame",
+        "command",
+      ),
+      getPossibleBreakpoints: withCdpName(
+        async (params?: cdp.types.ts.Debugger.GetPossibleBreakpointsParams) =>
+          commands["Debugger.getPossibleBreakpoints"].result.parse(
+            await send(
+              "Debugger.getPossibleBreakpoints",
+              commands["Debugger.getPossibleBreakpoints"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.getPossibleBreakpoints",
+        "command",
+      ),
+      getScriptSource: withCdpName(
+        async (params?: cdp.types.ts.Debugger.GetScriptSourceParams) =>
+          commands["Debugger.getScriptSource"].result.parse(
+            await send("Debugger.getScriptSource", commands["Debugger.getScriptSource"].params.parse(params ?? {})),
+          ),
+        "Debugger.getScriptSource",
+        "command",
+      ),
+      disassembleWasmModule: withCdpName(
+        async (params?: cdp.types.ts.Debugger.DisassembleWasmModuleParams) =>
+          commands["Debugger.disassembleWasmModule"].result.parse(
+            await send(
+              "Debugger.disassembleWasmModule",
+              commands["Debugger.disassembleWasmModule"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.disassembleWasmModule",
+        "command",
+      ),
+      nextWasmDisassemblyChunk: withCdpName(
+        async (params?: cdp.types.ts.Debugger.NextWasmDisassemblyChunkParams) =>
+          commands["Debugger.nextWasmDisassemblyChunk"].result.parse(
+            await send(
+              "Debugger.nextWasmDisassemblyChunk",
+              commands["Debugger.nextWasmDisassemblyChunk"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.nextWasmDisassemblyChunk",
+        "command",
+      ),
+      getWasmBytecode: withCdpName(
+        async (params?: cdp.types.ts.Debugger.GetWasmBytecodeParams) =>
+          commands["Debugger.getWasmBytecode"].result.parse(
+            await send("Debugger.getWasmBytecode", commands["Debugger.getWasmBytecode"].params.parse(params ?? {})),
+          ),
+        "Debugger.getWasmBytecode",
+        "command",
+      ),
+      getStackTrace: withCdpName(
+        async (params?: cdp.types.ts.Debugger.GetStackTraceParams) =>
+          commands["Debugger.getStackTrace"].result.parse(
+            await send("Debugger.getStackTrace", commands["Debugger.getStackTrace"].params.parse(params ?? {})),
+          ),
+        "Debugger.getStackTrace",
+        "command",
+      ),
+      pause: withCdpName(
+        async (params?: cdp.types.ts.Debugger.PauseParams) =>
+          commands["Debugger.pause"].result.parse(
+            await send("Debugger.pause", commands["Debugger.pause"].params.parse(params ?? {})),
+          ),
+        "Debugger.pause",
+        "command",
+      ),
+      pauseOnAsyncCall: withCdpName(
+        async (params?: cdp.types.ts.Debugger.PauseOnAsyncCallParams) =>
+          commands["Debugger.pauseOnAsyncCall"].result.parse(
+            await send("Debugger.pauseOnAsyncCall", commands["Debugger.pauseOnAsyncCall"].params.parse(params ?? {})),
+          ),
+        "Debugger.pauseOnAsyncCall",
+        "command",
+      ),
+      removeBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.Debugger.RemoveBreakpointParams) =>
+          commands["Debugger.removeBreakpoint"].result.parse(
+            await send("Debugger.removeBreakpoint", commands["Debugger.removeBreakpoint"].params.parse(params ?? {})),
+          ),
+        "Debugger.removeBreakpoint",
+        "command",
+      ),
+      restartFrame: withCdpName(
+        async (params?: cdp.types.ts.Debugger.RestartFrameParams) =>
+          commands["Debugger.restartFrame"].result.parse(
+            await send("Debugger.restartFrame", commands["Debugger.restartFrame"].params.parse(params ?? {})),
+          ),
+        "Debugger.restartFrame",
+        "command",
+      ),
+      resume: withCdpName(
+        async (params?: cdp.types.ts.Debugger.ResumeParams) =>
+          commands["Debugger.resume"].result.parse(
+            await send("Debugger.resume", commands["Debugger.resume"].params.parse(params ?? {})),
+          ),
+        "Debugger.resume",
+        "command",
+      ),
+      searchInContent: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SearchInContentParams) =>
+          commands["Debugger.searchInContent"].result.parse(
+            await send("Debugger.searchInContent", commands["Debugger.searchInContent"].params.parse(params ?? {})),
+          ),
+        "Debugger.searchInContent",
+        "command",
+      ),
+      setAsyncCallStackDepth: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetAsyncCallStackDepthParams) =>
+          commands["Debugger.setAsyncCallStackDepth"].result.parse(
+            await send(
+              "Debugger.setAsyncCallStackDepth",
+              commands["Debugger.setAsyncCallStackDepth"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setAsyncCallStackDepth",
+        "command",
+      ),
+      setBlackboxExecutionContexts: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBlackboxExecutionContextsParams) =>
+          commands["Debugger.setBlackboxExecutionContexts"].result.parse(
+            await send(
+              "Debugger.setBlackboxExecutionContexts",
+              commands["Debugger.setBlackboxExecutionContexts"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBlackboxExecutionContexts",
+        "command",
+      ),
+      setBlackboxPatterns: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBlackboxPatternsParams) =>
+          commands["Debugger.setBlackboxPatterns"].result.parse(
+            await send(
+              "Debugger.setBlackboxPatterns",
+              commands["Debugger.setBlackboxPatterns"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBlackboxPatterns",
+        "command",
+      ),
+      setBlackboxedRanges: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBlackboxedRangesParams) =>
+          commands["Debugger.setBlackboxedRanges"].result.parse(
+            await send(
+              "Debugger.setBlackboxedRanges",
+              commands["Debugger.setBlackboxedRanges"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBlackboxedRanges",
+        "command",
+      ),
+      setBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBreakpointParams) =>
+          commands["Debugger.setBreakpoint"].result.parse(
+            await send("Debugger.setBreakpoint", commands["Debugger.setBreakpoint"].params.parse(params ?? {})),
+          ),
+        "Debugger.setBreakpoint",
+        "command",
+      ),
+      setInstrumentationBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetInstrumentationBreakpointParams) =>
+          commands["Debugger.setInstrumentationBreakpoint"].result.parse(
+            await send(
+              "Debugger.setInstrumentationBreakpoint",
+              commands["Debugger.setInstrumentationBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setInstrumentationBreakpoint",
+        "command",
+      ),
+      setBreakpointByUrl: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBreakpointByUrlParams) =>
+          commands["Debugger.setBreakpointByUrl"].result.parse(
+            await send(
+              "Debugger.setBreakpointByUrl",
+              commands["Debugger.setBreakpointByUrl"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBreakpointByUrl",
+        "command",
+      ),
+      setBreakpointOnFunctionCall: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBreakpointOnFunctionCallParams) =>
+          commands["Debugger.setBreakpointOnFunctionCall"].result.parse(
+            await send(
+              "Debugger.setBreakpointOnFunctionCall",
+              commands["Debugger.setBreakpointOnFunctionCall"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBreakpointOnFunctionCall",
+        "command",
+      ),
+      setBreakpointsActive: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetBreakpointsActiveParams) =>
+          commands["Debugger.setBreakpointsActive"].result.parse(
+            await send(
+              "Debugger.setBreakpointsActive",
+              commands["Debugger.setBreakpointsActive"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setBreakpointsActive",
+        "command",
+      ),
+      setPauseOnExceptions: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetPauseOnExceptionsParams) =>
+          commands["Debugger.setPauseOnExceptions"].result.parse(
+            await send(
+              "Debugger.setPauseOnExceptions",
+              commands["Debugger.setPauseOnExceptions"].params.parse(params ?? {}),
+            ),
+          ),
+        "Debugger.setPauseOnExceptions",
+        "command",
+      ),
+      setReturnValue: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetReturnValueParams) =>
+          commands["Debugger.setReturnValue"].result.parse(
+            await send("Debugger.setReturnValue", commands["Debugger.setReturnValue"].params.parse(params ?? {})),
+          ),
+        "Debugger.setReturnValue",
+        "command",
+      ),
+      setScriptSource: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetScriptSourceParams) =>
+          commands["Debugger.setScriptSource"].result.parse(
+            await send("Debugger.setScriptSource", commands["Debugger.setScriptSource"].params.parse(params ?? {})),
+          ),
+        "Debugger.setScriptSource",
+        "command",
+      ),
+      setSkipAllPauses: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetSkipAllPausesParams) =>
+          commands["Debugger.setSkipAllPauses"].result.parse(
+            await send("Debugger.setSkipAllPauses", commands["Debugger.setSkipAllPauses"].params.parse(params ?? {})),
+          ),
+        "Debugger.setSkipAllPauses",
+        "command",
+      ),
+      setVariableValue: withCdpName(
+        async (params?: cdp.types.ts.Debugger.SetVariableValueParams) =>
+          commands["Debugger.setVariableValue"].result.parse(
+            await send("Debugger.setVariableValue", commands["Debugger.setVariableValue"].params.parse(params ?? {})),
+          ),
+        "Debugger.setVariableValue",
+        "command",
+      ),
+      stepInto: withCdpName(
+        async (params?: cdp.types.ts.Debugger.StepIntoParams) =>
+          commands["Debugger.stepInto"].result.parse(
+            await send("Debugger.stepInto", commands["Debugger.stepInto"].params.parse(params ?? {})),
+          ),
+        "Debugger.stepInto",
+        "command",
+      ),
+      stepOut: withCdpName(
+        async (params?: cdp.types.ts.Debugger.StepOutParams) =>
+          commands["Debugger.stepOut"].result.parse(
+            await send("Debugger.stepOut", commands["Debugger.stepOut"].params.parse(params ?? {})),
+          ),
+        "Debugger.stepOut",
+        "command",
+      ),
+      stepOver: withCdpName(
+        async (params?: cdp.types.ts.Debugger.StepOverParams) =>
+          commands["Debugger.stepOver"].result.parse(
+            await send("Debugger.stepOver", commands["Debugger.stepOver"].params.parse(params ?? {})),
+          ),
+        "Debugger.stepOver",
+        "command",
+      ),
       breakpointResolved: withCdpName(events["Debugger.breakpointResolved"], "Debugger.breakpointResolved", "event"),
       paused: withCdpName(events["Debugger.paused"], "Debugger.paused", "event"),
       resumed: withCdpName(events["Debugger.resumed"], "Debugger.resumed", "event"),
@@ -317,865 +1647,5617 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
       scriptParsed: withCdpName(events["Debugger.scriptParsed"], "Debugger.scriptParsed", "event"),
     },
     DeviceAccess: {
-      enable: withCdpName(async (params?: cdp.types.ts.DeviceAccess.EnableParams) => commands["DeviceAccess.enable"].result.parse(await send("DeviceAccess.enable", commands["DeviceAccess.enable"].params.parse(params ?? {}))), "DeviceAccess.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.DeviceAccess.DisableParams) => commands["DeviceAccess.disable"].result.parse(await send("DeviceAccess.disable", commands["DeviceAccess.disable"].params.parse(params ?? {}))), "DeviceAccess.disable", "command"),
-      selectPrompt: withCdpName(async (params?: cdp.types.ts.DeviceAccess.SelectPromptParams) => commands["DeviceAccess.selectPrompt"].result.parse(await send("DeviceAccess.selectPrompt", commands["DeviceAccess.selectPrompt"].params.parse(params ?? {}))), "DeviceAccess.selectPrompt", "command"),
-      cancelPrompt: withCdpName(async (params?: cdp.types.ts.DeviceAccess.CancelPromptParams) => commands["DeviceAccess.cancelPrompt"].result.parse(await send("DeviceAccess.cancelPrompt", commands["DeviceAccess.cancelPrompt"].params.parse(params ?? {}))), "DeviceAccess.cancelPrompt", "command"),
-      deviceRequestPrompted: withCdpName(events["DeviceAccess.deviceRequestPrompted"], "DeviceAccess.deviceRequestPrompted", "event"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.DeviceAccess.EnableParams) =>
+          commands["DeviceAccess.enable"].result.parse(
+            await send("DeviceAccess.enable", commands["DeviceAccess.enable"].params.parse(params ?? {})),
+          ),
+        "DeviceAccess.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.DeviceAccess.DisableParams) =>
+          commands["DeviceAccess.disable"].result.parse(
+            await send("DeviceAccess.disable", commands["DeviceAccess.disable"].params.parse(params ?? {})),
+          ),
+        "DeviceAccess.disable",
+        "command",
+      ),
+      selectPrompt: withCdpName(
+        async (params?: cdp.types.ts.DeviceAccess.SelectPromptParams) =>
+          commands["DeviceAccess.selectPrompt"].result.parse(
+            await send("DeviceAccess.selectPrompt", commands["DeviceAccess.selectPrompt"].params.parse(params ?? {})),
+          ),
+        "DeviceAccess.selectPrompt",
+        "command",
+      ),
+      cancelPrompt: withCdpName(
+        async (params?: cdp.types.ts.DeviceAccess.CancelPromptParams) =>
+          commands["DeviceAccess.cancelPrompt"].result.parse(
+            await send("DeviceAccess.cancelPrompt", commands["DeviceAccess.cancelPrompt"].params.parse(params ?? {})),
+          ),
+        "DeviceAccess.cancelPrompt",
+        "command",
+      ),
+      deviceRequestPrompted: withCdpName(
+        events["DeviceAccess.deviceRequestPrompted"],
+        "DeviceAccess.deviceRequestPrompted",
+        "event",
+      ),
     },
     DeviceOrientation: {
-      clearDeviceOrientationOverride: withCdpName(async (params?: cdp.types.ts.DeviceOrientation.ClearDeviceOrientationOverrideParams) => commands["DeviceOrientation.clearDeviceOrientationOverride"].result.parse(await send("DeviceOrientation.clearDeviceOrientationOverride", commands["DeviceOrientation.clearDeviceOrientationOverride"].params.parse(params ?? {}))), "DeviceOrientation.clearDeviceOrientationOverride", "command"),
-      setDeviceOrientationOverride: withCdpName(async (params?: cdp.types.ts.DeviceOrientation.SetDeviceOrientationOverrideParams) => commands["DeviceOrientation.setDeviceOrientationOverride"].result.parse(await send("DeviceOrientation.setDeviceOrientationOverride", commands["DeviceOrientation.setDeviceOrientationOverride"].params.parse(params ?? {}))), "DeviceOrientation.setDeviceOrientationOverride", "command"),
+      clearDeviceOrientationOverride: withCdpName(
+        async (params?: cdp.types.ts.DeviceOrientation.ClearDeviceOrientationOverrideParams) =>
+          commands["DeviceOrientation.clearDeviceOrientationOverride"].result.parse(
+            await send(
+              "DeviceOrientation.clearDeviceOrientationOverride",
+              commands["DeviceOrientation.clearDeviceOrientationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "DeviceOrientation.clearDeviceOrientationOverride",
+        "command",
+      ),
+      setDeviceOrientationOverride: withCdpName(
+        async (params?: cdp.types.ts.DeviceOrientation.SetDeviceOrientationOverrideParams) =>
+          commands["DeviceOrientation.setDeviceOrientationOverride"].result.parse(
+            await send(
+              "DeviceOrientation.setDeviceOrientationOverride",
+              commands["DeviceOrientation.setDeviceOrientationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "DeviceOrientation.setDeviceOrientationOverride",
+        "command",
+      ),
     },
     DOM: {
-      collectClassNamesFromSubtree: withCdpName(async (params?: cdp.types.ts.DOM.CollectClassNamesFromSubtreeParams) => commands["DOM.collectClassNamesFromSubtree"].result.parse(await send("DOM.collectClassNamesFromSubtree", commands["DOM.collectClassNamesFromSubtree"].params.parse(params ?? {}))), "DOM.collectClassNamesFromSubtree", "command"),
-      copyTo: withCdpName(async (params?: cdp.types.ts.DOM.CopyToParams) => commands["DOM.copyTo"].result.parse(await send("DOM.copyTo", commands["DOM.copyTo"].params.parse(params ?? {}))), "DOM.copyTo", "command"),
-      describeNode: withCdpName(async (params?: cdp.types.ts.DOM.DescribeNodeParams) => commands["DOM.describeNode"].result.parse(await send("DOM.describeNode", commands["DOM.describeNode"].params.parse(params ?? {}))), "DOM.describeNode", "command"),
-      scrollIntoViewIfNeeded: withCdpName(async (params?: cdp.types.ts.DOM.ScrollIntoViewIfNeededParams) => commands["DOM.scrollIntoViewIfNeeded"].result.parse(await send("DOM.scrollIntoViewIfNeeded", commands["DOM.scrollIntoViewIfNeeded"].params.parse(params ?? {}))), "DOM.scrollIntoViewIfNeeded", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.DOM.DisableParams) => commands["DOM.disable"].result.parse(await send("DOM.disable", commands["DOM.disable"].params.parse(params ?? {}))), "DOM.disable", "command"),
-      discardSearchResults: withCdpName(async (params?: cdp.types.ts.DOM.DiscardSearchResultsParams) => commands["DOM.discardSearchResults"].result.parse(await send("DOM.discardSearchResults", commands["DOM.discardSearchResults"].params.parse(params ?? {}))), "DOM.discardSearchResults", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.DOM.EnableParams) => commands["DOM.enable"].result.parse(await send("DOM.enable", commands["DOM.enable"].params.parse(params ?? {}))), "DOM.enable", "command"),
-      focus: withCdpName(async (params?: cdp.types.ts.DOM.FocusParams) => commands["DOM.focus"].result.parse(await send("DOM.focus", commands["DOM.focus"].params.parse(params ?? {}))), "DOM.focus", "command"),
-      getAttributes: withCdpName(async (params?: cdp.types.ts.DOM.GetAttributesParams) => commands["DOM.getAttributes"].result.parse(await send("DOM.getAttributes", commands["DOM.getAttributes"].params.parse(params ?? {}))), "DOM.getAttributes", "command"),
-      getBoxModel: withCdpName(async (params?: cdp.types.ts.DOM.GetBoxModelParams) => commands["DOM.getBoxModel"].result.parse(await send("DOM.getBoxModel", commands["DOM.getBoxModel"].params.parse(params ?? {}))), "DOM.getBoxModel", "command"),
-      getContentQuads: withCdpName(async (params?: cdp.types.ts.DOM.GetContentQuadsParams) => commands["DOM.getContentQuads"].result.parse(await send("DOM.getContentQuads", commands["DOM.getContentQuads"].params.parse(params ?? {}))), "DOM.getContentQuads", "command"),
-      getDocument: withCdpName(async (params?: cdp.types.ts.DOM.GetDocumentParams) => commands["DOM.getDocument"].result.parse(await send("DOM.getDocument", commands["DOM.getDocument"].params.parse(params ?? {}))), "DOM.getDocument", "command"),
-      getFlattenedDocument: withCdpName(async (params?: cdp.types.ts.DOM.GetFlattenedDocumentParams) => commands["DOM.getFlattenedDocument"].result.parse(await send("DOM.getFlattenedDocument", commands["DOM.getFlattenedDocument"].params.parse(params ?? {}))), "DOM.getFlattenedDocument", "command"),
-      getNodesForSubtreeByStyle: withCdpName(async (params?: cdp.types.ts.DOM.GetNodesForSubtreeByStyleParams) => commands["DOM.getNodesForSubtreeByStyle"].result.parse(await send("DOM.getNodesForSubtreeByStyle", commands["DOM.getNodesForSubtreeByStyle"].params.parse(params ?? {}))), "DOM.getNodesForSubtreeByStyle", "command"),
-      getNodeForLocation: withCdpName(async (params?: cdp.types.ts.DOM.GetNodeForLocationParams) => commands["DOM.getNodeForLocation"].result.parse(await send("DOM.getNodeForLocation", commands["DOM.getNodeForLocation"].params.parse(params ?? {}))), "DOM.getNodeForLocation", "command"),
-      getOuterHTML: withCdpName(async (params?: cdp.types.ts.DOM.GetOuterHTMLParams) => commands["DOM.getOuterHTML"].result.parse(await send("DOM.getOuterHTML", commands["DOM.getOuterHTML"].params.parse(params ?? {}))), "DOM.getOuterHTML", "command"),
-      getRelayoutBoundary: withCdpName(async (params?: cdp.types.ts.DOM.GetRelayoutBoundaryParams) => commands["DOM.getRelayoutBoundary"].result.parse(await send("DOM.getRelayoutBoundary", commands["DOM.getRelayoutBoundary"].params.parse(params ?? {}))), "DOM.getRelayoutBoundary", "command"),
-      getSearchResults: withCdpName(async (params?: cdp.types.ts.DOM.GetSearchResultsParams) => commands["DOM.getSearchResults"].result.parse(await send("DOM.getSearchResults", commands["DOM.getSearchResults"].params.parse(params ?? {}))), "DOM.getSearchResults", "command"),
-      hideHighlight: withCdpName(async (params?: cdp.types.ts.DOM.HideHighlightParams) => commands["DOM.hideHighlight"].result.parse(await send("DOM.hideHighlight", commands["DOM.hideHighlight"].params.parse(params ?? {}))), "DOM.hideHighlight", "command"),
-      highlightNode: withCdpName(async (params?: cdp.types.ts.DOM.HighlightNodeParams) => commands["DOM.highlightNode"].result.parse(await send("DOM.highlightNode", commands["DOM.highlightNode"].params.parse(params ?? {}))), "DOM.highlightNode", "command"),
-      highlightRect: withCdpName(async (params?: cdp.types.ts.DOM.HighlightRectParams) => commands["DOM.highlightRect"].result.parse(await send("DOM.highlightRect", commands["DOM.highlightRect"].params.parse(params ?? {}))), "DOM.highlightRect", "command"),
-      markUndoableState: withCdpName(async (params?: cdp.types.ts.DOM.MarkUndoableStateParams) => commands["DOM.markUndoableState"].result.parse(await send("DOM.markUndoableState", commands["DOM.markUndoableState"].params.parse(params ?? {}))), "DOM.markUndoableState", "command"),
-      moveTo: withCdpName(async (params?: cdp.types.ts.DOM.MoveToParams) => commands["DOM.moveTo"].result.parse(await send("DOM.moveTo", commands["DOM.moveTo"].params.parse(params ?? {}))), "DOM.moveTo", "command"),
-      performSearch: withCdpName(async (params?: cdp.types.ts.DOM.PerformSearchParams) => commands["DOM.performSearch"].result.parse(await send("DOM.performSearch", commands["DOM.performSearch"].params.parse(params ?? {}))), "DOM.performSearch", "command"),
-      pushNodeByPathToFrontend: withCdpName(async (params?: cdp.types.ts.DOM.PushNodeByPathToFrontendParams) => commands["DOM.pushNodeByPathToFrontend"].result.parse(await send("DOM.pushNodeByPathToFrontend", commands["DOM.pushNodeByPathToFrontend"].params.parse(params ?? {}))), "DOM.pushNodeByPathToFrontend", "command"),
-      pushNodesByBackendIdsToFrontend: withCdpName(async (params?: cdp.types.ts.DOM.PushNodesByBackendIdsToFrontendParams) => commands["DOM.pushNodesByBackendIdsToFrontend"].result.parse(await send("DOM.pushNodesByBackendIdsToFrontend", commands["DOM.pushNodesByBackendIdsToFrontend"].params.parse(params ?? {}))), "DOM.pushNodesByBackendIdsToFrontend", "command"),
-      querySelector: withCdpName(async (params?: cdp.types.ts.DOM.QuerySelectorParams) => commands["DOM.querySelector"].result.parse(await send("DOM.querySelector", commands["DOM.querySelector"].params.parse(params ?? {}))), "DOM.querySelector", "command"),
-      querySelectorAll: withCdpName(async (params?: cdp.types.ts.DOM.QuerySelectorAllParams) => commands["DOM.querySelectorAll"].result.parse(await send("DOM.querySelectorAll", commands["DOM.querySelectorAll"].params.parse(params ?? {}))), "DOM.querySelectorAll", "command"),
-      getTopLayerElements: withCdpName(async (params?: cdp.types.ts.DOM.GetTopLayerElementsParams) => commands["DOM.getTopLayerElements"].result.parse(await send("DOM.getTopLayerElements", commands["DOM.getTopLayerElements"].params.parse(params ?? {}))), "DOM.getTopLayerElements", "command"),
-      getElementByRelation: withCdpName(async (params?: cdp.types.ts.DOM.GetElementByRelationParams) => commands["DOM.getElementByRelation"].result.parse(await send("DOM.getElementByRelation", commands["DOM.getElementByRelation"].params.parse(params ?? {}))), "DOM.getElementByRelation", "command"),
-      redo: withCdpName(async (params?: cdp.types.ts.DOM.RedoParams) => commands["DOM.redo"].result.parse(await send("DOM.redo", commands["DOM.redo"].params.parse(params ?? {}))), "DOM.redo", "command"),
-      removeAttribute: withCdpName(async (params?: cdp.types.ts.DOM.RemoveAttributeParams) => commands["DOM.removeAttribute"].result.parse(await send("DOM.removeAttribute", commands["DOM.removeAttribute"].params.parse(params ?? {}))), "DOM.removeAttribute", "command"),
-      removeNode: withCdpName(async (params?: cdp.types.ts.DOM.RemoveNodeParams) => commands["DOM.removeNode"].result.parse(await send("DOM.removeNode", commands["DOM.removeNode"].params.parse(params ?? {}))), "DOM.removeNode", "command"),
-      requestChildNodes: withCdpName(async (params?: cdp.types.ts.DOM.RequestChildNodesParams) => commands["DOM.requestChildNodes"].result.parse(await send("DOM.requestChildNodes", commands["DOM.requestChildNodes"].params.parse(params ?? {}))), "DOM.requestChildNodes", "command"),
-      requestNode: withCdpName(async (params?: cdp.types.ts.DOM.RequestNodeParams) => commands["DOM.requestNode"].result.parse(await send("DOM.requestNode", commands["DOM.requestNode"].params.parse(params ?? {}))), "DOM.requestNode", "command"),
-      resolveNode: withCdpName(async (params?: cdp.types.ts.DOM.ResolveNodeParams) => commands["DOM.resolveNode"].result.parse(await send("DOM.resolveNode", commands["DOM.resolveNode"].params.parse(params ?? {}))), "DOM.resolveNode", "command"),
-      setAttributeValue: withCdpName(async (params?: cdp.types.ts.DOM.SetAttributeValueParams) => commands["DOM.setAttributeValue"].result.parse(await send("DOM.setAttributeValue", commands["DOM.setAttributeValue"].params.parse(params ?? {}))), "DOM.setAttributeValue", "command"),
-      setAttributesAsText: withCdpName(async (params?: cdp.types.ts.DOM.SetAttributesAsTextParams) => commands["DOM.setAttributesAsText"].result.parse(await send("DOM.setAttributesAsText", commands["DOM.setAttributesAsText"].params.parse(params ?? {}))), "DOM.setAttributesAsText", "command"),
-      setFileInputFiles: withCdpName(async (params?: cdp.types.ts.DOM.SetFileInputFilesParams) => commands["DOM.setFileInputFiles"].result.parse(await send("DOM.setFileInputFiles", commands["DOM.setFileInputFiles"].params.parse(params ?? {}))), "DOM.setFileInputFiles", "command"),
-      setNodeStackTracesEnabled: withCdpName(async (params?: cdp.types.ts.DOM.SetNodeStackTracesEnabledParams) => commands["DOM.setNodeStackTracesEnabled"].result.parse(await send("DOM.setNodeStackTracesEnabled", commands["DOM.setNodeStackTracesEnabled"].params.parse(params ?? {}))), "DOM.setNodeStackTracesEnabled", "command"),
-      getNodeStackTraces: withCdpName(async (params?: cdp.types.ts.DOM.GetNodeStackTracesParams) => commands["DOM.getNodeStackTraces"].result.parse(await send("DOM.getNodeStackTraces", commands["DOM.getNodeStackTraces"].params.parse(params ?? {}))), "DOM.getNodeStackTraces", "command"),
-      getFileInfo: withCdpName(async (params?: cdp.types.ts.DOM.GetFileInfoParams) => commands["DOM.getFileInfo"].result.parse(await send("DOM.getFileInfo", commands["DOM.getFileInfo"].params.parse(params ?? {}))), "DOM.getFileInfo", "command"),
-      getDetachedDomNodes: withCdpName(async (params?: cdp.types.ts.DOM.GetDetachedDomNodesParams) => commands["DOM.getDetachedDomNodes"].result.parse(await send("DOM.getDetachedDomNodes", commands["DOM.getDetachedDomNodes"].params.parse(params ?? {}))), "DOM.getDetachedDomNodes", "command"),
-      setInspectedNode: withCdpName(async (params?: cdp.types.ts.DOM.SetInspectedNodeParams) => commands["DOM.setInspectedNode"].result.parse(await send("DOM.setInspectedNode", commands["DOM.setInspectedNode"].params.parse(params ?? {}))), "DOM.setInspectedNode", "command"),
-      setNodeName: withCdpName(async (params?: cdp.types.ts.DOM.SetNodeNameParams) => commands["DOM.setNodeName"].result.parse(await send("DOM.setNodeName", commands["DOM.setNodeName"].params.parse(params ?? {}))), "DOM.setNodeName", "command"),
-      setNodeValue: withCdpName(async (params?: cdp.types.ts.DOM.SetNodeValueParams) => commands["DOM.setNodeValue"].result.parse(await send("DOM.setNodeValue", commands["DOM.setNodeValue"].params.parse(params ?? {}))), "DOM.setNodeValue", "command"),
-      setOuterHTML: withCdpName(async (params?: cdp.types.ts.DOM.SetOuterHTMLParams) => commands["DOM.setOuterHTML"].result.parse(await send("DOM.setOuterHTML", commands["DOM.setOuterHTML"].params.parse(params ?? {}))), "DOM.setOuterHTML", "command"),
-      undo: withCdpName(async (params?: cdp.types.ts.DOM.UndoParams) => commands["DOM.undo"].result.parse(await send("DOM.undo", commands["DOM.undo"].params.parse(params ?? {}))), "DOM.undo", "command"),
-      getFrameOwner: withCdpName(async (params?: cdp.types.ts.DOM.GetFrameOwnerParams) => commands["DOM.getFrameOwner"].result.parse(await send("DOM.getFrameOwner", commands["DOM.getFrameOwner"].params.parse(params ?? {}))), "DOM.getFrameOwner", "command"),
-      getContainerForNode: withCdpName(async (params?: cdp.types.ts.DOM.GetContainerForNodeParams) => commands["DOM.getContainerForNode"].result.parse(await send("DOM.getContainerForNode", commands["DOM.getContainerForNode"].params.parse(params ?? {}))), "DOM.getContainerForNode", "command"),
-      getQueryingDescendantsForContainer: withCdpName(async (params?: cdp.types.ts.DOM.GetQueryingDescendantsForContainerParams) => commands["DOM.getQueryingDescendantsForContainer"].result.parse(await send("DOM.getQueryingDescendantsForContainer", commands["DOM.getQueryingDescendantsForContainer"].params.parse(params ?? {}))), "DOM.getQueryingDescendantsForContainer", "command"),
-      getAnchorElement: withCdpName(async (params?: cdp.types.ts.DOM.GetAnchorElementParams) => commands["DOM.getAnchorElement"].result.parse(await send("DOM.getAnchorElement", commands["DOM.getAnchorElement"].params.parse(params ?? {}))), "DOM.getAnchorElement", "command"),
-      forceShowPopover: withCdpName(async (params?: cdp.types.ts.DOM.ForceShowPopoverParams) => commands["DOM.forceShowPopover"].result.parse(await send("DOM.forceShowPopover", commands["DOM.forceShowPopover"].params.parse(params ?? {}))), "DOM.forceShowPopover", "command"),
+      collectClassNamesFromSubtree: withCdpName(
+        async (params?: cdp.types.ts.DOM.CollectClassNamesFromSubtreeParams) =>
+          commands["DOM.collectClassNamesFromSubtree"].result.parse(
+            await send(
+              "DOM.collectClassNamesFromSubtree",
+              commands["DOM.collectClassNamesFromSubtree"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.collectClassNamesFromSubtree",
+        "command",
+      ),
+      copyTo: withCdpName(
+        async (params?: cdp.types.ts.DOM.CopyToParams) =>
+          commands["DOM.copyTo"].result.parse(
+            await send("DOM.copyTo", commands["DOM.copyTo"].params.parse(params ?? {})),
+          ),
+        "DOM.copyTo",
+        "command",
+      ),
+      describeNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.DescribeNodeParams) =>
+          commands["DOM.describeNode"].result.parse(
+            await send("DOM.describeNode", commands["DOM.describeNode"].params.parse(params ?? {})),
+          ),
+        "DOM.describeNode",
+        "command",
+      ),
+      scrollIntoViewIfNeeded: withCdpName(
+        async (params?: cdp.types.ts.DOM.ScrollIntoViewIfNeededParams) =>
+          commands["DOM.scrollIntoViewIfNeeded"].result.parse(
+            await send("DOM.scrollIntoViewIfNeeded", commands["DOM.scrollIntoViewIfNeeded"].params.parse(params ?? {})),
+          ),
+        "DOM.scrollIntoViewIfNeeded",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.DOM.DisableParams) =>
+          commands["DOM.disable"].result.parse(
+            await send("DOM.disable", commands["DOM.disable"].params.parse(params ?? {})),
+          ),
+        "DOM.disable",
+        "command",
+      ),
+      discardSearchResults: withCdpName(
+        async (params?: cdp.types.ts.DOM.DiscardSearchResultsParams) =>
+          commands["DOM.discardSearchResults"].result.parse(
+            await send("DOM.discardSearchResults", commands["DOM.discardSearchResults"].params.parse(params ?? {})),
+          ),
+        "DOM.discardSearchResults",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.DOM.EnableParams) =>
+          commands["DOM.enable"].result.parse(
+            await send("DOM.enable", commands["DOM.enable"].params.parse(params ?? {})),
+          ),
+        "DOM.enable",
+        "command",
+      ),
+      focus: withCdpName(
+        async (params?: cdp.types.ts.DOM.FocusParams) =>
+          commands["DOM.focus"].result.parse(await send("DOM.focus", commands["DOM.focus"].params.parse(params ?? {}))),
+        "DOM.focus",
+        "command",
+      ),
+      getAttributes: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetAttributesParams) =>
+          commands["DOM.getAttributes"].result.parse(
+            await send("DOM.getAttributes", commands["DOM.getAttributes"].params.parse(params ?? {})),
+          ),
+        "DOM.getAttributes",
+        "command",
+      ),
+      getBoxModel: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetBoxModelParams) =>
+          commands["DOM.getBoxModel"].result.parse(
+            await send("DOM.getBoxModel", commands["DOM.getBoxModel"].params.parse(params ?? {})),
+          ),
+        "DOM.getBoxModel",
+        "command",
+      ),
+      getContentQuads: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetContentQuadsParams) =>
+          commands["DOM.getContentQuads"].result.parse(
+            await send("DOM.getContentQuads", commands["DOM.getContentQuads"].params.parse(params ?? {})),
+          ),
+        "DOM.getContentQuads",
+        "command",
+      ),
+      getDocument: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetDocumentParams) =>
+          commands["DOM.getDocument"].result.parse(
+            await send("DOM.getDocument", commands["DOM.getDocument"].params.parse(params ?? {})),
+          ),
+        "DOM.getDocument",
+        "command",
+      ),
+      getFlattenedDocument: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetFlattenedDocumentParams) =>
+          commands["DOM.getFlattenedDocument"].result.parse(
+            await send("DOM.getFlattenedDocument", commands["DOM.getFlattenedDocument"].params.parse(params ?? {})),
+          ),
+        "DOM.getFlattenedDocument",
+        "command",
+      ),
+      getNodesForSubtreeByStyle: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetNodesForSubtreeByStyleParams) =>
+          commands["DOM.getNodesForSubtreeByStyle"].result.parse(
+            await send(
+              "DOM.getNodesForSubtreeByStyle",
+              commands["DOM.getNodesForSubtreeByStyle"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.getNodesForSubtreeByStyle",
+        "command",
+      ),
+      getNodeForLocation: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetNodeForLocationParams) =>
+          commands["DOM.getNodeForLocation"].result.parse(
+            await send("DOM.getNodeForLocation", commands["DOM.getNodeForLocation"].params.parse(params ?? {})),
+          ),
+        "DOM.getNodeForLocation",
+        "command",
+      ),
+      getOuterHTML: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetOuterHTMLParams) =>
+          commands["DOM.getOuterHTML"].result.parse(
+            await send("DOM.getOuterHTML", commands["DOM.getOuterHTML"].params.parse(params ?? {})),
+          ),
+        "DOM.getOuterHTML",
+        "command",
+      ),
+      getRelayoutBoundary: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetRelayoutBoundaryParams) =>
+          commands["DOM.getRelayoutBoundary"].result.parse(
+            await send("DOM.getRelayoutBoundary", commands["DOM.getRelayoutBoundary"].params.parse(params ?? {})),
+          ),
+        "DOM.getRelayoutBoundary",
+        "command",
+      ),
+      getSearchResults: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetSearchResultsParams) =>
+          commands["DOM.getSearchResults"].result.parse(
+            await send("DOM.getSearchResults", commands["DOM.getSearchResults"].params.parse(params ?? {})),
+          ),
+        "DOM.getSearchResults",
+        "command",
+      ),
+      hideHighlight: withCdpName(
+        async (params?: cdp.types.ts.DOM.HideHighlightParams) =>
+          commands["DOM.hideHighlight"].result.parse(
+            await send("DOM.hideHighlight", commands["DOM.hideHighlight"].params.parse(params ?? {})),
+          ),
+        "DOM.hideHighlight",
+        "command",
+      ),
+      highlightNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.HighlightNodeParams) =>
+          commands["DOM.highlightNode"].result.parse(
+            await send("DOM.highlightNode", commands["DOM.highlightNode"].params.parse(params ?? {})),
+          ),
+        "DOM.highlightNode",
+        "command",
+      ),
+      highlightRect: withCdpName(
+        async (params?: cdp.types.ts.DOM.HighlightRectParams) =>
+          commands["DOM.highlightRect"].result.parse(
+            await send("DOM.highlightRect", commands["DOM.highlightRect"].params.parse(params ?? {})),
+          ),
+        "DOM.highlightRect",
+        "command",
+      ),
+      markUndoableState: withCdpName(
+        async (params?: cdp.types.ts.DOM.MarkUndoableStateParams) =>
+          commands["DOM.markUndoableState"].result.parse(
+            await send("DOM.markUndoableState", commands["DOM.markUndoableState"].params.parse(params ?? {})),
+          ),
+        "DOM.markUndoableState",
+        "command",
+      ),
+      moveTo: withCdpName(
+        async (params?: cdp.types.ts.DOM.MoveToParams) =>
+          commands["DOM.moveTo"].result.parse(
+            await send("DOM.moveTo", commands["DOM.moveTo"].params.parse(params ?? {})),
+          ),
+        "DOM.moveTo",
+        "command",
+      ),
+      performSearch: withCdpName(
+        async (params?: cdp.types.ts.DOM.PerformSearchParams) =>
+          commands["DOM.performSearch"].result.parse(
+            await send("DOM.performSearch", commands["DOM.performSearch"].params.parse(params ?? {})),
+          ),
+        "DOM.performSearch",
+        "command",
+      ),
+      pushNodeByPathToFrontend: withCdpName(
+        async (params?: cdp.types.ts.DOM.PushNodeByPathToFrontendParams) =>
+          commands["DOM.pushNodeByPathToFrontend"].result.parse(
+            await send(
+              "DOM.pushNodeByPathToFrontend",
+              commands["DOM.pushNodeByPathToFrontend"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.pushNodeByPathToFrontend",
+        "command",
+      ),
+      pushNodesByBackendIdsToFrontend: withCdpName(
+        async (params?: cdp.types.ts.DOM.PushNodesByBackendIdsToFrontendParams) =>
+          commands["DOM.pushNodesByBackendIdsToFrontend"].result.parse(
+            await send(
+              "DOM.pushNodesByBackendIdsToFrontend",
+              commands["DOM.pushNodesByBackendIdsToFrontend"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.pushNodesByBackendIdsToFrontend",
+        "command",
+      ),
+      querySelector: withCdpName(
+        async (params?: cdp.types.ts.DOM.QuerySelectorParams) =>
+          commands["DOM.querySelector"].result.parse(
+            await send("DOM.querySelector", commands["DOM.querySelector"].params.parse(params ?? {})),
+          ),
+        "DOM.querySelector",
+        "command",
+      ),
+      querySelectorAll: withCdpName(
+        async (params?: cdp.types.ts.DOM.QuerySelectorAllParams) =>
+          commands["DOM.querySelectorAll"].result.parse(
+            await send("DOM.querySelectorAll", commands["DOM.querySelectorAll"].params.parse(params ?? {})),
+          ),
+        "DOM.querySelectorAll",
+        "command",
+      ),
+      getTopLayerElements: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetTopLayerElementsParams) =>
+          commands["DOM.getTopLayerElements"].result.parse(
+            await send("DOM.getTopLayerElements", commands["DOM.getTopLayerElements"].params.parse(params ?? {})),
+          ),
+        "DOM.getTopLayerElements",
+        "command",
+      ),
+      getElementByRelation: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetElementByRelationParams) =>
+          commands["DOM.getElementByRelation"].result.parse(
+            await send("DOM.getElementByRelation", commands["DOM.getElementByRelation"].params.parse(params ?? {})),
+          ),
+        "DOM.getElementByRelation",
+        "command",
+      ),
+      redo: withCdpName(
+        async (params?: cdp.types.ts.DOM.RedoParams) =>
+          commands["DOM.redo"].result.parse(await send("DOM.redo", commands["DOM.redo"].params.parse(params ?? {}))),
+        "DOM.redo",
+        "command",
+      ),
+      removeAttribute: withCdpName(
+        async (params?: cdp.types.ts.DOM.RemoveAttributeParams) =>
+          commands["DOM.removeAttribute"].result.parse(
+            await send("DOM.removeAttribute", commands["DOM.removeAttribute"].params.parse(params ?? {})),
+          ),
+        "DOM.removeAttribute",
+        "command",
+      ),
+      removeNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.RemoveNodeParams) =>
+          commands["DOM.removeNode"].result.parse(
+            await send("DOM.removeNode", commands["DOM.removeNode"].params.parse(params ?? {})),
+          ),
+        "DOM.removeNode",
+        "command",
+      ),
+      requestChildNodes: withCdpName(
+        async (params?: cdp.types.ts.DOM.RequestChildNodesParams) =>
+          commands["DOM.requestChildNodes"].result.parse(
+            await send("DOM.requestChildNodes", commands["DOM.requestChildNodes"].params.parse(params ?? {})),
+          ),
+        "DOM.requestChildNodes",
+        "command",
+      ),
+      requestNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.RequestNodeParams) =>
+          commands["DOM.requestNode"].result.parse(
+            await send("DOM.requestNode", commands["DOM.requestNode"].params.parse(params ?? {})),
+          ),
+        "DOM.requestNode",
+        "command",
+      ),
+      resolveNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.ResolveNodeParams) =>
+          commands["DOM.resolveNode"].result.parse(
+            await send("DOM.resolveNode", commands["DOM.resolveNode"].params.parse(params ?? {})),
+          ),
+        "DOM.resolveNode",
+        "command",
+      ),
+      setAttributeValue: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetAttributeValueParams) =>
+          commands["DOM.setAttributeValue"].result.parse(
+            await send("DOM.setAttributeValue", commands["DOM.setAttributeValue"].params.parse(params ?? {})),
+          ),
+        "DOM.setAttributeValue",
+        "command",
+      ),
+      setAttributesAsText: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetAttributesAsTextParams) =>
+          commands["DOM.setAttributesAsText"].result.parse(
+            await send("DOM.setAttributesAsText", commands["DOM.setAttributesAsText"].params.parse(params ?? {})),
+          ),
+        "DOM.setAttributesAsText",
+        "command",
+      ),
+      setFileInputFiles: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetFileInputFilesParams) =>
+          commands["DOM.setFileInputFiles"].result.parse(
+            await send("DOM.setFileInputFiles", commands["DOM.setFileInputFiles"].params.parse(params ?? {})),
+          ),
+        "DOM.setFileInputFiles",
+        "command",
+      ),
+      setNodeStackTracesEnabled: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetNodeStackTracesEnabledParams) =>
+          commands["DOM.setNodeStackTracesEnabled"].result.parse(
+            await send(
+              "DOM.setNodeStackTracesEnabled",
+              commands["DOM.setNodeStackTracesEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.setNodeStackTracesEnabled",
+        "command",
+      ),
+      getNodeStackTraces: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetNodeStackTracesParams) =>
+          commands["DOM.getNodeStackTraces"].result.parse(
+            await send("DOM.getNodeStackTraces", commands["DOM.getNodeStackTraces"].params.parse(params ?? {})),
+          ),
+        "DOM.getNodeStackTraces",
+        "command",
+      ),
+      getFileInfo: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetFileInfoParams) =>
+          commands["DOM.getFileInfo"].result.parse(
+            await send("DOM.getFileInfo", commands["DOM.getFileInfo"].params.parse(params ?? {})),
+          ),
+        "DOM.getFileInfo",
+        "command",
+      ),
+      getDetachedDomNodes: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetDetachedDomNodesParams) =>
+          commands["DOM.getDetachedDomNodes"].result.parse(
+            await send("DOM.getDetachedDomNodes", commands["DOM.getDetachedDomNodes"].params.parse(params ?? {})),
+          ),
+        "DOM.getDetachedDomNodes",
+        "command",
+      ),
+      setInspectedNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetInspectedNodeParams) =>
+          commands["DOM.setInspectedNode"].result.parse(
+            await send("DOM.setInspectedNode", commands["DOM.setInspectedNode"].params.parse(params ?? {})),
+          ),
+        "DOM.setInspectedNode",
+        "command",
+      ),
+      setNodeName: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetNodeNameParams) =>
+          commands["DOM.setNodeName"].result.parse(
+            await send("DOM.setNodeName", commands["DOM.setNodeName"].params.parse(params ?? {})),
+          ),
+        "DOM.setNodeName",
+        "command",
+      ),
+      setNodeValue: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetNodeValueParams) =>
+          commands["DOM.setNodeValue"].result.parse(
+            await send("DOM.setNodeValue", commands["DOM.setNodeValue"].params.parse(params ?? {})),
+          ),
+        "DOM.setNodeValue",
+        "command",
+      ),
+      setOuterHTML: withCdpName(
+        async (params?: cdp.types.ts.DOM.SetOuterHTMLParams) =>
+          commands["DOM.setOuterHTML"].result.parse(
+            await send("DOM.setOuterHTML", commands["DOM.setOuterHTML"].params.parse(params ?? {})),
+          ),
+        "DOM.setOuterHTML",
+        "command",
+      ),
+      undo: withCdpName(
+        async (params?: cdp.types.ts.DOM.UndoParams) =>
+          commands["DOM.undo"].result.parse(await send("DOM.undo", commands["DOM.undo"].params.parse(params ?? {}))),
+        "DOM.undo",
+        "command",
+      ),
+      getFrameOwner: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetFrameOwnerParams) =>
+          commands["DOM.getFrameOwner"].result.parse(
+            await send("DOM.getFrameOwner", commands["DOM.getFrameOwner"].params.parse(params ?? {})),
+          ),
+        "DOM.getFrameOwner",
+        "command",
+      ),
+      getContainerForNode: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetContainerForNodeParams) =>
+          commands["DOM.getContainerForNode"].result.parse(
+            await send("DOM.getContainerForNode", commands["DOM.getContainerForNode"].params.parse(params ?? {})),
+          ),
+        "DOM.getContainerForNode",
+        "command",
+      ),
+      getQueryingDescendantsForContainer: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetQueryingDescendantsForContainerParams) =>
+          commands["DOM.getQueryingDescendantsForContainer"].result.parse(
+            await send(
+              "DOM.getQueryingDescendantsForContainer",
+              commands["DOM.getQueryingDescendantsForContainer"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOM.getQueryingDescendantsForContainer",
+        "command",
+      ),
+      getAnchorElement: withCdpName(
+        async (params?: cdp.types.ts.DOM.GetAnchorElementParams) =>
+          commands["DOM.getAnchorElement"].result.parse(
+            await send("DOM.getAnchorElement", commands["DOM.getAnchorElement"].params.parse(params ?? {})),
+          ),
+        "DOM.getAnchorElement",
+        "command",
+      ),
+      forceShowPopover: withCdpName(
+        async (params?: cdp.types.ts.DOM.ForceShowPopoverParams) =>
+          commands["DOM.forceShowPopover"].result.parse(
+            await send("DOM.forceShowPopover", commands["DOM.forceShowPopover"].params.parse(params ?? {})),
+          ),
+        "DOM.forceShowPopover",
+        "command",
+      ),
       attributeModified: withCdpName(events["DOM.attributeModified"], "DOM.attributeModified", "event"),
-      adoptedStyleSheetsModified: withCdpName(events["DOM.adoptedStyleSheetsModified"], "DOM.adoptedStyleSheetsModified", "event"),
+      adoptedStyleSheetsModified: withCdpName(
+        events["DOM.adoptedStyleSheetsModified"],
+        "DOM.adoptedStyleSheetsModified",
+        "event",
+      ),
       attributeRemoved: withCdpName(events["DOM.attributeRemoved"], "DOM.attributeRemoved", "event"),
       characterDataModified: withCdpName(events["DOM.characterDataModified"], "DOM.characterDataModified", "event"),
       childNodeCountUpdated: withCdpName(events["DOM.childNodeCountUpdated"], "DOM.childNodeCountUpdated", "event"),
       childNodeInserted: withCdpName(events["DOM.childNodeInserted"], "DOM.childNodeInserted", "event"),
       childNodeRemoved: withCdpName(events["DOM.childNodeRemoved"], "DOM.childNodeRemoved", "event"),
-      distributedNodesUpdated: withCdpName(events["DOM.distributedNodesUpdated"], "DOM.distributedNodesUpdated", "event"),
+      distributedNodesUpdated: withCdpName(
+        events["DOM.distributedNodesUpdated"],
+        "DOM.distributedNodesUpdated",
+        "event",
+      ),
       documentUpdated: withCdpName(events["DOM.documentUpdated"], "DOM.documentUpdated", "event"),
       inlineStyleInvalidated: withCdpName(events["DOM.inlineStyleInvalidated"], "DOM.inlineStyleInvalidated", "event"),
       pseudoElementAdded: withCdpName(events["DOM.pseudoElementAdded"], "DOM.pseudoElementAdded", "event"),
-      topLayerElementsUpdated: withCdpName(events["DOM.topLayerElementsUpdated"], "DOM.topLayerElementsUpdated", "event"),
+      topLayerElementsUpdated: withCdpName(
+        events["DOM.topLayerElementsUpdated"],
+        "DOM.topLayerElementsUpdated",
+        "event",
+      ),
       scrollableFlagUpdated: withCdpName(events["DOM.scrollableFlagUpdated"], "DOM.scrollableFlagUpdated", "event"),
       adRelatedStateUpdated: withCdpName(events["DOM.adRelatedStateUpdated"], "DOM.adRelatedStateUpdated", "event"),
-      affectedByStartingStylesFlagUpdated: withCdpName(events["DOM.affectedByStartingStylesFlagUpdated"], "DOM.affectedByStartingStylesFlagUpdated", "event"),
+      affectedByStartingStylesFlagUpdated: withCdpName(
+        events["DOM.affectedByStartingStylesFlagUpdated"],
+        "DOM.affectedByStartingStylesFlagUpdated",
+        "event",
+      ),
       pseudoElementRemoved: withCdpName(events["DOM.pseudoElementRemoved"], "DOM.pseudoElementRemoved", "event"),
       setChildNodes: withCdpName(events["DOM.setChildNodes"], "DOM.setChildNodes", "event"),
       shadowRootPopped: withCdpName(events["DOM.shadowRootPopped"], "DOM.shadowRootPopped", "event"),
       shadowRootPushed: withCdpName(events["DOM.shadowRootPushed"], "DOM.shadowRootPushed", "event"),
     },
     DOMDebugger: {
-      getEventListeners: withCdpName(async (params?: cdp.types.ts.DOMDebugger.GetEventListenersParams) => commands["DOMDebugger.getEventListeners"].result.parse(await send("DOMDebugger.getEventListeners", commands["DOMDebugger.getEventListeners"].params.parse(params ?? {}))), "DOMDebugger.getEventListeners", "command"),
-      removeDOMBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.RemoveDOMBreakpointParams) => commands["DOMDebugger.removeDOMBreakpoint"].result.parse(await send("DOMDebugger.removeDOMBreakpoint", commands["DOMDebugger.removeDOMBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.removeDOMBreakpoint", "command"),
-      removeEventListenerBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.RemoveEventListenerBreakpointParams) => commands["DOMDebugger.removeEventListenerBreakpoint"].result.parse(await send("DOMDebugger.removeEventListenerBreakpoint", commands["DOMDebugger.removeEventListenerBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.removeEventListenerBreakpoint", "command"),
-      removeInstrumentationBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.RemoveInstrumentationBreakpointParams) => commands["DOMDebugger.removeInstrumentationBreakpoint"].result.parse(await send("DOMDebugger.removeInstrumentationBreakpoint", commands["DOMDebugger.removeInstrumentationBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.removeInstrumentationBreakpoint", "command"),
-      removeXHRBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.RemoveXHRBreakpointParams) => commands["DOMDebugger.removeXHRBreakpoint"].result.parse(await send("DOMDebugger.removeXHRBreakpoint", commands["DOMDebugger.removeXHRBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.removeXHRBreakpoint", "command"),
-      setBreakOnCSPViolation: withCdpName(async (params?: cdp.types.ts.DOMDebugger.SetBreakOnCSPViolationParams) => commands["DOMDebugger.setBreakOnCSPViolation"].result.parse(await send("DOMDebugger.setBreakOnCSPViolation", commands["DOMDebugger.setBreakOnCSPViolation"].params.parse(params ?? {}))), "DOMDebugger.setBreakOnCSPViolation", "command"),
-      setDOMBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.SetDOMBreakpointParams) => commands["DOMDebugger.setDOMBreakpoint"].result.parse(await send("DOMDebugger.setDOMBreakpoint", commands["DOMDebugger.setDOMBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.setDOMBreakpoint", "command"),
-      setEventListenerBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.SetEventListenerBreakpointParams) => commands["DOMDebugger.setEventListenerBreakpoint"].result.parse(await send("DOMDebugger.setEventListenerBreakpoint", commands["DOMDebugger.setEventListenerBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.setEventListenerBreakpoint", "command"),
-      setInstrumentationBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.SetInstrumentationBreakpointParams) => commands["DOMDebugger.setInstrumentationBreakpoint"].result.parse(await send("DOMDebugger.setInstrumentationBreakpoint", commands["DOMDebugger.setInstrumentationBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.setInstrumentationBreakpoint", "command"),
-      setXHRBreakpoint: withCdpName(async (params?: cdp.types.ts.DOMDebugger.SetXHRBreakpointParams) => commands["DOMDebugger.setXHRBreakpoint"].result.parse(await send("DOMDebugger.setXHRBreakpoint", commands["DOMDebugger.setXHRBreakpoint"].params.parse(params ?? {}))), "DOMDebugger.setXHRBreakpoint", "command"),
+      getEventListeners: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.GetEventListenersParams) =>
+          commands["DOMDebugger.getEventListeners"].result.parse(
+            await send(
+              "DOMDebugger.getEventListeners",
+              commands["DOMDebugger.getEventListeners"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.getEventListeners",
+        "command",
+      ),
+      removeDOMBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.RemoveDOMBreakpointParams) =>
+          commands["DOMDebugger.removeDOMBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.removeDOMBreakpoint",
+              commands["DOMDebugger.removeDOMBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.removeDOMBreakpoint",
+        "command",
+      ),
+      removeEventListenerBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.RemoveEventListenerBreakpointParams) =>
+          commands["DOMDebugger.removeEventListenerBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.removeEventListenerBreakpoint",
+              commands["DOMDebugger.removeEventListenerBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.removeEventListenerBreakpoint",
+        "command",
+      ),
+      removeInstrumentationBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.RemoveInstrumentationBreakpointParams) =>
+          commands["DOMDebugger.removeInstrumentationBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.removeInstrumentationBreakpoint",
+              commands["DOMDebugger.removeInstrumentationBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.removeInstrumentationBreakpoint",
+        "command",
+      ),
+      removeXHRBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.RemoveXHRBreakpointParams) =>
+          commands["DOMDebugger.removeXHRBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.removeXHRBreakpoint",
+              commands["DOMDebugger.removeXHRBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.removeXHRBreakpoint",
+        "command",
+      ),
+      setBreakOnCSPViolation: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.SetBreakOnCSPViolationParams) =>
+          commands["DOMDebugger.setBreakOnCSPViolation"].result.parse(
+            await send(
+              "DOMDebugger.setBreakOnCSPViolation",
+              commands["DOMDebugger.setBreakOnCSPViolation"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.setBreakOnCSPViolation",
+        "command",
+      ),
+      setDOMBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.SetDOMBreakpointParams) =>
+          commands["DOMDebugger.setDOMBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.setDOMBreakpoint",
+              commands["DOMDebugger.setDOMBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.setDOMBreakpoint",
+        "command",
+      ),
+      setEventListenerBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.SetEventListenerBreakpointParams) =>
+          commands["DOMDebugger.setEventListenerBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.setEventListenerBreakpoint",
+              commands["DOMDebugger.setEventListenerBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.setEventListenerBreakpoint",
+        "command",
+      ),
+      setInstrumentationBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.SetInstrumentationBreakpointParams) =>
+          commands["DOMDebugger.setInstrumentationBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.setInstrumentationBreakpoint",
+              commands["DOMDebugger.setInstrumentationBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.setInstrumentationBreakpoint",
+        "command",
+      ),
+      setXHRBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.DOMDebugger.SetXHRBreakpointParams) =>
+          commands["DOMDebugger.setXHRBreakpoint"].result.parse(
+            await send(
+              "DOMDebugger.setXHRBreakpoint",
+              commands["DOMDebugger.setXHRBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMDebugger.setXHRBreakpoint",
+        "command",
+      ),
     },
     DOMSnapshot: {
-      disable: withCdpName(async (params?: cdp.types.ts.DOMSnapshot.DisableParams) => commands["DOMSnapshot.disable"].result.parse(await send("DOMSnapshot.disable", commands["DOMSnapshot.disable"].params.parse(params ?? {}))), "DOMSnapshot.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.DOMSnapshot.EnableParams) => commands["DOMSnapshot.enable"].result.parse(await send("DOMSnapshot.enable", commands["DOMSnapshot.enable"].params.parse(params ?? {}))), "DOMSnapshot.enable", "command"),
-      getSnapshot: withCdpName(async (params?: cdp.types.ts.DOMSnapshot.GetSnapshotParams) => commands["DOMSnapshot.getSnapshot"].result.parse(await send("DOMSnapshot.getSnapshot", commands["DOMSnapshot.getSnapshot"].params.parse(params ?? {}))), "DOMSnapshot.getSnapshot", "command"),
-      captureSnapshot: withCdpName(async (params?: cdp.types.ts.DOMSnapshot.CaptureSnapshotParams) => commands["DOMSnapshot.captureSnapshot"].result.parse(await send("DOMSnapshot.captureSnapshot", commands["DOMSnapshot.captureSnapshot"].params.parse(params ?? {}))), "DOMSnapshot.captureSnapshot", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.DOMSnapshot.DisableParams) =>
+          commands["DOMSnapshot.disable"].result.parse(
+            await send("DOMSnapshot.disable", commands["DOMSnapshot.disable"].params.parse(params ?? {})),
+          ),
+        "DOMSnapshot.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.DOMSnapshot.EnableParams) =>
+          commands["DOMSnapshot.enable"].result.parse(
+            await send("DOMSnapshot.enable", commands["DOMSnapshot.enable"].params.parse(params ?? {})),
+          ),
+        "DOMSnapshot.enable",
+        "command",
+      ),
+      getSnapshot: withCdpName(
+        async (params?: cdp.types.ts.DOMSnapshot.GetSnapshotParams) =>
+          commands["DOMSnapshot.getSnapshot"].result.parse(
+            await send("DOMSnapshot.getSnapshot", commands["DOMSnapshot.getSnapshot"].params.parse(params ?? {})),
+          ),
+        "DOMSnapshot.getSnapshot",
+        "command",
+      ),
+      captureSnapshot: withCdpName(
+        async (params?: cdp.types.ts.DOMSnapshot.CaptureSnapshotParams) =>
+          commands["DOMSnapshot.captureSnapshot"].result.parse(
+            await send(
+              "DOMSnapshot.captureSnapshot",
+              commands["DOMSnapshot.captureSnapshot"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMSnapshot.captureSnapshot",
+        "command",
+      ),
     },
     DOMStorage: {
-      clear: withCdpName(async (params?: cdp.types.ts.DOMStorage.ClearParams) => commands["DOMStorage.clear"].result.parse(await send("DOMStorage.clear", commands["DOMStorage.clear"].params.parse(params ?? {}))), "DOMStorage.clear", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.DOMStorage.DisableParams) => commands["DOMStorage.disable"].result.parse(await send("DOMStorage.disable", commands["DOMStorage.disable"].params.parse(params ?? {}))), "DOMStorage.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.DOMStorage.EnableParams) => commands["DOMStorage.enable"].result.parse(await send("DOMStorage.enable", commands["DOMStorage.enable"].params.parse(params ?? {}))), "DOMStorage.enable", "command"),
-      getDOMStorageItems: withCdpName(async (params?: cdp.types.ts.DOMStorage.GetDOMStorageItemsParams) => commands["DOMStorage.getDOMStorageItems"].result.parse(await send("DOMStorage.getDOMStorageItems", commands["DOMStorage.getDOMStorageItems"].params.parse(params ?? {}))), "DOMStorage.getDOMStorageItems", "command"),
-      removeDOMStorageItem: withCdpName(async (params?: cdp.types.ts.DOMStorage.RemoveDOMStorageItemParams) => commands["DOMStorage.removeDOMStorageItem"].result.parse(await send("DOMStorage.removeDOMStorageItem", commands["DOMStorage.removeDOMStorageItem"].params.parse(params ?? {}))), "DOMStorage.removeDOMStorageItem", "command"),
-      setDOMStorageItem: withCdpName(async (params?: cdp.types.ts.DOMStorage.SetDOMStorageItemParams) => commands["DOMStorage.setDOMStorageItem"].result.parse(await send("DOMStorage.setDOMStorageItem", commands["DOMStorage.setDOMStorageItem"].params.parse(params ?? {}))), "DOMStorage.setDOMStorageItem", "command"),
-      domStorageItemAdded: withCdpName(events["DOMStorage.domStorageItemAdded"], "DOMStorage.domStorageItemAdded", "event"),
-      domStorageItemRemoved: withCdpName(events["DOMStorage.domStorageItemRemoved"], "DOMStorage.domStorageItemRemoved", "event"),
-      domStorageItemUpdated: withCdpName(events["DOMStorage.domStorageItemUpdated"], "DOMStorage.domStorageItemUpdated", "event"),
-      domStorageItemsCleared: withCdpName(events["DOMStorage.domStorageItemsCleared"], "DOMStorage.domStorageItemsCleared", "event"),
+      clear: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.ClearParams) =>
+          commands["DOMStorage.clear"].result.parse(
+            await send("DOMStorage.clear", commands["DOMStorage.clear"].params.parse(params ?? {})),
+          ),
+        "DOMStorage.clear",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.DisableParams) =>
+          commands["DOMStorage.disable"].result.parse(
+            await send("DOMStorage.disable", commands["DOMStorage.disable"].params.parse(params ?? {})),
+          ),
+        "DOMStorage.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.EnableParams) =>
+          commands["DOMStorage.enable"].result.parse(
+            await send("DOMStorage.enable", commands["DOMStorage.enable"].params.parse(params ?? {})),
+          ),
+        "DOMStorage.enable",
+        "command",
+      ),
+      getDOMStorageItems: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.GetDOMStorageItemsParams) =>
+          commands["DOMStorage.getDOMStorageItems"].result.parse(
+            await send(
+              "DOMStorage.getDOMStorageItems",
+              commands["DOMStorage.getDOMStorageItems"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMStorage.getDOMStorageItems",
+        "command",
+      ),
+      removeDOMStorageItem: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.RemoveDOMStorageItemParams) =>
+          commands["DOMStorage.removeDOMStorageItem"].result.parse(
+            await send(
+              "DOMStorage.removeDOMStorageItem",
+              commands["DOMStorage.removeDOMStorageItem"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMStorage.removeDOMStorageItem",
+        "command",
+      ),
+      setDOMStorageItem: withCdpName(
+        async (params?: cdp.types.ts.DOMStorage.SetDOMStorageItemParams) =>
+          commands["DOMStorage.setDOMStorageItem"].result.parse(
+            await send(
+              "DOMStorage.setDOMStorageItem",
+              commands["DOMStorage.setDOMStorageItem"].params.parse(params ?? {}),
+            ),
+          ),
+        "DOMStorage.setDOMStorageItem",
+        "command",
+      ),
+      domStorageItemAdded: withCdpName(
+        events["DOMStorage.domStorageItemAdded"],
+        "DOMStorage.domStorageItemAdded",
+        "event",
+      ),
+      domStorageItemRemoved: withCdpName(
+        events["DOMStorage.domStorageItemRemoved"],
+        "DOMStorage.domStorageItemRemoved",
+        "event",
+      ),
+      domStorageItemUpdated: withCdpName(
+        events["DOMStorage.domStorageItemUpdated"],
+        "DOMStorage.domStorageItemUpdated",
+        "event",
+      ),
+      domStorageItemsCleared: withCdpName(
+        events["DOMStorage.domStorageItemsCleared"],
+        "DOMStorage.domStorageItemsCleared",
+        "event",
+      ),
     },
     Emulation: {
-      canEmulate: withCdpName(async (params?: cdp.types.ts.Emulation.CanEmulateParams) => commands["Emulation.canEmulate"].result.parse(await send("Emulation.canEmulate", commands["Emulation.canEmulate"].params.parse(params ?? {}))), "Emulation.canEmulate", "command"),
-      clearDeviceMetricsOverride: withCdpName(async (params?: cdp.types.ts.Emulation.ClearDeviceMetricsOverrideParams) => commands["Emulation.clearDeviceMetricsOverride"].result.parse(await send("Emulation.clearDeviceMetricsOverride", commands["Emulation.clearDeviceMetricsOverride"].params.parse(params ?? {}))), "Emulation.clearDeviceMetricsOverride", "command"),
-      clearGeolocationOverride: withCdpName(async (params?: cdp.types.ts.Emulation.ClearGeolocationOverrideParams) => commands["Emulation.clearGeolocationOverride"].result.parse(await send("Emulation.clearGeolocationOverride", commands["Emulation.clearGeolocationOverride"].params.parse(params ?? {}))), "Emulation.clearGeolocationOverride", "command"),
-      resetPageScaleFactor: withCdpName(async (params?: cdp.types.ts.Emulation.ResetPageScaleFactorParams) => commands["Emulation.resetPageScaleFactor"].result.parse(await send("Emulation.resetPageScaleFactor", commands["Emulation.resetPageScaleFactor"].params.parse(params ?? {}))), "Emulation.resetPageScaleFactor", "command"),
-      setFocusEmulationEnabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetFocusEmulationEnabledParams) => commands["Emulation.setFocusEmulationEnabled"].result.parse(await send("Emulation.setFocusEmulationEnabled", commands["Emulation.setFocusEmulationEnabled"].params.parse(params ?? {}))), "Emulation.setFocusEmulationEnabled", "command"),
-      setAutoDarkModeOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetAutoDarkModeOverrideParams) => commands["Emulation.setAutoDarkModeOverride"].result.parse(await send("Emulation.setAutoDarkModeOverride", commands["Emulation.setAutoDarkModeOverride"].params.parse(params ?? {}))), "Emulation.setAutoDarkModeOverride", "command"),
-      setCPUThrottlingRate: withCdpName(async (params?: cdp.types.ts.Emulation.SetCPUThrottlingRateParams) => commands["Emulation.setCPUThrottlingRate"].result.parse(await send("Emulation.setCPUThrottlingRate", commands["Emulation.setCPUThrottlingRate"].params.parse(params ?? {}))), "Emulation.setCPUThrottlingRate", "command"),
-      setDefaultBackgroundColorOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetDefaultBackgroundColorOverrideParams) => commands["Emulation.setDefaultBackgroundColorOverride"].result.parse(await send("Emulation.setDefaultBackgroundColorOverride", commands["Emulation.setDefaultBackgroundColorOverride"].params.parse(params ?? {}))), "Emulation.setDefaultBackgroundColorOverride", "command"),
-      setSafeAreaInsetsOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetSafeAreaInsetsOverrideParams) => commands["Emulation.setSafeAreaInsetsOverride"].result.parse(await send("Emulation.setSafeAreaInsetsOverride", commands["Emulation.setSafeAreaInsetsOverride"].params.parse(params ?? {}))), "Emulation.setSafeAreaInsetsOverride", "command"),
-      setDeviceMetricsOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetDeviceMetricsOverrideParams) => commands["Emulation.setDeviceMetricsOverride"].result.parse(await send("Emulation.setDeviceMetricsOverride", commands["Emulation.setDeviceMetricsOverride"].params.parse(params ?? {}))), "Emulation.setDeviceMetricsOverride", "command"),
-      setDevicePostureOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetDevicePostureOverrideParams) => commands["Emulation.setDevicePostureOverride"].result.parse(await send("Emulation.setDevicePostureOverride", commands["Emulation.setDevicePostureOverride"].params.parse(params ?? {}))), "Emulation.setDevicePostureOverride", "command"),
-      clearDevicePostureOverride: withCdpName(async (params?: cdp.types.ts.Emulation.ClearDevicePostureOverrideParams) => commands["Emulation.clearDevicePostureOverride"].result.parse(await send("Emulation.clearDevicePostureOverride", commands["Emulation.clearDevicePostureOverride"].params.parse(params ?? {}))), "Emulation.clearDevicePostureOverride", "command"),
-      setDisplayFeaturesOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetDisplayFeaturesOverrideParams) => commands["Emulation.setDisplayFeaturesOverride"].result.parse(await send("Emulation.setDisplayFeaturesOverride", commands["Emulation.setDisplayFeaturesOverride"].params.parse(params ?? {}))), "Emulation.setDisplayFeaturesOverride", "command"),
-      clearDisplayFeaturesOverride: withCdpName(async (params?: cdp.types.ts.Emulation.ClearDisplayFeaturesOverrideParams) => commands["Emulation.clearDisplayFeaturesOverride"].result.parse(await send("Emulation.clearDisplayFeaturesOverride", commands["Emulation.clearDisplayFeaturesOverride"].params.parse(params ?? {}))), "Emulation.clearDisplayFeaturesOverride", "command"),
-      setScrollbarsHidden: withCdpName(async (params?: cdp.types.ts.Emulation.SetScrollbarsHiddenParams) => commands["Emulation.setScrollbarsHidden"].result.parse(await send("Emulation.setScrollbarsHidden", commands["Emulation.setScrollbarsHidden"].params.parse(params ?? {}))), "Emulation.setScrollbarsHidden", "command"),
-      setDocumentCookieDisabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetDocumentCookieDisabledParams) => commands["Emulation.setDocumentCookieDisabled"].result.parse(await send("Emulation.setDocumentCookieDisabled", commands["Emulation.setDocumentCookieDisabled"].params.parse(params ?? {}))), "Emulation.setDocumentCookieDisabled", "command"),
-      setEmitTouchEventsForMouse: withCdpName(async (params?: cdp.types.ts.Emulation.SetEmitTouchEventsForMouseParams) => commands["Emulation.setEmitTouchEventsForMouse"].result.parse(await send("Emulation.setEmitTouchEventsForMouse", commands["Emulation.setEmitTouchEventsForMouse"].params.parse(params ?? {}))), "Emulation.setEmitTouchEventsForMouse", "command"),
-      setEmulatedMedia: withCdpName(async (params?: cdp.types.ts.Emulation.SetEmulatedMediaParams) => commands["Emulation.setEmulatedMedia"].result.parse(await send("Emulation.setEmulatedMedia", commands["Emulation.setEmulatedMedia"].params.parse(params ?? {}))), "Emulation.setEmulatedMedia", "command"),
-      setEmulatedVisionDeficiency: withCdpName(async (params?: cdp.types.ts.Emulation.SetEmulatedVisionDeficiencyParams) => commands["Emulation.setEmulatedVisionDeficiency"].result.parse(await send("Emulation.setEmulatedVisionDeficiency", commands["Emulation.setEmulatedVisionDeficiency"].params.parse(params ?? {}))), "Emulation.setEmulatedVisionDeficiency", "command"),
-      setEmulatedOSTextScale: withCdpName(async (params?: cdp.types.ts.Emulation.SetEmulatedOSTextScaleParams) => commands["Emulation.setEmulatedOSTextScale"].result.parse(await send("Emulation.setEmulatedOSTextScale", commands["Emulation.setEmulatedOSTextScale"].params.parse(params ?? {}))), "Emulation.setEmulatedOSTextScale", "command"),
-      setGeolocationOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetGeolocationOverrideParams) => commands["Emulation.setGeolocationOverride"].result.parse(await send("Emulation.setGeolocationOverride", commands["Emulation.setGeolocationOverride"].params.parse(params ?? {}))), "Emulation.setGeolocationOverride", "command"),
-      getOverriddenSensorInformation: withCdpName(async (params?: cdp.types.ts.Emulation.GetOverriddenSensorInformationParams) => commands["Emulation.getOverriddenSensorInformation"].result.parse(await send("Emulation.getOverriddenSensorInformation", commands["Emulation.getOverriddenSensorInformation"].params.parse(params ?? {}))), "Emulation.getOverriddenSensorInformation", "command"),
-      setSensorOverrideEnabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetSensorOverrideEnabledParams) => commands["Emulation.setSensorOverrideEnabled"].result.parse(await send("Emulation.setSensorOverrideEnabled", commands["Emulation.setSensorOverrideEnabled"].params.parse(params ?? {}))), "Emulation.setSensorOverrideEnabled", "command"),
-      setSensorOverrideReadings: withCdpName(async (params?: cdp.types.ts.Emulation.SetSensorOverrideReadingsParams) => commands["Emulation.setSensorOverrideReadings"].result.parse(await send("Emulation.setSensorOverrideReadings", commands["Emulation.setSensorOverrideReadings"].params.parse(params ?? {}))), "Emulation.setSensorOverrideReadings", "command"),
-      setPressureSourceOverrideEnabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetPressureSourceOverrideEnabledParams) => commands["Emulation.setPressureSourceOverrideEnabled"].result.parse(await send("Emulation.setPressureSourceOverrideEnabled", commands["Emulation.setPressureSourceOverrideEnabled"].params.parse(params ?? {}))), "Emulation.setPressureSourceOverrideEnabled", "command"),
-      setPressureStateOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetPressureStateOverrideParams) => commands["Emulation.setPressureStateOverride"].result.parse(await send("Emulation.setPressureStateOverride", commands["Emulation.setPressureStateOverride"].params.parse(params ?? {}))), "Emulation.setPressureStateOverride", "command"),
-      setPressureDataOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetPressureDataOverrideParams) => commands["Emulation.setPressureDataOverride"].result.parse(await send("Emulation.setPressureDataOverride", commands["Emulation.setPressureDataOverride"].params.parse(params ?? {}))), "Emulation.setPressureDataOverride", "command"),
-      setIdleOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetIdleOverrideParams) => commands["Emulation.setIdleOverride"].result.parse(await send("Emulation.setIdleOverride", commands["Emulation.setIdleOverride"].params.parse(params ?? {}))), "Emulation.setIdleOverride", "command"),
-      clearIdleOverride: withCdpName(async (params?: cdp.types.ts.Emulation.ClearIdleOverrideParams) => commands["Emulation.clearIdleOverride"].result.parse(await send("Emulation.clearIdleOverride", commands["Emulation.clearIdleOverride"].params.parse(params ?? {}))), "Emulation.clearIdleOverride", "command"),
-      setNavigatorOverrides: withCdpName(async (params?: cdp.types.ts.Emulation.SetNavigatorOverridesParams) => commands["Emulation.setNavigatorOverrides"].result.parse(await send("Emulation.setNavigatorOverrides", commands["Emulation.setNavigatorOverrides"].params.parse(params ?? {}))), "Emulation.setNavigatorOverrides", "command"),
-      setPageScaleFactor: withCdpName(async (params?: cdp.types.ts.Emulation.SetPageScaleFactorParams) => commands["Emulation.setPageScaleFactor"].result.parse(await send("Emulation.setPageScaleFactor", commands["Emulation.setPageScaleFactor"].params.parse(params ?? {}))), "Emulation.setPageScaleFactor", "command"),
-      setScriptExecutionDisabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetScriptExecutionDisabledParams) => commands["Emulation.setScriptExecutionDisabled"].result.parse(await send("Emulation.setScriptExecutionDisabled", commands["Emulation.setScriptExecutionDisabled"].params.parse(params ?? {}))), "Emulation.setScriptExecutionDisabled", "command"),
-      setTouchEmulationEnabled: withCdpName(async (params?: cdp.types.ts.Emulation.SetTouchEmulationEnabledParams) => commands["Emulation.setTouchEmulationEnabled"].result.parse(await send("Emulation.setTouchEmulationEnabled", commands["Emulation.setTouchEmulationEnabled"].params.parse(params ?? {}))), "Emulation.setTouchEmulationEnabled", "command"),
-      setVirtualTimePolicy: withCdpName(async (params?: cdp.types.ts.Emulation.SetVirtualTimePolicyParams) => commands["Emulation.setVirtualTimePolicy"].result.parse(await send("Emulation.setVirtualTimePolicy", commands["Emulation.setVirtualTimePolicy"].params.parse(params ?? {}))), "Emulation.setVirtualTimePolicy", "command"),
-      setLocaleOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetLocaleOverrideParams) => commands["Emulation.setLocaleOverride"].result.parse(await send("Emulation.setLocaleOverride", commands["Emulation.setLocaleOverride"].params.parse(params ?? {}))), "Emulation.setLocaleOverride", "command"),
-      setTimezoneOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetTimezoneOverrideParams) => commands["Emulation.setTimezoneOverride"].result.parse(await send("Emulation.setTimezoneOverride", commands["Emulation.setTimezoneOverride"].params.parse(params ?? {}))), "Emulation.setTimezoneOverride", "command"),
-      setVisibleSize: withCdpName(async (params?: cdp.types.ts.Emulation.SetVisibleSizeParams) => commands["Emulation.setVisibleSize"].result.parse(await send("Emulation.setVisibleSize", commands["Emulation.setVisibleSize"].params.parse(params ?? {}))), "Emulation.setVisibleSize", "command"),
-      setDisabledImageTypes: withCdpName(async (params?: cdp.types.ts.Emulation.SetDisabledImageTypesParams) => commands["Emulation.setDisabledImageTypes"].result.parse(await send("Emulation.setDisabledImageTypes", commands["Emulation.setDisabledImageTypes"].params.parse(params ?? {}))), "Emulation.setDisabledImageTypes", "command"),
-      setDataSaverOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetDataSaverOverrideParams) => commands["Emulation.setDataSaverOverride"].result.parse(await send("Emulation.setDataSaverOverride", commands["Emulation.setDataSaverOverride"].params.parse(params ?? {}))), "Emulation.setDataSaverOverride", "command"),
-      setHardwareConcurrencyOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetHardwareConcurrencyOverrideParams) => commands["Emulation.setHardwareConcurrencyOverride"].result.parse(await send("Emulation.setHardwareConcurrencyOverride", commands["Emulation.setHardwareConcurrencyOverride"].params.parse(params ?? {}))), "Emulation.setHardwareConcurrencyOverride", "command"),
-      setUserAgentOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetUserAgentOverrideParams) => commands["Emulation.setUserAgentOverride"].result.parse(await send("Emulation.setUserAgentOverride", commands["Emulation.setUserAgentOverride"].params.parse(params ?? {}))), "Emulation.setUserAgentOverride", "command"),
-      setAutomationOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetAutomationOverrideParams) => commands["Emulation.setAutomationOverride"].result.parse(await send("Emulation.setAutomationOverride", commands["Emulation.setAutomationOverride"].params.parse(params ?? {}))), "Emulation.setAutomationOverride", "command"),
-      setSmallViewportHeightDifferenceOverride: withCdpName(async (params?: cdp.types.ts.Emulation.SetSmallViewportHeightDifferenceOverrideParams) => commands["Emulation.setSmallViewportHeightDifferenceOverride"].result.parse(await send("Emulation.setSmallViewportHeightDifferenceOverride", commands["Emulation.setSmallViewportHeightDifferenceOverride"].params.parse(params ?? {}))), "Emulation.setSmallViewportHeightDifferenceOverride", "command"),
-      getScreenInfos: withCdpName(async (params?: cdp.types.ts.Emulation.GetScreenInfosParams) => commands["Emulation.getScreenInfos"].result.parse(await send("Emulation.getScreenInfos", commands["Emulation.getScreenInfos"].params.parse(params ?? {}))), "Emulation.getScreenInfos", "command"),
-      addScreen: withCdpName(async (params?: cdp.types.ts.Emulation.AddScreenParams) => commands["Emulation.addScreen"].result.parse(await send("Emulation.addScreen", commands["Emulation.addScreen"].params.parse(params ?? {}))), "Emulation.addScreen", "command"),
-      updateScreen: withCdpName(async (params?: cdp.types.ts.Emulation.UpdateScreenParams) => commands["Emulation.updateScreen"].result.parse(await send("Emulation.updateScreen", commands["Emulation.updateScreen"].params.parse(params ?? {}))), "Emulation.updateScreen", "command"),
-      removeScreen: withCdpName(async (params?: cdp.types.ts.Emulation.RemoveScreenParams) => commands["Emulation.removeScreen"].result.parse(await send("Emulation.removeScreen", commands["Emulation.removeScreen"].params.parse(params ?? {}))), "Emulation.removeScreen", "command"),
-      setPrimaryScreen: withCdpName(async (params?: cdp.types.ts.Emulation.SetPrimaryScreenParams) => commands["Emulation.setPrimaryScreen"].result.parse(await send("Emulation.setPrimaryScreen", commands["Emulation.setPrimaryScreen"].params.parse(params ?? {}))), "Emulation.setPrimaryScreen", "command"),
-      virtualTimeBudgetExpired: withCdpName(events["Emulation.virtualTimeBudgetExpired"], "Emulation.virtualTimeBudgetExpired", "event"),
-      screenOrientationLockChanged: withCdpName(events["Emulation.screenOrientationLockChanged"], "Emulation.screenOrientationLockChanged", "event"),
+      canEmulate: withCdpName(
+        async (params?: cdp.types.ts.Emulation.CanEmulateParams) =>
+          commands["Emulation.canEmulate"].result.parse(
+            await send("Emulation.canEmulate", commands["Emulation.canEmulate"].params.parse(params ?? {})),
+          ),
+        "Emulation.canEmulate",
+        "command",
+      ),
+      clearDeviceMetricsOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ClearDeviceMetricsOverrideParams) =>
+          commands["Emulation.clearDeviceMetricsOverride"].result.parse(
+            await send(
+              "Emulation.clearDeviceMetricsOverride",
+              commands["Emulation.clearDeviceMetricsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.clearDeviceMetricsOverride",
+        "command",
+      ),
+      clearGeolocationOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ClearGeolocationOverrideParams) =>
+          commands["Emulation.clearGeolocationOverride"].result.parse(
+            await send(
+              "Emulation.clearGeolocationOverride",
+              commands["Emulation.clearGeolocationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.clearGeolocationOverride",
+        "command",
+      ),
+      resetPageScaleFactor: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ResetPageScaleFactorParams) =>
+          commands["Emulation.resetPageScaleFactor"].result.parse(
+            await send(
+              "Emulation.resetPageScaleFactor",
+              commands["Emulation.resetPageScaleFactor"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.resetPageScaleFactor",
+        "command",
+      ),
+      setFocusEmulationEnabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetFocusEmulationEnabledParams) =>
+          commands["Emulation.setFocusEmulationEnabled"].result.parse(
+            await send(
+              "Emulation.setFocusEmulationEnabled",
+              commands["Emulation.setFocusEmulationEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setFocusEmulationEnabled",
+        "command",
+      ),
+      setAutoDarkModeOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetAutoDarkModeOverrideParams) =>
+          commands["Emulation.setAutoDarkModeOverride"].result.parse(
+            await send(
+              "Emulation.setAutoDarkModeOverride",
+              commands["Emulation.setAutoDarkModeOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setAutoDarkModeOverride",
+        "command",
+      ),
+      setCPUThrottlingRate: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetCPUThrottlingRateParams) =>
+          commands["Emulation.setCPUThrottlingRate"].result.parse(
+            await send(
+              "Emulation.setCPUThrottlingRate",
+              commands["Emulation.setCPUThrottlingRate"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setCPUThrottlingRate",
+        "command",
+      ),
+      setDefaultBackgroundColorOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDefaultBackgroundColorOverrideParams) =>
+          commands["Emulation.setDefaultBackgroundColorOverride"].result.parse(
+            await send(
+              "Emulation.setDefaultBackgroundColorOverride",
+              commands["Emulation.setDefaultBackgroundColorOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDefaultBackgroundColorOverride",
+        "command",
+      ),
+      setSafeAreaInsetsOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetSafeAreaInsetsOverrideParams) =>
+          commands["Emulation.setSafeAreaInsetsOverride"].result.parse(
+            await send(
+              "Emulation.setSafeAreaInsetsOverride",
+              commands["Emulation.setSafeAreaInsetsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setSafeAreaInsetsOverride",
+        "command",
+      ),
+      setDeviceMetricsOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDeviceMetricsOverrideParams) =>
+          commands["Emulation.setDeviceMetricsOverride"].result.parse(
+            await send(
+              "Emulation.setDeviceMetricsOverride",
+              commands["Emulation.setDeviceMetricsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDeviceMetricsOverride",
+        "command",
+      ),
+      setDevicePostureOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDevicePostureOverrideParams) =>
+          commands["Emulation.setDevicePostureOverride"].result.parse(
+            await send(
+              "Emulation.setDevicePostureOverride",
+              commands["Emulation.setDevicePostureOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDevicePostureOverride",
+        "command",
+      ),
+      clearDevicePostureOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ClearDevicePostureOverrideParams) =>
+          commands["Emulation.clearDevicePostureOverride"].result.parse(
+            await send(
+              "Emulation.clearDevicePostureOverride",
+              commands["Emulation.clearDevicePostureOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.clearDevicePostureOverride",
+        "command",
+      ),
+      setDisplayFeaturesOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDisplayFeaturesOverrideParams) =>
+          commands["Emulation.setDisplayFeaturesOverride"].result.parse(
+            await send(
+              "Emulation.setDisplayFeaturesOverride",
+              commands["Emulation.setDisplayFeaturesOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDisplayFeaturesOverride",
+        "command",
+      ),
+      clearDisplayFeaturesOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ClearDisplayFeaturesOverrideParams) =>
+          commands["Emulation.clearDisplayFeaturesOverride"].result.parse(
+            await send(
+              "Emulation.clearDisplayFeaturesOverride",
+              commands["Emulation.clearDisplayFeaturesOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.clearDisplayFeaturesOverride",
+        "command",
+      ),
+      setScrollbarsHidden: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetScrollbarsHiddenParams) =>
+          commands["Emulation.setScrollbarsHidden"].result.parse(
+            await send(
+              "Emulation.setScrollbarsHidden",
+              commands["Emulation.setScrollbarsHidden"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setScrollbarsHidden",
+        "command",
+      ),
+      setDocumentCookieDisabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDocumentCookieDisabledParams) =>
+          commands["Emulation.setDocumentCookieDisabled"].result.parse(
+            await send(
+              "Emulation.setDocumentCookieDisabled",
+              commands["Emulation.setDocumentCookieDisabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDocumentCookieDisabled",
+        "command",
+      ),
+      setEmitTouchEventsForMouse: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetEmitTouchEventsForMouseParams) =>
+          commands["Emulation.setEmitTouchEventsForMouse"].result.parse(
+            await send(
+              "Emulation.setEmitTouchEventsForMouse",
+              commands["Emulation.setEmitTouchEventsForMouse"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setEmitTouchEventsForMouse",
+        "command",
+      ),
+      setEmulatedMedia: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetEmulatedMediaParams) =>
+          commands["Emulation.setEmulatedMedia"].result.parse(
+            await send("Emulation.setEmulatedMedia", commands["Emulation.setEmulatedMedia"].params.parse(params ?? {})),
+          ),
+        "Emulation.setEmulatedMedia",
+        "command",
+      ),
+      setEmulatedVisionDeficiency: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetEmulatedVisionDeficiencyParams) =>
+          commands["Emulation.setEmulatedVisionDeficiency"].result.parse(
+            await send(
+              "Emulation.setEmulatedVisionDeficiency",
+              commands["Emulation.setEmulatedVisionDeficiency"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setEmulatedVisionDeficiency",
+        "command",
+      ),
+      setEmulatedOSTextScale: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetEmulatedOSTextScaleParams) =>
+          commands["Emulation.setEmulatedOSTextScale"].result.parse(
+            await send(
+              "Emulation.setEmulatedOSTextScale",
+              commands["Emulation.setEmulatedOSTextScale"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setEmulatedOSTextScale",
+        "command",
+      ),
+      setGeolocationOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetGeolocationOverrideParams) =>
+          commands["Emulation.setGeolocationOverride"].result.parse(
+            await send(
+              "Emulation.setGeolocationOverride",
+              commands["Emulation.setGeolocationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setGeolocationOverride",
+        "command",
+      ),
+      getOverriddenSensorInformation: withCdpName(
+        async (params?: cdp.types.ts.Emulation.GetOverriddenSensorInformationParams) =>
+          commands["Emulation.getOverriddenSensorInformation"].result.parse(
+            await send(
+              "Emulation.getOverriddenSensorInformation",
+              commands["Emulation.getOverriddenSensorInformation"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.getOverriddenSensorInformation",
+        "command",
+      ),
+      setSensorOverrideEnabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetSensorOverrideEnabledParams) =>
+          commands["Emulation.setSensorOverrideEnabled"].result.parse(
+            await send(
+              "Emulation.setSensorOverrideEnabled",
+              commands["Emulation.setSensorOverrideEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setSensorOverrideEnabled",
+        "command",
+      ),
+      setSensorOverrideReadings: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetSensorOverrideReadingsParams) =>
+          commands["Emulation.setSensorOverrideReadings"].result.parse(
+            await send(
+              "Emulation.setSensorOverrideReadings",
+              commands["Emulation.setSensorOverrideReadings"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setSensorOverrideReadings",
+        "command",
+      ),
+      setPressureSourceOverrideEnabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetPressureSourceOverrideEnabledParams) =>
+          commands["Emulation.setPressureSourceOverrideEnabled"].result.parse(
+            await send(
+              "Emulation.setPressureSourceOverrideEnabled",
+              commands["Emulation.setPressureSourceOverrideEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setPressureSourceOverrideEnabled",
+        "command",
+      ),
+      setPressureStateOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetPressureStateOverrideParams) =>
+          commands["Emulation.setPressureStateOverride"].result.parse(
+            await send(
+              "Emulation.setPressureStateOverride",
+              commands["Emulation.setPressureStateOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setPressureStateOverride",
+        "command",
+      ),
+      setPressureDataOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetPressureDataOverrideParams) =>
+          commands["Emulation.setPressureDataOverride"].result.parse(
+            await send(
+              "Emulation.setPressureDataOverride",
+              commands["Emulation.setPressureDataOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setPressureDataOverride",
+        "command",
+      ),
+      setIdleOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetIdleOverrideParams) =>
+          commands["Emulation.setIdleOverride"].result.parse(
+            await send("Emulation.setIdleOverride", commands["Emulation.setIdleOverride"].params.parse(params ?? {})),
+          ),
+        "Emulation.setIdleOverride",
+        "command",
+      ),
+      clearIdleOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.ClearIdleOverrideParams) =>
+          commands["Emulation.clearIdleOverride"].result.parse(
+            await send(
+              "Emulation.clearIdleOverride",
+              commands["Emulation.clearIdleOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.clearIdleOverride",
+        "command",
+      ),
+      setNavigatorOverrides: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetNavigatorOverridesParams) =>
+          commands["Emulation.setNavigatorOverrides"].result.parse(
+            await send(
+              "Emulation.setNavigatorOverrides",
+              commands["Emulation.setNavigatorOverrides"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setNavigatorOverrides",
+        "command",
+      ),
+      setPageScaleFactor: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetPageScaleFactorParams) =>
+          commands["Emulation.setPageScaleFactor"].result.parse(
+            await send(
+              "Emulation.setPageScaleFactor",
+              commands["Emulation.setPageScaleFactor"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setPageScaleFactor",
+        "command",
+      ),
+      setScriptExecutionDisabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetScriptExecutionDisabledParams) =>
+          commands["Emulation.setScriptExecutionDisabled"].result.parse(
+            await send(
+              "Emulation.setScriptExecutionDisabled",
+              commands["Emulation.setScriptExecutionDisabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setScriptExecutionDisabled",
+        "command",
+      ),
+      setTouchEmulationEnabled: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetTouchEmulationEnabledParams) =>
+          commands["Emulation.setTouchEmulationEnabled"].result.parse(
+            await send(
+              "Emulation.setTouchEmulationEnabled",
+              commands["Emulation.setTouchEmulationEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setTouchEmulationEnabled",
+        "command",
+      ),
+      setVirtualTimePolicy: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetVirtualTimePolicyParams) =>
+          commands["Emulation.setVirtualTimePolicy"].result.parse(
+            await send(
+              "Emulation.setVirtualTimePolicy",
+              commands["Emulation.setVirtualTimePolicy"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setVirtualTimePolicy",
+        "command",
+      ),
+      setLocaleOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetLocaleOverrideParams) =>
+          commands["Emulation.setLocaleOverride"].result.parse(
+            await send(
+              "Emulation.setLocaleOverride",
+              commands["Emulation.setLocaleOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setLocaleOverride",
+        "command",
+      ),
+      setTimezoneOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetTimezoneOverrideParams) =>
+          commands["Emulation.setTimezoneOverride"].result.parse(
+            await send(
+              "Emulation.setTimezoneOverride",
+              commands["Emulation.setTimezoneOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setTimezoneOverride",
+        "command",
+      ),
+      setVisibleSize: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetVisibleSizeParams) =>
+          commands["Emulation.setVisibleSize"].result.parse(
+            await send("Emulation.setVisibleSize", commands["Emulation.setVisibleSize"].params.parse(params ?? {})),
+          ),
+        "Emulation.setVisibleSize",
+        "command",
+      ),
+      setDisabledImageTypes: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDisabledImageTypesParams) =>
+          commands["Emulation.setDisabledImageTypes"].result.parse(
+            await send(
+              "Emulation.setDisabledImageTypes",
+              commands["Emulation.setDisabledImageTypes"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDisabledImageTypes",
+        "command",
+      ),
+      setDataSaverOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetDataSaverOverrideParams) =>
+          commands["Emulation.setDataSaverOverride"].result.parse(
+            await send(
+              "Emulation.setDataSaverOverride",
+              commands["Emulation.setDataSaverOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setDataSaverOverride",
+        "command",
+      ),
+      setHardwareConcurrencyOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetHardwareConcurrencyOverrideParams) =>
+          commands["Emulation.setHardwareConcurrencyOverride"].result.parse(
+            await send(
+              "Emulation.setHardwareConcurrencyOverride",
+              commands["Emulation.setHardwareConcurrencyOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setHardwareConcurrencyOverride",
+        "command",
+      ),
+      setUserAgentOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetUserAgentOverrideParams) =>
+          commands["Emulation.setUserAgentOverride"].result.parse(
+            await send(
+              "Emulation.setUserAgentOverride",
+              commands["Emulation.setUserAgentOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setUserAgentOverride",
+        "command",
+      ),
+      setAutomationOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetAutomationOverrideParams) =>
+          commands["Emulation.setAutomationOverride"].result.parse(
+            await send(
+              "Emulation.setAutomationOverride",
+              commands["Emulation.setAutomationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setAutomationOverride",
+        "command",
+      ),
+      setSmallViewportHeightDifferenceOverride: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetSmallViewportHeightDifferenceOverrideParams) =>
+          commands["Emulation.setSmallViewportHeightDifferenceOverride"].result.parse(
+            await send(
+              "Emulation.setSmallViewportHeightDifferenceOverride",
+              commands["Emulation.setSmallViewportHeightDifferenceOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Emulation.setSmallViewportHeightDifferenceOverride",
+        "command",
+      ),
+      getScreenInfos: withCdpName(
+        async (params?: cdp.types.ts.Emulation.GetScreenInfosParams) =>
+          commands["Emulation.getScreenInfos"].result.parse(
+            await send("Emulation.getScreenInfos", commands["Emulation.getScreenInfos"].params.parse(params ?? {})),
+          ),
+        "Emulation.getScreenInfos",
+        "command",
+      ),
+      addScreen: withCdpName(
+        async (params?: cdp.types.ts.Emulation.AddScreenParams) =>
+          commands["Emulation.addScreen"].result.parse(
+            await send("Emulation.addScreen", commands["Emulation.addScreen"].params.parse(params ?? {})),
+          ),
+        "Emulation.addScreen",
+        "command",
+      ),
+      updateScreen: withCdpName(
+        async (params?: cdp.types.ts.Emulation.UpdateScreenParams) =>
+          commands["Emulation.updateScreen"].result.parse(
+            await send("Emulation.updateScreen", commands["Emulation.updateScreen"].params.parse(params ?? {})),
+          ),
+        "Emulation.updateScreen",
+        "command",
+      ),
+      removeScreen: withCdpName(
+        async (params?: cdp.types.ts.Emulation.RemoveScreenParams) =>
+          commands["Emulation.removeScreen"].result.parse(
+            await send("Emulation.removeScreen", commands["Emulation.removeScreen"].params.parse(params ?? {})),
+          ),
+        "Emulation.removeScreen",
+        "command",
+      ),
+      setPrimaryScreen: withCdpName(
+        async (params?: cdp.types.ts.Emulation.SetPrimaryScreenParams) =>
+          commands["Emulation.setPrimaryScreen"].result.parse(
+            await send("Emulation.setPrimaryScreen", commands["Emulation.setPrimaryScreen"].params.parse(params ?? {})),
+          ),
+        "Emulation.setPrimaryScreen",
+        "command",
+      ),
+      virtualTimeBudgetExpired: withCdpName(
+        events["Emulation.virtualTimeBudgetExpired"],
+        "Emulation.virtualTimeBudgetExpired",
+        "event",
+      ),
+      screenOrientationLockChanged: withCdpName(
+        events["Emulation.screenOrientationLockChanged"],
+        "Emulation.screenOrientationLockChanged",
+        "event",
+      ),
     },
     EventBreakpoints: {
-      setInstrumentationBreakpoint: withCdpName(async (params?: cdp.types.ts.EventBreakpoints.SetInstrumentationBreakpointParams) => commands["EventBreakpoints.setInstrumentationBreakpoint"].result.parse(await send("EventBreakpoints.setInstrumentationBreakpoint", commands["EventBreakpoints.setInstrumentationBreakpoint"].params.parse(params ?? {}))), "EventBreakpoints.setInstrumentationBreakpoint", "command"),
-      removeInstrumentationBreakpoint: withCdpName(async (params?: cdp.types.ts.EventBreakpoints.RemoveInstrumentationBreakpointParams) => commands["EventBreakpoints.removeInstrumentationBreakpoint"].result.parse(await send("EventBreakpoints.removeInstrumentationBreakpoint", commands["EventBreakpoints.removeInstrumentationBreakpoint"].params.parse(params ?? {}))), "EventBreakpoints.removeInstrumentationBreakpoint", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.EventBreakpoints.DisableParams) => commands["EventBreakpoints.disable"].result.parse(await send("EventBreakpoints.disable", commands["EventBreakpoints.disable"].params.parse(params ?? {}))), "EventBreakpoints.disable", "command"),
+      setInstrumentationBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.EventBreakpoints.SetInstrumentationBreakpointParams) =>
+          commands["EventBreakpoints.setInstrumentationBreakpoint"].result.parse(
+            await send(
+              "EventBreakpoints.setInstrumentationBreakpoint",
+              commands["EventBreakpoints.setInstrumentationBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "EventBreakpoints.setInstrumentationBreakpoint",
+        "command",
+      ),
+      removeInstrumentationBreakpoint: withCdpName(
+        async (params?: cdp.types.ts.EventBreakpoints.RemoveInstrumentationBreakpointParams) =>
+          commands["EventBreakpoints.removeInstrumentationBreakpoint"].result.parse(
+            await send(
+              "EventBreakpoints.removeInstrumentationBreakpoint",
+              commands["EventBreakpoints.removeInstrumentationBreakpoint"].params.parse(params ?? {}),
+            ),
+          ),
+        "EventBreakpoints.removeInstrumentationBreakpoint",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.EventBreakpoints.DisableParams) =>
+          commands["EventBreakpoints.disable"].result.parse(
+            await send("EventBreakpoints.disable", commands["EventBreakpoints.disable"].params.parse(params ?? {})),
+          ),
+        "EventBreakpoints.disable",
+        "command",
+      ),
     },
     Extensions: {
-      triggerAction: withCdpName(async (params?: cdp.types.ts.Extensions.TriggerActionParams) => commands["Extensions.triggerAction"].result.parse(await send("Extensions.triggerAction", commands["Extensions.triggerAction"].params.parse(params ?? {}))), "Extensions.triggerAction", "command"),
-      loadUnpacked: withCdpName(async (params?: cdp.types.ts.Extensions.LoadUnpackedParams) => commands["Extensions.loadUnpacked"].result.parse(await send("Extensions.loadUnpacked", commands["Extensions.loadUnpacked"].params.parse(params ?? {}))), "Extensions.loadUnpacked", "command"),
-      getExtensions: withCdpName(async (params?: cdp.types.ts.Extensions.GetExtensionsParams) => commands["Extensions.getExtensions"].result.parse(await send("Extensions.getExtensions", commands["Extensions.getExtensions"].params.parse(params ?? {}))), "Extensions.getExtensions", "command"),
-      uninstall: withCdpName(async (params?: cdp.types.ts.Extensions.UninstallParams) => commands["Extensions.uninstall"].result.parse(await send("Extensions.uninstall", commands["Extensions.uninstall"].params.parse(params ?? {}))), "Extensions.uninstall", "command"),
-      getStorageItems: withCdpName(async (params?: cdp.types.ts.Extensions.GetStorageItemsParams) => commands["Extensions.getStorageItems"].result.parse(await send("Extensions.getStorageItems", commands["Extensions.getStorageItems"].params.parse(params ?? {}))), "Extensions.getStorageItems", "command"),
-      removeStorageItems: withCdpName(async (params?: cdp.types.ts.Extensions.RemoveStorageItemsParams) => commands["Extensions.removeStorageItems"].result.parse(await send("Extensions.removeStorageItems", commands["Extensions.removeStorageItems"].params.parse(params ?? {}))), "Extensions.removeStorageItems", "command"),
-      clearStorageItems: withCdpName(async (params?: cdp.types.ts.Extensions.ClearStorageItemsParams) => commands["Extensions.clearStorageItems"].result.parse(await send("Extensions.clearStorageItems", commands["Extensions.clearStorageItems"].params.parse(params ?? {}))), "Extensions.clearStorageItems", "command"),
-      setStorageItems: withCdpName(async (params?: cdp.types.ts.Extensions.SetStorageItemsParams) => commands["Extensions.setStorageItems"].result.parse(await send("Extensions.setStorageItems", commands["Extensions.setStorageItems"].params.parse(params ?? {}))), "Extensions.setStorageItems", "command"),
+      triggerAction: withCdpName(
+        async (params?: cdp.types.ts.Extensions.TriggerActionParams) =>
+          commands["Extensions.triggerAction"].result.parse(
+            await send("Extensions.triggerAction", commands["Extensions.triggerAction"].params.parse(params ?? {})),
+          ),
+        "Extensions.triggerAction",
+        "command",
+      ),
+      loadUnpacked: withCdpName(
+        async (params?: cdp.types.ts.Extensions.LoadUnpackedParams) =>
+          commands["Extensions.loadUnpacked"].result.parse(
+            await send("Extensions.loadUnpacked", commands["Extensions.loadUnpacked"].params.parse(params ?? {})),
+          ),
+        "Extensions.loadUnpacked",
+        "command",
+      ),
+      getExtensions: withCdpName(
+        async (params?: cdp.types.ts.Extensions.GetExtensionsParams) =>
+          commands["Extensions.getExtensions"].result.parse(
+            await send("Extensions.getExtensions", commands["Extensions.getExtensions"].params.parse(params ?? {})),
+          ),
+        "Extensions.getExtensions",
+        "command",
+      ),
+      uninstall: withCdpName(
+        async (params?: cdp.types.ts.Extensions.UninstallParams) =>
+          commands["Extensions.uninstall"].result.parse(
+            await send("Extensions.uninstall", commands["Extensions.uninstall"].params.parse(params ?? {})),
+          ),
+        "Extensions.uninstall",
+        "command",
+      ),
+      getStorageItems: withCdpName(
+        async (params?: cdp.types.ts.Extensions.GetStorageItemsParams) =>
+          commands["Extensions.getStorageItems"].result.parse(
+            await send("Extensions.getStorageItems", commands["Extensions.getStorageItems"].params.parse(params ?? {})),
+          ),
+        "Extensions.getStorageItems",
+        "command",
+      ),
+      removeStorageItems: withCdpName(
+        async (params?: cdp.types.ts.Extensions.RemoveStorageItemsParams) =>
+          commands["Extensions.removeStorageItems"].result.parse(
+            await send(
+              "Extensions.removeStorageItems",
+              commands["Extensions.removeStorageItems"].params.parse(params ?? {}),
+            ),
+          ),
+        "Extensions.removeStorageItems",
+        "command",
+      ),
+      clearStorageItems: withCdpName(
+        async (params?: cdp.types.ts.Extensions.ClearStorageItemsParams) =>
+          commands["Extensions.clearStorageItems"].result.parse(
+            await send(
+              "Extensions.clearStorageItems",
+              commands["Extensions.clearStorageItems"].params.parse(params ?? {}),
+            ),
+          ),
+        "Extensions.clearStorageItems",
+        "command",
+      ),
+      setStorageItems: withCdpName(
+        async (params?: cdp.types.ts.Extensions.SetStorageItemsParams) =>
+          commands["Extensions.setStorageItems"].result.parse(
+            await send("Extensions.setStorageItems", commands["Extensions.setStorageItems"].params.parse(params ?? {})),
+          ),
+        "Extensions.setStorageItems",
+        "command",
+      ),
     },
     FedCm: {
-      enable: withCdpName(async (params?: cdp.types.ts.FedCm.EnableParams) => commands["FedCm.enable"].result.parse(await send("FedCm.enable", commands["FedCm.enable"].params.parse(params ?? {}))), "FedCm.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.FedCm.DisableParams) => commands["FedCm.disable"].result.parse(await send("FedCm.disable", commands["FedCm.disable"].params.parse(params ?? {}))), "FedCm.disable", "command"),
-      selectAccount: withCdpName(async (params?: cdp.types.ts.FedCm.SelectAccountParams) => commands["FedCm.selectAccount"].result.parse(await send("FedCm.selectAccount", commands["FedCm.selectAccount"].params.parse(params ?? {}))), "FedCm.selectAccount", "command"),
-      clickDialogButton: withCdpName(async (params?: cdp.types.ts.FedCm.ClickDialogButtonParams) => commands["FedCm.clickDialogButton"].result.parse(await send("FedCm.clickDialogButton", commands["FedCm.clickDialogButton"].params.parse(params ?? {}))), "FedCm.clickDialogButton", "command"),
-      openUrl: withCdpName(async (params?: cdp.types.ts.FedCm.OpenUrlParams) => commands["FedCm.openUrl"].result.parse(await send("FedCm.openUrl", commands["FedCm.openUrl"].params.parse(params ?? {}))), "FedCm.openUrl", "command"),
-      dismissDialog: withCdpName(async (params?: cdp.types.ts.FedCm.DismissDialogParams) => commands["FedCm.dismissDialog"].result.parse(await send("FedCm.dismissDialog", commands["FedCm.dismissDialog"].params.parse(params ?? {}))), "FedCm.dismissDialog", "command"),
-      resetCooldown: withCdpName(async (params?: cdp.types.ts.FedCm.ResetCooldownParams) => commands["FedCm.resetCooldown"].result.parse(await send("FedCm.resetCooldown", commands["FedCm.resetCooldown"].params.parse(params ?? {}))), "FedCm.resetCooldown", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.FedCm.EnableParams) =>
+          commands["FedCm.enable"].result.parse(
+            await send("FedCm.enable", commands["FedCm.enable"].params.parse(params ?? {})),
+          ),
+        "FedCm.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.FedCm.DisableParams) =>
+          commands["FedCm.disable"].result.parse(
+            await send("FedCm.disable", commands["FedCm.disable"].params.parse(params ?? {})),
+          ),
+        "FedCm.disable",
+        "command",
+      ),
+      selectAccount: withCdpName(
+        async (params?: cdp.types.ts.FedCm.SelectAccountParams) =>
+          commands["FedCm.selectAccount"].result.parse(
+            await send("FedCm.selectAccount", commands["FedCm.selectAccount"].params.parse(params ?? {})),
+          ),
+        "FedCm.selectAccount",
+        "command",
+      ),
+      clickDialogButton: withCdpName(
+        async (params?: cdp.types.ts.FedCm.ClickDialogButtonParams) =>
+          commands["FedCm.clickDialogButton"].result.parse(
+            await send("FedCm.clickDialogButton", commands["FedCm.clickDialogButton"].params.parse(params ?? {})),
+          ),
+        "FedCm.clickDialogButton",
+        "command",
+      ),
+      openUrl: withCdpName(
+        async (params?: cdp.types.ts.FedCm.OpenUrlParams) =>
+          commands["FedCm.openUrl"].result.parse(
+            await send("FedCm.openUrl", commands["FedCm.openUrl"].params.parse(params ?? {})),
+          ),
+        "FedCm.openUrl",
+        "command",
+      ),
+      dismissDialog: withCdpName(
+        async (params?: cdp.types.ts.FedCm.DismissDialogParams) =>
+          commands["FedCm.dismissDialog"].result.parse(
+            await send("FedCm.dismissDialog", commands["FedCm.dismissDialog"].params.parse(params ?? {})),
+          ),
+        "FedCm.dismissDialog",
+        "command",
+      ),
+      resetCooldown: withCdpName(
+        async (params?: cdp.types.ts.FedCm.ResetCooldownParams) =>
+          commands["FedCm.resetCooldown"].result.parse(
+            await send("FedCm.resetCooldown", commands["FedCm.resetCooldown"].params.parse(params ?? {})),
+          ),
+        "FedCm.resetCooldown",
+        "command",
+      ),
       dialogShown: withCdpName(events["FedCm.dialogShown"], "FedCm.dialogShown", "event"),
       dialogClosed: withCdpName(events["FedCm.dialogClosed"], "FedCm.dialogClosed", "event"),
     },
     Fetch: {
-      disable: withCdpName(async (params?: cdp.types.ts.Fetch.DisableParams) => commands["Fetch.disable"].result.parse(await send("Fetch.disable", commands["Fetch.disable"].params.parse(params ?? {}))), "Fetch.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Fetch.EnableParams) => commands["Fetch.enable"].result.parse(await send("Fetch.enable", commands["Fetch.enable"].params.parse(params ?? {}))), "Fetch.enable", "command"),
-      failRequest: withCdpName(async (params?: cdp.types.ts.Fetch.FailRequestParams) => commands["Fetch.failRequest"].result.parse(await send("Fetch.failRequest", commands["Fetch.failRequest"].params.parse(params ?? {}))), "Fetch.failRequest", "command"),
-      fulfillRequest: withCdpName(async (params?: cdp.types.ts.Fetch.FulfillRequestParams) => commands["Fetch.fulfillRequest"].result.parse(await send("Fetch.fulfillRequest", commands["Fetch.fulfillRequest"].params.parse(params ?? {}))), "Fetch.fulfillRequest", "command"),
-      continueRequest: withCdpName(async (params?: cdp.types.ts.Fetch.ContinueRequestParams) => commands["Fetch.continueRequest"].result.parse(await send("Fetch.continueRequest", commands["Fetch.continueRequest"].params.parse(params ?? {}))), "Fetch.continueRequest", "command"),
-      continueWithAuth: withCdpName(async (params?: cdp.types.ts.Fetch.ContinueWithAuthParams) => commands["Fetch.continueWithAuth"].result.parse(await send("Fetch.continueWithAuth", commands["Fetch.continueWithAuth"].params.parse(params ?? {}))), "Fetch.continueWithAuth", "command"),
-      continueResponse: withCdpName(async (params?: cdp.types.ts.Fetch.ContinueResponseParams) => commands["Fetch.continueResponse"].result.parse(await send("Fetch.continueResponse", commands["Fetch.continueResponse"].params.parse(params ?? {}))), "Fetch.continueResponse", "command"),
-      getResponseBody: withCdpName(async (params?: cdp.types.ts.Fetch.GetResponseBodyParams) => commands["Fetch.getResponseBody"].result.parse(await send("Fetch.getResponseBody", commands["Fetch.getResponseBody"].params.parse(params ?? {}))), "Fetch.getResponseBody", "command"),
-      takeResponseBodyAsStream: withCdpName(async (params?: cdp.types.ts.Fetch.TakeResponseBodyAsStreamParams) => commands["Fetch.takeResponseBodyAsStream"].result.parse(await send("Fetch.takeResponseBodyAsStream", commands["Fetch.takeResponseBodyAsStream"].params.parse(params ?? {}))), "Fetch.takeResponseBodyAsStream", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Fetch.DisableParams) =>
+          commands["Fetch.disable"].result.parse(
+            await send("Fetch.disable", commands["Fetch.disable"].params.parse(params ?? {})),
+          ),
+        "Fetch.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Fetch.EnableParams) =>
+          commands["Fetch.enable"].result.parse(
+            await send("Fetch.enable", commands["Fetch.enable"].params.parse(params ?? {})),
+          ),
+        "Fetch.enable",
+        "command",
+      ),
+      failRequest: withCdpName(
+        async (params?: cdp.types.ts.Fetch.FailRequestParams) =>
+          commands["Fetch.failRequest"].result.parse(
+            await send("Fetch.failRequest", commands["Fetch.failRequest"].params.parse(params ?? {})),
+          ),
+        "Fetch.failRequest",
+        "command",
+      ),
+      fulfillRequest: withCdpName(
+        async (params?: cdp.types.ts.Fetch.FulfillRequestParams) =>
+          commands["Fetch.fulfillRequest"].result.parse(
+            await send("Fetch.fulfillRequest", commands["Fetch.fulfillRequest"].params.parse(params ?? {})),
+          ),
+        "Fetch.fulfillRequest",
+        "command",
+      ),
+      continueRequest: withCdpName(
+        async (params?: cdp.types.ts.Fetch.ContinueRequestParams) =>
+          commands["Fetch.continueRequest"].result.parse(
+            await send("Fetch.continueRequest", commands["Fetch.continueRequest"].params.parse(params ?? {})),
+          ),
+        "Fetch.continueRequest",
+        "command",
+      ),
+      continueWithAuth: withCdpName(
+        async (params?: cdp.types.ts.Fetch.ContinueWithAuthParams) =>
+          commands["Fetch.continueWithAuth"].result.parse(
+            await send("Fetch.continueWithAuth", commands["Fetch.continueWithAuth"].params.parse(params ?? {})),
+          ),
+        "Fetch.continueWithAuth",
+        "command",
+      ),
+      continueResponse: withCdpName(
+        async (params?: cdp.types.ts.Fetch.ContinueResponseParams) =>
+          commands["Fetch.continueResponse"].result.parse(
+            await send("Fetch.continueResponse", commands["Fetch.continueResponse"].params.parse(params ?? {})),
+          ),
+        "Fetch.continueResponse",
+        "command",
+      ),
+      getResponseBody: withCdpName(
+        async (params?: cdp.types.ts.Fetch.GetResponseBodyParams) =>
+          commands["Fetch.getResponseBody"].result.parse(
+            await send("Fetch.getResponseBody", commands["Fetch.getResponseBody"].params.parse(params ?? {})),
+          ),
+        "Fetch.getResponseBody",
+        "command",
+      ),
+      takeResponseBodyAsStream: withCdpName(
+        async (params?: cdp.types.ts.Fetch.TakeResponseBodyAsStreamParams) =>
+          commands["Fetch.takeResponseBodyAsStream"].result.parse(
+            await send(
+              "Fetch.takeResponseBodyAsStream",
+              commands["Fetch.takeResponseBodyAsStream"].params.parse(params ?? {}),
+            ),
+          ),
+        "Fetch.takeResponseBodyAsStream",
+        "command",
+      ),
       requestPaused: withCdpName(events["Fetch.requestPaused"], "Fetch.requestPaused", "event"),
       authRequired: withCdpName(events["Fetch.authRequired"], "Fetch.authRequired", "event"),
     },
     FileSystem: {
-      getDirectory: withCdpName(async (params?: cdp.types.ts.FileSystem.GetDirectoryParams) => commands["FileSystem.getDirectory"].result.parse(await send("FileSystem.getDirectory", commands["FileSystem.getDirectory"].params.parse(params ?? {}))), "FileSystem.getDirectory", "command"),
+      getDirectory: withCdpName(
+        async (params?: cdp.types.ts.FileSystem.GetDirectoryParams) =>
+          commands["FileSystem.getDirectory"].result.parse(
+            await send("FileSystem.getDirectory", commands["FileSystem.getDirectory"].params.parse(params ?? {})),
+          ),
+        "FileSystem.getDirectory",
+        "command",
+      ),
     },
     HeadlessExperimental: {
-      beginFrame: withCdpName(async (params?: cdp.types.ts.HeadlessExperimental.BeginFrameParams) => commands["HeadlessExperimental.beginFrame"].result.parse(await send("HeadlessExperimental.beginFrame", commands["HeadlessExperimental.beginFrame"].params.parse(params ?? {}))), "HeadlessExperimental.beginFrame", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.HeadlessExperimental.DisableParams) => commands["HeadlessExperimental.disable"].result.parse(await send("HeadlessExperimental.disable", commands["HeadlessExperimental.disable"].params.parse(params ?? {}))), "HeadlessExperimental.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.HeadlessExperimental.EnableParams) => commands["HeadlessExperimental.enable"].result.parse(await send("HeadlessExperimental.enable", commands["HeadlessExperimental.enable"].params.parse(params ?? {}))), "HeadlessExperimental.enable", "command"),
+      beginFrame: withCdpName(
+        async (params?: cdp.types.ts.HeadlessExperimental.BeginFrameParams) =>
+          commands["HeadlessExperimental.beginFrame"].result.parse(
+            await send(
+              "HeadlessExperimental.beginFrame",
+              commands["HeadlessExperimental.beginFrame"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeadlessExperimental.beginFrame",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.HeadlessExperimental.DisableParams) =>
+          commands["HeadlessExperimental.disable"].result.parse(
+            await send(
+              "HeadlessExperimental.disable",
+              commands["HeadlessExperimental.disable"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeadlessExperimental.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.HeadlessExperimental.EnableParams) =>
+          commands["HeadlessExperimental.enable"].result.parse(
+            await send(
+              "HeadlessExperimental.enable",
+              commands["HeadlessExperimental.enable"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeadlessExperimental.enable",
+        "command",
+      ),
     },
     HeapProfiler: {
-      addInspectedHeapObject: withCdpName(async (params?: cdp.types.ts.HeapProfiler.AddInspectedHeapObjectParams) => commands["HeapProfiler.addInspectedHeapObject"].result.parse(await send("HeapProfiler.addInspectedHeapObject", commands["HeapProfiler.addInspectedHeapObject"].params.parse(params ?? {}))), "HeapProfiler.addInspectedHeapObject", "command"),
-      collectGarbage: withCdpName(async (params?: cdp.types.ts.HeapProfiler.CollectGarbageParams) => commands["HeapProfiler.collectGarbage"].result.parse(await send("HeapProfiler.collectGarbage", commands["HeapProfiler.collectGarbage"].params.parse(params ?? {}))), "HeapProfiler.collectGarbage", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.HeapProfiler.DisableParams) => commands["HeapProfiler.disable"].result.parse(await send("HeapProfiler.disable", commands["HeapProfiler.disable"].params.parse(params ?? {}))), "HeapProfiler.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.HeapProfiler.EnableParams) => commands["HeapProfiler.enable"].result.parse(await send("HeapProfiler.enable", commands["HeapProfiler.enable"].params.parse(params ?? {}))), "HeapProfiler.enable", "command"),
-      getHeapObjectId: withCdpName(async (params?: cdp.types.ts.HeapProfiler.GetHeapObjectIdParams) => commands["HeapProfiler.getHeapObjectId"].result.parse(await send("HeapProfiler.getHeapObjectId", commands["HeapProfiler.getHeapObjectId"].params.parse(params ?? {}))), "HeapProfiler.getHeapObjectId", "command"),
-      getObjectByHeapObjectId: withCdpName(async (params?: cdp.types.ts.HeapProfiler.GetObjectByHeapObjectIdParams) => commands["HeapProfiler.getObjectByHeapObjectId"].result.parse(await send("HeapProfiler.getObjectByHeapObjectId", commands["HeapProfiler.getObjectByHeapObjectId"].params.parse(params ?? {}))), "HeapProfiler.getObjectByHeapObjectId", "command"),
-      getSamplingProfile: withCdpName(async (params?: cdp.types.ts.HeapProfiler.GetSamplingProfileParams) => commands["HeapProfiler.getSamplingProfile"].result.parse(await send("HeapProfiler.getSamplingProfile", commands["HeapProfiler.getSamplingProfile"].params.parse(params ?? {}))), "HeapProfiler.getSamplingProfile", "command"),
-      startSampling: withCdpName(async (params?: cdp.types.ts.HeapProfiler.StartSamplingParams) => commands["HeapProfiler.startSampling"].result.parse(await send("HeapProfiler.startSampling", commands["HeapProfiler.startSampling"].params.parse(params ?? {}))), "HeapProfiler.startSampling", "command"),
-      startTrackingHeapObjects: withCdpName(async (params?: cdp.types.ts.HeapProfiler.StartTrackingHeapObjectsParams) => commands["HeapProfiler.startTrackingHeapObjects"].result.parse(await send("HeapProfiler.startTrackingHeapObjects", commands["HeapProfiler.startTrackingHeapObjects"].params.parse(params ?? {}))), "HeapProfiler.startTrackingHeapObjects", "command"),
-      stopSampling: withCdpName(async (params?: cdp.types.ts.HeapProfiler.StopSamplingParams) => commands["HeapProfiler.stopSampling"].result.parse(await send("HeapProfiler.stopSampling", commands["HeapProfiler.stopSampling"].params.parse(params ?? {}))), "HeapProfiler.stopSampling", "command"),
-      stopTrackingHeapObjects: withCdpName(async (params?: cdp.types.ts.HeapProfiler.StopTrackingHeapObjectsParams) => commands["HeapProfiler.stopTrackingHeapObjects"].result.parse(await send("HeapProfiler.stopTrackingHeapObjects", commands["HeapProfiler.stopTrackingHeapObjects"].params.parse(params ?? {}))), "HeapProfiler.stopTrackingHeapObjects", "command"),
-      takeHeapSnapshot: withCdpName(async (params?: cdp.types.ts.HeapProfiler.TakeHeapSnapshotParams) => commands["HeapProfiler.takeHeapSnapshot"].result.parse(await send("HeapProfiler.takeHeapSnapshot", commands["HeapProfiler.takeHeapSnapshot"].params.parse(params ?? {}))), "HeapProfiler.takeHeapSnapshot", "command"),
-      addHeapSnapshotChunk: withCdpName(events["HeapProfiler.addHeapSnapshotChunk"], "HeapProfiler.addHeapSnapshotChunk", "event"),
+      addInspectedHeapObject: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.AddInspectedHeapObjectParams) =>
+          commands["HeapProfiler.addInspectedHeapObject"].result.parse(
+            await send(
+              "HeapProfiler.addInspectedHeapObject",
+              commands["HeapProfiler.addInspectedHeapObject"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.addInspectedHeapObject",
+        "command",
+      ),
+      collectGarbage: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.CollectGarbageParams) =>
+          commands["HeapProfiler.collectGarbage"].result.parse(
+            await send(
+              "HeapProfiler.collectGarbage",
+              commands["HeapProfiler.collectGarbage"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.collectGarbage",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.DisableParams) =>
+          commands["HeapProfiler.disable"].result.parse(
+            await send("HeapProfiler.disable", commands["HeapProfiler.disable"].params.parse(params ?? {})),
+          ),
+        "HeapProfiler.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.EnableParams) =>
+          commands["HeapProfiler.enable"].result.parse(
+            await send("HeapProfiler.enable", commands["HeapProfiler.enable"].params.parse(params ?? {})),
+          ),
+        "HeapProfiler.enable",
+        "command",
+      ),
+      getHeapObjectId: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.GetHeapObjectIdParams) =>
+          commands["HeapProfiler.getHeapObjectId"].result.parse(
+            await send(
+              "HeapProfiler.getHeapObjectId",
+              commands["HeapProfiler.getHeapObjectId"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.getHeapObjectId",
+        "command",
+      ),
+      getObjectByHeapObjectId: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.GetObjectByHeapObjectIdParams) =>
+          commands["HeapProfiler.getObjectByHeapObjectId"].result.parse(
+            await send(
+              "HeapProfiler.getObjectByHeapObjectId",
+              commands["HeapProfiler.getObjectByHeapObjectId"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.getObjectByHeapObjectId",
+        "command",
+      ),
+      getSamplingProfile: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.GetSamplingProfileParams) =>
+          commands["HeapProfiler.getSamplingProfile"].result.parse(
+            await send(
+              "HeapProfiler.getSamplingProfile",
+              commands["HeapProfiler.getSamplingProfile"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.getSamplingProfile",
+        "command",
+      ),
+      startSampling: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.StartSamplingParams) =>
+          commands["HeapProfiler.startSampling"].result.parse(
+            await send("HeapProfiler.startSampling", commands["HeapProfiler.startSampling"].params.parse(params ?? {})),
+          ),
+        "HeapProfiler.startSampling",
+        "command",
+      ),
+      startTrackingHeapObjects: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.StartTrackingHeapObjectsParams) =>
+          commands["HeapProfiler.startTrackingHeapObjects"].result.parse(
+            await send(
+              "HeapProfiler.startTrackingHeapObjects",
+              commands["HeapProfiler.startTrackingHeapObjects"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.startTrackingHeapObjects",
+        "command",
+      ),
+      stopSampling: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.StopSamplingParams) =>
+          commands["HeapProfiler.stopSampling"].result.parse(
+            await send("HeapProfiler.stopSampling", commands["HeapProfiler.stopSampling"].params.parse(params ?? {})),
+          ),
+        "HeapProfiler.stopSampling",
+        "command",
+      ),
+      stopTrackingHeapObjects: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.StopTrackingHeapObjectsParams) =>
+          commands["HeapProfiler.stopTrackingHeapObjects"].result.parse(
+            await send(
+              "HeapProfiler.stopTrackingHeapObjects",
+              commands["HeapProfiler.stopTrackingHeapObjects"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.stopTrackingHeapObjects",
+        "command",
+      ),
+      takeHeapSnapshot: withCdpName(
+        async (params?: cdp.types.ts.HeapProfiler.TakeHeapSnapshotParams) =>
+          commands["HeapProfiler.takeHeapSnapshot"].result.parse(
+            await send(
+              "HeapProfiler.takeHeapSnapshot",
+              commands["HeapProfiler.takeHeapSnapshot"].params.parse(params ?? {}),
+            ),
+          ),
+        "HeapProfiler.takeHeapSnapshot",
+        "command",
+      ),
+      addHeapSnapshotChunk: withCdpName(
+        events["HeapProfiler.addHeapSnapshotChunk"],
+        "HeapProfiler.addHeapSnapshotChunk",
+        "event",
+      ),
       heapStatsUpdate: withCdpName(events["HeapProfiler.heapStatsUpdate"], "HeapProfiler.heapStatsUpdate", "event"),
       lastSeenObjectId: withCdpName(events["HeapProfiler.lastSeenObjectId"], "HeapProfiler.lastSeenObjectId", "event"),
-      reportHeapSnapshotProgress: withCdpName(events["HeapProfiler.reportHeapSnapshotProgress"], "HeapProfiler.reportHeapSnapshotProgress", "event"),
+      reportHeapSnapshotProgress: withCdpName(
+        events["HeapProfiler.reportHeapSnapshotProgress"],
+        "HeapProfiler.reportHeapSnapshotProgress",
+        "event",
+      ),
       resetProfiles: withCdpName(events["HeapProfiler.resetProfiles"], "HeapProfiler.resetProfiles", "event"),
     },
     IndexedDB: {
-      clearObjectStore: withCdpName(async (params?: cdp.types.ts.IndexedDB.ClearObjectStoreParams) => commands["IndexedDB.clearObjectStore"].result.parse(await send("IndexedDB.clearObjectStore", commands["IndexedDB.clearObjectStore"].params.parse(params ?? {}))), "IndexedDB.clearObjectStore", "command"),
-      deleteDatabase: withCdpName(async (params?: cdp.types.ts.IndexedDB.DeleteDatabaseParams) => commands["IndexedDB.deleteDatabase"].result.parse(await send("IndexedDB.deleteDatabase", commands["IndexedDB.deleteDatabase"].params.parse(params ?? {}))), "IndexedDB.deleteDatabase", "command"),
-      deleteObjectStoreEntries: withCdpName(async (params?: cdp.types.ts.IndexedDB.DeleteObjectStoreEntriesParams) => commands["IndexedDB.deleteObjectStoreEntries"].result.parse(await send("IndexedDB.deleteObjectStoreEntries", commands["IndexedDB.deleteObjectStoreEntries"].params.parse(params ?? {}))), "IndexedDB.deleteObjectStoreEntries", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.IndexedDB.DisableParams) => commands["IndexedDB.disable"].result.parse(await send("IndexedDB.disable", commands["IndexedDB.disable"].params.parse(params ?? {}))), "IndexedDB.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.IndexedDB.EnableParams) => commands["IndexedDB.enable"].result.parse(await send("IndexedDB.enable", commands["IndexedDB.enable"].params.parse(params ?? {}))), "IndexedDB.enable", "command"),
-      requestData: withCdpName(async (params?: cdp.types.ts.IndexedDB.RequestDataParams) => commands["IndexedDB.requestData"].result.parse(await send("IndexedDB.requestData", commands["IndexedDB.requestData"].params.parse(params ?? {}))), "IndexedDB.requestData", "command"),
-      getMetadata: withCdpName(async (params?: cdp.types.ts.IndexedDB.GetMetadataParams) => commands["IndexedDB.getMetadata"].result.parse(await send("IndexedDB.getMetadata", commands["IndexedDB.getMetadata"].params.parse(params ?? {}))), "IndexedDB.getMetadata", "command"),
-      requestDatabase: withCdpName(async (params?: cdp.types.ts.IndexedDB.RequestDatabaseParams) => commands["IndexedDB.requestDatabase"].result.parse(await send("IndexedDB.requestDatabase", commands["IndexedDB.requestDatabase"].params.parse(params ?? {}))), "IndexedDB.requestDatabase", "command"),
-      requestDatabaseNames: withCdpName(async (params?: cdp.types.ts.IndexedDB.RequestDatabaseNamesParams) => commands["IndexedDB.requestDatabaseNames"].result.parse(await send("IndexedDB.requestDatabaseNames", commands["IndexedDB.requestDatabaseNames"].params.parse(params ?? {}))), "IndexedDB.requestDatabaseNames", "command"),
+      clearObjectStore: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.ClearObjectStoreParams) =>
+          commands["IndexedDB.clearObjectStore"].result.parse(
+            await send("IndexedDB.clearObjectStore", commands["IndexedDB.clearObjectStore"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.clearObjectStore",
+        "command",
+      ),
+      deleteDatabase: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.DeleteDatabaseParams) =>
+          commands["IndexedDB.deleteDatabase"].result.parse(
+            await send("IndexedDB.deleteDatabase", commands["IndexedDB.deleteDatabase"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.deleteDatabase",
+        "command",
+      ),
+      deleteObjectStoreEntries: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.DeleteObjectStoreEntriesParams) =>
+          commands["IndexedDB.deleteObjectStoreEntries"].result.parse(
+            await send(
+              "IndexedDB.deleteObjectStoreEntries",
+              commands["IndexedDB.deleteObjectStoreEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "IndexedDB.deleteObjectStoreEntries",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.DisableParams) =>
+          commands["IndexedDB.disable"].result.parse(
+            await send("IndexedDB.disable", commands["IndexedDB.disable"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.EnableParams) =>
+          commands["IndexedDB.enable"].result.parse(
+            await send("IndexedDB.enable", commands["IndexedDB.enable"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.enable",
+        "command",
+      ),
+      requestData: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.RequestDataParams) =>
+          commands["IndexedDB.requestData"].result.parse(
+            await send("IndexedDB.requestData", commands["IndexedDB.requestData"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.requestData",
+        "command",
+      ),
+      getMetadata: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.GetMetadataParams) =>
+          commands["IndexedDB.getMetadata"].result.parse(
+            await send("IndexedDB.getMetadata", commands["IndexedDB.getMetadata"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.getMetadata",
+        "command",
+      ),
+      requestDatabase: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.RequestDatabaseParams) =>
+          commands["IndexedDB.requestDatabase"].result.parse(
+            await send("IndexedDB.requestDatabase", commands["IndexedDB.requestDatabase"].params.parse(params ?? {})),
+          ),
+        "IndexedDB.requestDatabase",
+        "command",
+      ),
+      requestDatabaseNames: withCdpName(
+        async (params?: cdp.types.ts.IndexedDB.RequestDatabaseNamesParams) =>
+          commands["IndexedDB.requestDatabaseNames"].result.parse(
+            await send(
+              "IndexedDB.requestDatabaseNames",
+              commands["IndexedDB.requestDatabaseNames"].params.parse(params ?? {}),
+            ),
+          ),
+        "IndexedDB.requestDatabaseNames",
+        "command",
+      ),
     },
     Input: {
-      dispatchDragEvent: withCdpName(async (params?: cdp.types.ts.Input.DispatchDragEventParams) => commands["Input.dispatchDragEvent"].result.parse(await send("Input.dispatchDragEvent", commands["Input.dispatchDragEvent"].params.parse(params ?? {}))), "Input.dispatchDragEvent", "command"),
-      dispatchKeyEvent: withCdpName(async (params?: cdp.types.ts.Input.DispatchKeyEventParams) => commands["Input.dispatchKeyEvent"].result.parse(await send("Input.dispatchKeyEvent", commands["Input.dispatchKeyEvent"].params.parse(params ?? {}))), "Input.dispatchKeyEvent", "command"),
-      insertText: withCdpName(async (params?: cdp.types.ts.Input.InsertTextParams) => commands["Input.insertText"].result.parse(await send("Input.insertText", commands["Input.insertText"].params.parse(params ?? {}))), "Input.insertText", "command"),
-      imeSetComposition: withCdpName(async (params?: cdp.types.ts.Input.ImeSetCompositionParams) => commands["Input.imeSetComposition"].result.parse(await send("Input.imeSetComposition", commands["Input.imeSetComposition"].params.parse(params ?? {}))), "Input.imeSetComposition", "command"),
-      dispatchMouseEvent: withCdpName(async (params?: cdp.types.ts.Input.DispatchMouseEventParams) => commands["Input.dispatchMouseEvent"].result.parse(await send("Input.dispatchMouseEvent", commands["Input.dispatchMouseEvent"].params.parse(params ?? {}))), "Input.dispatchMouseEvent", "command"),
-      dispatchTouchEvent: withCdpName(async (params?: cdp.types.ts.Input.DispatchTouchEventParams) => commands["Input.dispatchTouchEvent"].result.parse(await send("Input.dispatchTouchEvent", commands["Input.dispatchTouchEvent"].params.parse(params ?? {}))), "Input.dispatchTouchEvent", "command"),
-      cancelDragging: withCdpName(async (params?: cdp.types.ts.Input.CancelDraggingParams) => commands["Input.cancelDragging"].result.parse(await send("Input.cancelDragging", commands["Input.cancelDragging"].params.parse(params ?? {}))), "Input.cancelDragging", "command"),
-      emulateTouchFromMouseEvent: withCdpName(async (params?: cdp.types.ts.Input.EmulateTouchFromMouseEventParams) => commands["Input.emulateTouchFromMouseEvent"].result.parse(await send("Input.emulateTouchFromMouseEvent", commands["Input.emulateTouchFromMouseEvent"].params.parse(params ?? {}))), "Input.emulateTouchFromMouseEvent", "command"),
-      setIgnoreInputEvents: withCdpName(async (params?: cdp.types.ts.Input.SetIgnoreInputEventsParams) => commands["Input.setIgnoreInputEvents"].result.parse(await send("Input.setIgnoreInputEvents", commands["Input.setIgnoreInputEvents"].params.parse(params ?? {}))), "Input.setIgnoreInputEvents", "command"),
-      setInterceptDrags: withCdpName(async (params?: cdp.types.ts.Input.SetInterceptDragsParams) => commands["Input.setInterceptDrags"].result.parse(await send("Input.setInterceptDrags", commands["Input.setInterceptDrags"].params.parse(params ?? {}))), "Input.setInterceptDrags", "command"),
-      synthesizePinchGesture: withCdpName(async (params?: cdp.types.ts.Input.SynthesizePinchGestureParams) => commands["Input.synthesizePinchGesture"].result.parse(await send("Input.synthesizePinchGesture", commands["Input.synthesizePinchGesture"].params.parse(params ?? {}))), "Input.synthesizePinchGesture", "command"),
-      synthesizeScrollGesture: withCdpName(async (params?: cdp.types.ts.Input.SynthesizeScrollGestureParams) => commands["Input.synthesizeScrollGesture"].result.parse(await send("Input.synthesizeScrollGesture", commands["Input.synthesizeScrollGesture"].params.parse(params ?? {}))), "Input.synthesizeScrollGesture", "command"),
-      synthesizeTapGesture: withCdpName(async (params?: cdp.types.ts.Input.SynthesizeTapGestureParams) => commands["Input.synthesizeTapGesture"].result.parse(await send("Input.synthesizeTapGesture", commands["Input.synthesizeTapGesture"].params.parse(params ?? {}))), "Input.synthesizeTapGesture", "command"),
+      dispatchDragEvent: withCdpName(
+        async (params?: cdp.types.ts.Input.DispatchDragEventParams) =>
+          commands["Input.dispatchDragEvent"].result.parse(
+            await send("Input.dispatchDragEvent", commands["Input.dispatchDragEvent"].params.parse(params ?? {})),
+          ),
+        "Input.dispatchDragEvent",
+        "command",
+      ),
+      dispatchKeyEvent: withCdpName(
+        async (params?: cdp.types.ts.Input.DispatchKeyEventParams) =>
+          commands["Input.dispatchKeyEvent"].result.parse(
+            await send("Input.dispatchKeyEvent", commands["Input.dispatchKeyEvent"].params.parse(params ?? {})),
+          ),
+        "Input.dispatchKeyEvent",
+        "command",
+      ),
+      insertText: withCdpName(
+        async (params?: cdp.types.ts.Input.InsertTextParams) =>
+          commands["Input.insertText"].result.parse(
+            await send("Input.insertText", commands["Input.insertText"].params.parse(params ?? {})),
+          ),
+        "Input.insertText",
+        "command",
+      ),
+      imeSetComposition: withCdpName(
+        async (params?: cdp.types.ts.Input.ImeSetCompositionParams) =>
+          commands["Input.imeSetComposition"].result.parse(
+            await send("Input.imeSetComposition", commands["Input.imeSetComposition"].params.parse(params ?? {})),
+          ),
+        "Input.imeSetComposition",
+        "command",
+      ),
+      dispatchMouseEvent: withCdpName(
+        async (params?: cdp.types.ts.Input.DispatchMouseEventParams) =>
+          commands["Input.dispatchMouseEvent"].result.parse(
+            await send("Input.dispatchMouseEvent", commands["Input.dispatchMouseEvent"].params.parse(params ?? {})),
+          ),
+        "Input.dispatchMouseEvent",
+        "command",
+      ),
+      dispatchTouchEvent: withCdpName(
+        async (params?: cdp.types.ts.Input.DispatchTouchEventParams) =>
+          commands["Input.dispatchTouchEvent"].result.parse(
+            await send("Input.dispatchTouchEvent", commands["Input.dispatchTouchEvent"].params.parse(params ?? {})),
+          ),
+        "Input.dispatchTouchEvent",
+        "command",
+      ),
+      cancelDragging: withCdpName(
+        async (params?: cdp.types.ts.Input.CancelDraggingParams) =>
+          commands["Input.cancelDragging"].result.parse(
+            await send("Input.cancelDragging", commands["Input.cancelDragging"].params.parse(params ?? {})),
+          ),
+        "Input.cancelDragging",
+        "command",
+      ),
+      emulateTouchFromMouseEvent: withCdpName(
+        async (params?: cdp.types.ts.Input.EmulateTouchFromMouseEventParams) =>
+          commands["Input.emulateTouchFromMouseEvent"].result.parse(
+            await send(
+              "Input.emulateTouchFromMouseEvent",
+              commands["Input.emulateTouchFromMouseEvent"].params.parse(params ?? {}),
+            ),
+          ),
+        "Input.emulateTouchFromMouseEvent",
+        "command",
+      ),
+      setIgnoreInputEvents: withCdpName(
+        async (params?: cdp.types.ts.Input.SetIgnoreInputEventsParams) =>
+          commands["Input.setIgnoreInputEvents"].result.parse(
+            await send("Input.setIgnoreInputEvents", commands["Input.setIgnoreInputEvents"].params.parse(params ?? {})),
+          ),
+        "Input.setIgnoreInputEvents",
+        "command",
+      ),
+      setInterceptDrags: withCdpName(
+        async (params?: cdp.types.ts.Input.SetInterceptDragsParams) =>
+          commands["Input.setInterceptDrags"].result.parse(
+            await send("Input.setInterceptDrags", commands["Input.setInterceptDrags"].params.parse(params ?? {})),
+          ),
+        "Input.setInterceptDrags",
+        "command",
+      ),
+      synthesizePinchGesture: withCdpName(
+        async (params?: cdp.types.ts.Input.SynthesizePinchGestureParams) =>
+          commands["Input.synthesizePinchGesture"].result.parse(
+            await send(
+              "Input.synthesizePinchGesture",
+              commands["Input.synthesizePinchGesture"].params.parse(params ?? {}),
+            ),
+          ),
+        "Input.synthesizePinchGesture",
+        "command",
+      ),
+      synthesizeScrollGesture: withCdpName(
+        async (params?: cdp.types.ts.Input.SynthesizeScrollGestureParams) =>
+          commands["Input.synthesizeScrollGesture"].result.parse(
+            await send(
+              "Input.synthesizeScrollGesture",
+              commands["Input.synthesizeScrollGesture"].params.parse(params ?? {}),
+            ),
+          ),
+        "Input.synthesizeScrollGesture",
+        "command",
+      ),
+      synthesizeTapGesture: withCdpName(
+        async (params?: cdp.types.ts.Input.SynthesizeTapGestureParams) =>
+          commands["Input.synthesizeTapGesture"].result.parse(
+            await send("Input.synthesizeTapGesture", commands["Input.synthesizeTapGesture"].params.parse(params ?? {})),
+          ),
+        "Input.synthesizeTapGesture",
+        "command",
+      ),
       dragIntercepted: withCdpName(events["Input.dragIntercepted"], "Input.dragIntercepted", "event"),
     },
     Inspector: {
-      disable: withCdpName(async (params?: cdp.types.ts.Inspector.DisableParams) => commands["Inspector.disable"].result.parse(await send("Inspector.disable", commands["Inspector.disable"].params.parse(params ?? {}))), "Inspector.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Inspector.EnableParams) => commands["Inspector.enable"].result.parse(await send("Inspector.enable", commands["Inspector.enable"].params.parse(params ?? {}))), "Inspector.enable", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Inspector.DisableParams) =>
+          commands["Inspector.disable"].result.parse(
+            await send("Inspector.disable", commands["Inspector.disable"].params.parse(params ?? {})),
+          ),
+        "Inspector.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Inspector.EnableParams) =>
+          commands["Inspector.enable"].result.parse(
+            await send("Inspector.enable", commands["Inspector.enable"].params.parse(params ?? {})),
+          ),
+        "Inspector.enable",
+        "command",
+      ),
       detached: withCdpName(events["Inspector.detached"], "Inspector.detached", "event"),
       targetCrashed: withCdpName(events["Inspector.targetCrashed"], "Inspector.targetCrashed", "event"),
-      targetReloadedAfterCrash: withCdpName(events["Inspector.targetReloadedAfterCrash"], "Inspector.targetReloadedAfterCrash", "event"),
+      targetReloadedAfterCrash: withCdpName(
+        events["Inspector.targetReloadedAfterCrash"],
+        "Inspector.targetReloadedAfterCrash",
+        "event",
+      ),
       workerScriptLoaded: withCdpName(events["Inspector.workerScriptLoaded"], "Inspector.workerScriptLoaded", "event"),
     },
     IO: {
-      close: withCdpName(async (params?: cdp.types.ts.IO.CloseParams) => commands["IO.close"].result.parse(await send("IO.close", commands["IO.close"].params.parse(params ?? {}))), "IO.close", "command"),
-      read: withCdpName(async (params?: cdp.types.ts.IO.ReadParams) => commands["IO.read"].result.parse(await send("IO.read", commands["IO.read"].params.parse(params ?? {}))), "IO.read", "command"),
-      resolveBlob: withCdpName(async (params?: cdp.types.ts.IO.ResolveBlobParams) => commands["IO.resolveBlob"].result.parse(await send("IO.resolveBlob", commands["IO.resolveBlob"].params.parse(params ?? {}))), "IO.resolveBlob", "command"),
+      close: withCdpName(
+        async (params?: cdp.types.ts.IO.CloseParams) =>
+          commands["IO.close"].result.parse(await send("IO.close", commands["IO.close"].params.parse(params ?? {}))),
+        "IO.close",
+        "command",
+      ),
+      read: withCdpName(
+        async (params?: cdp.types.ts.IO.ReadParams) =>
+          commands["IO.read"].result.parse(await send("IO.read", commands["IO.read"].params.parse(params ?? {}))),
+        "IO.read",
+        "command",
+      ),
+      resolveBlob: withCdpName(
+        async (params?: cdp.types.ts.IO.ResolveBlobParams) =>
+          commands["IO.resolveBlob"].result.parse(
+            await send("IO.resolveBlob", commands["IO.resolveBlob"].params.parse(params ?? {})),
+          ),
+        "IO.resolveBlob",
+        "command",
+      ),
     },
     LayerTree: {
-      compositingReasons: withCdpName(async (params?: cdp.types.ts.LayerTree.CompositingReasonsParams) => commands["LayerTree.compositingReasons"].result.parse(await send("LayerTree.compositingReasons", commands["LayerTree.compositingReasons"].params.parse(params ?? {}))), "LayerTree.compositingReasons", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.LayerTree.DisableParams) => commands["LayerTree.disable"].result.parse(await send("LayerTree.disable", commands["LayerTree.disable"].params.parse(params ?? {}))), "LayerTree.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.LayerTree.EnableParams) => commands["LayerTree.enable"].result.parse(await send("LayerTree.enable", commands["LayerTree.enable"].params.parse(params ?? {}))), "LayerTree.enable", "command"),
-      loadSnapshot: withCdpName(async (params?: cdp.types.ts.LayerTree.LoadSnapshotParams) => commands["LayerTree.loadSnapshot"].result.parse(await send("LayerTree.loadSnapshot", commands["LayerTree.loadSnapshot"].params.parse(params ?? {}))), "LayerTree.loadSnapshot", "command"),
-      makeSnapshot: withCdpName(async (params?: cdp.types.ts.LayerTree.MakeSnapshotParams) => commands["LayerTree.makeSnapshot"].result.parse(await send("LayerTree.makeSnapshot", commands["LayerTree.makeSnapshot"].params.parse(params ?? {}))), "LayerTree.makeSnapshot", "command"),
-      profileSnapshot: withCdpName(async (params?: cdp.types.ts.LayerTree.ProfileSnapshotParams) => commands["LayerTree.profileSnapshot"].result.parse(await send("LayerTree.profileSnapshot", commands["LayerTree.profileSnapshot"].params.parse(params ?? {}))), "LayerTree.profileSnapshot", "command"),
-      releaseSnapshot: withCdpName(async (params?: cdp.types.ts.LayerTree.ReleaseSnapshotParams) => commands["LayerTree.releaseSnapshot"].result.parse(await send("LayerTree.releaseSnapshot", commands["LayerTree.releaseSnapshot"].params.parse(params ?? {}))), "LayerTree.releaseSnapshot", "command"),
-      replaySnapshot: withCdpName(async (params?: cdp.types.ts.LayerTree.ReplaySnapshotParams) => commands["LayerTree.replaySnapshot"].result.parse(await send("LayerTree.replaySnapshot", commands["LayerTree.replaySnapshot"].params.parse(params ?? {}))), "LayerTree.replaySnapshot", "command"),
-      snapshotCommandLog: withCdpName(async (params?: cdp.types.ts.LayerTree.SnapshotCommandLogParams) => commands["LayerTree.snapshotCommandLog"].result.parse(await send("LayerTree.snapshotCommandLog", commands["LayerTree.snapshotCommandLog"].params.parse(params ?? {}))), "LayerTree.snapshotCommandLog", "command"),
+      compositingReasons: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.CompositingReasonsParams) =>
+          commands["LayerTree.compositingReasons"].result.parse(
+            await send(
+              "LayerTree.compositingReasons",
+              commands["LayerTree.compositingReasons"].params.parse(params ?? {}),
+            ),
+          ),
+        "LayerTree.compositingReasons",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.DisableParams) =>
+          commands["LayerTree.disable"].result.parse(
+            await send("LayerTree.disable", commands["LayerTree.disable"].params.parse(params ?? {})),
+          ),
+        "LayerTree.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.EnableParams) =>
+          commands["LayerTree.enable"].result.parse(
+            await send("LayerTree.enable", commands["LayerTree.enable"].params.parse(params ?? {})),
+          ),
+        "LayerTree.enable",
+        "command",
+      ),
+      loadSnapshot: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.LoadSnapshotParams) =>
+          commands["LayerTree.loadSnapshot"].result.parse(
+            await send("LayerTree.loadSnapshot", commands["LayerTree.loadSnapshot"].params.parse(params ?? {})),
+          ),
+        "LayerTree.loadSnapshot",
+        "command",
+      ),
+      makeSnapshot: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.MakeSnapshotParams) =>
+          commands["LayerTree.makeSnapshot"].result.parse(
+            await send("LayerTree.makeSnapshot", commands["LayerTree.makeSnapshot"].params.parse(params ?? {})),
+          ),
+        "LayerTree.makeSnapshot",
+        "command",
+      ),
+      profileSnapshot: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.ProfileSnapshotParams) =>
+          commands["LayerTree.profileSnapshot"].result.parse(
+            await send("LayerTree.profileSnapshot", commands["LayerTree.profileSnapshot"].params.parse(params ?? {})),
+          ),
+        "LayerTree.profileSnapshot",
+        "command",
+      ),
+      releaseSnapshot: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.ReleaseSnapshotParams) =>
+          commands["LayerTree.releaseSnapshot"].result.parse(
+            await send("LayerTree.releaseSnapshot", commands["LayerTree.releaseSnapshot"].params.parse(params ?? {})),
+          ),
+        "LayerTree.releaseSnapshot",
+        "command",
+      ),
+      replaySnapshot: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.ReplaySnapshotParams) =>
+          commands["LayerTree.replaySnapshot"].result.parse(
+            await send("LayerTree.replaySnapshot", commands["LayerTree.replaySnapshot"].params.parse(params ?? {})),
+          ),
+        "LayerTree.replaySnapshot",
+        "command",
+      ),
+      snapshotCommandLog: withCdpName(
+        async (params?: cdp.types.ts.LayerTree.SnapshotCommandLogParams) =>
+          commands["LayerTree.snapshotCommandLog"].result.parse(
+            await send(
+              "LayerTree.snapshotCommandLog",
+              commands["LayerTree.snapshotCommandLog"].params.parse(params ?? {}),
+            ),
+          ),
+        "LayerTree.snapshotCommandLog",
+        "command",
+      ),
       layerPainted: withCdpName(events["LayerTree.layerPainted"], "LayerTree.layerPainted", "event"),
       layerTreeDidChange: withCdpName(events["LayerTree.layerTreeDidChange"], "LayerTree.layerTreeDidChange", "event"),
     },
     Log: {
-      clear: withCdpName(async (params?: cdp.types.ts.Log.ClearParams) => commands["Log.clear"].result.parse(await send("Log.clear", commands["Log.clear"].params.parse(params ?? {}))), "Log.clear", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Log.DisableParams) => commands["Log.disable"].result.parse(await send("Log.disable", commands["Log.disable"].params.parse(params ?? {}))), "Log.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Log.EnableParams) => commands["Log.enable"].result.parse(await send("Log.enable", commands["Log.enable"].params.parse(params ?? {}))), "Log.enable", "command"),
-      startViolationsReport: withCdpName(async (params?: cdp.types.ts.Log.StartViolationsReportParams) => commands["Log.startViolationsReport"].result.parse(await send("Log.startViolationsReport", commands["Log.startViolationsReport"].params.parse(params ?? {}))), "Log.startViolationsReport", "command"),
-      stopViolationsReport: withCdpName(async (params?: cdp.types.ts.Log.StopViolationsReportParams) => commands["Log.stopViolationsReport"].result.parse(await send("Log.stopViolationsReport", commands["Log.stopViolationsReport"].params.parse(params ?? {}))), "Log.stopViolationsReport", "command"),
+      clear: withCdpName(
+        async (params?: cdp.types.ts.Log.ClearParams) =>
+          commands["Log.clear"].result.parse(await send("Log.clear", commands["Log.clear"].params.parse(params ?? {}))),
+        "Log.clear",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Log.DisableParams) =>
+          commands["Log.disable"].result.parse(
+            await send("Log.disable", commands["Log.disable"].params.parse(params ?? {})),
+          ),
+        "Log.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Log.EnableParams) =>
+          commands["Log.enable"].result.parse(
+            await send("Log.enable", commands["Log.enable"].params.parse(params ?? {})),
+          ),
+        "Log.enable",
+        "command",
+      ),
+      startViolationsReport: withCdpName(
+        async (params?: cdp.types.ts.Log.StartViolationsReportParams) =>
+          commands["Log.startViolationsReport"].result.parse(
+            await send("Log.startViolationsReport", commands["Log.startViolationsReport"].params.parse(params ?? {})),
+          ),
+        "Log.startViolationsReport",
+        "command",
+      ),
+      stopViolationsReport: withCdpName(
+        async (params?: cdp.types.ts.Log.StopViolationsReportParams) =>
+          commands["Log.stopViolationsReport"].result.parse(
+            await send("Log.stopViolationsReport", commands["Log.stopViolationsReport"].params.parse(params ?? {})),
+          ),
+        "Log.stopViolationsReport",
+        "command",
+      ),
       entryAdded: withCdpName(events["Log.entryAdded"], "Log.entryAdded", "event"),
     },
     Media: {
-      enable: withCdpName(async (params?: cdp.types.ts.Media.EnableParams) => commands["Media.enable"].result.parse(await send("Media.enable", commands["Media.enable"].params.parse(params ?? {}))), "Media.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Media.DisableParams) => commands["Media.disable"].result.parse(await send("Media.disable", commands["Media.disable"].params.parse(params ?? {}))), "Media.disable", "command"),
-      playerPropertiesChanged: withCdpName(events["Media.playerPropertiesChanged"], "Media.playerPropertiesChanged", "event"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Media.EnableParams) =>
+          commands["Media.enable"].result.parse(
+            await send("Media.enable", commands["Media.enable"].params.parse(params ?? {})),
+          ),
+        "Media.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Media.DisableParams) =>
+          commands["Media.disable"].result.parse(
+            await send("Media.disable", commands["Media.disable"].params.parse(params ?? {})),
+          ),
+        "Media.disable",
+        "command",
+      ),
+      playerPropertiesChanged: withCdpName(
+        events["Media.playerPropertiesChanged"],
+        "Media.playerPropertiesChanged",
+        "event",
+      ),
       playerEventsAdded: withCdpName(events["Media.playerEventsAdded"], "Media.playerEventsAdded", "event"),
       playerMessagesLogged: withCdpName(events["Media.playerMessagesLogged"], "Media.playerMessagesLogged", "event"),
       playerErrorsRaised: withCdpName(events["Media.playerErrorsRaised"], "Media.playerErrorsRaised", "event"),
       playerCreated: withCdpName(events["Media.playerCreated"], "Media.playerCreated", "event"),
     },
     Memory: {
-      getDOMCounters: withCdpName(async (params?: cdp.types.ts.Memory.GetDOMCountersParams) => commands["Memory.getDOMCounters"].result.parse(await send("Memory.getDOMCounters", commands["Memory.getDOMCounters"].params.parse(params ?? {}))), "Memory.getDOMCounters", "command"),
-      getDOMCountersForLeakDetection: withCdpName(async (params?: cdp.types.ts.Memory.GetDOMCountersForLeakDetectionParams) => commands["Memory.getDOMCountersForLeakDetection"].result.parse(await send("Memory.getDOMCountersForLeakDetection", commands["Memory.getDOMCountersForLeakDetection"].params.parse(params ?? {}))), "Memory.getDOMCountersForLeakDetection", "command"),
-      prepareForLeakDetection: withCdpName(async (params?: cdp.types.ts.Memory.PrepareForLeakDetectionParams) => commands["Memory.prepareForLeakDetection"].result.parse(await send("Memory.prepareForLeakDetection", commands["Memory.prepareForLeakDetection"].params.parse(params ?? {}))), "Memory.prepareForLeakDetection", "command"),
-      forciblyPurgeJavaScriptMemory: withCdpName(async (params?: cdp.types.ts.Memory.ForciblyPurgeJavaScriptMemoryParams) => commands["Memory.forciblyPurgeJavaScriptMemory"].result.parse(await send("Memory.forciblyPurgeJavaScriptMemory", commands["Memory.forciblyPurgeJavaScriptMemory"].params.parse(params ?? {}))), "Memory.forciblyPurgeJavaScriptMemory", "command"),
-      setPressureNotificationsSuppressed: withCdpName(async (params?: cdp.types.ts.Memory.SetPressureNotificationsSuppressedParams) => commands["Memory.setPressureNotificationsSuppressed"].result.parse(await send("Memory.setPressureNotificationsSuppressed", commands["Memory.setPressureNotificationsSuppressed"].params.parse(params ?? {}))), "Memory.setPressureNotificationsSuppressed", "command"),
-      simulatePressureNotification: withCdpName(async (params?: cdp.types.ts.Memory.SimulatePressureNotificationParams) => commands["Memory.simulatePressureNotification"].result.parse(await send("Memory.simulatePressureNotification", commands["Memory.simulatePressureNotification"].params.parse(params ?? {}))), "Memory.simulatePressureNotification", "command"),
-      startSampling: withCdpName(async (params?: cdp.types.ts.Memory.StartSamplingParams) => commands["Memory.startSampling"].result.parse(await send("Memory.startSampling", commands["Memory.startSampling"].params.parse(params ?? {}))), "Memory.startSampling", "command"),
-      stopSampling: withCdpName(async (params?: cdp.types.ts.Memory.StopSamplingParams) => commands["Memory.stopSampling"].result.parse(await send("Memory.stopSampling", commands["Memory.stopSampling"].params.parse(params ?? {}))), "Memory.stopSampling", "command"),
-      getAllTimeSamplingProfile: withCdpName(async (params?: cdp.types.ts.Memory.GetAllTimeSamplingProfileParams) => commands["Memory.getAllTimeSamplingProfile"].result.parse(await send("Memory.getAllTimeSamplingProfile", commands["Memory.getAllTimeSamplingProfile"].params.parse(params ?? {}))), "Memory.getAllTimeSamplingProfile", "command"),
-      getBrowserSamplingProfile: withCdpName(async (params?: cdp.types.ts.Memory.GetBrowserSamplingProfileParams) => commands["Memory.getBrowserSamplingProfile"].result.parse(await send("Memory.getBrowserSamplingProfile", commands["Memory.getBrowserSamplingProfile"].params.parse(params ?? {}))), "Memory.getBrowserSamplingProfile", "command"),
-      getSamplingProfile: withCdpName(async (params?: cdp.types.ts.Memory.GetSamplingProfileParams) => commands["Memory.getSamplingProfile"].result.parse(await send("Memory.getSamplingProfile", commands["Memory.getSamplingProfile"].params.parse(params ?? {}))), "Memory.getSamplingProfile", "command"),
+      getDOMCounters: withCdpName(
+        async (params?: cdp.types.ts.Memory.GetDOMCountersParams) =>
+          commands["Memory.getDOMCounters"].result.parse(
+            await send("Memory.getDOMCounters", commands["Memory.getDOMCounters"].params.parse(params ?? {})),
+          ),
+        "Memory.getDOMCounters",
+        "command",
+      ),
+      getDOMCountersForLeakDetection: withCdpName(
+        async (params?: cdp.types.ts.Memory.GetDOMCountersForLeakDetectionParams) =>
+          commands["Memory.getDOMCountersForLeakDetection"].result.parse(
+            await send(
+              "Memory.getDOMCountersForLeakDetection",
+              commands["Memory.getDOMCountersForLeakDetection"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.getDOMCountersForLeakDetection",
+        "command",
+      ),
+      prepareForLeakDetection: withCdpName(
+        async (params?: cdp.types.ts.Memory.PrepareForLeakDetectionParams) =>
+          commands["Memory.prepareForLeakDetection"].result.parse(
+            await send(
+              "Memory.prepareForLeakDetection",
+              commands["Memory.prepareForLeakDetection"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.prepareForLeakDetection",
+        "command",
+      ),
+      forciblyPurgeJavaScriptMemory: withCdpName(
+        async (params?: cdp.types.ts.Memory.ForciblyPurgeJavaScriptMemoryParams) =>
+          commands["Memory.forciblyPurgeJavaScriptMemory"].result.parse(
+            await send(
+              "Memory.forciblyPurgeJavaScriptMemory",
+              commands["Memory.forciblyPurgeJavaScriptMemory"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.forciblyPurgeJavaScriptMemory",
+        "command",
+      ),
+      setPressureNotificationsSuppressed: withCdpName(
+        async (params?: cdp.types.ts.Memory.SetPressureNotificationsSuppressedParams) =>
+          commands["Memory.setPressureNotificationsSuppressed"].result.parse(
+            await send(
+              "Memory.setPressureNotificationsSuppressed",
+              commands["Memory.setPressureNotificationsSuppressed"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.setPressureNotificationsSuppressed",
+        "command",
+      ),
+      simulatePressureNotification: withCdpName(
+        async (params?: cdp.types.ts.Memory.SimulatePressureNotificationParams) =>
+          commands["Memory.simulatePressureNotification"].result.parse(
+            await send(
+              "Memory.simulatePressureNotification",
+              commands["Memory.simulatePressureNotification"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.simulatePressureNotification",
+        "command",
+      ),
+      startSampling: withCdpName(
+        async (params?: cdp.types.ts.Memory.StartSamplingParams) =>
+          commands["Memory.startSampling"].result.parse(
+            await send("Memory.startSampling", commands["Memory.startSampling"].params.parse(params ?? {})),
+          ),
+        "Memory.startSampling",
+        "command",
+      ),
+      stopSampling: withCdpName(
+        async (params?: cdp.types.ts.Memory.StopSamplingParams) =>
+          commands["Memory.stopSampling"].result.parse(
+            await send("Memory.stopSampling", commands["Memory.stopSampling"].params.parse(params ?? {})),
+          ),
+        "Memory.stopSampling",
+        "command",
+      ),
+      getAllTimeSamplingProfile: withCdpName(
+        async (params?: cdp.types.ts.Memory.GetAllTimeSamplingProfileParams) =>
+          commands["Memory.getAllTimeSamplingProfile"].result.parse(
+            await send(
+              "Memory.getAllTimeSamplingProfile",
+              commands["Memory.getAllTimeSamplingProfile"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.getAllTimeSamplingProfile",
+        "command",
+      ),
+      getBrowserSamplingProfile: withCdpName(
+        async (params?: cdp.types.ts.Memory.GetBrowserSamplingProfileParams) =>
+          commands["Memory.getBrowserSamplingProfile"].result.parse(
+            await send(
+              "Memory.getBrowserSamplingProfile",
+              commands["Memory.getBrowserSamplingProfile"].params.parse(params ?? {}),
+            ),
+          ),
+        "Memory.getBrowserSamplingProfile",
+        "command",
+      ),
+      getSamplingProfile: withCdpName(
+        async (params?: cdp.types.ts.Memory.GetSamplingProfileParams) =>
+          commands["Memory.getSamplingProfile"].result.parse(
+            await send("Memory.getSamplingProfile", commands["Memory.getSamplingProfile"].params.parse(params ?? {})),
+          ),
+        "Memory.getSamplingProfile",
+        "command",
+      ),
     },
     Network: {
-      setAcceptedEncodings: withCdpName(async (params?: cdp.types.ts.Network.SetAcceptedEncodingsParams) => commands["Network.setAcceptedEncodings"].result.parse(await send("Network.setAcceptedEncodings", commands["Network.setAcceptedEncodings"].params.parse(params ?? {}))), "Network.setAcceptedEncodings", "command"),
-      clearAcceptedEncodingsOverride: withCdpName(async (params?: cdp.types.ts.Network.ClearAcceptedEncodingsOverrideParams) => commands["Network.clearAcceptedEncodingsOverride"].result.parse(await send("Network.clearAcceptedEncodingsOverride", commands["Network.clearAcceptedEncodingsOverride"].params.parse(params ?? {}))), "Network.clearAcceptedEncodingsOverride", "command"),
-      canClearBrowserCache: withCdpName(async (params?: cdp.types.ts.Network.CanClearBrowserCacheParams) => commands["Network.canClearBrowserCache"].result.parse(await send("Network.canClearBrowserCache", commands["Network.canClearBrowserCache"].params.parse(params ?? {}))), "Network.canClearBrowserCache", "command"),
-      canClearBrowserCookies: withCdpName(async (params?: cdp.types.ts.Network.CanClearBrowserCookiesParams) => commands["Network.canClearBrowserCookies"].result.parse(await send("Network.canClearBrowserCookies", commands["Network.canClearBrowserCookies"].params.parse(params ?? {}))), "Network.canClearBrowserCookies", "command"),
-      canEmulateNetworkConditions: withCdpName(async (params?: cdp.types.ts.Network.CanEmulateNetworkConditionsParams) => commands["Network.canEmulateNetworkConditions"].result.parse(await send("Network.canEmulateNetworkConditions", commands["Network.canEmulateNetworkConditions"].params.parse(params ?? {}))), "Network.canEmulateNetworkConditions", "command"),
-      clearBrowserCache: withCdpName(async (params?: cdp.types.ts.Network.ClearBrowserCacheParams) => commands["Network.clearBrowserCache"].result.parse(await send("Network.clearBrowserCache", commands["Network.clearBrowserCache"].params.parse(params ?? {}))), "Network.clearBrowserCache", "command"),
-      clearBrowserCookies: withCdpName(async (params?: cdp.types.ts.Network.ClearBrowserCookiesParams) => commands["Network.clearBrowserCookies"].result.parse(await send("Network.clearBrowserCookies", commands["Network.clearBrowserCookies"].params.parse(params ?? {}))), "Network.clearBrowserCookies", "command"),
-      continueInterceptedRequest: withCdpName(async (params?: cdp.types.ts.Network.ContinueInterceptedRequestParams) => commands["Network.continueInterceptedRequest"].result.parse(await send("Network.continueInterceptedRequest", commands["Network.continueInterceptedRequest"].params.parse(params ?? {}))), "Network.continueInterceptedRequest", "command"),
-      deleteCookies: withCdpName(async (params?: cdp.types.ts.Network.DeleteCookiesParams) => commands["Network.deleteCookies"].result.parse(await send("Network.deleteCookies", commands["Network.deleteCookies"].params.parse(params ?? {}))), "Network.deleteCookies", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Network.DisableParams) => commands["Network.disable"].result.parse(await send("Network.disable", commands["Network.disable"].params.parse(params ?? {}))), "Network.disable", "command"),
-      emulateNetworkConditions: withCdpName(async (params?: cdp.types.ts.Network.EmulateNetworkConditionsParams) => commands["Network.emulateNetworkConditions"].result.parse(await send("Network.emulateNetworkConditions", commands["Network.emulateNetworkConditions"].params.parse(params ?? {}))), "Network.emulateNetworkConditions", "command"),
-      emulateNetworkConditionsByRule: withCdpName(async (params?: cdp.types.ts.Network.EmulateNetworkConditionsByRuleParams) => commands["Network.emulateNetworkConditionsByRule"].result.parse(await send("Network.emulateNetworkConditionsByRule", commands["Network.emulateNetworkConditionsByRule"].params.parse(params ?? {}))), "Network.emulateNetworkConditionsByRule", "command"),
-      overrideNetworkState: withCdpName(async (params?: cdp.types.ts.Network.OverrideNetworkStateParams) => commands["Network.overrideNetworkState"].result.parse(await send("Network.overrideNetworkState", commands["Network.overrideNetworkState"].params.parse(params ?? {}))), "Network.overrideNetworkState", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Network.EnableParams) => commands["Network.enable"].result.parse(await send("Network.enable", commands["Network.enable"].params.parse(params ?? {}))), "Network.enable", "command"),
-      configureDurableMessages: withCdpName(async (params?: cdp.types.ts.Network.ConfigureDurableMessagesParams) => commands["Network.configureDurableMessages"].result.parse(await send("Network.configureDurableMessages", commands["Network.configureDurableMessages"].params.parse(params ?? {}))), "Network.configureDurableMessages", "command"),
-      getAllCookies: withCdpName(async (params?: cdp.types.ts.Network.GetAllCookiesParams) => commands["Network.getAllCookies"].result.parse(await send("Network.getAllCookies", commands["Network.getAllCookies"].params.parse(params ?? {}))), "Network.getAllCookies", "command"),
-      getCertificate: withCdpName(async (params?: cdp.types.ts.Network.GetCertificateParams) => commands["Network.getCertificate"].result.parse(await send("Network.getCertificate", commands["Network.getCertificate"].params.parse(params ?? {}))), "Network.getCertificate", "command"),
-      getCookies: withCdpName(async (params?: cdp.types.ts.Network.GetCookiesParams) => commands["Network.getCookies"].result.parse(await send("Network.getCookies", commands["Network.getCookies"].params.parse(params ?? {}))), "Network.getCookies", "command"),
-      getResponseBody: withCdpName(async (params?: cdp.types.ts.Network.GetResponseBodyParams) => commands["Network.getResponseBody"].result.parse(await send("Network.getResponseBody", commands["Network.getResponseBody"].params.parse(params ?? {}))), "Network.getResponseBody", "command"),
-      getRequestPostData: withCdpName(async (params?: cdp.types.ts.Network.GetRequestPostDataParams) => commands["Network.getRequestPostData"].result.parse(await send("Network.getRequestPostData", commands["Network.getRequestPostData"].params.parse(params ?? {}))), "Network.getRequestPostData", "command"),
-      getResponseBodyForInterception: withCdpName(async (params?: cdp.types.ts.Network.GetResponseBodyForInterceptionParams) => commands["Network.getResponseBodyForInterception"].result.parse(await send("Network.getResponseBodyForInterception", commands["Network.getResponseBodyForInterception"].params.parse(params ?? {}))), "Network.getResponseBodyForInterception", "command"),
-      takeResponseBodyForInterceptionAsStream: withCdpName(async (params?: cdp.types.ts.Network.TakeResponseBodyForInterceptionAsStreamParams) => commands["Network.takeResponseBodyForInterceptionAsStream"].result.parse(await send("Network.takeResponseBodyForInterceptionAsStream", commands["Network.takeResponseBodyForInterceptionAsStream"].params.parse(params ?? {}))), "Network.takeResponseBodyForInterceptionAsStream", "command"),
-      replayXHR: withCdpName(async (params?: cdp.types.ts.Network.ReplayXHRParams) => commands["Network.replayXHR"].result.parse(await send("Network.replayXHR", commands["Network.replayXHR"].params.parse(params ?? {}))), "Network.replayXHR", "command"),
-      searchInResponseBody: withCdpName(async (params?: cdp.types.ts.Network.SearchInResponseBodyParams) => commands["Network.searchInResponseBody"].result.parse(await send("Network.searchInResponseBody", commands["Network.searchInResponseBody"].params.parse(params ?? {}))), "Network.searchInResponseBody", "command"),
-      setBlockedURLs: withCdpName(async (params?: cdp.types.ts.Network.SetBlockedURLsParams) => commands["Network.setBlockedURLs"].result.parse(await send("Network.setBlockedURLs", commands["Network.setBlockedURLs"].params.parse(params ?? {}))), "Network.setBlockedURLs", "command"),
-      setBypassServiceWorker: withCdpName(async (params?: cdp.types.ts.Network.SetBypassServiceWorkerParams) => commands["Network.setBypassServiceWorker"].result.parse(await send("Network.setBypassServiceWorker", commands["Network.setBypassServiceWorker"].params.parse(params ?? {}))), "Network.setBypassServiceWorker", "command"),
-      setCacheDisabled: withCdpName(async (params?: cdp.types.ts.Network.SetCacheDisabledParams) => commands["Network.setCacheDisabled"].result.parse(await send("Network.setCacheDisabled", commands["Network.setCacheDisabled"].params.parse(params ?? {}))), "Network.setCacheDisabled", "command"),
-      setCookie: withCdpName(async (params?: cdp.types.ts.Network.SetCookieParams) => commands["Network.setCookie"].result.parse(await send("Network.setCookie", commands["Network.setCookie"].params.parse(params ?? {}))), "Network.setCookie", "command"),
-      setCookies: withCdpName(async (params?: cdp.types.ts.Network.SetCookiesParams) => commands["Network.setCookies"].result.parse(await send("Network.setCookies", commands["Network.setCookies"].params.parse(params ?? {}))), "Network.setCookies", "command"),
-      setExtraHTTPHeaders: withCdpName(async (params?: cdp.types.ts.Network.SetExtraHTTPHeadersParams) => commands["Network.setExtraHTTPHeaders"].result.parse(await send("Network.setExtraHTTPHeaders", commands["Network.setExtraHTTPHeaders"].params.parse(params ?? {}))), "Network.setExtraHTTPHeaders", "command"),
-      setAttachDebugStack: withCdpName(async (params?: cdp.types.ts.Network.SetAttachDebugStackParams) => commands["Network.setAttachDebugStack"].result.parse(await send("Network.setAttachDebugStack", commands["Network.setAttachDebugStack"].params.parse(params ?? {}))), "Network.setAttachDebugStack", "command"),
-      setRequestInterception: withCdpName(async (params?: cdp.types.ts.Network.SetRequestInterceptionParams) => commands["Network.setRequestInterception"].result.parse(await send("Network.setRequestInterception", commands["Network.setRequestInterception"].params.parse(params ?? {}))), "Network.setRequestInterception", "command"),
-      setUserAgentOverride: withCdpName(async (params?: cdp.types.ts.Network.SetUserAgentOverrideParams) => commands["Network.setUserAgentOverride"].result.parse(await send("Network.setUserAgentOverride", commands["Network.setUserAgentOverride"].params.parse(params ?? {}))), "Network.setUserAgentOverride", "command"),
-      streamResourceContent: withCdpName(async (params?: cdp.types.ts.Network.StreamResourceContentParams) => commands["Network.streamResourceContent"].result.parse(await send("Network.streamResourceContent", commands["Network.streamResourceContent"].params.parse(params ?? {}))), "Network.streamResourceContent", "command"),
-      getSecurityIsolationStatus: withCdpName(async (params?: cdp.types.ts.Network.GetSecurityIsolationStatusParams) => commands["Network.getSecurityIsolationStatus"].result.parse(await send("Network.getSecurityIsolationStatus", commands["Network.getSecurityIsolationStatus"].params.parse(params ?? {}))), "Network.getSecurityIsolationStatus", "command"),
-      enableReportingApi: withCdpName(async (params?: cdp.types.ts.Network.EnableReportingApiParams) => commands["Network.enableReportingApi"].result.parse(await send("Network.enableReportingApi", commands["Network.enableReportingApi"].params.parse(params ?? {}))), "Network.enableReportingApi", "command"),
-      enableDeviceBoundSessions: withCdpName(async (params?: cdp.types.ts.Network.EnableDeviceBoundSessionsParams) => commands["Network.enableDeviceBoundSessions"].result.parse(await send("Network.enableDeviceBoundSessions", commands["Network.enableDeviceBoundSessions"].params.parse(params ?? {}))), "Network.enableDeviceBoundSessions", "command"),
-      deleteDeviceBoundSession: withCdpName(async (params?: cdp.types.ts.Network.DeleteDeviceBoundSessionParams) => commands["Network.deleteDeviceBoundSession"].result.parse(await send("Network.deleteDeviceBoundSession", commands["Network.deleteDeviceBoundSession"].params.parse(params ?? {}))), "Network.deleteDeviceBoundSession", "command"),
-      fetchSchemefulSite: withCdpName(async (params?: cdp.types.ts.Network.FetchSchemefulSiteParams) => commands["Network.fetchSchemefulSite"].result.parse(await send("Network.fetchSchemefulSite", commands["Network.fetchSchemefulSite"].params.parse(params ?? {}))), "Network.fetchSchemefulSite", "command"),
-      loadNetworkResource: withCdpName(async (params?: cdp.types.ts.Network.LoadNetworkResourceParams) => commands["Network.loadNetworkResource"].result.parse(await send("Network.loadNetworkResource", commands["Network.loadNetworkResource"].params.parse(params ?? {}))), "Network.loadNetworkResource", "command"),
-      setCookieControls: withCdpName(async (params?: cdp.types.ts.Network.SetCookieControlsParams) => commands["Network.setCookieControls"].result.parse(await send("Network.setCookieControls", commands["Network.setCookieControls"].params.parse(params ?? {}))), "Network.setCookieControls", "command"),
+      setAcceptedEncodings: withCdpName(
+        async (params?: cdp.types.ts.Network.SetAcceptedEncodingsParams) =>
+          commands["Network.setAcceptedEncodings"].result.parse(
+            await send(
+              "Network.setAcceptedEncodings",
+              commands["Network.setAcceptedEncodings"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setAcceptedEncodings",
+        "command",
+      ),
+      clearAcceptedEncodingsOverride: withCdpName(
+        async (params?: cdp.types.ts.Network.ClearAcceptedEncodingsOverrideParams) =>
+          commands["Network.clearAcceptedEncodingsOverride"].result.parse(
+            await send(
+              "Network.clearAcceptedEncodingsOverride",
+              commands["Network.clearAcceptedEncodingsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.clearAcceptedEncodingsOverride",
+        "command",
+      ),
+      canClearBrowserCache: withCdpName(
+        async (params?: cdp.types.ts.Network.CanClearBrowserCacheParams) =>
+          commands["Network.canClearBrowserCache"].result.parse(
+            await send(
+              "Network.canClearBrowserCache",
+              commands["Network.canClearBrowserCache"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.canClearBrowserCache",
+        "command",
+      ),
+      canClearBrowserCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.CanClearBrowserCookiesParams) =>
+          commands["Network.canClearBrowserCookies"].result.parse(
+            await send(
+              "Network.canClearBrowserCookies",
+              commands["Network.canClearBrowserCookies"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.canClearBrowserCookies",
+        "command",
+      ),
+      canEmulateNetworkConditions: withCdpName(
+        async (params?: cdp.types.ts.Network.CanEmulateNetworkConditionsParams) =>
+          commands["Network.canEmulateNetworkConditions"].result.parse(
+            await send(
+              "Network.canEmulateNetworkConditions",
+              commands["Network.canEmulateNetworkConditions"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.canEmulateNetworkConditions",
+        "command",
+      ),
+      clearBrowserCache: withCdpName(
+        async (params?: cdp.types.ts.Network.ClearBrowserCacheParams) =>
+          commands["Network.clearBrowserCache"].result.parse(
+            await send("Network.clearBrowserCache", commands["Network.clearBrowserCache"].params.parse(params ?? {})),
+          ),
+        "Network.clearBrowserCache",
+        "command",
+      ),
+      clearBrowserCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.ClearBrowserCookiesParams) =>
+          commands["Network.clearBrowserCookies"].result.parse(
+            await send(
+              "Network.clearBrowserCookies",
+              commands["Network.clearBrowserCookies"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.clearBrowserCookies",
+        "command",
+      ),
+      continueInterceptedRequest: withCdpName(
+        async (params?: cdp.types.ts.Network.ContinueInterceptedRequestParams) =>
+          commands["Network.continueInterceptedRequest"].result.parse(
+            await send(
+              "Network.continueInterceptedRequest",
+              commands["Network.continueInterceptedRequest"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.continueInterceptedRequest",
+        "command",
+      ),
+      deleteCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.DeleteCookiesParams) =>
+          commands["Network.deleteCookies"].result.parse(
+            await send("Network.deleteCookies", commands["Network.deleteCookies"].params.parse(params ?? {})),
+          ),
+        "Network.deleteCookies",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Network.DisableParams) =>
+          commands["Network.disable"].result.parse(
+            await send("Network.disable", commands["Network.disable"].params.parse(params ?? {})),
+          ),
+        "Network.disable",
+        "command",
+      ),
+      emulateNetworkConditions: withCdpName(
+        async (params?: cdp.types.ts.Network.EmulateNetworkConditionsParams) =>
+          commands["Network.emulateNetworkConditions"].result.parse(
+            await send(
+              "Network.emulateNetworkConditions",
+              commands["Network.emulateNetworkConditions"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.emulateNetworkConditions",
+        "command",
+      ),
+      emulateNetworkConditionsByRule: withCdpName(
+        async (params?: cdp.types.ts.Network.EmulateNetworkConditionsByRuleParams) =>
+          commands["Network.emulateNetworkConditionsByRule"].result.parse(
+            await send(
+              "Network.emulateNetworkConditionsByRule",
+              commands["Network.emulateNetworkConditionsByRule"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.emulateNetworkConditionsByRule",
+        "command",
+      ),
+      overrideNetworkState: withCdpName(
+        async (params?: cdp.types.ts.Network.OverrideNetworkStateParams) =>
+          commands["Network.overrideNetworkState"].result.parse(
+            await send(
+              "Network.overrideNetworkState",
+              commands["Network.overrideNetworkState"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.overrideNetworkState",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Network.EnableParams) =>
+          commands["Network.enable"].result.parse(
+            await send("Network.enable", commands["Network.enable"].params.parse(params ?? {})),
+          ),
+        "Network.enable",
+        "command",
+      ),
+      configureDurableMessages: withCdpName(
+        async (params?: cdp.types.ts.Network.ConfigureDurableMessagesParams) =>
+          commands["Network.configureDurableMessages"].result.parse(
+            await send(
+              "Network.configureDurableMessages",
+              commands["Network.configureDurableMessages"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.configureDurableMessages",
+        "command",
+      ),
+      getAllCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.GetAllCookiesParams) =>
+          commands["Network.getAllCookies"].result.parse(
+            await send("Network.getAllCookies", commands["Network.getAllCookies"].params.parse(params ?? {})),
+          ),
+        "Network.getAllCookies",
+        "command",
+      ),
+      getCertificate: withCdpName(
+        async (params?: cdp.types.ts.Network.GetCertificateParams) =>
+          commands["Network.getCertificate"].result.parse(
+            await send("Network.getCertificate", commands["Network.getCertificate"].params.parse(params ?? {})),
+          ),
+        "Network.getCertificate",
+        "command",
+      ),
+      getCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.GetCookiesParams) =>
+          commands["Network.getCookies"].result.parse(
+            await send("Network.getCookies", commands["Network.getCookies"].params.parse(params ?? {})),
+          ),
+        "Network.getCookies",
+        "command",
+      ),
+      getResponseBody: withCdpName(
+        async (params?: cdp.types.ts.Network.GetResponseBodyParams) =>
+          commands["Network.getResponseBody"].result.parse(
+            await send("Network.getResponseBody", commands["Network.getResponseBody"].params.parse(params ?? {})),
+          ),
+        "Network.getResponseBody",
+        "command",
+      ),
+      getRequestPostData: withCdpName(
+        async (params?: cdp.types.ts.Network.GetRequestPostDataParams) =>
+          commands["Network.getRequestPostData"].result.parse(
+            await send("Network.getRequestPostData", commands["Network.getRequestPostData"].params.parse(params ?? {})),
+          ),
+        "Network.getRequestPostData",
+        "command",
+      ),
+      getResponseBodyForInterception: withCdpName(
+        async (params?: cdp.types.ts.Network.GetResponseBodyForInterceptionParams) =>
+          commands["Network.getResponseBodyForInterception"].result.parse(
+            await send(
+              "Network.getResponseBodyForInterception",
+              commands["Network.getResponseBodyForInterception"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.getResponseBodyForInterception",
+        "command",
+      ),
+      takeResponseBodyForInterceptionAsStream: withCdpName(
+        async (params?: cdp.types.ts.Network.TakeResponseBodyForInterceptionAsStreamParams) =>
+          commands["Network.takeResponseBodyForInterceptionAsStream"].result.parse(
+            await send(
+              "Network.takeResponseBodyForInterceptionAsStream",
+              commands["Network.takeResponseBodyForInterceptionAsStream"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.takeResponseBodyForInterceptionAsStream",
+        "command",
+      ),
+      replayXHR: withCdpName(
+        async (params?: cdp.types.ts.Network.ReplayXHRParams) =>
+          commands["Network.replayXHR"].result.parse(
+            await send("Network.replayXHR", commands["Network.replayXHR"].params.parse(params ?? {})),
+          ),
+        "Network.replayXHR",
+        "command",
+      ),
+      searchInResponseBody: withCdpName(
+        async (params?: cdp.types.ts.Network.SearchInResponseBodyParams) =>
+          commands["Network.searchInResponseBody"].result.parse(
+            await send(
+              "Network.searchInResponseBody",
+              commands["Network.searchInResponseBody"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.searchInResponseBody",
+        "command",
+      ),
+      setBlockedURLs: withCdpName(
+        async (params?: cdp.types.ts.Network.SetBlockedURLsParams) =>
+          commands["Network.setBlockedURLs"].result.parse(
+            await send("Network.setBlockedURLs", commands["Network.setBlockedURLs"].params.parse(params ?? {})),
+          ),
+        "Network.setBlockedURLs",
+        "command",
+      ),
+      setBypassServiceWorker: withCdpName(
+        async (params?: cdp.types.ts.Network.SetBypassServiceWorkerParams) =>
+          commands["Network.setBypassServiceWorker"].result.parse(
+            await send(
+              "Network.setBypassServiceWorker",
+              commands["Network.setBypassServiceWorker"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setBypassServiceWorker",
+        "command",
+      ),
+      setCacheDisabled: withCdpName(
+        async (params?: cdp.types.ts.Network.SetCacheDisabledParams) =>
+          commands["Network.setCacheDisabled"].result.parse(
+            await send("Network.setCacheDisabled", commands["Network.setCacheDisabled"].params.parse(params ?? {})),
+          ),
+        "Network.setCacheDisabled",
+        "command",
+      ),
+      setCookie: withCdpName(
+        async (params?: cdp.types.ts.Network.SetCookieParams) =>
+          commands["Network.setCookie"].result.parse(
+            await send("Network.setCookie", commands["Network.setCookie"].params.parse(params ?? {})),
+          ),
+        "Network.setCookie",
+        "command",
+      ),
+      setCookies: withCdpName(
+        async (params?: cdp.types.ts.Network.SetCookiesParams) =>
+          commands["Network.setCookies"].result.parse(
+            await send("Network.setCookies", commands["Network.setCookies"].params.parse(params ?? {})),
+          ),
+        "Network.setCookies",
+        "command",
+      ),
+      setExtraHTTPHeaders: withCdpName(
+        async (params?: cdp.types.ts.Network.SetExtraHTTPHeadersParams) =>
+          commands["Network.setExtraHTTPHeaders"].result.parse(
+            await send(
+              "Network.setExtraHTTPHeaders",
+              commands["Network.setExtraHTTPHeaders"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setExtraHTTPHeaders",
+        "command",
+      ),
+      setAttachDebugStack: withCdpName(
+        async (params?: cdp.types.ts.Network.SetAttachDebugStackParams) =>
+          commands["Network.setAttachDebugStack"].result.parse(
+            await send(
+              "Network.setAttachDebugStack",
+              commands["Network.setAttachDebugStack"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setAttachDebugStack",
+        "command",
+      ),
+      setRequestInterception: withCdpName(
+        async (params?: cdp.types.ts.Network.SetRequestInterceptionParams) =>
+          commands["Network.setRequestInterception"].result.parse(
+            await send(
+              "Network.setRequestInterception",
+              commands["Network.setRequestInterception"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setRequestInterception",
+        "command",
+      ),
+      setUserAgentOverride: withCdpName(
+        async (params?: cdp.types.ts.Network.SetUserAgentOverrideParams) =>
+          commands["Network.setUserAgentOverride"].result.parse(
+            await send(
+              "Network.setUserAgentOverride",
+              commands["Network.setUserAgentOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.setUserAgentOverride",
+        "command",
+      ),
+      streamResourceContent: withCdpName(
+        async (params?: cdp.types.ts.Network.StreamResourceContentParams) =>
+          commands["Network.streamResourceContent"].result.parse(
+            await send(
+              "Network.streamResourceContent",
+              commands["Network.streamResourceContent"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.streamResourceContent",
+        "command",
+      ),
+      getSecurityIsolationStatus: withCdpName(
+        async (params?: cdp.types.ts.Network.GetSecurityIsolationStatusParams) =>
+          commands["Network.getSecurityIsolationStatus"].result.parse(
+            await send(
+              "Network.getSecurityIsolationStatus",
+              commands["Network.getSecurityIsolationStatus"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.getSecurityIsolationStatus",
+        "command",
+      ),
+      enableReportingApi: withCdpName(
+        async (params?: cdp.types.ts.Network.EnableReportingApiParams) =>
+          commands["Network.enableReportingApi"].result.parse(
+            await send("Network.enableReportingApi", commands["Network.enableReportingApi"].params.parse(params ?? {})),
+          ),
+        "Network.enableReportingApi",
+        "command",
+      ),
+      enableDeviceBoundSessions: withCdpName(
+        async (params?: cdp.types.ts.Network.EnableDeviceBoundSessionsParams) =>
+          commands["Network.enableDeviceBoundSessions"].result.parse(
+            await send(
+              "Network.enableDeviceBoundSessions",
+              commands["Network.enableDeviceBoundSessions"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.enableDeviceBoundSessions",
+        "command",
+      ),
+      deleteDeviceBoundSession: withCdpName(
+        async (params?: cdp.types.ts.Network.DeleteDeviceBoundSessionParams) =>
+          commands["Network.deleteDeviceBoundSession"].result.parse(
+            await send(
+              "Network.deleteDeviceBoundSession",
+              commands["Network.deleteDeviceBoundSession"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.deleteDeviceBoundSession",
+        "command",
+      ),
+      fetchSchemefulSite: withCdpName(
+        async (params?: cdp.types.ts.Network.FetchSchemefulSiteParams) =>
+          commands["Network.fetchSchemefulSite"].result.parse(
+            await send("Network.fetchSchemefulSite", commands["Network.fetchSchemefulSite"].params.parse(params ?? {})),
+          ),
+        "Network.fetchSchemefulSite",
+        "command",
+      ),
+      loadNetworkResource: withCdpName(
+        async (params?: cdp.types.ts.Network.LoadNetworkResourceParams) =>
+          commands["Network.loadNetworkResource"].result.parse(
+            await send(
+              "Network.loadNetworkResource",
+              commands["Network.loadNetworkResource"].params.parse(params ?? {}),
+            ),
+          ),
+        "Network.loadNetworkResource",
+        "command",
+      ),
+      setCookieControls: withCdpName(
+        async (params?: cdp.types.ts.Network.SetCookieControlsParams) =>
+          commands["Network.setCookieControls"].result.parse(
+            await send("Network.setCookieControls", commands["Network.setCookieControls"].params.parse(params ?? {})),
+          ),
+        "Network.setCookieControls",
+        "command",
+      ),
       dataReceived: withCdpName(events["Network.dataReceived"], "Network.dataReceived", "event"),
-      eventSourceMessageReceived: withCdpName(events["Network.eventSourceMessageReceived"], "Network.eventSourceMessageReceived", "event"),
+      eventSourceMessageReceived: withCdpName(
+        events["Network.eventSourceMessageReceived"],
+        "Network.eventSourceMessageReceived",
+        "event",
+      ),
       loadingFailed: withCdpName(events["Network.loadingFailed"], "Network.loadingFailed", "event"),
       loadingFinished: withCdpName(events["Network.loadingFinished"], "Network.loadingFinished", "event"),
       requestIntercepted: withCdpName(events["Network.requestIntercepted"], "Network.requestIntercepted", "event"),
-      requestServedFromCache: withCdpName(events["Network.requestServedFromCache"], "Network.requestServedFromCache", "event"),
+      requestServedFromCache: withCdpName(
+        events["Network.requestServedFromCache"],
+        "Network.requestServedFromCache",
+        "event",
+      ),
       requestWillBeSent: withCdpName(events["Network.requestWillBeSent"], "Network.requestWillBeSent", "event"),
-      resourceChangedPriority: withCdpName(events["Network.resourceChangedPriority"], "Network.resourceChangedPriority", "event"),
-      signedExchangeReceived: withCdpName(events["Network.signedExchangeReceived"], "Network.signedExchangeReceived", "event"),
+      resourceChangedPriority: withCdpName(
+        events["Network.resourceChangedPriority"],
+        "Network.resourceChangedPriority",
+        "event",
+      ),
+      signedExchangeReceived: withCdpName(
+        events["Network.signedExchangeReceived"],
+        "Network.signedExchangeReceived",
+        "event",
+      ),
       responseReceived: withCdpName(events["Network.responseReceived"], "Network.responseReceived", "event"),
       webSocketClosed: withCdpName(events["Network.webSocketClosed"], "Network.webSocketClosed", "event"),
       webSocketCreated: withCdpName(events["Network.webSocketCreated"], "Network.webSocketCreated", "event"),
       webSocketFrameError: withCdpName(events["Network.webSocketFrameError"], "Network.webSocketFrameError", "event"),
-      webSocketFrameReceived: withCdpName(events["Network.webSocketFrameReceived"], "Network.webSocketFrameReceived", "event"),
+      webSocketFrameReceived: withCdpName(
+        events["Network.webSocketFrameReceived"],
+        "Network.webSocketFrameReceived",
+        "event",
+      ),
       webSocketFrameSent: withCdpName(events["Network.webSocketFrameSent"], "Network.webSocketFrameSent", "event"),
-      webSocketHandshakeResponseReceived: withCdpName(events["Network.webSocketHandshakeResponseReceived"], "Network.webSocketHandshakeResponseReceived", "event"),
-      webSocketWillSendHandshakeRequest: withCdpName(events["Network.webSocketWillSendHandshakeRequest"], "Network.webSocketWillSendHandshakeRequest", "event"),
+      webSocketHandshakeResponseReceived: withCdpName(
+        events["Network.webSocketHandshakeResponseReceived"],
+        "Network.webSocketHandshakeResponseReceived",
+        "event",
+      ),
+      webSocketWillSendHandshakeRequest: withCdpName(
+        events["Network.webSocketWillSendHandshakeRequest"],
+        "Network.webSocketWillSendHandshakeRequest",
+        "event",
+      ),
       webTransportCreated: withCdpName(events["Network.webTransportCreated"], "Network.webTransportCreated", "event"),
-      webTransportConnectionEstablished: withCdpName(events["Network.webTransportConnectionEstablished"], "Network.webTransportConnectionEstablished", "event"),
+      webTransportConnectionEstablished: withCdpName(
+        events["Network.webTransportConnectionEstablished"],
+        "Network.webTransportConnectionEstablished",
+        "event",
+      ),
       webTransportClosed: withCdpName(events["Network.webTransportClosed"], "Network.webTransportClosed", "event"),
-      directTCPSocketCreated: withCdpName(events["Network.directTCPSocketCreated"], "Network.directTCPSocketCreated", "event"),
-      directTCPSocketOpened: withCdpName(events["Network.directTCPSocketOpened"], "Network.directTCPSocketOpened", "event"),
-      directTCPSocketAborted: withCdpName(events["Network.directTCPSocketAborted"], "Network.directTCPSocketAborted", "event"),
-      directTCPSocketClosed: withCdpName(events["Network.directTCPSocketClosed"], "Network.directTCPSocketClosed", "event"),
-      directTCPSocketChunkSent: withCdpName(events["Network.directTCPSocketChunkSent"], "Network.directTCPSocketChunkSent", "event"),
-      directTCPSocketChunkReceived: withCdpName(events["Network.directTCPSocketChunkReceived"], "Network.directTCPSocketChunkReceived", "event"),
-      directUDPSocketJoinedMulticastGroup: withCdpName(events["Network.directUDPSocketJoinedMulticastGroup"], "Network.directUDPSocketJoinedMulticastGroup", "event"),
-      directUDPSocketLeftMulticastGroup: withCdpName(events["Network.directUDPSocketLeftMulticastGroup"], "Network.directUDPSocketLeftMulticastGroup", "event"),
-      directUDPSocketCreated: withCdpName(events["Network.directUDPSocketCreated"], "Network.directUDPSocketCreated", "event"),
-      directUDPSocketOpened: withCdpName(events["Network.directUDPSocketOpened"], "Network.directUDPSocketOpened", "event"),
-      directUDPSocketAborted: withCdpName(events["Network.directUDPSocketAborted"], "Network.directUDPSocketAborted", "event"),
-      directUDPSocketClosed: withCdpName(events["Network.directUDPSocketClosed"], "Network.directUDPSocketClosed", "event"),
-      directUDPSocketChunkSent: withCdpName(events["Network.directUDPSocketChunkSent"], "Network.directUDPSocketChunkSent", "event"),
-      directUDPSocketChunkReceived: withCdpName(events["Network.directUDPSocketChunkReceived"], "Network.directUDPSocketChunkReceived", "event"),
-      requestWillBeSentExtraInfo: withCdpName(events["Network.requestWillBeSentExtraInfo"], "Network.requestWillBeSentExtraInfo", "event"),
-      responseReceivedExtraInfo: withCdpName(events["Network.responseReceivedExtraInfo"], "Network.responseReceivedExtraInfo", "event"),
-      responseReceivedEarlyHints: withCdpName(events["Network.responseReceivedEarlyHints"], "Network.responseReceivedEarlyHints", "event"),
-      trustTokenOperationDone: withCdpName(events["Network.trustTokenOperationDone"], "Network.trustTokenOperationDone", "event"),
+      directTCPSocketCreated: withCdpName(
+        events["Network.directTCPSocketCreated"],
+        "Network.directTCPSocketCreated",
+        "event",
+      ),
+      directTCPSocketOpened: withCdpName(
+        events["Network.directTCPSocketOpened"],
+        "Network.directTCPSocketOpened",
+        "event",
+      ),
+      directTCPSocketAborted: withCdpName(
+        events["Network.directTCPSocketAborted"],
+        "Network.directTCPSocketAborted",
+        "event",
+      ),
+      directTCPSocketClosed: withCdpName(
+        events["Network.directTCPSocketClosed"],
+        "Network.directTCPSocketClosed",
+        "event",
+      ),
+      directTCPSocketChunkSent: withCdpName(
+        events["Network.directTCPSocketChunkSent"],
+        "Network.directTCPSocketChunkSent",
+        "event",
+      ),
+      directTCPSocketChunkReceived: withCdpName(
+        events["Network.directTCPSocketChunkReceived"],
+        "Network.directTCPSocketChunkReceived",
+        "event",
+      ),
+      directUDPSocketJoinedMulticastGroup: withCdpName(
+        events["Network.directUDPSocketJoinedMulticastGroup"],
+        "Network.directUDPSocketJoinedMulticastGroup",
+        "event",
+      ),
+      directUDPSocketLeftMulticastGroup: withCdpName(
+        events["Network.directUDPSocketLeftMulticastGroup"],
+        "Network.directUDPSocketLeftMulticastGroup",
+        "event",
+      ),
+      directUDPSocketCreated: withCdpName(
+        events["Network.directUDPSocketCreated"],
+        "Network.directUDPSocketCreated",
+        "event",
+      ),
+      directUDPSocketOpened: withCdpName(
+        events["Network.directUDPSocketOpened"],
+        "Network.directUDPSocketOpened",
+        "event",
+      ),
+      directUDPSocketAborted: withCdpName(
+        events["Network.directUDPSocketAborted"],
+        "Network.directUDPSocketAborted",
+        "event",
+      ),
+      directUDPSocketClosed: withCdpName(
+        events["Network.directUDPSocketClosed"],
+        "Network.directUDPSocketClosed",
+        "event",
+      ),
+      directUDPSocketChunkSent: withCdpName(
+        events["Network.directUDPSocketChunkSent"],
+        "Network.directUDPSocketChunkSent",
+        "event",
+      ),
+      directUDPSocketChunkReceived: withCdpName(
+        events["Network.directUDPSocketChunkReceived"],
+        "Network.directUDPSocketChunkReceived",
+        "event",
+      ),
+      requestWillBeSentExtraInfo: withCdpName(
+        events["Network.requestWillBeSentExtraInfo"],
+        "Network.requestWillBeSentExtraInfo",
+        "event",
+      ),
+      responseReceivedExtraInfo: withCdpName(
+        events["Network.responseReceivedExtraInfo"],
+        "Network.responseReceivedExtraInfo",
+        "event",
+      ),
+      responseReceivedEarlyHints: withCdpName(
+        events["Network.responseReceivedEarlyHints"],
+        "Network.responseReceivedEarlyHints",
+        "event",
+      ),
+      trustTokenOperationDone: withCdpName(
+        events["Network.trustTokenOperationDone"],
+        "Network.trustTokenOperationDone",
+        "event",
+      ),
       policyUpdated: withCdpName(events["Network.policyUpdated"], "Network.policyUpdated", "event"),
-      reportingApiReportAdded: withCdpName(events["Network.reportingApiReportAdded"], "Network.reportingApiReportAdded", "event"),
-      reportingApiReportUpdated: withCdpName(events["Network.reportingApiReportUpdated"], "Network.reportingApiReportUpdated", "event"),
-      reportingApiEndpointsChangedForOrigin: withCdpName(events["Network.reportingApiEndpointsChangedForOrigin"], "Network.reportingApiEndpointsChangedForOrigin", "event"),
-      deviceBoundSessionsAdded: withCdpName(events["Network.deviceBoundSessionsAdded"], "Network.deviceBoundSessionsAdded", "event"),
-      deviceBoundSessionEventOccurred: withCdpName(events["Network.deviceBoundSessionEventOccurred"], "Network.deviceBoundSessionEventOccurred", "event"),
+      reportingApiReportAdded: withCdpName(
+        events["Network.reportingApiReportAdded"],
+        "Network.reportingApiReportAdded",
+        "event",
+      ),
+      reportingApiReportUpdated: withCdpName(
+        events["Network.reportingApiReportUpdated"],
+        "Network.reportingApiReportUpdated",
+        "event",
+      ),
+      reportingApiEndpointsChangedForOrigin: withCdpName(
+        events["Network.reportingApiEndpointsChangedForOrigin"],
+        "Network.reportingApiEndpointsChangedForOrigin",
+        "event",
+      ),
+      deviceBoundSessionsAdded: withCdpName(
+        events["Network.deviceBoundSessionsAdded"],
+        "Network.deviceBoundSessionsAdded",
+        "event",
+      ),
+      deviceBoundSessionEventOccurred: withCdpName(
+        events["Network.deviceBoundSessionEventOccurred"],
+        "Network.deviceBoundSessionEventOccurred",
+        "event",
+      ),
     },
     Overlay: {
-      disable: withCdpName(async (params?: cdp.types.ts.Overlay.DisableParams) => commands["Overlay.disable"].result.parse(await send("Overlay.disable", commands["Overlay.disable"].params.parse(params ?? {}))), "Overlay.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Overlay.EnableParams) => commands["Overlay.enable"].result.parse(await send("Overlay.enable", commands["Overlay.enable"].params.parse(params ?? {}))), "Overlay.enable", "command"),
-      getHighlightObjectForTest: withCdpName(async (params?: cdp.types.ts.Overlay.GetHighlightObjectForTestParams) => commands["Overlay.getHighlightObjectForTest"].result.parse(await send("Overlay.getHighlightObjectForTest", commands["Overlay.getHighlightObjectForTest"].params.parse(params ?? {}))), "Overlay.getHighlightObjectForTest", "command"),
-      getGridHighlightObjectsForTest: withCdpName(async (params?: cdp.types.ts.Overlay.GetGridHighlightObjectsForTestParams) => commands["Overlay.getGridHighlightObjectsForTest"].result.parse(await send("Overlay.getGridHighlightObjectsForTest", commands["Overlay.getGridHighlightObjectsForTest"].params.parse(params ?? {}))), "Overlay.getGridHighlightObjectsForTest", "command"),
-      getSourceOrderHighlightObjectForTest: withCdpName(async (params?: cdp.types.ts.Overlay.GetSourceOrderHighlightObjectForTestParams) => commands["Overlay.getSourceOrderHighlightObjectForTest"].result.parse(await send("Overlay.getSourceOrderHighlightObjectForTest", commands["Overlay.getSourceOrderHighlightObjectForTest"].params.parse(params ?? {}))), "Overlay.getSourceOrderHighlightObjectForTest", "command"),
-      hideHighlight: withCdpName(async (params?: cdp.types.ts.Overlay.HideHighlightParams) => commands["Overlay.hideHighlight"].result.parse(await send("Overlay.hideHighlight", commands["Overlay.hideHighlight"].params.parse(params ?? {}))), "Overlay.hideHighlight", "command"),
-      highlightFrame: withCdpName(async (params?: cdp.types.ts.Overlay.HighlightFrameParams) => commands["Overlay.highlightFrame"].result.parse(await send("Overlay.highlightFrame", commands["Overlay.highlightFrame"].params.parse(params ?? {}))), "Overlay.highlightFrame", "command"),
-      highlightNode: withCdpName(async (params?: cdp.types.ts.Overlay.HighlightNodeParams) => commands["Overlay.highlightNode"].result.parse(await send("Overlay.highlightNode", commands["Overlay.highlightNode"].params.parse(params ?? {}))), "Overlay.highlightNode", "command"),
-      highlightQuad: withCdpName(async (params?: cdp.types.ts.Overlay.HighlightQuadParams) => commands["Overlay.highlightQuad"].result.parse(await send("Overlay.highlightQuad", commands["Overlay.highlightQuad"].params.parse(params ?? {}))), "Overlay.highlightQuad", "command"),
-      highlightRect: withCdpName(async (params?: cdp.types.ts.Overlay.HighlightRectParams) => commands["Overlay.highlightRect"].result.parse(await send("Overlay.highlightRect", commands["Overlay.highlightRect"].params.parse(params ?? {}))), "Overlay.highlightRect", "command"),
-      highlightSourceOrder: withCdpName(async (params?: cdp.types.ts.Overlay.HighlightSourceOrderParams) => commands["Overlay.highlightSourceOrder"].result.parse(await send("Overlay.highlightSourceOrder", commands["Overlay.highlightSourceOrder"].params.parse(params ?? {}))), "Overlay.highlightSourceOrder", "command"),
-      setInspectMode: withCdpName(async (params?: cdp.types.ts.Overlay.SetInspectModeParams) => commands["Overlay.setInspectMode"].result.parse(await send("Overlay.setInspectMode", commands["Overlay.setInspectMode"].params.parse(params ?? {}))), "Overlay.setInspectMode", "command"),
-      setShowAdHighlights: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowAdHighlightsParams) => commands["Overlay.setShowAdHighlights"].result.parse(await send("Overlay.setShowAdHighlights", commands["Overlay.setShowAdHighlights"].params.parse(params ?? {}))), "Overlay.setShowAdHighlights", "command"),
-      setPausedInDebuggerMessage: withCdpName(async (params?: cdp.types.ts.Overlay.SetPausedInDebuggerMessageParams) => commands["Overlay.setPausedInDebuggerMessage"].result.parse(await send("Overlay.setPausedInDebuggerMessage", commands["Overlay.setPausedInDebuggerMessage"].params.parse(params ?? {}))), "Overlay.setPausedInDebuggerMessage", "command"),
-      setShowDebugBorders: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowDebugBordersParams) => commands["Overlay.setShowDebugBorders"].result.parse(await send("Overlay.setShowDebugBorders", commands["Overlay.setShowDebugBorders"].params.parse(params ?? {}))), "Overlay.setShowDebugBorders", "command"),
-      setShowFPSCounter: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowFPSCounterParams) => commands["Overlay.setShowFPSCounter"].result.parse(await send("Overlay.setShowFPSCounter", commands["Overlay.setShowFPSCounter"].params.parse(params ?? {}))), "Overlay.setShowFPSCounter", "command"),
-      setShowGridOverlays: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowGridOverlaysParams) => commands["Overlay.setShowGridOverlays"].result.parse(await send("Overlay.setShowGridOverlays", commands["Overlay.setShowGridOverlays"].params.parse(params ?? {}))), "Overlay.setShowGridOverlays", "command"),
-      setShowFlexOverlays: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowFlexOverlaysParams) => commands["Overlay.setShowFlexOverlays"].result.parse(await send("Overlay.setShowFlexOverlays", commands["Overlay.setShowFlexOverlays"].params.parse(params ?? {}))), "Overlay.setShowFlexOverlays", "command"),
-      setShowScrollSnapOverlays: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowScrollSnapOverlaysParams) => commands["Overlay.setShowScrollSnapOverlays"].result.parse(await send("Overlay.setShowScrollSnapOverlays", commands["Overlay.setShowScrollSnapOverlays"].params.parse(params ?? {}))), "Overlay.setShowScrollSnapOverlays", "command"),
-      setShowContainerQueryOverlays: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowContainerQueryOverlaysParams) => commands["Overlay.setShowContainerQueryOverlays"].result.parse(await send("Overlay.setShowContainerQueryOverlays", commands["Overlay.setShowContainerQueryOverlays"].params.parse(params ?? {}))), "Overlay.setShowContainerQueryOverlays", "command"),
-      setShowInspectedElementAnchor: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowInspectedElementAnchorParams) => commands["Overlay.setShowInspectedElementAnchor"].result.parse(await send("Overlay.setShowInspectedElementAnchor", commands["Overlay.setShowInspectedElementAnchor"].params.parse(params ?? {}))), "Overlay.setShowInspectedElementAnchor", "command"),
-      setShowPaintRects: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowPaintRectsParams) => commands["Overlay.setShowPaintRects"].result.parse(await send("Overlay.setShowPaintRects", commands["Overlay.setShowPaintRects"].params.parse(params ?? {}))), "Overlay.setShowPaintRects", "command"),
-      setShowLayoutShiftRegions: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowLayoutShiftRegionsParams) => commands["Overlay.setShowLayoutShiftRegions"].result.parse(await send("Overlay.setShowLayoutShiftRegions", commands["Overlay.setShowLayoutShiftRegions"].params.parse(params ?? {}))), "Overlay.setShowLayoutShiftRegions", "command"),
-      setShowScrollBottleneckRects: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowScrollBottleneckRectsParams) => commands["Overlay.setShowScrollBottleneckRects"].result.parse(await send("Overlay.setShowScrollBottleneckRects", commands["Overlay.setShowScrollBottleneckRects"].params.parse(params ?? {}))), "Overlay.setShowScrollBottleneckRects", "command"),
-      setShowHitTestBorders: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowHitTestBordersParams) => commands["Overlay.setShowHitTestBorders"].result.parse(await send("Overlay.setShowHitTestBorders", commands["Overlay.setShowHitTestBorders"].params.parse(params ?? {}))), "Overlay.setShowHitTestBorders", "command"),
-      setShowWebVitals: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowWebVitalsParams) => commands["Overlay.setShowWebVitals"].result.parse(await send("Overlay.setShowWebVitals", commands["Overlay.setShowWebVitals"].params.parse(params ?? {}))), "Overlay.setShowWebVitals", "command"),
-      setShowViewportSizeOnResize: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowViewportSizeOnResizeParams) => commands["Overlay.setShowViewportSizeOnResize"].result.parse(await send("Overlay.setShowViewportSizeOnResize", commands["Overlay.setShowViewportSizeOnResize"].params.parse(params ?? {}))), "Overlay.setShowViewportSizeOnResize", "command"),
-      setShowHinge: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowHingeParams) => commands["Overlay.setShowHinge"].result.parse(await send("Overlay.setShowHinge", commands["Overlay.setShowHinge"].params.parse(params ?? {}))), "Overlay.setShowHinge", "command"),
-      setShowIsolatedElements: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowIsolatedElementsParams) => commands["Overlay.setShowIsolatedElements"].result.parse(await send("Overlay.setShowIsolatedElements", commands["Overlay.setShowIsolatedElements"].params.parse(params ?? {}))), "Overlay.setShowIsolatedElements", "command"),
-      setShowWindowControlsOverlay: withCdpName(async (params?: cdp.types.ts.Overlay.SetShowWindowControlsOverlayParams) => commands["Overlay.setShowWindowControlsOverlay"].result.parse(await send("Overlay.setShowWindowControlsOverlay", commands["Overlay.setShowWindowControlsOverlay"].params.parse(params ?? {}))), "Overlay.setShowWindowControlsOverlay", "command"),
-      inspectNodeRequested: withCdpName(events["Overlay.inspectNodeRequested"], "Overlay.inspectNodeRequested", "event"),
-      nodeHighlightRequested: withCdpName(events["Overlay.nodeHighlightRequested"], "Overlay.nodeHighlightRequested", "event"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Overlay.DisableParams) =>
+          commands["Overlay.disable"].result.parse(
+            await send("Overlay.disable", commands["Overlay.disable"].params.parse(params ?? {})),
+          ),
+        "Overlay.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Overlay.EnableParams) =>
+          commands["Overlay.enable"].result.parse(
+            await send("Overlay.enable", commands["Overlay.enable"].params.parse(params ?? {})),
+          ),
+        "Overlay.enable",
+        "command",
+      ),
+      getHighlightObjectForTest: withCdpName(
+        async (params?: cdp.types.ts.Overlay.GetHighlightObjectForTestParams) =>
+          commands["Overlay.getHighlightObjectForTest"].result.parse(
+            await send(
+              "Overlay.getHighlightObjectForTest",
+              commands["Overlay.getHighlightObjectForTest"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.getHighlightObjectForTest",
+        "command",
+      ),
+      getGridHighlightObjectsForTest: withCdpName(
+        async (params?: cdp.types.ts.Overlay.GetGridHighlightObjectsForTestParams) =>
+          commands["Overlay.getGridHighlightObjectsForTest"].result.parse(
+            await send(
+              "Overlay.getGridHighlightObjectsForTest",
+              commands["Overlay.getGridHighlightObjectsForTest"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.getGridHighlightObjectsForTest",
+        "command",
+      ),
+      getSourceOrderHighlightObjectForTest: withCdpName(
+        async (params?: cdp.types.ts.Overlay.GetSourceOrderHighlightObjectForTestParams) =>
+          commands["Overlay.getSourceOrderHighlightObjectForTest"].result.parse(
+            await send(
+              "Overlay.getSourceOrderHighlightObjectForTest",
+              commands["Overlay.getSourceOrderHighlightObjectForTest"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.getSourceOrderHighlightObjectForTest",
+        "command",
+      ),
+      hideHighlight: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HideHighlightParams) =>
+          commands["Overlay.hideHighlight"].result.parse(
+            await send("Overlay.hideHighlight", commands["Overlay.hideHighlight"].params.parse(params ?? {})),
+          ),
+        "Overlay.hideHighlight",
+        "command",
+      ),
+      highlightFrame: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HighlightFrameParams) =>
+          commands["Overlay.highlightFrame"].result.parse(
+            await send("Overlay.highlightFrame", commands["Overlay.highlightFrame"].params.parse(params ?? {})),
+          ),
+        "Overlay.highlightFrame",
+        "command",
+      ),
+      highlightNode: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HighlightNodeParams) =>
+          commands["Overlay.highlightNode"].result.parse(
+            await send("Overlay.highlightNode", commands["Overlay.highlightNode"].params.parse(params ?? {})),
+          ),
+        "Overlay.highlightNode",
+        "command",
+      ),
+      highlightQuad: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HighlightQuadParams) =>
+          commands["Overlay.highlightQuad"].result.parse(
+            await send("Overlay.highlightQuad", commands["Overlay.highlightQuad"].params.parse(params ?? {})),
+          ),
+        "Overlay.highlightQuad",
+        "command",
+      ),
+      highlightRect: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HighlightRectParams) =>
+          commands["Overlay.highlightRect"].result.parse(
+            await send("Overlay.highlightRect", commands["Overlay.highlightRect"].params.parse(params ?? {})),
+          ),
+        "Overlay.highlightRect",
+        "command",
+      ),
+      highlightSourceOrder: withCdpName(
+        async (params?: cdp.types.ts.Overlay.HighlightSourceOrderParams) =>
+          commands["Overlay.highlightSourceOrder"].result.parse(
+            await send(
+              "Overlay.highlightSourceOrder",
+              commands["Overlay.highlightSourceOrder"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.highlightSourceOrder",
+        "command",
+      ),
+      setInspectMode: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetInspectModeParams) =>
+          commands["Overlay.setInspectMode"].result.parse(
+            await send("Overlay.setInspectMode", commands["Overlay.setInspectMode"].params.parse(params ?? {})),
+          ),
+        "Overlay.setInspectMode",
+        "command",
+      ),
+      setShowAdHighlights: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowAdHighlightsParams) =>
+          commands["Overlay.setShowAdHighlights"].result.parse(
+            await send(
+              "Overlay.setShowAdHighlights",
+              commands["Overlay.setShowAdHighlights"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowAdHighlights",
+        "command",
+      ),
+      setPausedInDebuggerMessage: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetPausedInDebuggerMessageParams) =>
+          commands["Overlay.setPausedInDebuggerMessage"].result.parse(
+            await send(
+              "Overlay.setPausedInDebuggerMessage",
+              commands["Overlay.setPausedInDebuggerMessage"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setPausedInDebuggerMessage",
+        "command",
+      ),
+      setShowDebugBorders: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowDebugBordersParams) =>
+          commands["Overlay.setShowDebugBorders"].result.parse(
+            await send(
+              "Overlay.setShowDebugBorders",
+              commands["Overlay.setShowDebugBorders"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowDebugBorders",
+        "command",
+      ),
+      setShowFPSCounter: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowFPSCounterParams) =>
+          commands["Overlay.setShowFPSCounter"].result.parse(
+            await send("Overlay.setShowFPSCounter", commands["Overlay.setShowFPSCounter"].params.parse(params ?? {})),
+          ),
+        "Overlay.setShowFPSCounter",
+        "command",
+      ),
+      setShowGridOverlays: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowGridOverlaysParams) =>
+          commands["Overlay.setShowGridOverlays"].result.parse(
+            await send(
+              "Overlay.setShowGridOverlays",
+              commands["Overlay.setShowGridOverlays"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowGridOverlays",
+        "command",
+      ),
+      setShowFlexOverlays: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowFlexOverlaysParams) =>
+          commands["Overlay.setShowFlexOverlays"].result.parse(
+            await send(
+              "Overlay.setShowFlexOverlays",
+              commands["Overlay.setShowFlexOverlays"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowFlexOverlays",
+        "command",
+      ),
+      setShowScrollSnapOverlays: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowScrollSnapOverlaysParams) =>
+          commands["Overlay.setShowScrollSnapOverlays"].result.parse(
+            await send(
+              "Overlay.setShowScrollSnapOverlays",
+              commands["Overlay.setShowScrollSnapOverlays"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowScrollSnapOverlays",
+        "command",
+      ),
+      setShowContainerQueryOverlays: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowContainerQueryOverlaysParams) =>
+          commands["Overlay.setShowContainerQueryOverlays"].result.parse(
+            await send(
+              "Overlay.setShowContainerQueryOverlays",
+              commands["Overlay.setShowContainerQueryOverlays"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowContainerQueryOverlays",
+        "command",
+      ),
+      setShowInspectedElementAnchor: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowInspectedElementAnchorParams) =>
+          commands["Overlay.setShowInspectedElementAnchor"].result.parse(
+            await send(
+              "Overlay.setShowInspectedElementAnchor",
+              commands["Overlay.setShowInspectedElementAnchor"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowInspectedElementAnchor",
+        "command",
+      ),
+      setShowPaintRects: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowPaintRectsParams) =>
+          commands["Overlay.setShowPaintRects"].result.parse(
+            await send("Overlay.setShowPaintRects", commands["Overlay.setShowPaintRects"].params.parse(params ?? {})),
+          ),
+        "Overlay.setShowPaintRects",
+        "command",
+      ),
+      setShowLayoutShiftRegions: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowLayoutShiftRegionsParams) =>
+          commands["Overlay.setShowLayoutShiftRegions"].result.parse(
+            await send(
+              "Overlay.setShowLayoutShiftRegions",
+              commands["Overlay.setShowLayoutShiftRegions"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowLayoutShiftRegions",
+        "command",
+      ),
+      setShowScrollBottleneckRects: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowScrollBottleneckRectsParams) =>
+          commands["Overlay.setShowScrollBottleneckRects"].result.parse(
+            await send(
+              "Overlay.setShowScrollBottleneckRects",
+              commands["Overlay.setShowScrollBottleneckRects"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowScrollBottleneckRects",
+        "command",
+      ),
+      setShowHitTestBorders: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowHitTestBordersParams) =>
+          commands["Overlay.setShowHitTestBorders"].result.parse(
+            await send(
+              "Overlay.setShowHitTestBorders",
+              commands["Overlay.setShowHitTestBorders"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowHitTestBorders",
+        "command",
+      ),
+      setShowWebVitals: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowWebVitalsParams) =>
+          commands["Overlay.setShowWebVitals"].result.parse(
+            await send("Overlay.setShowWebVitals", commands["Overlay.setShowWebVitals"].params.parse(params ?? {})),
+          ),
+        "Overlay.setShowWebVitals",
+        "command",
+      ),
+      setShowViewportSizeOnResize: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowViewportSizeOnResizeParams) =>
+          commands["Overlay.setShowViewportSizeOnResize"].result.parse(
+            await send(
+              "Overlay.setShowViewportSizeOnResize",
+              commands["Overlay.setShowViewportSizeOnResize"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowViewportSizeOnResize",
+        "command",
+      ),
+      setShowHinge: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowHingeParams) =>
+          commands["Overlay.setShowHinge"].result.parse(
+            await send("Overlay.setShowHinge", commands["Overlay.setShowHinge"].params.parse(params ?? {})),
+          ),
+        "Overlay.setShowHinge",
+        "command",
+      ),
+      setShowIsolatedElements: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowIsolatedElementsParams) =>
+          commands["Overlay.setShowIsolatedElements"].result.parse(
+            await send(
+              "Overlay.setShowIsolatedElements",
+              commands["Overlay.setShowIsolatedElements"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowIsolatedElements",
+        "command",
+      ),
+      setShowWindowControlsOverlay: withCdpName(
+        async (params?: cdp.types.ts.Overlay.SetShowWindowControlsOverlayParams) =>
+          commands["Overlay.setShowWindowControlsOverlay"].result.parse(
+            await send(
+              "Overlay.setShowWindowControlsOverlay",
+              commands["Overlay.setShowWindowControlsOverlay"].params.parse(params ?? {}),
+            ),
+          ),
+        "Overlay.setShowWindowControlsOverlay",
+        "command",
+      ),
+      inspectNodeRequested: withCdpName(
+        events["Overlay.inspectNodeRequested"],
+        "Overlay.inspectNodeRequested",
+        "event",
+      ),
+      nodeHighlightRequested: withCdpName(
+        events["Overlay.nodeHighlightRequested"],
+        "Overlay.nodeHighlightRequested",
+        "event",
+      ),
       screenshotRequested: withCdpName(events["Overlay.screenshotRequested"], "Overlay.screenshotRequested", "event"),
-      inspectPanelShowRequested: withCdpName(events["Overlay.inspectPanelShowRequested"], "Overlay.inspectPanelShowRequested", "event"),
-      inspectedElementWindowRestored: withCdpName(events["Overlay.inspectedElementWindowRestored"], "Overlay.inspectedElementWindowRestored", "event"),
+      inspectPanelShowRequested: withCdpName(
+        events["Overlay.inspectPanelShowRequested"],
+        "Overlay.inspectPanelShowRequested",
+        "event",
+      ),
+      inspectedElementWindowRestored: withCdpName(
+        events["Overlay.inspectedElementWindowRestored"],
+        "Overlay.inspectedElementWindowRestored",
+        "event",
+      ),
       inspectModeCanceled: withCdpName(events["Overlay.inspectModeCanceled"], "Overlay.inspectModeCanceled", "event"),
     },
     Page: {
-      addScriptToEvaluateOnLoad: withCdpName(async (params?: cdp.types.ts.Page.AddScriptToEvaluateOnLoadParams) => commands["Page.addScriptToEvaluateOnLoad"].result.parse(await send("Page.addScriptToEvaluateOnLoad", commands["Page.addScriptToEvaluateOnLoad"].params.parse(params ?? {}))), "Page.addScriptToEvaluateOnLoad", "command"),
-      addScriptToEvaluateOnNewDocument: withCdpName(async (params?: cdp.types.ts.Page.AddScriptToEvaluateOnNewDocumentParams) => commands["Page.addScriptToEvaluateOnNewDocument"].result.parse(await send("Page.addScriptToEvaluateOnNewDocument", commands["Page.addScriptToEvaluateOnNewDocument"].params.parse(params ?? {}))), "Page.addScriptToEvaluateOnNewDocument", "command"),
-      bringToFront: withCdpName(async (params?: cdp.types.ts.Page.BringToFrontParams) => commands["Page.bringToFront"].result.parse(await send("Page.bringToFront", commands["Page.bringToFront"].params.parse(params ?? {}))), "Page.bringToFront", "command"),
-      captureScreenshot: withCdpName(async (params?: cdp.types.ts.Page.CaptureScreenshotParams) => commands["Page.captureScreenshot"].result.parse(await send("Page.captureScreenshot", commands["Page.captureScreenshot"].params.parse(params ?? {}))), "Page.captureScreenshot", "command"),
-      captureSnapshot: withCdpName(async (params?: cdp.types.ts.Page.CaptureSnapshotParams) => commands["Page.captureSnapshot"].result.parse(await send("Page.captureSnapshot", commands["Page.captureSnapshot"].params.parse(params ?? {}))), "Page.captureSnapshot", "command"),
-      clearDeviceMetricsOverride: withCdpName(async (params?: cdp.types.ts.Page.ClearDeviceMetricsOverrideParams) => commands["Page.clearDeviceMetricsOverride"].result.parse(await send("Page.clearDeviceMetricsOverride", commands["Page.clearDeviceMetricsOverride"].params.parse(params ?? {}))), "Page.clearDeviceMetricsOverride", "command"),
-      clearDeviceOrientationOverride: withCdpName(async (params?: cdp.types.ts.Page.ClearDeviceOrientationOverrideParams) => commands["Page.clearDeviceOrientationOverride"].result.parse(await send("Page.clearDeviceOrientationOverride", commands["Page.clearDeviceOrientationOverride"].params.parse(params ?? {}))), "Page.clearDeviceOrientationOverride", "command"),
-      clearGeolocationOverride: withCdpName(async (params?: cdp.types.ts.Page.ClearGeolocationOverrideParams) => commands["Page.clearGeolocationOverride"].result.parse(await send("Page.clearGeolocationOverride", commands["Page.clearGeolocationOverride"].params.parse(params ?? {}))), "Page.clearGeolocationOverride", "command"),
-      createIsolatedWorld: withCdpName(async (params?: cdp.types.ts.Page.CreateIsolatedWorldParams) => commands["Page.createIsolatedWorld"].result.parse(await send("Page.createIsolatedWorld", commands["Page.createIsolatedWorld"].params.parse(params ?? {}))), "Page.createIsolatedWorld", "command"),
-      deleteCookie: withCdpName(async (params?: cdp.types.ts.Page.DeleteCookieParams) => commands["Page.deleteCookie"].result.parse(await send("Page.deleteCookie", commands["Page.deleteCookie"].params.parse(params ?? {}))), "Page.deleteCookie", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Page.DisableParams) => commands["Page.disable"].result.parse(await send("Page.disable", commands["Page.disable"].params.parse(params ?? {}))), "Page.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Page.EnableParams) => commands["Page.enable"].result.parse(await send("Page.enable", commands["Page.enable"].params.parse(params ?? {}))), "Page.enable", "command"),
-      getAppManifest: withCdpName(async (params?: cdp.types.ts.Page.GetAppManifestParams) => commands["Page.getAppManifest"].result.parse(await send("Page.getAppManifest", commands["Page.getAppManifest"].params.parse(params ?? {}))), "Page.getAppManifest", "command"),
-      getInstallabilityErrors: withCdpName(async (params?: cdp.types.ts.Page.GetInstallabilityErrorsParams) => commands["Page.getInstallabilityErrors"].result.parse(await send("Page.getInstallabilityErrors", commands["Page.getInstallabilityErrors"].params.parse(params ?? {}))), "Page.getInstallabilityErrors", "command"),
-      getManifestIcons: withCdpName(async (params?: cdp.types.ts.Page.GetManifestIconsParams) => commands["Page.getManifestIcons"].result.parse(await send("Page.getManifestIcons", commands["Page.getManifestIcons"].params.parse(params ?? {}))), "Page.getManifestIcons", "command"),
-      getAppId: withCdpName(async (params?: cdp.types.ts.Page.GetAppIdParams) => commands["Page.getAppId"].result.parse(await send("Page.getAppId", commands["Page.getAppId"].params.parse(params ?? {}))), "Page.getAppId", "command"),
-      getAdScriptAncestry: withCdpName(async (params?: cdp.types.ts.Page.GetAdScriptAncestryParams) => commands["Page.getAdScriptAncestry"].result.parse(await send("Page.getAdScriptAncestry", commands["Page.getAdScriptAncestry"].params.parse(params ?? {}))), "Page.getAdScriptAncestry", "command"),
-      getFrameTree: withCdpName(async (params?: cdp.types.ts.Page.GetFrameTreeParams) => commands["Page.getFrameTree"].result.parse(await send("Page.getFrameTree", commands["Page.getFrameTree"].params.parse(params ?? {}))), "Page.getFrameTree", "command"),
-      getLayoutMetrics: withCdpName(async (params?: cdp.types.ts.Page.GetLayoutMetricsParams) => commands["Page.getLayoutMetrics"].result.parse(await send("Page.getLayoutMetrics", commands["Page.getLayoutMetrics"].params.parse(params ?? {}))), "Page.getLayoutMetrics", "command"),
-      getNavigationHistory: withCdpName(async (params?: cdp.types.ts.Page.GetNavigationHistoryParams) => commands["Page.getNavigationHistory"].result.parse(await send("Page.getNavigationHistory", commands["Page.getNavigationHistory"].params.parse(params ?? {}))), "Page.getNavigationHistory", "command"),
-      resetNavigationHistory: withCdpName(async (params?: cdp.types.ts.Page.ResetNavigationHistoryParams) => commands["Page.resetNavigationHistory"].result.parse(await send("Page.resetNavigationHistory", commands["Page.resetNavigationHistory"].params.parse(params ?? {}))), "Page.resetNavigationHistory", "command"),
-      getResourceContent: withCdpName(async (params?: cdp.types.ts.Page.GetResourceContentParams) => commands["Page.getResourceContent"].result.parse(await send("Page.getResourceContent", commands["Page.getResourceContent"].params.parse(params ?? {}))), "Page.getResourceContent", "command"),
-      getResourceTree: withCdpName(async (params?: cdp.types.ts.Page.GetResourceTreeParams) => commands["Page.getResourceTree"].result.parse(await send("Page.getResourceTree", commands["Page.getResourceTree"].params.parse(params ?? {}))), "Page.getResourceTree", "command"),
-      handleJavaScriptDialog: withCdpName(async (params?: cdp.types.ts.Page.HandleJavaScriptDialogParams) => commands["Page.handleJavaScriptDialog"].result.parse(await send("Page.handleJavaScriptDialog", commands["Page.handleJavaScriptDialog"].params.parse(params ?? {}))), "Page.handleJavaScriptDialog", "command"),
-      navigate: withCdpName(async (params?: cdp.types.ts.Page.NavigateParams) => commands["Page.navigate"].result.parse(await send("Page.navigate", commands["Page.navigate"].params.parse(params ?? {}))), "Page.navigate", "command"),
-      navigateToHistoryEntry: withCdpName(async (params?: cdp.types.ts.Page.NavigateToHistoryEntryParams) => commands["Page.navigateToHistoryEntry"].result.parse(await send("Page.navigateToHistoryEntry", commands["Page.navigateToHistoryEntry"].params.parse(params ?? {}))), "Page.navigateToHistoryEntry", "command"),
-      printToPDF: withCdpName(async (params?: cdp.types.ts.Page.PrintToPDFParams) => commands["Page.printToPDF"].result.parse(await send("Page.printToPDF", commands["Page.printToPDF"].params.parse(params ?? {}))), "Page.printToPDF", "command"),
-      reload: withCdpName(async (params?: cdp.types.ts.Page.ReloadParams) => commands["Page.reload"].result.parse(await send("Page.reload", commands["Page.reload"].params.parse(params ?? {}))), "Page.reload", "command"),
-      removeScriptToEvaluateOnLoad: withCdpName(async (params?: cdp.types.ts.Page.RemoveScriptToEvaluateOnLoadParams) => commands["Page.removeScriptToEvaluateOnLoad"].result.parse(await send("Page.removeScriptToEvaluateOnLoad", commands["Page.removeScriptToEvaluateOnLoad"].params.parse(params ?? {}))), "Page.removeScriptToEvaluateOnLoad", "command"),
-      removeScriptToEvaluateOnNewDocument: withCdpName(async (params?: cdp.types.ts.Page.RemoveScriptToEvaluateOnNewDocumentParams) => commands["Page.removeScriptToEvaluateOnNewDocument"].result.parse(await send("Page.removeScriptToEvaluateOnNewDocument", commands["Page.removeScriptToEvaluateOnNewDocument"].params.parse(params ?? {}))), "Page.removeScriptToEvaluateOnNewDocument", "command"),
-      screencastFrameAck: withCdpName(async (params?: cdp.types.ts.Page.ScreencastFrameAckParams) => commands["Page.screencastFrameAck"].result.parse(await send("Page.screencastFrameAck", commands["Page.screencastFrameAck"].params.parse(params ?? {}))), "Page.screencastFrameAck", "command"),
-      searchInResource: withCdpName(async (params?: cdp.types.ts.Page.SearchInResourceParams) => commands["Page.searchInResource"].result.parse(await send("Page.searchInResource", commands["Page.searchInResource"].params.parse(params ?? {}))), "Page.searchInResource", "command"),
-      setAdBlockingEnabled: withCdpName(async (params?: cdp.types.ts.Page.SetAdBlockingEnabledParams) => commands["Page.setAdBlockingEnabled"].result.parse(await send("Page.setAdBlockingEnabled", commands["Page.setAdBlockingEnabled"].params.parse(params ?? {}))), "Page.setAdBlockingEnabled", "command"),
-      setBypassCSP: withCdpName(async (params?: cdp.types.ts.Page.SetBypassCSPParams) => commands["Page.setBypassCSP"].result.parse(await send("Page.setBypassCSP", commands["Page.setBypassCSP"].params.parse(params ?? {}))), "Page.setBypassCSP", "command"),
-      getPermissionsPolicyState: withCdpName(async (params?: cdp.types.ts.Page.GetPermissionsPolicyStateParams) => commands["Page.getPermissionsPolicyState"].result.parse(await send("Page.getPermissionsPolicyState", commands["Page.getPermissionsPolicyState"].params.parse(params ?? {}))), "Page.getPermissionsPolicyState", "command"),
-      getOriginTrials: withCdpName(async (params?: cdp.types.ts.Page.GetOriginTrialsParams) => commands["Page.getOriginTrials"].result.parse(await send("Page.getOriginTrials", commands["Page.getOriginTrials"].params.parse(params ?? {}))), "Page.getOriginTrials", "command"),
-      setDeviceMetricsOverride: withCdpName(async (params?: cdp.types.ts.Page.SetDeviceMetricsOverrideParams) => commands["Page.setDeviceMetricsOverride"].result.parse(await send("Page.setDeviceMetricsOverride", commands["Page.setDeviceMetricsOverride"].params.parse(params ?? {}))), "Page.setDeviceMetricsOverride", "command"),
-      setDeviceOrientationOverride: withCdpName(async (params?: cdp.types.ts.Page.SetDeviceOrientationOverrideParams) => commands["Page.setDeviceOrientationOverride"].result.parse(await send("Page.setDeviceOrientationOverride", commands["Page.setDeviceOrientationOverride"].params.parse(params ?? {}))), "Page.setDeviceOrientationOverride", "command"),
-      setFontFamilies: withCdpName(async (params?: cdp.types.ts.Page.SetFontFamiliesParams) => commands["Page.setFontFamilies"].result.parse(await send("Page.setFontFamilies", commands["Page.setFontFamilies"].params.parse(params ?? {}))), "Page.setFontFamilies", "command"),
-      setFontSizes: withCdpName(async (params?: cdp.types.ts.Page.SetFontSizesParams) => commands["Page.setFontSizes"].result.parse(await send("Page.setFontSizes", commands["Page.setFontSizes"].params.parse(params ?? {}))), "Page.setFontSizes", "command"),
-      setDocumentContent: withCdpName(async (params?: cdp.types.ts.Page.SetDocumentContentParams) => commands["Page.setDocumentContent"].result.parse(await send("Page.setDocumentContent", commands["Page.setDocumentContent"].params.parse(params ?? {}))), "Page.setDocumentContent", "command"),
-      setDownloadBehavior: withCdpName(async (params?: cdp.types.ts.Page.SetDownloadBehaviorParams) => commands["Page.setDownloadBehavior"].result.parse(await send("Page.setDownloadBehavior", commands["Page.setDownloadBehavior"].params.parse(params ?? {}))), "Page.setDownloadBehavior", "command"),
-      setGeolocationOverride: withCdpName(async (params?: cdp.types.ts.Page.SetGeolocationOverrideParams) => commands["Page.setGeolocationOverride"].result.parse(await send("Page.setGeolocationOverride", commands["Page.setGeolocationOverride"].params.parse(params ?? {}))), "Page.setGeolocationOverride", "command"),
-      setLifecycleEventsEnabled: withCdpName(async (params?: cdp.types.ts.Page.SetLifecycleEventsEnabledParams) => commands["Page.setLifecycleEventsEnabled"].result.parse(await send("Page.setLifecycleEventsEnabled", commands["Page.setLifecycleEventsEnabled"].params.parse(params ?? {}))), "Page.setLifecycleEventsEnabled", "command"),
-      setTouchEmulationEnabled: withCdpName(async (params?: cdp.types.ts.Page.SetTouchEmulationEnabledParams) => commands["Page.setTouchEmulationEnabled"].result.parse(await send("Page.setTouchEmulationEnabled", commands["Page.setTouchEmulationEnabled"].params.parse(params ?? {}))), "Page.setTouchEmulationEnabled", "command"),
-      startScreencast: withCdpName(async (params?: cdp.types.ts.Page.StartScreencastParams) => commands["Page.startScreencast"].result.parse(await send("Page.startScreencast", commands["Page.startScreencast"].params.parse(params ?? {}))), "Page.startScreencast", "command"),
-      stopLoading: withCdpName(async (params?: cdp.types.ts.Page.StopLoadingParams) => commands["Page.stopLoading"].result.parse(await send("Page.stopLoading", commands["Page.stopLoading"].params.parse(params ?? {}))), "Page.stopLoading", "command"),
-      crash: withCdpName(async (params?: cdp.types.ts.Page.CrashParams) => commands["Page.crash"].result.parse(await send("Page.crash", commands["Page.crash"].params.parse(params ?? {}))), "Page.crash", "command"),
-      close: withCdpName(async (params?: cdp.types.ts.Page.CloseParams) => commands["Page.close"].result.parse(await send("Page.close", commands["Page.close"].params.parse(params ?? {}))), "Page.close", "command"),
-      setWebLifecycleState: withCdpName(async (params?: cdp.types.ts.Page.SetWebLifecycleStateParams) => commands["Page.setWebLifecycleState"].result.parse(await send("Page.setWebLifecycleState", commands["Page.setWebLifecycleState"].params.parse(params ?? {}))), "Page.setWebLifecycleState", "command"),
-      stopScreencast: withCdpName(async (params?: cdp.types.ts.Page.StopScreencastParams) => commands["Page.stopScreencast"].result.parse(await send("Page.stopScreencast", commands["Page.stopScreencast"].params.parse(params ?? {}))), "Page.stopScreencast", "command"),
-      produceCompilationCache: withCdpName(async (params?: cdp.types.ts.Page.ProduceCompilationCacheParams) => commands["Page.produceCompilationCache"].result.parse(await send("Page.produceCompilationCache", commands["Page.produceCompilationCache"].params.parse(params ?? {}))), "Page.produceCompilationCache", "command"),
-      addCompilationCache: withCdpName(async (params?: cdp.types.ts.Page.AddCompilationCacheParams) => commands["Page.addCompilationCache"].result.parse(await send("Page.addCompilationCache", commands["Page.addCompilationCache"].params.parse(params ?? {}))), "Page.addCompilationCache", "command"),
-      clearCompilationCache: withCdpName(async (params?: cdp.types.ts.Page.ClearCompilationCacheParams) => commands["Page.clearCompilationCache"].result.parse(await send("Page.clearCompilationCache", commands["Page.clearCompilationCache"].params.parse(params ?? {}))), "Page.clearCompilationCache", "command"),
-      setSPCTransactionMode: withCdpName(async (params?: cdp.types.ts.Page.SetSPCTransactionModeParams) => commands["Page.setSPCTransactionMode"].result.parse(await send("Page.setSPCTransactionMode", commands["Page.setSPCTransactionMode"].params.parse(params ?? {}))), "Page.setSPCTransactionMode", "command"),
-      setRPHRegistrationMode: withCdpName(async (params?: cdp.types.ts.Page.SetRPHRegistrationModeParams) => commands["Page.setRPHRegistrationMode"].result.parse(await send("Page.setRPHRegistrationMode", commands["Page.setRPHRegistrationMode"].params.parse(params ?? {}))), "Page.setRPHRegistrationMode", "command"),
-      generateTestReport: withCdpName(async (params?: cdp.types.ts.Page.GenerateTestReportParams) => commands["Page.generateTestReport"].result.parse(await send("Page.generateTestReport", commands["Page.generateTestReport"].params.parse(params ?? {}))), "Page.generateTestReport", "command"),
-      waitForDebugger: withCdpName(async (params?: cdp.types.ts.Page.WaitForDebuggerParams) => commands["Page.waitForDebugger"].result.parse(await send("Page.waitForDebugger", commands["Page.waitForDebugger"].params.parse(params ?? {}))), "Page.waitForDebugger", "command"),
-      setInterceptFileChooserDialog: withCdpName(async (params?: cdp.types.ts.Page.SetInterceptFileChooserDialogParams) => commands["Page.setInterceptFileChooserDialog"].result.parse(await send("Page.setInterceptFileChooserDialog", commands["Page.setInterceptFileChooserDialog"].params.parse(params ?? {}))), "Page.setInterceptFileChooserDialog", "command"),
-      setPrerenderingAllowed: withCdpName(async (params?: cdp.types.ts.Page.SetPrerenderingAllowedParams) => commands["Page.setPrerenderingAllowed"].result.parse(await send("Page.setPrerenderingAllowed", commands["Page.setPrerenderingAllowed"].params.parse(params ?? {}))), "Page.setPrerenderingAllowed", "command"),
-      getAnnotatedPageContent: withCdpName(async (params?: cdp.types.ts.Page.GetAnnotatedPageContentParams) => commands["Page.getAnnotatedPageContent"].result.parse(await send("Page.getAnnotatedPageContent", commands["Page.getAnnotatedPageContent"].params.parse(params ?? {}))), "Page.getAnnotatedPageContent", "command"),
+      addScriptToEvaluateOnLoad: withCdpName(
+        async (params?: cdp.types.ts.Page.AddScriptToEvaluateOnLoadParams) =>
+          commands["Page.addScriptToEvaluateOnLoad"].result.parse(
+            await send(
+              "Page.addScriptToEvaluateOnLoad",
+              commands["Page.addScriptToEvaluateOnLoad"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.addScriptToEvaluateOnLoad",
+        "command",
+      ),
+      addScriptToEvaluateOnNewDocument: withCdpName(
+        async (params?: cdp.types.ts.Page.AddScriptToEvaluateOnNewDocumentParams) =>
+          commands["Page.addScriptToEvaluateOnNewDocument"].result.parse(
+            await send(
+              "Page.addScriptToEvaluateOnNewDocument",
+              commands["Page.addScriptToEvaluateOnNewDocument"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.addScriptToEvaluateOnNewDocument",
+        "command",
+      ),
+      bringToFront: withCdpName(
+        async (params?: cdp.types.ts.Page.BringToFrontParams) =>
+          commands["Page.bringToFront"].result.parse(
+            await send("Page.bringToFront", commands["Page.bringToFront"].params.parse(params ?? {})),
+          ),
+        "Page.bringToFront",
+        "command",
+      ),
+      captureScreenshot: withCdpName(
+        async (params?: cdp.types.ts.Page.CaptureScreenshotParams) =>
+          commands["Page.captureScreenshot"].result.parse(
+            await send("Page.captureScreenshot", commands["Page.captureScreenshot"].params.parse(params ?? {})),
+          ),
+        "Page.captureScreenshot",
+        "command",
+      ),
+      captureSnapshot: withCdpName(
+        async (params?: cdp.types.ts.Page.CaptureSnapshotParams) =>
+          commands["Page.captureSnapshot"].result.parse(
+            await send("Page.captureSnapshot", commands["Page.captureSnapshot"].params.parse(params ?? {})),
+          ),
+        "Page.captureSnapshot",
+        "command",
+      ),
+      clearDeviceMetricsOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.ClearDeviceMetricsOverrideParams) =>
+          commands["Page.clearDeviceMetricsOverride"].result.parse(
+            await send(
+              "Page.clearDeviceMetricsOverride",
+              commands["Page.clearDeviceMetricsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.clearDeviceMetricsOverride",
+        "command",
+      ),
+      clearDeviceOrientationOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.ClearDeviceOrientationOverrideParams) =>
+          commands["Page.clearDeviceOrientationOverride"].result.parse(
+            await send(
+              "Page.clearDeviceOrientationOverride",
+              commands["Page.clearDeviceOrientationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.clearDeviceOrientationOverride",
+        "command",
+      ),
+      clearGeolocationOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.ClearGeolocationOverrideParams) =>
+          commands["Page.clearGeolocationOverride"].result.parse(
+            await send(
+              "Page.clearGeolocationOverride",
+              commands["Page.clearGeolocationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.clearGeolocationOverride",
+        "command",
+      ),
+      createIsolatedWorld: withCdpName(
+        async (params?: cdp.types.ts.Page.CreateIsolatedWorldParams) =>
+          commands["Page.createIsolatedWorld"].result.parse(
+            await send("Page.createIsolatedWorld", commands["Page.createIsolatedWorld"].params.parse(params ?? {})),
+          ),
+        "Page.createIsolatedWorld",
+        "command",
+      ),
+      deleteCookie: withCdpName(
+        async (params?: cdp.types.ts.Page.DeleteCookieParams) =>
+          commands["Page.deleteCookie"].result.parse(
+            await send("Page.deleteCookie", commands["Page.deleteCookie"].params.parse(params ?? {})),
+          ),
+        "Page.deleteCookie",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Page.DisableParams) =>
+          commands["Page.disable"].result.parse(
+            await send("Page.disable", commands["Page.disable"].params.parse(params ?? {})),
+          ),
+        "Page.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Page.EnableParams) =>
+          commands["Page.enable"].result.parse(
+            await send("Page.enable", commands["Page.enable"].params.parse(params ?? {})),
+          ),
+        "Page.enable",
+        "command",
+      ),
+      getAppManifest: withCdpName(
+        async (params?: cdp.types.ts.Page.GetAppManifestParams) =>
+          commands["Page.getAppManifest"].result.parse(
+            await send("Page.getAppManifest", commands["Page.getAppManifest"].params.parse(params ?? {})),
+          ),
+        "Page.getAppManifest",
+        "command",
+      ),
+      getInstallabilityErrors: withCdpName(
+        async (params?: cdp.types.ts.Page.GetInstallabilityErrorsParams) =>
+          commands["Page.getInstallabilityErrors"].result.parse(
+            await send(
+              "Page.getInstallabilityErrors",
+              commands["Page.getInstallabilityErrors"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.getInstallabilityErrors",
+        "command",
+      ),
+      getManifestIcons: withCdpName(
+        async (params?: cdp.types.ts.Page.GetManifestIconsParams) =>
+          commands["Page.getManifestIcons"].result.parse(
+            await send("Page.getManifestIcons", commands["Page.getManifestIcons"].params.parse(params ?? {})),
+          ),
+        "Page.getManifestIcons",
+        "command",
+      ),
+      getAppId: withCdpName(
+        async (params?: cdp.types.ts.Page.GetAppIdParams) =>
+          commands["Page.getAppId"].result.parse(
+            await send("Page.getAppId", commands["Page.getAppId"].params.parse(params ?? {})),
+          ),
+        "Page.getAppId",
+        "command",
+      ),
+      getAdScriptAncestry: withCdpName(
+        async (params?: cdp.types.ts.Page.GetAdScriptAncestryParams) =>
+          commands["Page.getAdScriptAncestry"].result.parse(
+            await send("Page.getAdScriptAncestry", commands["Page.getAdScriptAncestry"].params.parse(params ?? {})),
+          ),
+        "Page.getAdScriptAncestry",
+        "command",
+      ),
+      getFrameTree: withCdpName(
+        async (params?: cdp.types.ts.Page.GetFrameTreeParams) =>
+          commands["Page.getFrameTree"].result.parse(
+            await send("Page.getFrameTree", commands["Page.getFrameTree"].params.parse(params ?? {})),
+          ),
+        "Page.getFrameTree",
+        "command",
+      ),
+      getLayoutMetrics: withCdpName(
+        async (params?: cdp.types.ts.Page.GetLayoutMetricsParams) =>
+          commands["Page.getLayoutMetrics"].result.parse(
+            await send("Page.getLayoutMetrics", commands["Page.getLayoutMetrics"].params.parse(params ?? {})),
+          ),
+        "Page.getLayoutMetrics",
+        "command",
+      ),
+      getNavigationHistory: withCdpName(
+        async (params?: cdp.types.ts.Page.GetNavigationHistoryParams) =>
+          commands["Page.getNavigationHistory"].result.parse(
+            await send("Page.getNavigationHistory", commands["Page.getNavigationHistory"].params.parse(params ?? {})),
+          ),
+        "Page.getNavigationHistory",
+        "command",
+      ),
+      resetNavigationHistory: withCdpName(
+        async (params?: cdp.types.ts.Page.ResetNavigationHistoryParams) =>
+          commands["Page.resetNavigationHistory"].result.parse(
+            await send(
+              "Page.resetNavigationHistory",
+              commands["Page.resetNavigationHistory"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.resetNavigationHistory",
+        "command",
+      ),
+      getResourceContent: withCdpName(
+        async (params?: cdp.types.ts.Page.GetResourceContentParams) =>
+          commands["Page.getResourceContent"].result.parse(
+            await send("Page.getResourceContent", commands["Page.getResourceContent"].params.parse(params ?? {})),
+          ),
+        "Page.getResourceContent",
+        "command",
+      ),
+      getResourceTree: withCdpName(
+        async (params?: cdp.types.ts.Page.GetResourceTreeParams) =>
+          commands["Page.getResourceTree"].result.parse(
+            await send("Page.getResourceTree", commands["Page.getResourceTree"].params.parse(params ?? {})),
+          ),
+        "Page.getResourceTree",
+        "command",
+      ),
+      handleJavaScriptDialog: withCdpName(
+        async (params?: cdp.types.ts.Page.HandleJavaScriptDialogParams) =>
+          commands["Page.handleJavaScriptDialog"].result.parse(
+            await send(
+              "Page.handleJavaScriptDialog",
+              commands["Page.handleJavaScriptDialog"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.handleJavaScriptDialog",
+        "command",
+      ),
+      navigate: withCdpName(
+        async (params?: cdp.types.ts.Page.NavigateParams) =>
+          commands["Page.navigate"].result.parse(
+            await send("Page.navigate", commands["Page.navigate"].params.parse(params ?? {})),
+          ),
+        "Page.navigate",
+        "command",
+      ),
+      navigateToHistoryEntry: withCdpName(
+        async (params?: cdp.types.ts.Page.NavigateToHistoryEntryParams) =>
+          commands["Page.navigateToHistoryEntry"].result.parse(
+            await send(
+              "Page.navigateToHistoryEntry",
+              commands["Page.navigateToHistoryEntry"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.navigateToHistoryEntry",
+        "command",
+      ),
+      printToPDF: withCdpName(
+        async (params?: cdp.types.ts.Page.PrintToPDFParams) =>
+          commands["Page.printToPDF"].result.parse(
+            await send("Page.printToPDF", commands["Page.printToPDF"].params.parse(params ?? {})),
+          ),
+        "Page.printToPDF",
+        "command",
+      ),
+      reload: withCdpName(
+        async (params?: cdp.types.ts.Page.ReloadParams) =>
+          commands["Page.reload"].result.parse(
+            await send("Page.reload", commands["Page.reload"].params.parse(params ?? {})),
+          ),
+        "Page.reload",
+        "command",
+      ),
+      removeScriptToEvaluateOnLoad: withCdpName(
+        async (params?: cdp.types.ts.Page.RemoveScriptToEvaluateOnLoadParams) =>
+          commands["Page.removeScriptToEvaluateOnLoad"].result.parse(
+            await send(
+              "Page.removeScriptToEvaluateOnLoad",
+              commands["Page.removeScriptToEvaluateOnLoad"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.removeScriptToEvaluateOnLoad",
+        "command",
+      ),
+      removeScriptToEvaluateOnNewDocument: withCdpName(
+        async (params?: cdp.types.ts.Page.RemoveScriptToEvaluateOnNewDocumentParams) =>
+          commands["Page.removeScriptToEvaluateOnNewDocument"].result.parse(
+            await send(
+              "Page.removeScriptToEvaluateOnNewDocument",
+              commands["Page.removeScriptToEvaluateOnNewDocument"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.removeScriptToEvaluateOnNewDocument",
+        "command",
+      ),
+      screencastFrameAck: withCdpName(
+        async (params?: cdp.types.ts.Page.ScreencastFrameAckParams) =>
+          commands["Page.screencastFrameAck"].result.parse(
+            await send("Page.screencastFrameAck", commands["Page.screencastFrameAck"].params.parse(params ?? {})),
+          ),
+        "Page.screencastFrameAck",
+        "command",
+      ),
+      searchInResource: withCdpName(
+        async (params?: cdp.types.ts.Page.SearchInResourceParams) =>
+          commands["Page.searchInResource"].result.parse(
+            await send("Page.searchInResource", commands["Page.searchInResource"].params.parse(params ?? {})),
+          ),
+        "Page.searchInResource",
+        "command",
+      ),
+      setAdBlockingEnabled: withCdpName(
+        async (params?: cdp.types.ts.Page.SetAdBlockingEnabledParams) =>
+          commands["Page.setAdBlockingEnabled"].result.parse(
+            await send("Page.setAdBlockingEnabled", commands["Page.setAdBlockingEnabled"].params.parse(params ?? {})),
+          ),
+        "Page.setAdBlockingEnabled",
+        "command",
+      ),
+      setBypassCSP: withCdpName(
+        async (params?: cdp.types.ts.Page.SetBypassCSPParams) =>
+          commands["Page.setBypassCSP"].result.parse(
+            await send("Page.setBypassCSP", commands["Page.setBypassCSP"].params.parse(params ?? {})),
+          ),
+        "Page.setBypassCSP",
+        "command",
+      ),
+      getPermissionsPolicyState: withCdpName(
+        async (params?: cdp.types.ts.Page.GetPermissionsPolicyStateParams) =>
+          commands["Page.getPermissionsPolicyState"].result.parse(
+            await send(
+              "Page.getPermissionsPolicyState",
+              commands["Page.getPermissionsPolicyState"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.getPermissionsPolicyState",
+        "command",
+      ),
+      getOriginTrials: withCdpName(
+        async (params?: cdp.types.ts.Page.GetOriginTrialsParams) =>
+          commands["Page.getOriginTrials"].result.parse(
+            await send("Page.getOriginTrials", commands["Page.getOriginTrials"].params.parse(params ?? {})),
+          ),
+        "Page.getOriginTrials",
+        "command",
+      ),
+      setDeviceMetricsOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.SetDeviceMetricsOverrideParams) =>
+          commands["Page.setDeviceMetricsOverride"].result.parse(
+            await send(
+              "Page.setDeviceMetricsOverride",
+              commands["Page.setDeviceMetricsOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setDeviceMetricsOverride",
+        "command",
+      ),
+      setDeviceOrientationOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.SetDeviceOrientationOverrideParams) =>
+          commands["Page.setDeviceOrientationOverride"].result.parse(
+            await send(
+              "Page.setDeviceOrientationOverride",
+              commands["Page.setDeviceOrientationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setDeviceOrientationOverride",
+        "command",
+      ),
+      setFontFamilies: withCdpName(
+        async (params?: cdp.types.ts.Page.SetFontFamiliesParams) =>
+          commands["Page.setFontFamilies"].result.parse(
+            await send("Page.setFontFamilies", commands["Page.setFontFamilies"].params.parse(params ?? {})),
+          ),
+        "Page.setFontFamilies",
+        "command",
+      ),
+      setFontSizes: withCdpName(
+        async (params?: cdp.types.ts.Page.SetFontSizesParams) =>
+          commands["Page.setFontSizes"].result.parse(
+            await send("Page.setFontSizes", commands["Page.setFontSizes"].params.parse(params ?? {})),
+          ),
+        "Page.setFontSizes",
+        "command",
+      ),
+      setDocumentContent: withCdpName(
+        async (params?: cdp.types.ts.Page.SetDocumentContentParams) =>
+          commands["Page.setDocumentContent"].result.parse(
+            await send("Page.setDocumentContent", commands["Page.setDocumentContent"].params.parse(params ?? {})),
+          ),
+        "Page.setDocumentContent",
+        "command",
+      ),
+      setDownloadBehavior: withCdpName(
+        async (params?: cdp.types.ts.Page.SetDownloadBehaviorParams) =>
+          commands["Page.setDownloadBehavior"].result.parse(
+            await send("Page.setDownloadBehavior", commands["Page.setDownloadBehavior"].params.parse(params ?? {})),
+          ),
+        "Page.setDownloadBehavior",
+        "command",
+      ),
+      setGeolocationOverride: withCdpName(
+        async (params?: cdp.types.ts.Page.SetGeolocationOverrideParams) =>
+          commands["Page.setGeolocationOverride"].result.parse(
+            await send(
+              "Page.setGeolocationOverride",
+              commands["Page.setGeolocationOverride"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setGeolocationOverride",
+        "command",
+      ),
+      setLifecycleEventsEnabled: withCdpName(
+        async (params?: cdp.types.ts.Page.SetLifecycleEventsEnabledParams) =>
+          commands["Page.setLifecycleEventsEnabled"].result.parse(
+            await send(
+              "Page.setLifecycleEventsEnabled",
+              commands["Page.setLifecycleEventsEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setLifecycleEventsEnabled",
+        "command",
+      ),
+      setTouchEmulationEnabled: withCdpName(
+        async (params?: cdp.types.ts.Page.SetTouchEmulationEnabledParams) =>
+          commands["Page.setTouchEmulationEnabled"].result.parse(
+            await send(
+              "Page.setTouchEmulationEnabled",
+              commands["Page.setTouchEmulationEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setTouchEmulationEnabled",
+        "command",
+      ),
+      startScreencast: withCdpName(
+        async (params?: cdp.types.ts.Page.StartScreencastParams) =>
+          commands["Page.startScreencast"].result.parse(
+            await send("Page.startScreencast", commands["Page.startScreencast"].params.parse(params ?? {})),
+          ),
+        "Page.startScreencast",
+        "command",
+      ),
+      stopLoading: withCdpName(
+        async (params?: cdp.types.ts.Page.StopLoadingParams) =>
+          commands["Page.stopLoading"].result.parse(
+            await send("Page.stopLoading", commands["Page.stopLoading"].params.parse(params ?? {})),
+          ),
+        "Page.stopLoading",
+        "command",
+      ),
+      crash: withCdpName(
+        async (params?: cdp.types.ts.Page.CrashParams) =>
+          commands["Page.crash"].result.parse(
+            await send("Page.crash", commands["Page.crash"].params.parse(params ?? {})),
+          ),
+        "Page.crash",
+        "command",
+      ),
+      close: withCdpName(
+        async (params?: cdp.types.ts.Page.CloseParams) =>
+          commands["Page.close"].result.parse(
+            await send("Page.close", commands["Page.close"].params.parse(params ?? {})),
+          ),
+        "Page.close",
+        "command",
+      ),
+      setWebLifecycleState: withCdpName(
+        async (params?: cdp.types.ts.Page.SetWebLifecycleStateParams) =>
+          commands["Page.setWebLifecycleState"].result.parse(
+            await send("Page.setWebLifecycleState", commands["Page.setWebLifecycleState"].params.parse(params ?? {})),
+          ),
+        "Page.setWebLifecycleState",
+        "command",
+      ),
+      stopScreencast: withCdpName(
+        async (params?: cdp.types.ts.Page.StopScreencastParams) =>
+          commands["Page.stopScreencast"].result.parse(
+            await send("Page.stopScreencast", commands["Page.stopScreencast"].params.parse(params ?? {})),
+          ),
+        "Page.stopScreencast",
+        "command",
+      ),
+      produceCompilationCache: withCdpName(
+        async (params?: cdp.types.ts.Page.ProduceCompilationCacheParams) =>
+          commands["Page.produceCompilationCache"].result.parse(
+            await send(
+              "Page.produceCompilationCache",
+              commands["Page.produceCompilationCache"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.produceCompilationCache",
+        "command",
+      ),
+      addCompilationCache: withCdpName(
+        async (params?: cdp.types.ts.Page.AddCompilationCacheParams) =>
+          commands["Page.addCompilationCache"].result.parse(
+            await send("Page.addCompilationCache", commands["Page.addCompilationCache"].params.parse(params ?? {})),
+          ),
+        "Page.addCompilationCache",
+        "command",
+      ),
+      clearCompilationCache: withCdpName(
+        async (params?: cdp.types.ts.Page.ClearCompilationCacheParams) =>
+          commands["Page.clearCompilationCache"].result.parse(
+            await send("Page.clearCompilationCache", commands["Page.clearCompilationCache"].params.parse(params ?? {})),
+          ),
+        "Page.clearCompilationCache",
+        "command",
+      ),
+      setSPCTransactionMode: withCdpName(
+        async (params?: cdp.types.ts.Page.SetSPCTransactionModeParams) =>
+          commands["Page.setSPCTransactionMode"].result.parse(
+            await send("Page.setSPCTransactionMode", commands["Page.setSPCTransactionMode"].params.parse(params ?? {})),
+          ),
+        "Page.setSPCTransactionMode",
+        "command",
+      ),
+      setRPHRegistrationMode: withCdpName(
+        async (params?: cdp.types.ts.Page.SetRPHRegistrationModeParams) =>
+          commands["Page.setRPHRegistrationMode"].result.parse(
+            await send(
+              "Page.setRPHRegistrationMode",
+              commands["Page.setRPHRegistrationMode"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setRPHRegistrationMode",
+        "command",
+      ),
+      generateTestReport: withCdpName(
+        async (params?: cdp.types.ts.Page.GenerateTestReportParams) =>
+          commands["Page.generateTestReport"].result.parse(
+            await send("Page.generateTestReport", commands["Page.generateTestReport"].params.parse(params ?? {})),
+          ),
+        "Page.generateTestReport",
+        "command",
+      ),
+      waitForDebugger: withCdpName(
+        async (params?: cdp.types.ts.Page.WaitForDebuggerParams) =>
+          commands["Page.waitForDebugger"].result.parse(
+            await send("Page.waitForDebugger", commands["Page.waitForDebugger"].params.parse(params ?? {})),
+          ),
+        "Page.waitForDebugger",
+        "command",
+      ),
+      setInterceptFileChooserDialog: withCdpName(
+        async (params?: cdp.types.ts.Page.SetInterceptFileChooserDialogParams) =>
+          commands["Page.setInterceptFileChooserDialog"].result.parse(
+            await send(
+              "Page.setInterceptFileChooserDialog",
+              commands["Page.setInterceptFileChooserDialog"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setInterceptFileChooserDialog",
+        "command",
+      ),
+      setPrerenderingAllowed: withCdpName(
+        async (params?: cdp.types.ts.Page.SetPrerenderingAllowedParams) =>
+          commands["Page.setPrerenderingAllowed"].result.parse(
+            await send(
+              "Page.setPrerenderingAllowed",
+              commands["Page.setPrerenderingAllowed"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.setPrerenderingAllowed",
+        "command",
+      ),
+      getAnnotatedPageContent: withCdpName(
+        async (params?: cdp.types.ts.Page.GetAnnotatedPageContentParams) =>
+          commands["Page.getAnnotatedPageContent"].result.parse(
+            await send(
+              "Page.getAnnotatedPageContent",
+              commands["Page.getAnnotatedPageContent"].params.parse(params ?? {}),
+            ),
+          ),
+        "Page.getAnnotatedPageContent",
+        "command",
+      ),
       domContentEventFired: withCdpName(events["Page.domContentEventFired"], "Page.domContentEventFired", "event"),
       fileChooserOpened: withCdpName(events["Page.fileChooserOpened"], "Page.fileChooserOpened", "event"),
       frameAttached: withCdpName(events["Page.frameAttached"], "Page.frameAttached", "event"),
-      frameClearedScheduledNavigation: withCdpName(events["Page.frameClearedScheduledNavigation"], "Page.frameClearedScheduledNavigation", "event"),
+      frameClearedScheduledNavigation: withCdpName(
+        events["Page.frameClearedScheduledNavigation"],
+        "Page.frameClearedScheduledNavigation",
+        "event",
+      ),
       frameDetached: withCdpName(events["Page.frameDetached"], "Page.frameDetached", "event"),
-      frameSubtreeWillBeDetached: withCdpName(events["Page.frameSubtreeWillBeDetached"], "Page.frameSubtreeWillBeDetached", "event"),
+      frameSubtreeWillBeDetached: withCdpName(
+        events["Page.frameSubtreeWillBeDetached"],
+        "Page.frameSubtreeWillBeDetached",
+        "event",
+      ),
       frameNavigated: withCdpName(events["Page.frameNavigated"], "Page.frameNavigated", "event"),
       documentOpened: withCdpName(events["Page.documentOpened"], "Page.documentOpened", "event"),
       frameResized: withCdpName(events["Page.frameResized"], "Page.frameResized", "event"),
-      frameStartedNavigating: withCdpName(events["Page.frameStartedNavigating"], "Page.frameStartedNavigating", "event"),
-      frameRequestedNavigation: withCdpName(events["Page.frameRequestedNavigation"], "Page.frameRequestedNavigation", "event"),
-      frameScheduledNavigation: withCdpName(events["Page.frameScheduledNavigation"], "Page.frameScheduledNavigation", "event"),
+      frameStartedNavigating: withCdpName(
+        events["Page.frameStartedNavigating"],
+        "Page.frameStartedNavigating",
+        "event",
+      ),
+      frameRequestedNavigation: withCdpName(
+        events["Page.frameRequestedNavigation"],
+        "Page.frameRequestedNavigation",
+        "event",
+      ),
+      frameScheduledNavigation: withCdpName(
+        events["Page.frameScheduledNavigation"],
+        "Page.frameScheduledNavigation",
+        "event",
+      ),
       frameStartedLoading: withCdpName(events["Page.frameStartedLoading"], "Page.frameStartedLoading", "event"),
       frameStoppedLoading: withCdpName(events["Page.frameStoppedLoading"], "Page.frameStoppedLoading", "event"),
       downloadWillBegin: withCdpName(events["Page.downloadWillBegin"], "Page.downloadWillBegin", "event"),
       downloadProgress: withCdpName(events["Page.downloadProgress"], "Page.downloadProgress", "event"),
       interstitialHidden: withCdpName(events["Page.interstitialHidden"], "Page.interstitialHidden", "event"),
       interstitialShown: withCdpName(events["Page.interstitialShown"], "Page.interstitialShown", "event"),
-      javascriptDialogClosed: withCdpName(events["Page.javascriptDialogClosed"], "Page.javascriptDialogClosed", "event"),
-      javascriptDialogOpening: withCdpName(events["Page.javascriptDialogOpening"], "Page.javascriptDialogOpening", "event"),
+      javascriptDialogClosed: withCdpName(
+        events["Page.javascriptDialogClosed"],
+        "Page.javascriptDialogClosed",
+        "event",
+      ),
+      javascriptDialogOpening: withCdpName(
+        events["Page.javascriptDialogOpening"],
+        "Page.javascriptDialogOpening",
+        "event",
+      ),
       lifecycleEvent: withCdpName(events["Page.lifecycleEvent"], "Page.lifecycleEvent", "event"),
-      backForwardCacheNotUsed: withCdpName(events["Page.backForwardCacheNotUsed"], "Page.backForwardCacheNotUsed", "event"),
+      backForwardCacheNotUsed: withCdpName(
+        events["Page.backForwardCacheNotUsed"],
+        "Page.backForwardCacheNotUsed",
+        "event",
+      ),
       loadEventFired: withCdpName(events["Page.loadEventFired"], "Page.loadEventFired", "event"),
-      navigatedWithinDocument: withCdpName(events["Page.navigatedWithinDocument"], "Page.navigatedWithinDocument", "event"),
+      navigatedWithinDocument: withCdpName(
+        events["Page.navigatedWithinDocument"],
+        "Page.navigatedWithinDocument",
+        "event",
+      ),
       screencastFrame: withCdpName(events["Page.screencastFrame"], "Page.screencastFrame", "event"),
-      screencastVisibilityChanged: withCdpName(events["Page.screencastVisibilityChanged"], "Page.screencastVisibilityChanged", "event"),
+      screencastVisibilityChanged: withCdpName(
+        events["Page.screencastVisibilityChanged"],
+        "Page.screencastVisibilityChanged",
+        "event",
+      ),
       windowOpen: withCdpName(events["Page.windowOpen"], "Page.windowOpen", "event"),
-      compilationCacheProduced: withCdpName(events["Page.compilationCacheProduced"], "Page.compilationCacheProduced", "event"),
+      compilationCacheProduced: withCdpName(
+        events["Page.compilationCacheProduced"],
+        "Page.compilationCacheProduced",
+        "event",
+      ),
     },
     Performance: {
-      disable: withCdpName(async (params?: cdp.types.ts.Performance.DisableParams) => commands["Performance.disable"].result.parse(await send("Performance.disable", commands["Performance.disable"].params.parse(params ?? {}))), "Performance.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Performance.EnableParams) => commands["Performance.enable"].result.parse(await send("Performance.enable", commands["Performance.enable"].params.parse(params ?? {}))), "Performance.enable", "command"),
-      setTimeDomain: withCdpName(async (params?: cdp.types.ts.Performance.SetTimeDomainParams) => commands["Performance.setTimeDomain"].result.parse(await send("Performance.setTimeDomain", commands["Performance.setTimeDomain"].params.parse(params ?? {}))), "Performance.setTimeDomain", "command"),
-      getMetrics: withCdpName(async (params?: cdp.types.ts.Performance.GetMetricsParams) => commands["Performance.getMetrics"].result.parse(await send("Performance.getMetrics", commands["Performance.getMetrics"].params.parse(params ?? {}))), "Performance.getMetrics", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Performance.DisableParams) =>
+          commands["Performance.disable"].result.parse(
+            await send("Performance.disable", commands["Performance.disable"].params.parse(params ?? {})),
+          ),
+        "Performance.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Performance.EnableParams) =>
+          commands["Performance.enable"].result.parse(
+            await send("Performance.enable", commands["Performance.enable"].params.parse(params ?? {})),
+          ),
+        "Performance.enable",
+        "command",
+      ),
+      setTimeDomain: withCdpName(
+        async (params?: cdp.types.ts.Performance.SetTimeDomainParams) =>
+          commands["Performance.setTimeDomain"].result.parse(
+            await send("Performance.setTimeDomain", commands["Performance.setTimeDomain"].params.parse(params ?? {})),
+          ),
+        "Performance.setTimeDomain",
+        "command",
+      ),
+      getMetrics: withCdpName(
+        async (params?: cdp.types.ts.Performance.GetMetricsParams) =>
+          commands["Performance.getMetrics"].result.parse(
+            await send("Performance.getMetrics", commands["Performance.getMetrics"].params.parse(params ?? {})),
+          ),
+        "Performance.getMetrics",
+        "command",
+      ),
       metrics: withCdpName(events["Performance.metrics"], "Performance.metrics", "event"),
     },
     PerformanceTimeline: {
-      enable: withCdpName(async (params?: cdp.types.ts.PerformanceTimeline.EnableParams) => commands["PerformanceTimeline.enable"].result.parse(await send("PerformanceTimeline.enable", commands["PerformanceTimeline.enable"].params.parse(params ?? {}))), "PerformanceTimeline.enable", "command"),
-      timelineEventAdded: withCdpName(events["PerformanceTimeline.timelineEventAdded"], "PerformanceTimeline.timelineEventAdded", "event"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.PerformanceTimeline.EnableParams) =>
+          commands["PerformanceTimeline.enable"].result.parse(
+            await send("PerformanceTimeline.enable", commands["PerformanceTimeline.enable"].params.parse(params ?? {})),
+          ),
+        "PerformanceTimeline.enable",
+        "command",
+      ),
+      timelineEventAdded: withCdpName(
+        events["PerformanceTimeline.timelineEventAdded"],
+        "PerformanceTimeline.timelineEventAdded",
+        "event",
+      ),
     },
     Preload: {
-      enable: withCdpName(async (params?: cdp.types.ts.Preload.EnableParams) => commands["Preload.enable"].result.parse(await send("Preload.enable", commands["Preload.enable"].params.parse(params ?? {}))), "Preload.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Preload.DisableParams) => commands["Preload.disable"].result.parse(await send("Preload.disable", commands["Preload.disable"].params.parse(params ?? {}))), "Preload.disable", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Preload.EnableParams) =>
+          commands["Preload.enable"].result.parse(
+            await send("Preload.enable", commands["Preload.enable"].params.parse(params ?? {})),
+          ),
+        "Preload.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Preload.DisableParams) =>
+          commands["Preload.disable"].result.parse(
+            await send("Preload.disable", commands["Preload.disable"].params.parse(params ?? {})),
+          ),
+        "Preload.disable",
+        "command",
+      ),
       ruleSetUpdated: withCdpName(events["Preload.ruleSetUpdated"], "Preload.ruleSetUpdated", "event"),
       ruleSetRemoved: withCdpName(events["Preload.ruleSetRemoved"], "Preload.ruleSetRemoved", "event"),
-      preloadEnabledStateUpdated: withCdpName(events["Preload.preloadEnabledStateUpdated"], "Preload.preloadEnabledStateUpdated", "event"),
-      prefetchStatusUpdated: withCdpName(events["Preload.prefetchStatusUpdated"], "Preload.prefetchStatusUpdated", "event"),
-      prerenderStatusUpdated: withCdpName(events["Preload.prerenderStatusUpdated"], "Preload.prerenderStatusUpdated", "event"),
-      preloadingAttemptSourcesUpdated: withCdpName(events["Preload.preloadingAttemptSourcesUpdated"], "Preload.preloadingAttemptSourcesUpdated", "event"),
+      preloadEnabledStateUpdated: withCdpName(
+        events["Preload.preloadEnabledStateUpdated"],
+        "Preload.preloadEnabledStateUpdated",
+        "event",
+      ),
+      prefetchStatusUpdated: withCdpName(
+        events["Preload.prefetchStatusUpdated"],
+        "Preload.prefetchStatusUpdated",
+        "event",
+      ),
+      prerenderStatusUpdated: withCdpName(
+        events["Preload.prerenderStatusUpdated"],
+        "Preload.prerenderStatusUpdated",
+        "event",
+      ),
+      preloadingAttemptSourcesUpdated: withCdpName(
+        events["Preload.preloadingAttemptSourcesUpdated"],
+        "Preload.preloadingAttemptSourcesUpdated",
+        "event",
+      ),
     },
     Profiler: {
-      disable: withCdpName(async (params?: cdp.types.ts.Profiler.DisableParams) => commands["Profiler.disable"].result.parse(await send("Profiler.disable", commands["Profiler.disable"].params.parse(params ?? {}))), "Profiler.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Profiler.EnableParams) => commands["Profiler.enable"].result.parse(await send("Profiler.enable", commands["Profiler.enable"].params.parse(params ?? {}))), "Profiler.enable", "command"),
-      getBestEffortCoverage: withCdpName(async (params?: cdp.types.ts.Profiler.GetBestEffortCoverageParams) => commands["Profiler.getBestEffortCoverage"].result.parse(await send("Profiler.getBestEffortCoverage", commands["Profiler.getBestEffortCoverage"].params.parse(params ?? {}))), "Profiler.getBestEffortCoverage", "command"),
-      setSamplingInterval: withCdpName(async (params?: cdp.types.ts.Profiler.SetSamplingIntervalParams) => commands["Profiler.setSamplingInterval"].result.parse(await send("Profiler.setSamplingInterval", commands["Profiler.setSamplingInterval"].params.parse(params ?? {}))), "Profiler.setSamplingInterval", "command"),
-      start: withCdpName(async (params?: cdp.types.ts.Profiler.StartParams) => commands["Profiler.start"].result.parse(await send("Profiler.start", commands["Profiler.start"].params.parse(params ?? {}))), "Profiler.start", "command"),
-      startPreciseCoverage: withCdpName(async (params?: cdp.types.ts.Profiler.StartPreciseCoverageParams) => commands["Profiler.startPreciseCoverage"].result.parse(await send("Profiler.startPreciseCoverage", commands["Profiler.startPreciseCoverage"].params.parse(params ?? {}))), "Profiler.startPreciseCoverage", "command"),
-      stop: withCdpName(async (params?: cdp.types.ts.Profiler.StopParams) => commands["Profiler.stop"].result.parse(await send("Profiler.stop", commands["Profiler.stop"].params.parse(params ?? {}))), "Profiler.stop", "command"),
-      stopPreciseCoverage: withCdpName(async (params?: cdp.types.ts.Profiler.StopPreciseCoverageParams) => commands["Profiler.stopPreciseCoverage"].result.parse(await send("Profiler.stopPreciseCoverage", commands["Profiler.stopPreciseCoverage"].params.parse(params ?? {}))), "Profiler.stopPreciseCoverage", "command"),
-      takePreciseCoverage: withCdpName(async (params?: cdp.types.ts.Profiler.TakePreciseCoverageParams) => commands["Profiler.takePreciseCoverage"].result.parse(await send("Profiler.takePreciseCoverage", commands["Profiler.takePreciseCoverage"].params.parse(params ?? {}))), "Profiler.takePreciseCoverage", "command"),
-      consoleProfileFinished: withCdpName(events["Profiler.consoleProfileFinished"], "Profiler.consoleProfileFinished", "event"),
-      consoleProfileStarted: withCdpName(events["Profiler.consoleProfileStarted"], "Profiler.consoleProfileStarted", "event"),
-      preciseCoverageDeltaUpdate: withCdpName(events["Profiler.preciseCoverageDeltaUpdate"], "Profiler.preciseCoverageDeltaUpdate", "event"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Profiler.DisableParams) =>
+          commands["Profiler.disable"].result.parse(
+            await send("Profiler.disable", commands["Profiler.disable"].params.parse(params ?? {})),
+          ),
+        "Profiler.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Profiler.EnableParams) =>
+          commands["Profiler.enable"].result.parse(
+            await send("Profiler.enable", commands["Profiler.enable"].params.parse(params ?? {})),
+          ),
+        "Profiler.enable",
+        "command",
+      ),
+      getBestEffortCoverage: withCdpName(
+        async (params?: cdp.types.ts.Profiler.GetBestEffortCoverageParams) =>
+          commands["Profiler.getBestEffortCoverage"].result.parse(
+            await send(
+              "Profiler.getBestEffortCoverage",
+              commands["Profiler.getBestEffortCoverage"].params.parse(params ?? {}),
+            ),
+          ),
+        "Profiler.getBestEffortCoverage",
+        "command",
+      ),
+      setSamplingInterval: withCdpName(
+        async (params?: cdp.types.ts.Profiler.SetSamplingIntervalParams) =>
+          commands["Profiler.setSamplingInterval"].result.parse(
+            await send(
+              "Profiler.setSamplingInterval",
+              commands["Profiler.setSamplingInterval"].params.parse(params ?? {}),
+            ),
+          ),
+        "Profiler.setSamplingInterval",
+        "command",
+      ),
+      start: withCdpName(
+        async (params?: cdp.types.ts.Profiler.StartParams) =>
+          commands["Profiler.start"].result.parse(
+            await send("Profiler.start", commands["Profiler.start"].params.parse(params ?? {})),
+          ),
+        "Profiler.start",
+        "command",
+      ),
+      startPreciseCoverage: withCdpName(
+        async (params?: cdp.types.ts.Profiler.StartPreciseCoverageParams) =>
+          commands["Profiler.startPreciseCoverage"].result.parse(
+            await send(
+              "Profiler.startPreciseCoverage",
+              commands["Profiler.startPreciseCoverage"].params.parse(params ?? {}),
+            ),
+          ),
+        "Profiler.startPreciseCoverage",
+        "command",
+      ),
+      stop: withCdpName(
+        async (params?: cdp.types.ts.Profiler.StopParams) =>
+          commands["Profiler.stop"].result.parse(
+            await send("Profiler.stop", commands["Profiler.stop"].params.parse(params ?? {})),
+          ),
+        "Profiler.stop",
+        "command",
+      ),
+      stopPreciseCoverage: withCdpName(
+        async (params?: cdp.types.ts.Profiler.StopPreciseCoverageParams) =>
+          commands["Profiler.stopPreciseCoverage"].result.parse(
+            await send(
+              "Profiler.stopPreciseCoverage",
+              commands["Profiler.stopPreciseCoverage"].params.parse(params ?? {}),
+            ),
+          ),
+        "Profiler.stopPreciseCoverage",
+        "command",
+      ),
+      takePreciseCoverage: withCdpName(
+        async (params?: cdp.types.ts.Profiler.TakePreciseCoverageParams) =>
+          commands["Profiler.takePreciseCoverage"].result.parse(
+            await send(
+              "Profiler.takePreciseCoverage",
+              commands["Profiler.takePreciseCoverage"].params.parse(params ?? {}),
+            ),
+          ),
+        "Profiler.takePreciseCoverage",
+        "command",
+      ),
+      consoleProfileFinished: withCdpName(
+        events["Profiler.consoleProfileFinished"],
+        "Profiler.consoleProfileFinished",
+        "event",
+      ),
+      consoleProfileStarted: withCdpName(
+        events["Profiler.consoleProfileStarted"],
+        "Profiler.consoleProfileStarted",
+        "event",
+      ),
+      preciseCoverageDeltaUpdate: withCdpName(
+        events["Profiler.preciseCoverageDeltaUpdate"],
+        "Profiler.preciseCoverageDeltaUpdate",
+        "event",
+      ),
     },
     PWA: {
-      getOsAppState: withCdpName(async (params?: cdp.types.ts.PWA.GetOsAppStateParams) => commands["PWA.getOsAppState"].result.parse(await send("PWA.getOsAppState", commands["PWA.getOsAppState"].params.parse(params ?? {}))), "PWA.getOsAppState", "command"),
-      install: withCdpName(async (params?: cdp.types.ts.PWA.InstallParams) => commands["PWA.install"].result.parse(await send("PWA.install", commands["PWA.install"].params.parse(params ?? {}))), "PWA.install", "command"),
-      uninstall: withCdpName(async (params?: cdp.types.ts.PWA.UninstallParams) => commands["PWA.uninstall"].result.parse(await send("PWA.uninstall", commands["PWA.uninstall"].params.parse(params ?? {}))), "PWA.uninstall", "command"),
-      launch: withCdpName(async (params?: cdp.types.ts.PWA.LaunchParams) => commands["PWA.launch"].result.parse(await send("PWA.launch", commands["PWA.launch"].params.parse(params ?? {}))), "PWA.launch", "command"),
-      launchFilesInApp: withCdpName(async (params?: cdp.types.ts.PWA.LaunchFilesInAppParams) => commands["PWA.launchFilesInApp"].result.parse(await send("PWA.launchFilesInApp", commands["PWA.launchFilesInApp"].params.parse(params ?? {}))), "PWA.launchFilesInApp", "command"),
-      openCurrentPageInApp: withCdpName(async (params?: cdp.types.ts.PWA.OpenCurrentPageInAppParams) => commands["PWA.openCurrentPageInApp"].result.parse(await send("PWA.openCurrentPageInApp", commands["PWA.openCurrentPageInApp"].params.parse(params ?? {}))), "PWA.openCurrentPageInApp", "command"),
-      changeAppUserSettings: withCdpName(async (params?: cdp.types.ts.PWA.ChangeAppUserSettingsParams) => commands["PWA.changeAppUserSettings"].result.parse(await send("PWA.changeAppUserSettings", commands["PWA.changeAppUserSettings"].params.parse(params ?? {}))), "PWA.changeAppUserSettings", "command"),
+      getOsAppState: withCdpName(
+        async (params?: cdp.types.ts.PWA.GetOsAppStateParams) =>
+          commands["PWA.getOsAppState"].result.parse(
+            await send("PWA.getOsAppState", commands["PWA.getOsAppState"].params.parse(params ?? {})),
+          ),
+        "PWA.getOsAppState",
+        "command",
+      ),
+      install: withCdpName(
+        async (params?: cdp.types.ts.PWA.InstallParams) =>
+          commands["PWA.install"].result.parse(
+            await send("PWA.install", commands["PWA.install"].params.parse(params ?? {})),
+          ),
+        "PWA.install",
+        "command",
+      ),
+      uninstall: withCdpName(
+        async (params?: cdp.types.ts.PWA.UninstallParams) =>
+          commands["PWA.uninstall"].result.parse(
+            await send("PWA.uninstall", commands["PWA.uninstall"].params.parse(params ?? {})),
+          ),
+        "PWA.uninstall",
+        "command",
+      ),
+      launch: withCdpName(
+        async (params?: cdp.types.ts.PWA.LaunchParams) =>
+          commands["PWA.launch"].result.parse(
+            await send("PWA.launch", commands["PWA.launch"].params.parse(params ?? {})),
+          ),
+        "PWA.launch",
+        "command",
+      ),
+      launchFilesInApp: withCdpName(
+        async (params?: cdp.types.ts.PWA.LaunchFilesInAppParams) =>
+          commands["PWA.launchFilesInApp"].result.parse(
+            await send("PWA.launchFilesInApp", commands["PWA.launchFilesInApp"].params.parse(params ?? {})),
+          ),
+        "PWA.launchFilesInApp",
+        "command",
+      ),
+      openCurrentPageInApp: withCdpName(
+        async (params?: cdp.types.ts.PWA.OpenCurrentPageInAppParams) =>
+          commands["PWA.openCurrentPageInApp"].result.parse(
+            await send("PWA.openCurrentPageInApp", commands["PWA.openCurrentPageInApp"].params.parse(params ?? {})),
+          ),
+        "PWA.openCurrentPageInApp",
+        "command",
+      ),
+      changeAppUserSettings: withCdpName(
+        async (params?: cdp.types.ts.PWA.ChangeAppUserSettingsParams) =>
+          commands["PWA.changeAppUserSettings"].result.parse(
+            await send("PWA.changeAppUserSettings", commands["PWA.changeAppUserSettings"].params.parse(params ?? {})),
+          ),
+        "PWA.changeAppUserSettings",
+        "command",
+      ),
     },
     Runtime: {
-      awaitPromise: withCdpName(async (params?: cdp.types.ts.Runtime.AwaitPromiseParams) => commands["Runtime.awaitPromise"].result.parse(await send("Runtime.awaitPromise", commands["Runtime.awaitPromise"].params.parse(params ?? {}))), "Runtime.awaitPromise", "command"),
-      callFunctionOn: withCdpName(async (params?: cdp.types.ts.Runtime.CallFunctionOnParams) => commands["Runtime.callFunctionOn"].result.parse(await send("Runtime.callFunctionOn", commands["Runtime.callFunctionOn"].params.parse(params ?? {}))), "Runtime.callFunctionOn", "command"),
-      compileScript: withCdpName(async (params?: cdp.types.ts.Runtime.CompileScriptParams) => commands["Runtime.compileScript"].result.parse(await send("Runtime.compileScript", commands["Runtime.compileScript"].params.parse(params ?? {}))), "Runtime.compileScript", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.Runtime.DisableParams) => commands["Runtime.disable"].result.parse(await send("Runtime.disable", commands["Runtime.disable"].params.parse(params ?? {}))), "Runtime.disable", "command"),
-      discardConsoleEntries: withCdpName(async (params?: cdp.types.ts.Runtime.DiscardConsoleEntriesParams) => commands["Runtime.discardConsoleEntries"].result.parse(await send("Runtime.discardConsoleEntries", commands["Runtime.discardConsoleEntries"].params.parse(params ?? {}))), "Runtime.discardConsoleEntries", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Runtime.EnableParams) => commands["Runtime.enable"].result.parse(await send("Runtime.enable", commands["Runtime.enable"].params.parse(params ?? {}))), "Runtime.enable", "command"),
-      evaluate: withCdpName(async (params?: cdp.types.ts.Runtime.EvaluateParams) => commands["Runtime.evaluate"].result.parse(await send("Runtime.evaluate", commands["Runtime.evaluate"].params.parse(params ?? {}))), "Runtime.evaluate", "command"),
-      getIsolateId: withCdpName(async (params?: cdp.types.ts.Runtime.GetIsolateIdParams) => commands["Runtime.getIsolateId"].result.parse(await send("Runtime.getIsolateId", commands["Runtime.getIsolateId"].params.parse(params ?? {}))), "Runtime.getIsolateId", "command"),
-      getHeapUsage: withCdpName(async (params?: cdp.types.ts.Runtime.GetHeapUsageParams) => commands["Runtime.getHeapUsage"].result.parse(await send("Runtime.getHeapUsage", commands["Runtime.getHeapUsage"].params.parse(params ?? {}))), "Runtime.getHeapUsage", "command"),
-      getProperties: withCdpName(async (params?: cdp.types.ts.Runtime.GetPropertiesParams) => commands["Runtime.getProperties"].result.parse(await send("Runtime.getProperties", commands["Runtime.getProperties"].params.parse(params ?? {}))), "Runtime.getProperties", "command"),
-      globalLexicalScopeNames: withCdpName(async (params?: cdp.types.ts.Runtime.GlobalLexicalScopeNamesParams) => commands["Runtime.globalLexicalScopeNames"].result.parse(await send("Runtime.globalLexicalScopeNames", commands["Runtime.globalLexicalScopeNames"].params.parse(params ?? {}))), "Runtime.globalLexicalScopeNames", "command"),
-      queryObjects: withCdpName(async (params?: cdp.types.ts.Runtime.QueryObjectsParams) => commands["Runtime.queryObjects"].result.parse(await send("Runtime.queryObjects", commands["Runtime.queryObjects"].params.parse(params ?? {}))), "Runtime.queryObjects", "command"),
-      releaseObject: withCdpName(async (params?: cdp.types.ts.Runtime.ReleaseObjectParams) => commands["Runtime.releaseObject"].result.parse(await send("Runtime.releaseObject", commands["Runtime.releaseObject"].params.parse(params ?? {}))), "Runtime.releaseObject", "command"),
-      releaseObjectGroup: withCdpName(async (params?: cdp.types.ts.Runtime.ReleaseObjectGroupParams) => commands["Runtime.releaseObjectGroup"].result.parse(await send("Runtime.releaseObjectGroup", commands["Runtime.releaseObjectGroup"].params.parse(params ?? {}))), "Runtime.releaseObjectGroup", "command"),
-      runIfWaitingForDebugger: withCdpName(async (params?: cdp.types.ts.Runtime.RunIfWaitingForDebuggerParams) => commands["Runtime.runIfWaitingForDebugger"].result.parse(await send("Runtime.runIfWaitingForDebugger", commands["Runtime.runIfWaitingForDebugger"].params.parse(params ?? {}))), "Runtime.runIfWaitingForDebugger", "command"),
-      runScript: withCdpName(async (params?: cdp.types.ts.Runtime.RunScriptParams) => commands["Runtime.runScript"].result.parse(await send("Runtime.runScript", commands["Runtime.runScript"].params.parse(params ?? {}))), "Runtime.runScript", "command"),
-      setAsyncCallStackDepth: withCdpName(async (params?: cdp.types.ts.Runtime.SetAsyncCallStackDepthParams) => commands["Runtime.setAsyncCallStackDepth"].result.parse(await send("Runtime.setAsyncCallStackDepth", commands["Runtime.setAsyncCallStackDepth"].params.parse(params ?? {}))), "Runtime.setAsyncCallStackDepth", "command"),
-      setCustomObjectFormatterEnabled: withCdpName(async (params?: cdp.types.ts.Runtime.SetCustomObjectFormatterEnabledParams) => commands["Runtime.setCustomObjectFormatterEnabled"].result.parse(await send("Runtime.setCustomObjectFormatterEnabled", commands["Runtime.setCustomObjectFormatterEnabled"].params.parse(params ?? {}))), "Runtime.setCustomObjectFormatterEnabled", "command"),
-      setMaxCallStackSizeToCapture: withCdpName(async (params?: cdp.types.ts.Runtime.SetMaxCallStackSizeToCaptureParams) => commands["Runtime.setMaxCallStackSizeToCapture"].result.parse(await send("Runtime.setMaxCallStackSizeToCapture", commands["Runtime.setMaxCallStackSizeToCapture"].params.parse(params ?? {}))), "Runtime.setMaxCallStackSizeToCapture", "command"),
-      terminateExecution: withCdpName(async (params?: cdp.types.ts.Runtime.TerminateExecutionParams) => commands["Runtime.terminateExecution"].result.parse(await send("Runtime.terminateExecution", commands["Runtime.terminateExecution"].params.parse(params ?? {}))), "Runtime.terminateExecution", "command"),
-      addBinding: withCdpName(async (params?: cdp.types.ts.Runtime.AddBindingParams) => commands["Runtime.addBinding"].result.parse(await send("Runtime.addBinding", commands["Runtime.addBinding"].params.parse(params ?? {}))), "Runtime.addBinding", "command"),
-      removeBinding: withCdpName(async (params?: cdp.types.ts.Runtime.RemoveBindingParams) => commands["Runtime.removeBinding"].result.parse(await send("Runtime.removeBinding", commands["Runtime.removeBinding"].params.parse(params ?? {}))), "Runtime.removeBinding", "command"),
-      getExceptionDetails: withCdpName(async (params?: cdp.types.ts.Runtime.GetExceptionDetailsParams) => commands["Runtime.getExceptionDetails"].result.parse(await send("Runtime.getExceptionDetails", commands["Runtime.getExceptionDetails"].params.parse(params ?? {}))), "Runtime.getExceptionDetails", "command"),
+      awaitPromise: withCdpName(
+        async (params?: cdp.types.ts.Runtime.AwaitPromiseParams) =>
+          commands["Runtime.awaitPromise"].result.parse(
+            await send("Runtime.awaitPromise", commands["Runtime.awaitPromise"].params.parse(params ?? {})),
+          ),
+        "Runtime.awaitPromise",
+        "command",
+      ),
+      callFunctionOn: withCdpName(
+        async (params?: cdp.types.ts.Runtime.CallFunctionOnParams) =>
+          commands["Runtime.callFunctionOn"].result.parse(
+            await send("Runtime.callFunctionOn", commands["Runtime.callFunctionOn"].params.parse(params ?? {})),
+          ),
+        "Runtime.callFunctionOn",
+        "command",
+      ),
+      compileScript: withCdpName(
+        async (params?: cdp.types.ts.Runtime.CompileScriptParams) =>
+          commands["Runtime.compileScript"].result.parse(
+            await send("Runtime.compileScript", commands["Runtime.compileScript"].params.parse(params ?? {})),
+          ),
+        "Runtime.compileScript",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Runtime.DisableParams) =>
+          commands["Runtime.disable"].result.parse(
+            await send("Runtime.disable", commands["Runtime.disable"].params.parse(params ?? {})),
+          ),
+        "Runtime.disable",
+        "command",
+      ),
+      discardConsoleEntries: withCdpName(
+        async (params?: cdp.types.ts.Runtime.DiscardConsoleEntriesParams) =>
+          commands["Runtime.discardConsoleEntries"].result.parse(
+            await send(
+              "Runtime.discardConsoleEntries",
+              commands["Runtime.discardConsoleEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.discardConsoleEntries",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Runtime.EnableParams) =>
+          commands["Runtime.enable"].result.parse(
+            await send("Runtime.enable", commands["Runtime.enable"].params.parse(params ?? {})),
+          ),
+        "Runtime.enable",
+        "command",
+      ),
+      evaluate: withCdpName(
+        async (params?: cdp.types.ts.Runtime.EvaluateParams) =>
+          commands["Runtime.evaluate"].result.parse(
+            await send("Runtime.evaluate", commands["Runtime.evaluate"].params.parse(params ?? {})),
+          ),
+        "Runtime.evaluate",
+        "command",
+      ),
+      getIsolateId: withCdpName(
+        async (params?: cdp.types.ts.Runtime.GetIsolateIdParams) =>
+          commands["Runtime.getIsolateId"].result.parse(
+            await send("Runtime.getIsolateId", commands["Runtime.getIsolateId"].params.parse(params ?? {})),
+          ),
+        "Runtime.getIsolateId",
+        "command",
+      ),
+      getHeapUsage: withCdpName(
+        async (params?: cdp.types.ts.Runtime.GetHeapUsageParams) =>
+          commands["Runtime.getHeapUsage"].result.parse(
+            await send("Runtime.getHeapUsage", commands["Runtime.getHeapUsage"].params.parse(params ?? {})),
+          ),
+        "Runtime.getHeapUsage",
+        "command",
+      ),
+      getProperties: withCdpName(
+        async (params?: cdp.types.ts.Runtime.GetPropertiesParams) =>
+          commands["Runtime.getProperties"].result.parse(
+            await send("Runtime.getProperties", commands["Runtime.getProperties"].params.parse(params ?? {})),
+          ),
+        "Runtime.getProperties",
+        "command",
+      ),
+      globalLexicalScopeNames: withCdpName(
+        async (params?: cdp.types.ts.Runtime.GlobalLexicalScopeNamesParams) =>
+          commands["Runtime.globalLexicalScopeNames"].result.parse(
+            await send(
+              "Runtime.globalLexicalScopeNames",
+              commands["Runtime.globalLexicalScopeNames"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.globalLexicalScopeNames",
+        "command",
+      ),
+      queryObjects: withCdpName(
+        async (params?: cdp.types.ts.Runtime.QueryObjectsParams) =>
+          commands["Runtime.queryObjects"].result.parse(
+            await send("Runtime.queryObjects", commands["Runtime.queryObjects"].params.parse(params ?? {})),
+          ),
+        "Runtime.queryObjects",
+        "command",
+      ),
+      releaseObject: withCdpName(
+        async (params?: cdp.types.ts.Runtime.ReleaseObjectParams) =>
+          commands["Runtime.releaseObject"].result.parse(
+            await send("Runtime.releaseObject", commands["Runtime.releaseObject"].params.parse(params ?? {})),
+          ),
+        "Runtime.releaseObject",
+        "command",
+      ),
+      releaseObjectGroup: withCdpName(
+        async (params?: cdp.types.ts.Runtime.ReleaseObjectGroupParams) =>
+          commands["Runtime.releaseObjectGroup"].result.parse(
+            await send("Runtime.releaseObjectGroup", commands["Runtime.releaseObjectGroup"].params.parse(params ?? {})),
+          ),
+        "Runtime.releaseObjectGroup",
+        "command",
+      ),
+      runIfWaitingForDebugger: withCdpName(
+        async (params?: cdp.types.ts.Runtime.RunIfWaitingForDebuggerParams) =>
+          commands["Runtime.runIfWaitingForDebugger"].result.parse(
+            await send(
+              "Runtime.runIfWaitingForDebugger",
+              commands["Runtime.runIfWaitingForDebugger"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.runIfWaitingForDebugger",
+        "command",
+      ),
+      runScript: withCdpName(
+        async (params?: cdp.types.ts.Runtime.RunScriptParams) =>
+          commands["Runtime.runScript"].result.parse(
+            await send("Runtime.runScript", commands["Runtime.runScript"].params.parse(params ?? {})),
+          ),
+        "Runtime.runScript",
+        "command",
+      ),
+      setAsyncCallStackDepth: withCdpName(
+        async (params?: cdp.types.ts.Runtime.SetAsyncCallStackDepthParams) =>
+          commands["Runtime.setAsyncCallStackDepth"].result.parse(
+            await send(
+              "Runtime.setAsyncCallStackDepth",
+              commands["Runtime.setAsyncCallStackDepth"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.setAsyncCallStackDepth",
+        "command",
+      ),
+      setCustomObjectFormatterEnabled: withCdpName(
+        async (params?: cdp.types.ts.Runtime.SetCustomObjectFormatterEnabledParams) =>
+          commands["Runtime.setCustomObjectFormatterEnabled"].result.parse(
+            await send(
+              "Runtime.setCustomObjectFormatterEnabled",
+              commands["Runtime.setCustomObjectFormatterEnabled"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.setCustomObjectFormatterEnabled",
+        "command",
+      ),
+      setMaxCallStackSizeToCapture: withCdpName(
+        async (params?: cdp.types.ts.Runtime.SetMaxCallStackSizeToCaptureParams) =>
+          commands["Runtime.setMaxCallStackSizeToCapture"].result.parse(
+            await send(
+              "Runtime.setMaxCallStackSizeToCapture",
+              commands["Runtime.setMaxCallStackSizeToCapture"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.setMaxCallStackSizeToCapture",
+        "command",
+      ),
+      terminateExecution: withCdpName(
+        async (params?: cdp.types.ts.Runtime.TerminateExecutionParams) =>
+          commands["Runtime.terminateExecution"].result.parse(
+            await send("Runtime.terminateExecution", commands["Runtime.terminateExecution"].params.parse(params ?? {})),
+          ),
+        "Runtime.terminateExecution",
+        "command",
+      ),
+      addBinding: withCdpName(
+        async (params?: cdp.types.ts.Runtime.AddBindingParams) =>
+          commands["Runtime.addBinding"].result.parse(
+            await send("Runtime.addBinding", commands["Runtime.addBinding"].params.parse(params ?? {})),
+          ),
+        "Runtime.addBinding",
+        "command",
+      ),
+      removeBinding: withCdpName(
+        async (params?: cdp.types.ts.Runtime.RemoveBindingParams) =>
+          commands["Runtime.removeBinding"].result.parse(
+            await send("Runtime.removeBinding", commands["Runtime.removeBinding"].params.parse(params ?? {})),
+          ),
+        "Runtime.removeBinding",
+        "command",
+      ),
+      getExceptionDetails: withCdpName(
+        async (params?: cdp.types.ts.Runtime.GetExceptionDetailsParams) =>
+          commands["Runtime.getExceptionDetails"].result.parse(
+            await send(
+              "Runtime.getExceptionDetails",
+              commands["Runtime.getExceptionDetails"].params.parse(params ?? {}),
+            ),
+          ),
+        "Runtime.getExceptionDetails",
+        "command",
+      ),
       bindingCalled: withCdpName(events["Runtime.bindingCalled"], "Runtime.bindingCalled", "event"),
       consoleAPICalled: withCdpName(events["Runtime.consoleAPICalled"], "Runtime.consoleAPICalled", "event"),
       exceptionRevoked: withCdpName(events["Runtime.exceptionRevoked"], "Runtime.exceptionRevoked", "event"),
       exceptionThrown: withCdpName(events["Runtime.exceptionThrown"], "Runtime.exceptionThrown", "event"),
-      executionContextCreated: withCdpName(events["Runtime.executionContextCreated"], "Runtime.executionContextCreated", "event"),
-      executionContextDestroyed: withCdpName(events["Runtime.executionContextDestroyed"], "Runtime.executionContextDestroyed", "event"),
-      executionContextsCleared: withCdpName(events["Runtime.executionContextsCleared"], "Runtime.executionContextsCleared", "event"),
+      executionContextCreated: withCdpName(
+        events["Runtime.executionContextCreated"],
+        "Runtime.executionContextCreated",
+        "event",
+      ),
+      executionContextDestroyed: withCdpName(
+        events["Runtime.executionContextDestroyed"],
+        "Runtime.executionContextDestroyed",
+        "event",
+      ),
+      executionContextsCleared: withCdpName(
+        events["Runtime.executionContextsCleared"],
+        "Runtime.executionContextsCleared",
+        "event",
+      ),
       inspectRequested: withCdpName(events["Runtime.inspectRequested"], "Runtime.inspectRequested", "event"),
     },
     Schema: {
-      getDomains: withCdpName(async (params?: cdp.types.ts.Schema.GetDomainsParams) => commands["Schema.getDomains"].result.parse(await send("Schema.getDomains", commands["Schema.getDomains"].params.parse(params ?? {}))), "Schema.getDomains", "command"),
+      getDomains: withCdpName(
+        async (params?: cdp.types.ts.Schema.GetDomainsParams) =>
+          commands["Schema.getDomains"].result.parse(
+            await send("Schema.getDomains", commands["Schema.getDomains"].params.parse(params ?? {})),
+          ),
+        "Schema.getDomains",
+        "command",
+      ),
     },
     Security: {
-      disable: withCdpName(async (params?: cdp.types.ts.Security.DisableParams) => commands["Security.disable"].result.parse(await send("Security.disable", commands["Security.disable"].params.parse(params ?? {}))), "Security.disable", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.Security.EnableParams) => commands["Security.enable"].result.parse(await send("Security.enable", commands["Security.enable"].params.parse(params ?? {}))), "Security.enable", "command"),
-      setIgnoreCertificateErrors: withCdpName(async (params?: cdp.types.ts.Security.SetIgnoreCertificateErrorsParams) => commands["Security.setIgnoreCertificateErrors"].result.parse(await send("Security.setIgnoreCertificateErrors", commands["Security.setIgnoreCertificateErrors"].params.parse(params ?? {}))), "Security.setIgnoreCertificateErrors", "command"),
-      handleCertificateError: withCdpName(async (params?: cdp.types.ts.Security.HandleCertificateErrorParams) => commands["Security.handleCertificateError"].result.parse(await send("Security.handleCertificateError", commands["Security.handleCertificateError"].params.parse(params ?? {}))), "Security.handleCertificateError", "command"),
-      setOverrideCertificateErrors: withCdpName(async (params?: cdp.types.ts.Security.SetOverrideCertificateErrorsParams) => commands["Security.setOverrideCertificateErrors"].result.parse(await send("Security.setOverrideCertificateErrors", commands["Security.setOverrideCertificateErrors"].params.parse(params ?? {}))), "Security.setOverrideCertificateErrors", "command"),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.Security.DisableParams) =>
+          commands["Security.disable"].result.parse(
+            await send("Security.disable", commands["Security.disable"].params.parse(params ?? {})),
+          ),
+        "Security.disable",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.Security.EnableParams) =>
+          commands["Security.enable"].result.parse(
+            await send("Security.enable", commands["Security.enable"].params.parse(params ?? {})),
+          ),
+        "Security.enable",
+        "command",
+      ),
+      setIgnoreCertificateErrors: withCdpName(
+        async (params?: cdp.types.ts.Security.SetIgnoreCertificateErrorsParams) =>
+          commands["Security.setIgnoreCertificateErrors"].result.parse(
+            await send(
+              "Security.setIgnoreCertificateErrors",
+              commands["Security.setIgnoreCertificateErrors"].params.parse(params ?? {}),
+            ),
+          ),
+        "Security.setIgnoreCertificateErrors",
+        "command",
+      ),
+      handleCertificateError: withCdpName(
+        async (params?: cdp.types.ts.Security.HandleCertificateErrorParams) =>
+          commands["Security.handleCertificateError"].result.parse(
+            await send(
+              "Security.handleCertificateError",
+              commands["Security.handleCertificateError"].params.parse(params ?? {}),
+            ),
+          ),
+        "Security.handleCertificateError",
+        "command",
+      ),
+      setOverrideCertificateErrors: withCdpName(
+        async (params?: cdp.types.ts.Security.SetOverrideCertificateErrorsParams) =>
+          commands["Security.setOverrideCertificateErrors"].result.parse(
+            await send(
+              "Security.setOverrideCertificateErrors",
+              commands["Security.setOverrideCertificateErrors"].params.parse(params ?? {}),
+            ),
+          ),
+        "Security.setOverrideCertificateErrors",
+        "command",
+      ),
       certificateError: withCdpName(events["Security.certificateError"], "Security.certificateError", "event"),
-      visibleSecurityStateChanged: withCdpName(events["Security.visibleSecurityStateChanged"], "Security.visibleSecurityStateChanged", "event"),
-      securityStateChanged: withCdpName(events["Security.securityStateChanged"], "Security.securityStateChanged", "event"),
+      visibleSecurityStateChanged: withCdpName(
+        events["Security.visibleSecurityStateChanged"],
+        "Security.visibleSecurityStateChanged",
+        "event",
+      ),
+      securityStateChanged: withCdpName(
+        events["Security.securityStateChanged"],
+        "Security.securityStateChanged",
+        "event",
+      ),
     },
     ServiceWorker: {
-      deliverPushMessage: withCdpName(async (params?: cdp.types.ts.ServiceWorker.DeliverPushMessageParams) => commands["ServiceWorker.deliverPushMessage"].result.parse(await send("ServiceWorker.deliverPushMessage", commands["ServiceWorker.deliverPushMessage"].params.parse(params ?? {}))), "ServiceWorker.deliverPushMessage", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.ServiceWorker.DisableParams) => commands["ServiceWorker.disable"].result.parse(await send("ServiceWorker.disable", commands["ServiceWorker.disable"].params.parse(params ?? {}))), "ServiceWorker.disable", "command"),
-      dispatchSyncEvent: withCdpName(async (params?: cdp.types.ts.ServiceWorker.DispatchSyncEventParams) => commands["ServiceWorker.dispatchSyncEvent"].result.parse(await send("ServiceWorker.dispatchSyncEvent", commands["ServiceWorker.dispatchSyncEvent"].params.parse(params ?? {}))), "ServiceWorker.dispatchSyncEvent", "command"),
-      dispatchPeriodicSyncEvent: withCdpName(async (params?: cdp.types.ts.ServiceWorker.DispatchPeriodicSyncEventParams) => commands["ServiceWorker.dispatchPeriodicSyncEvent"].result.parse(await send("ServiceWorker.dispatchPeriodicSyncEvent", commands["ServiceWorker.dispatchPeriodicSyncEvent"].params.parse(params ?? {}))), "ServiceWorker.dispatchPeriodicSyncEvent", "command"),
-      enable: withCdpName(async (params?: cdp.types.ts.ServiceWorker.EnableParams) => commands["ServiceWorker.enable"].result.parse(await send("ServiceWorker.enable", commands["ServiceWorker.enable"].params.parse(params ?? {}))), "ServiceWorker.enable", "command"),
-      setForceUpdateOnPageLoad: withCdpName(async (params?: cdp.types.ts.ServiceWorker.SetForceUpdateOnPageLoadParams) => commands["ServiceWorker.setForceUpdateOnPageLoad"].result.parse(await send("ServiceWorker.setForceUpdateOnPageLoad", commands["ServiceWorker.setForceUpdateOnPageLoad"].params.parse(params ?? {}))), "ServiceWorker.setForceUpdateOnPageLoad", "command"),
-      skipWaiting: withCdpName(async (params?: cdp.types.ts.ServiceWorker.SkipWaitingParams) => commands["ServiceWorker.skipWaiting"].result.parse(await send("ServiceWorker.skipWaiting", commands["ServiceWorker.skipWaiting"].params.parse(params ?? {}))), "ServiceWorker.skipWaiting", "command"),
-      startWorker: withCdpName(async (params?: cdp.types.ts.ServiceWorker.StartWorkerParams) => commands["ServiceWorker.startWorker"].result.parse(await send("ServiceWorker.startWorker", commands["ServiceWorker.startWorker"].params.parse(params ?? {}))), "ServiceWorker.startWorker", "command"),
-      stopAllWorkers: withCdpName(async (params?: cdp.types.ts.ServiceWorker.StopAllWorkersParams) => commands["ServiceWorker.stopAllWorkers"].result.parse(await send("ServiceWorker.stopAllWorkers", commands["ServiceWorker.stopAllWorkers"].params.parse(params ?? {}))), "ServiceWorker.stopAllWorkers", "command"),
-      stopWorker: withCdpName(async (params?: cdp.types.ts.ServiceWorker.StopWorkerParams) => commands["ServiceWorker.stopWorker"].result.parse(await send("ServiceWorker.stopWorker", commands["ServiceWorker.stopWorker"].params.parse(params ?? {}))), "ServiceWorker.stopWorker", "command"),
-      unregister: withCdpName(async (params?: cdp.types.ts.ServiceWorker.UnregisterParams) => commands["ServiceWorker.unregister"].result.parse(await send("ServiceWorker.unregister", commands["ServiceWorker.unregister"].params.parse(params ?? {}))), "ServiceWorker.unregister", "command"),
-      updateRegistration: withCdpName(async (params?: cdp.types.ts.ServiceWorker.UpdateRegistrationParams) => commands["ServiceWorker.updateRegistration"].result.parse(await send("ServiceWorker.updateRegistration", commands["ServiceWorker.updateRegistration"].params.parse(params ?? {}))), "ServiceWorker.updateRegistration", "command"),
-      workerErrorReported: withCdpName(events["ServiceWorker.workerErrorReported"], "ServiceWorker.workerErrorReported", "event"),
-      workerRegistrationUpdated: withCdpName(events["ServiceWorker.workerRegistrationUpdated"], "ServiceWorker.workerRegistrationUpdated", "event"),
-      workerVersionUpdated: withCdpName(events["ServiceWorker.workerVersionUpdated"], "ServiceWorker.workerVersionUpdated", "event"),
+      deliverPushMessage: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.DeliverPushMessageParams) =>
+          commands["ServiceWorker.deliverPushMessage"].result.parse(
+            await send(
+              "ServiceWorker.deliverPushMessage",
+              commands["ServiceWorker.deliverPushMessage"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.deliverPushMessage",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.DisableParams) =>
+          commands["ServiceWorker.disable"].result.parse(
+            await send("ServiceWorker.disable", commands["ServiceWorker.disable"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.disable",
+        "command",
+      ),
+      dispatchSyncEvent: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.DispatchSyncEventParams) =>
+          commands["ServiceWorker.dispatchSyncEvent"].result.parse(
+            await send(
+              "ServiceWorker.dispatchSyncEvent",
+              commands["ServiceWorker.dispatchSyncEvent"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.dispatchSyncEvent",
+        "command",
+      ),
+      dispatchPeriodicSyncEvent: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.DispatchPeriodicSyncEventParams) =>
+          commands["ServiceWorker.dispatchPeriodicSyncEvent"].result.parse(
+            await send(
+              "ServiceWorker.dispatchPeriodicSyncEvent",
+              commands["ServiceWorker.dispatchPeriodicSyncEvent"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.dispatchPeriodicSyncEvent",
+        "command",
+      ),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.EnableParams) =>
+          commands["ServiceWorker.enable"].result.parse(
+            await send("ServiceWorker.enable", commands["ServiceWorker.enable"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.enable",
+        "command",
+      ),
+      setForceUpdateOnPageLoad: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.SetForceUpdateOnPageLoadParams) =>
+          commands["ServiceWorker.setForceUpdateOnPageLoad"].result.parse(
+            await send(
+              "ServiceWorker.setForceUpdateOnPageLoad",
+              commands["ServiceWorker.setForceUpdateOnPageLoad"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.setForceUpdateOnPageLoad",
+        "command",
+      ),
+      skipWaiting: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.SkipWaitingParams) =>
+          commands["ServiceWorker.skipWaiting"].result.parse(
+            await send("ServiceWorker.skipWaiting", commands["ServiceWorker.skipWaiting"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.skipWaiting",
+        "command",
+      ),
+      startWorker: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.StartWorkerParams) =>
+          commands["ServiceWorker.startWorker"].result.parse(
+            await send("ServiceWorker.startWorker", commands["ServiceWorker.startWorker"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.startWorker",
+        "command",
+      ),
+      stopAllWorkers: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.StopAllWorkersParams) =>
+          commands["ServiceWorker.stopAllWorkers"].result.parse(
+            await send(
+              "ServiceWorker.stopAllWorkers",
+              commands["ServiceWorker.stopAllWorkers"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.stopAllWorkers",
+        "command",
+      ),
+      stopWorker: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.StopWorkerParams) =>
+          commands["ServiceWorker.stopWorker"].result.parse(
+            await send("ServiceWorker.stopWorker", commands["ServiceWorker.stopWorker"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.stopWorker",
+        "command",
+      ),
+      unregister: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.UnregisterParams) =>
+          commands["ServiceWorker.unregister"].result.parse(
+            await send("ServiceWorker.unregister", commands["ServiceWorker.unregister"].params.parse(params ?? {})),
+          ),
+        "ServiceWorker.unregister",
+        "command",
+      ),
+      updateRegistration: withCdpName(
+        async (params?: cdp.types.ts.ServiceWorker.UpdateRegistrationParams) =>
+          commands["ServiceWorker.updateRegistration"].result.parse(
+            await send(
+              "ServiceWorker.updateRegistration",
+              commands["ServiceWorker.updateRegistration"].params.parse(params ?? {}),
+            ),
+          ),
+        "ServiceWorker.updateRegistration",
+        "command",
+      ),
+      workerErrorReported: withCdpName(
+        events["ServiceWorker.workerErrorReported"],
+        "ServiceWorker.workerErrorReported",
+        "event",
+      ),
+      workerRegistrationUpdated: withCdpName(
+        events["ServiceWorker.workerRegistrationUpdated"],
+        "ServiceWorker.workerRegistrationUpdated",
+        "event",
+      ),
+      workerVersionUpdated: withCdpName(
+        events["ServiceWorker.workerVersionUpdated"],
+        "ServiceWorker.workerVersionUpdated",
+        "event",
+      ),
     },
     SmartCardEmulation: {
-      enable: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.EnableParams) => commands["SmartCardEmulation.enable"].result.parse(await send("SmartCardEmulation.enable", commands["SmartCardEmulation.enable"].params.parse(params ?? {}))), "SmartCardEmulation.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.DisableParams) => commands["SmartCardEmulation.disable"].result.parse(await send("SmartCardEmulation.disable", commands["SmartCardEmulation.disable"].params.parse(params ?? {}))), "SmartCardEmulation.disable", "command"),
-      reportEstablishContextResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportEstablishContextResultParams) => commands["SmartCardEmulation.reportEstablishContextResult"].result.parse(await send("SmartCardEmulation.reportEstablishContextResult", commands["SmartCardEmulation.reportEstablishContextResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportEstablishContextResult", "command"),
-      reportReleaseContextResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportReleaseContextResultParams) => commands["SmartCardEmulation.reportReleaseContextResult"].result.parse(await send("SmartCardEmulation.reportReleaseContextResult", commands["SmartCardEmulation.reportReleaseContextResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportReleaseContextResult", "command"),
-      reportListReadersResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportListReadersResultParams) => commands["SmartCardEmulation.reportListReadersResult"].result.parse(await send("SmartCardEmulation.reportListReadersResult", commands["SmartCardEmulation.reportListReadersResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportListReadersResult", "command"),
-      reportGetStatusChangeResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportGetStatusChangeResultParams) => commands["SmartCardEmulation.reportGetStatusChangeResult"].result.parse(await send("SmartCardEmulation.reportGetStatusChangeResult", commands["SmartCardEmulation.reportGetStatusChangeResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportGetStatusChangeResult", "command"),
-      reportBeginTransactionResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportBeginTransactionResultParams) => commands["SmartCardEmulation.reportBeginTransactionResult"].result.parse(await send("SmartCardEmulation.reportBeginTransactionResult", commands["SmartCardEmulation.reportBeginTransactionResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportBeginTransactionResult", "command"),
-      reportPlainResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportPlainResultParams) => commands["SmartCardEmulation.reportPlainResult"].result.parse(await send("SmartCardEmulation.reportPlainResult", commands["SmartCardEmulation.reportPlainResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportPlainResult", "command"),
-      reportConnectResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportConnectResultParams) => commands["SmartCardEmulation.reportConnectResult"].result.parse(await send("SmartCardEmulation.reportConnectResult", commands["SmartCardEmulation.reportConnectResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportConnectResult", "command"),
-      reportDataResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportDataResultParams) => commands["SmartCardEmulation.reportDataResult"].result.parse(await send("SmartCardEmulation.reportDataResult", commands["SmartCardEmulation.reportDataResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportDataResult", "command"),
-      reportStatusResult: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportStatusResultParams) => commands["SmartCardEmulation.reportStatusResult"].result.parse(await send("SmartCardEmulation.reportStatusResult", commands["SmartCardEmulation.reportStatusResult"].params.parse(params ?? {}))), "SmartCardEmulation.reportStatusResult", "command"),
-      reportError: withCdpName(async (params?: cdp.types.ts.SmartCardEmulation.ReportErrorParams) => commands["SmartCardEmulation.reportError"].result.parse(await send("SmartCardEmulation.reportError", commands["SmartCardEmulation.reportError"].params.parse(params ?? {}))), "SmartCardEmulation.reportError", "command"),
-      establishContextRequested: withCdpName(events["SmartCardEmulation.establishContextRequested"], "SmartCardEmulation.establishContextRequested", "event"),
-      releaseContextRequested: withCdpName(events["SmartCardEmulation.releaseContextRequested"], "SmartCardEmulation.releaseContextRequested", "event"),
-      listReadersRequested: withCdpName(events["SmartCardEmulation.listReadersRequested"], "SmartCardEmulation.listReadersRequested", "event"),
-      getStatusChangeRequested: withCdpName(events["SmartCardEmulation.getStatusChangeRequested"], "SmartCardEmulation.getStatusChangeRequested", "event"),
-      cancelRequested: withCdpName(events["SmartCardEmulation.cancelRequested"], "SmartCardEmulation.cancelRequested", "event"),
-      connectRequested: withCdpName(events["SmartCardEmulation.connectRequested"], "SmartCardEmulation.connectRequested", "event"),
-      disconnectRequested: withCdpName(events["SmartCardEmulation.disconnectRequested"], "SmartCardEmulation.disconnectRequested", "event"),
-      transmitRequested: withCdpName(events["SmartCardEmulation.transmitRequested"], "SmartCardEmulation.transmitRequested", "event"),
-      controlRequested: withCdpName(events["SmartCardEmulation.controlRequested"], "SmartCardEmulation.controlRequested", "event"),
-      getAttribRequested: withCdpName(events["SmartCardEmulation.getAttribRequested"], "SmartCardEmulation.getAttribRequested", "event"),
-      setAttribRequested: withCdpName(events["SmartCardEmulation.setAttribRequested"], "SmartCardEmulation.setAttribRequested", "event"),
-      statusRequested: withCdpName(events["SmartCardEmulation.statusRequested"], "SmartCardEmulation.statusRequested", "event"),
-      beginTransactionRequested: withCdpName(events["SmartCardEmulation.beginTransactionRequested"], "SmartCardEmulation.beginTransactionRequested", "event"),
-      endTransactionRequested: withCdpName(events["SmartCardEmulation.endTransactionRequested"], "SmartCardEmulation.endTransactionRequested", "event"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.EnableParams) =>
+          commands["SmartCardEmulation.enable"].result.parse(
+            await send("SmartCardEmulation.enable", commands["SmartCardEmulation.enable"].params.parse(params ?? {})),
+          ),
+        "SmartCardEmulation.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.DisableParams) =>
+          commands["SmartCardEmulation.disable"].result.parse(
+            await send("SmartCardEmulation.disable", commands["SmartCardEmulation.disable"].params.parse(params ?? {})),
+          ),
+        "SmartCardEmulation.disable",
+        "command",
+      ),
+      reportEstablishContextResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportEstablishContextResultParams) =>
+          commands["SmartCardEmulation.reportEstablishContextResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportEstablishContextResult",
+              commands["SmartCardEmulation.reportEstablishContextResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportEstablishContextResult",
+        "command",
+      ),
+      reportReleaseContextResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportReleaseContextResultParams) =>
+          commands["SmartCardEmulation.reportReleaseContextResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportReleaseContextResult",
+              commands["SmartCardEmulation.reportReleaseContextResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportReleaseContextResult",
+        "command",
+      ),
+      reportListReadersResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportListReadersResultParams) =>
+          commands["SmartCardEmulation.reportListReadersResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportListReadersResult",
+              commands["SmartCardEmulation.reportListReadersResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportListReadersResult",
+        "command",
+      ),
+      reportGetStatusChangeResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportGetStatusChangeResultParams) =>
+          commands["SmartCardEmulation.reportGetStatusChangeResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportGetStatusChangeResult",
+              commands["SmartCardEmulation.reportGetStatusChangeResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportGetStatusChangeResult",
+        "command",
+      ),
+      reportBeginTransactionResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportBeginTransactionResultParams) =>
+          commands["SmartCardEmulation.reportBeginTransactionResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportBeginTransactionResult",
+              commands["SmartCardEmulation.reportBeginTransactionResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportBeginTransactionResult",
+        "command",
+      ),
+      reportPlainResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportPlainResultParams) =>
+          commands["SmartCardEmulation.reportPlainResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportPlainResult",
+              commands["SmartCardEmulation.reportPlainResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportPlainResult",
+        "command",
+      ),
+      reportConnectResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportConnectResultParams) =>
+          commands["SmartCardEmulation.reportConnectResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportConnectResult",
+              commands["SmartCardEmulation.reportConnectResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportConnectResult",
+        "command",
+      ),
+      reportDataResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportDataResultParams) =>
+          commands["SmartCardEmulation.reportDataResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportDataResult",
+              commands["SmartCardEmulation.reportDataResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportDataResult",
+        "command",
+      ),
+      reportStatusResult: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportStatusResultParams) =>
+          commands["SmartCardEmulation.reportStatusResult"].result.parse(
+            await send(
+              "SmartCardEmulation.reportStatusResult",
+              commands["SmartCardEmulation.reportStatusResult"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportStatusResult",
+        "command",
+      ),
+      reportError: withCdpName(
+        async (params?: cdp.types.ts.SmartCardEmulation.ReportErrorParams) =>
+          commands["SmartCardEmulation.reportError"].result.parse(
+            await send(
+              "SmartCardEmulation.reportError",
+              commands["SmartCardEmulation.reportError"].params.parse(params ?? {}),
+            ),
+          ),
+        "SmartCardEmulation.reportError",
+        "command",
+      ),
+      establishContextRequested: withCdpName(
+        events["SmartCardEmulation.establishContextRequested"],
+        "SmartCardEmulation.establishContextRequested",
+        "event",
+      ),
+      releaseContextRequested: withCdpName(
+        events["SmartCardEmulation.releaseContextRequested"],
+        "SmartCardEmulation.releaseContextRequested",
+        "event",
+      ),
+      listReadersRequested: withCdpName(
+        events["SmartCardEmulation.listReadersRequested"],
+        "SmartCardEmulation.listReadersRequested",
+        "event",
+      ),
+      getStatusChangeRequested: withCdpName(
+        events["SmartCardEmulation.getStatusChangeRequested"],
+        "SmartCardEmulation.getStatusChangeRequested",
+        "event",
+      ),
+      cancelRequested: withCdpName(
+        events["SmartCardEmulation.cancelRequested"],
+        "SmartCardEmulation.cancelRequested",
+        "event",
+      ),
+      connectRequested: withCdpName(
+        events["SmartCardEmulation.connectRequested"],
+        "SmartCardEmulation.connectRequested",
+        "event",
+      ),
+      disconnectRequested: withCdpName(
+        events["SmartCardEmulation.disconnectRequested"],
+        "SmartCardEmulation.disconnectRequested",
+        "event",
+      ),
+      transmitRequested: withCdpName(
+        events["SmartCardEmulation.transmitRequested"],
+        "SmartCardEmulation.transmitRequested",
+        "event",
+      ),
+      controlRequested: withCdpName(
+        events["SmartCardEmulation.controlRequested"],
+        "SmartCardEmulation.controlRequested",
+        "event",
+      ),
+      getAttribRequested: withCdpName(
+        events["SmartCardEmulation.getAttribRequested"],
+        "SmartCardEmulation.getAttribRequested",
+        "event",
+      ),
+      setAttribRequested: withCdpName(
+        events["SmartCardEmulation.setAttribRequested"],
+        "SmartCardEmulation.setAttribRequested",
+        "event",
+      ),
+      statusRequested: withCdpName(
+        events["SmartCardEmulation.statusRequested"],
+        "SmartCardEmulation.statusRequested",
+        "event",
+      ),
+      beginTransactionRequested: withCdpName(
+        events["SmartCardEmulation.beginTransactionRequested"],
+        "SmartCardEmulation.beginTransactionRequested",
+        "event",
+      ),
+      endTransactionRequested: withCdpName(
+        events["SmartCardEmulation.endTransactionRequested"],
+        "SmartCardEmulation.endTransactionRequested",
+        "event",
+      ),
     },
     Storage: {
-      getStorageKeyForFrame: withCdpName(async (params?: cdp.types.ts.Storage.GetStorageKeyForFrameParams) => commands["Storage.getStorageKeyForFrame"].result.parse(await send("Storage.getStorageKeyForFrame", commands["Storage.getStorageKeyForFrame"].params.parse(params ?? {}))), "Storage.getStorageKeyForFrame", "command"),
-      getStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.GetStorageKeyParams) => commands["Storage.getStorageKey"].result.parse(await send("Storage.getStorageKey", commands["Storage.getStorageKey"].params.parse(params ?? {}))), "Storage.getStorageKey", "command"),
-      clearDataForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.ClearDataForOriginParams) => commands["Storage.clearDataForOrigin"].result.parse(await send("Storage.clearDataForOrigin", commands["Storage.clearDataForOrigin"].params.parse(params ?? {}))), "Storage.clearDataForOrigin", "command"),
-      clearDataForStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.ClearDataForStorageKeyParams) => commands["Storage.clearDataForStorageKey"].result.parse(await send("Storage.clearDataForStorageKey", commands["Storage.clearDataForStorageKey"].params.parse(params ?? {}))), "Storage.clearDataForStorageKey", "command"),
-      getCookies: withCdpName(async (params?: cdp.types.ts.Storage.GetCookiesParams) => commands["Storage.getCookies"].result.parse(await send("Storage.getCookies", commands["Storage.getCookies"].params.parse(params ?? {}))), "Storage.getCookies", "command"),
-      setCookies: withCdpName(async (params?: cdp.types.ts.Storage.SetCookiesParams) => commands["Storage.setCookies"].result.parse(await send("Storage.setCookies", commands["Storage.setCookies"].params.parse(params ?? {}))), "Storage.setCookies", "command"),
-      clearCookies: withCdpName(async (params?: cdp.types.ts.Storage.ClearCookiesParams) => commands["Storage.clearCookies"].result.parse(await send("Storage.clearCookies", commands["Storage.clearCookies"].params.parse(params ?? {}))), "Storage.clearCookies", "command"),
-      getUsageAndQuota: withCdpName(async (params?: cdp.types.ts.Storage.GetUsageAndQuotaParams) => commands["Storage.getUsageAndQuota"].result.parse(await send("Storage.getUsageAndQuota", commands["Storage.getUsageAndQuota"].params.parse(params ?? {}))), "Storage.getUsageAndQuota", "command"),
-      overrideQuotaForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.OverrideQuotaForOriginParams) => commands["Storage.overrideQuotaForOrigin"].result.parse(await send("Storage.overrideQuotaForOrigin", commands["Storage.overrideQuotaForOrigin"].params.parse(params ?? {}))), "Storage.overrideQuotaForOrigin", "command"),
-      trackCacheStorageForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.TrackCacheStorageForOriginParams) => commands["Storage.trackCacheStorageForOrigin"].result.parse(await send("Storage.trackCacheStorageForOrigin", commands["Storage.trackCacheStorageForOrigin"].params.parse(params ?? {}))), "Storage.trackCacheStorageForOrigin", "command"),
-      trackCacheStorageForStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.TrackCacheStorageForStorageKeyParams) => commands["Storage.trackCacheStorageForStorageKey"].result.parse(await send("Storage.trackCacheStorageForStorageKey", commands["Storage.trackCacheStorageForStorageKey"].params.parse(params ?? {}))), "Storage.trackCacheStorageForStorageKey", "command"),
-      trackIndexedDBForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.TrackIndexedDBForOriginParams) => commands["Storage.trackIndexedDBForOrigin"].result.parse(await send("Storage.trackIndexedDBForOrigin", commands["Storage.trackIndexedDBForOrigin"].params.parse(params ?? {}))), "Storage.trackIndexedDBForOrigin", "command"),
-      trackIndexedDBForStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.TrackIndexedDBForStorageKeyParams) => commands["Storage.trackIndexedDBForStorageKey"].result.parse(await send("Storage.trackIndexedDBForStorageKey", commands["Storage.trackIndexedDBForStorageKey"].params.parse(params ?? {}))), "Storage.trackIndexedDBForStorageKey", "command"),
-      untrackCacheStorageForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.UntrackCacheStorageForOriginParams) => commands["Storage.untrackCacheStorageForOrigin"].result.parse(await send("Storage.untrackCacheStorageForOrigin", commands["Storage.untrackCacheStorageForOrigin"].params.parse(params ?? {}))), "Storage.untrackCacheStorageForOrigin", "command"),
-      untrackCacheStorageForStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.UntrackCacheStorageForStorageKeyParams) => commands["Storage.untrackCacheStorageForStorageKey"].result.parse(await send("Storage.untrackCacheStorageForStorageKey", commands["Storage.untrackCacheStorageForStorageKey"].params.parse(params ?? {}))), "Storage.untrackCacheStorageForStorageKey", "command"),
-      untrackIndexedDBForOrigin: withCdpName(async (params?: cdp.types.ts.Storage.UntrackIndexedDBForOriginParams) => commands["Storage.untrackIndexedDBForOrigin"].result.parse(await send("Storage.untrackIndexedDBForOrigin", commands["Storage.untrackIndexedDBForOrigin"].params.parse(params ?? {}))), "Storage.untrackIndexedDBForOrigin", "command"),
-      untrackIndexedDBForStorageKey: withCdpName(async (params?: cdp.types.ts.Storage.UntrackIndexedDBForStorageKeyParams) => commands["Storage.untrackIndexedDBForStorageKey"].result.parse(await send("Storage.untrackIndexedDBForStorageKey", commands["Storage.untrackIndexedDBForStorageKey"].params.parse(params ?? {}))), "Storage.untrackIndexedDBForStorageKey", "command"),
-      getTrustTokens: withCdpName(async (params?: cdp.types.ts.Storage.GetTrustTokensParams) => commands["Storage.getTrustTokens"].result.parse(await send("Storage.getTrustTokens", commands["Storage.getTrustTokens"].params.parse(params ?? {}))), "Storage.getTrustTokens", "command"),
-      clearTrustTokens: withCdpName(async (params?: cdp.types.ts.Storage.ClearTrustTokensParams) => commands["Storage.clearTrustTokens"].result.parse(await send("Storage.clearTrustTokens", commands["Storage.clearTrustTokens"].params.parse(params ?? {}))), "Storage.clearTrustTokens", "command"),
-      getInterestGroupDetails: withCdpName(async (params?: cdp.types.ts.Storage.GetInterestGroupDetailsParams) => commands["Storage.getInterestGroupDetails"].result.parse(await send("Storage.getInterestGroupDetails", commands["Storage.getInterestGroupDetails"].params.parse(params ?? {}))), "Storage.getInterestGroupDetails", "command"),
-      setInterestGroupTracking: withCdpName(async (params?: cdp.types.ts.Storage.SetInterestGroupTrackingParams) => commands["Storage.setInterestGroupTracking"].result.parse(await send("Storage.setInterestGroupTracking", commands["Storage.setInterestGroupTracking"].params.parse(params ?? {}))), "Storage.setInterestGroupTracking", "command"),
-      setInterestGroupAuctionTracking: withCdpName(async (params?: cdp.types.ts.Storage.SetInterestGroupAuctionTrackingParams) => commands["Storage.setInterestGroupAuctionTracking"].result.parse(await send("Storage.setInterestGroupAuctionTracking", commands["Storage.setInterestGroupAuctionTracking"].params.parse(params ?? {}))), "Storage.setInterestGroupAuctionTracking", "command"),
-      getSharedStorageMetadata: withCdpName(async (params?: cdp.types.ts.Storage.GetSharedStorageMetadataParams) => commands["Storage.getSharedStorageMetadata"].result.parse(await send("Storage.getSharedStorageMetadata", commands["Storage.getSharedStorageMetadata"].params.parse(params ?? {}))), "Storage.getSharedStorageMetadata", "command"),
-      getSharedStorageEntries: withCdpName(async (params?: cdp.types.ts.Storage.GetSharedStorageEntriesParams) => commands["Storage.getSharedStorageEntries"].result.parse(await send("Storage.getSharedStorageEntries", commands["Storage.getSharedStorageEntries"].params.parse(params ?? {}))), "Storage.getSharedStorageEntries", "command"),
-      setSharedStorageEntry: withCdpName(async (params?: cdp.types.ts.Storage.SetSharedStorageEntryParams) => commands["Storage.setSharedStorageEntry"].result.parse(await send("Storage.setSharedStorageEntry", commands["Storage.setSharedStorageEntry"].params.parse(params ?? {}))), "Storage.setSharedStorageEntry", "command"),
-      deleteSharedStorageEntry: withCdpName(async (params?: cdp.types.ts.Storage.DeleteSharedStorageEntryParams) => commands["Storage.deleteSharedStorageEntry"].result.parse(await send("Storage.deleteSharedStorageEntry", commands["Storage.deleteSharedStorageEntry"].params.parse(params ?? {}))), "Storage.deleteSharedStorageEntry", "command"),
-      clearSharedStorageEntries: withCdpName(async (params?: cdp.types.ts.Storage.ClearSharedStorageEntriesParams) => commands["Storage.clearSharedStorageEntries"].result.parse(await send("Storage.clearSharedStorageEntries", commands["Storage.clearSharedStorageEntries"].params.parse(params ?? {}))), "Storage.clearSharedStorageEntries", "command"),
-      resetSharedStorageBudget: withCdpName(async (params?: cdp.types.ts.Storage.ResetSharedStorageBudgetParams) => commands["Storage.resetSharedStorageBudget"].result.parse(await send("Storage.resetSharedStorageBudget", commands["Storage.resetSharedStorageBudget"].params.parse(params ?? {}))), "Storage.resetSharedStorageBudget", "command"),
-      setSharedStorageTracking: withCdpName(async (params?: cdp.types.ts.Storage.SetSharedStorageTrackingParams) => commands["Storage.setSharedStorageTracking"].result.parse(await send("Storage.setSharedStorageTracking", commands["Storage.setSharedStorageTracking"].params.parse(params ?? {}))), "Storage.setSharedStorageTracking", "command"),
-      setStorageBucketTracking: withCdpName(async (params?: cdp.types.ts.Storage.SetStorageBucketTrackingParams) => commands["Storage.setStorageBucketTracking"].result.parse(await send("Storage.setStorageBucketTracking", commands["Storage.setStorageBucketTracking"].params.parse(params ?? {}))), "Storage.setStorageBucketTracking", "command"),
-      deleteStorageBucket: withCdpName(async (params?: cdp.types.ts.Storage.DeleteStorageBucketParams) => commands["Storage.deleteStorageBucket"].result.parse(await send("Storage.deleteStorageBucket", commands["Storage.deleteStorageBucket"].params.parse(params ?? {}))), "Storage.deleteStorageBucket", "command"),
-      runBounceTrackingMitigations: withCdpName(async (params?: cdp.types.ts.Storage.RunBounceTrackingMitigationsParams) => commands["Storage.runBounceTrackingMitigations"].result.parse(await send("Storage.runBounceTrackingMitigations", commands["Storage.runBounceTrackingMitigations"].params.parse(params ?? {}))), "Storage.runBounceTrackingMitigations", "command"),
-      getRelatedWebsiteSets: withCdpName(async (params?: cdp.types.ts.Storage.GetRelatedWebsiteSetsParams) => commands["Storage.getRelatedWebsiteSets"].result.parse(await send("Storage.getRelatedWebsiteSets", commands["Storage.getRelatedWebsiteSets"].params.parse(params ?? {}))), "Storage.getRelatedWebsiteSets", "command"),
-      setProtectedAudienceKAnonymity: withCdpName(async (params?: cdp.types.ts.Storage.SetProtectedAudienceKAnonymityParams) => commands["Storage.setProtectedAudienceKAnonymity"].result.parse(await send("Storage.setProtectedAudienceKAnonymity", commands["Storage.setProtectedAudienceKAnonymity"].params.parse(params ?? {}))), "Storage.setProtectedAudienceKAnonymity", "command"),
-      cacheStorageContentUpdated: withCdpName(events["Storage.cacheStorageContentUpdated"], "Storage.cacheStorageContentUpdated", "event"),
-      cacheStorageListUpdated: withCdpName(events["Storage.cacheStorageListUpdated"], "Storage.cacheStorageListUpdated", "event"),
-      indexedDBContentUpdated: withCdpName(events["Storage.indexedDBContentUpdated"], "Storage.indexedDBContentUpdated", "event"),
-      indexedDBListUpdated: withCdpName(events["Storage.indexedDBListUpdated"], "Storage.indexedDBListUpdated", "event"),
-      interestGroupAccessed: withCdpName(events["Storage.interestGroupAccessed"], "Storage.interestGroupAccessed", "event"),
-      interestGroupAuctionEventOccurred: withCdpName(events["Storage.interestGroupAuctionEventOccurred"], "Storage.interestGroupAuctionEventOccurred", "event"),
-      interestGroupAuctionNetworkRequestCreated: withCdpName(events["Storage.interestGroupAuctionNetworkRequestCreated"], "Storage.interestGroupAuctionNetworkRequestCreated", "event"),
-      sharedStorageAccessed: withCdpName(events["Storage.sharedStorageAccessed"], "Storage.sharedStorageAccessed", "event"),
-      sharedStorageWorkletOperationExecutionFinished: withCdpName(events["Storage.sharedStorageWorkletOperationExecutionFinished"], "Storage.sharedStorageWorkletOperationExecutionFinished", "event"),
-      storageBucketCreatedOrUpdated: withCdpName(events["Storage.storageBucketCreatedOrUpdated"], "Storage.storageBucketCreatedOrUpdated", "event"),
-      storageBucketDeleted: withCdpName(events["Storage.storageBucketDeleted"], "Storage.storageBucketDeleted", "event"),
+      getStorageKeyForFrame: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetStorageKeyForFrameParams) =>
+          commands["Storage.getStorageKeyForFrame"].result.parse(
+            await send(
+              "Storage.getStorageKeyForFrame",
+              commands["Storage.getStorageKeyForFrame"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.getStorageKeyForFrame",
+        "command",
+      ),
+      getStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetStorageKeyParams) =>
+          commands["Storage.getStorageKey"].result.parse(
+            await send("Storage.getStorageKey", commands["Storage.getStorageKey"].params.parse(params ?? {})),
+          ),
+        "Storage.getStorageKey",
+        "command",
+      ),
+      clearDataForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.ClearDataForOriginParams) =>
+          commands["Storage.clearDataForOrigin"].result.parse(
+            await send("Storage.clearDataForOrigin", commands["Storage.clearDataForOrigin"].params.parse(params ?? {})),
+          ),
+        "Storage.clearDataForOrigin",
+        "command",
+      ),
+      clearDataForStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.ClearDataForStorageKeyParams) =>
+          commands["Storage.clearDataForStorageKey"].result.parse(
+            await send(
+              "Storage.clearDataForStorageKey",
+              commands["Storage.clearDataForStorageKey"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.clearDataForStorageKey",
+        "command",
+      ),
+      getCookies: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetCookiesParams) =>
+          commands["Storage.getCookies"].result.parse(
+            await send("Storage.getCookies", commands["Storage.getCookies"].params.parse(params ?? {})),
+          ),
+        "Storage.getCookies",
+        "command",
+      ),
+      setCookies: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetCookiesParams) =>
+          commands["Storage.setCookies"].result.parse(
+            await send("Storage.setCookies", commands["Storage.setCookies"].params.parse(params ?? {})),
+          ),
+        "Storage.setCookies",
+        "command",
+      ),
+      clearCookies: withCdpName(
+        async (params?: cdp.types.ts.Storage.ClearCookiesParams) =>
+          commands["Storage.clearCookies"].result.parse(
+            await send("Storage.clearCookies", commands["Storage.clearCookies"].params.parse(params ?? {})),
+          ),
+        "Storage.clearCookies",
+        "command",
+      ),
+      getUsageAndQuota: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetUsageAndQuotaParams) =>
+          commands["Storage.getUsageAndQuota"].result.parse(
+            await send("Storage.getUsageAndQuota", commands["Storage.getUsageAndQuota"].params.parse(params ?? {})),
+          ),
+        "Storage.getUsageAndQuota",
+        "command",
+      ),
+      overrideQuotaForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.OverrideQuotaForOriginParams) =>
+          commands["Storage.overrideQuotaForOrigin"].result.parse(
+            await send(
+              "Storage.overrideQuotaForOrigin",
+              commands["Storage.overrideQuotaForOrigin"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.overrideQuotaForOrigin",
+        "command",
+      ),
+      trackCacheStorageForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.TrackCacheStorageForOriginParams) =>
+          commands["Storage.trackCacheStorageForOrigin"].result.parse(
+            await send(
+              "Storage.trackCacheStorageForOrigin",
+              commands["Storage.trackCacheStorageForOrigin"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.trackCacheStorageForOrigin",
+        "command",
+      ),
+      trackCacheStorageForStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.TrackCacheStorageForStorageKeyParams) =>
+          commands["Storage.trackCacheStorageForStorageKey"].result.parse(
+            await send(
+              "Storage.trackCacheStorageForStorageKey",
+              commands["Storage.trackCacheStorageForStorageKey"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.trackCacheStorageForStorageKey",
+        "command",
+      ),
+      trackIndexedDBForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.TrackIndexedDBForOriginParams) =>
+          commands["Storage.trackIndexedDBForOrigin"].result.parse(
+            await send(
+              "Storage.trackIndexedDBForOrigin",
+              commands["Storage.trackIndexedDBForOrigin"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.trackIndexedDBForOrigin",
+        "command",
+      ),
+      trackIndexedDBForStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.TrackIndexedDBForStorageKeyParams) =>
+          commands["Storage.trackIndexedDBForStorageKey"].result.parse(
+            await send(
+              "Storage.trackIndexedDBForStorageKey",
+              commands["Storage.trackIndexedDBForStorageKey"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.trackIndexedDBForStorageKey",
+        "command",
+      ),
+      untrackCacheStorageForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.UntrackCacheStorageForOriginParams) =>
+          commands["Storage.untrackCacheStorageForOrigin"].result.parse(
+            await send(
+              "Storage.untrackCacheStorageForOrigin",
+              commands["Storage.untrackCacheStorageForOrigin"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.untrackCacheStorageForOrigin",
+        "command",
+      ),
+      untrackCacheStorageForStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.UntrackCacheStorageForStorageKeyParams) =>
+          commands["Storage.untrackCacheStorageForStorageKey"].result.parse(
+            await send(
+              "Storage.untrackCacheStorageForStorageKey",
+              commands["Storage.untrackCacheStorageForStorageKey"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.untrackCacheStorageForStorageKey",
+        "command",
+      ),
+      untrackIndexedDBForOrigin: withCdpName(
+        async (params?: cdp.types.ts.Storage.UntrackIndexedDBForOriginParams) =>
+          commands["Storage.untrackIndexedDBForOrigin"].result.parse(
+            await send(
+              "Storage.untrackIndexedDBForOrigin",
+              commands["Storage.untrackIndexedDBForOrigin"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.untrackIndexedDBForOrigin",
+        "command",
+      ),
+      untrackIndexedDBForStorageKey: withCdpName(
+        async (params?: cdp.types.ts.Storage.UntrackIndexedDBForStorageKeyParams) =>
+          commands["Storage.untrackIndexedDBForStorageKey"].result.parse(
+            await send(
+              "Storage.untrackIndexedDBForStorageKey",
+              commands["Storage.untrackIndexedDBForStorageKey"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.untrackIndexedDBForStorageKey",
+        "command",
+      ),
+      getTrustTokens: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetTrustTokensParams) =>
+          commands["Storage.getTrustTokens"].result.parse(
+            await send("Storage.getTrustTokens", commands["Storage.getTrustTokens"].params.parse(params ?? {})),
+          ),
+        "Storage.getTrustTokens",
+        "command",
+      ),
+      clearTrustTokens: withCdpName(
+        async (params?: cdp.types.ts.Storage.ClearTrustTokensParams) =>
+          commands["Storage.clearTrustTokens"].result.parse(
+            await send("Storage.clearTrustTokens", commands["Storage.clearTrustTokens"].params.parse(params ?? {})),
+          ),
+        "Storage.clearTrustTokens",
+        "command",
+      ),
+      getInterestGroupDetails: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetInterestGroupDetailsParams) =>
+          commands["Storage.getInterestGroupDetails"].result.parse(
+            await send(
+              "Storage.getInterestGroupDetails",
+              commands["Storage.getInterestGroupDetails"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.getInterestGroupDetails",
+        "command",
+      ),
+      setInterestGroupTracking: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetInterestGroupTrackingParams) =>
+          commands["Storage.setInterestGroupTracking"].result.parse(
+            await send(
+              "Storage.setInterestGroupTracking",
+              commands["Storage.setInterestGroupTracking"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setInterestGroupTracking",
+        "command",
+      ),
+      setInterestGroupAuctionTracking: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetInterestGroupAuctionTrackingParams) =>
+          commands["Storage.setInterestGroupAuctionTracking"].result.parse(
+            await send(
+              "Storage.setInterestGroupAuctionTracking",
+              commands["Storage.setInterestGroupAuctionTracking"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setInterestGroupAuctionTracking",
+        "command",
+      ),
+      getSharedStorageMetadata: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetSharedStorageMetadataParams) =>
+          commands["Storage.getSharedStorageMetadata"].result.parse(
+            await send(
+              "Storage.getSharedStorageMetadata",
+              commands["Storage.getSharedStorageMetadata"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.getSharedStorageMetadata",
+        "command",
+      ),
+      getSharedStorageEntries: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetSharedStorageEntriesParams) =>
+          commands["Storage.getSharedStorageEntries"].result.parse(
+            await send(
+              "Storage.getSharedStorageEntries",
+              commands["Storage.getSharedStorageEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.getSharedStorageEntries",
+        "command",
+      ),
+      setSharedStorageEntry: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetSharedStorageEntryParams) =>
+          commands["Storage.setSharedStorageEntry"].result.parse(
+            await send(
+              "Storage.setSharedStorageEntry",
+              commands["Storage.setSharedStorageEntry"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setSharedStorageEntry",
+        "command",
+      ),
+      deleteSharedStorageEntry: withCdpName(
+        async (params?: cdp.types.ts.Storage.DeleteSharedStorageEntryParams) =>
+          commands["Storage.deleteSharedStorageEntry"].result.parse(
+            await send(
+              "Storage.deleteSharedStorageEntry",
+              commands["Storage.deleteSharedStorageEntry"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.deleteSharedStorageEntry",
+        "command",
+      ),
+      clearSharedStorageEntries: withCdpName(
+        async (params?: cdp.types.ts.Storage.ClearSharedStorageEntriesParams) =>
+          commands["Storage.clearSharedStorageEntries"].result.parse(
+            await send(
+              "Storage.clearSharedStorageEntries",
+              commands["Storage.clearSharedStorageEntries"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.clearSharedStorageEntries",
+        "command",
+      ),
+      resetSharedStorageBudget: withCdpName(
+        async (params?: cdp.types.ts.Storage.ResetSharedStorageBudgetParams) =>
+          commands["Storage.resetSharedStorageBudget"].result.parse(
+            await send(
+              "Storage.resetSharedStorageBudget",
+              commands["Storage.resetSharedStorageBudget"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.resetSharedStorageBudget",
+        "command",
+      ),
+      setSharedStorageTracking: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetSharedStorageTrackingParams) =>
+          commands["Storage.setSharedStorageTracking"].result.parse(
+            await send(
+              "Storage.setSharedStorageTracking",
+              commands["Storage.setSharedStorageTracking"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setSharedStorageTracking",
+        "command",
+      ),
+      setStorageBucketTracking: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetStorageBucketTrackingParams) =>
+          commands["Storage.setStorageBucketTracking"].result.parse(
+            await send(
+              "Storage.setStorageBucketTracking",
+              commands["Storage.setStorageBucketTracking"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setStorageBucketTracking",
+        "command",
+      ),
+      deleteStorageBucket: withCdpName(
+        async (params?: cdp.types.ts.Storage.DeleteStorageBucketParams) =>
+          commands["Storage.deleteStorageBucket"].result.parse(
+            await send(
+              "Storage.deleteStorageBucket",
+              commands["Storage.deleteStorageBucket"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.deleteStorageBucket",
+        "command",
+      ),
+      runBounceTrackingMitigations: withCdpName(
+        async (params?: cdp.types.ts.Storage.RunBounceTrackingMitigationsParams) =>
+          commands["Storage.runBounceTrackingMitigations"].result.parse(
+            await send(
+              "Storage.runBounceTrackingMitigations",
+              commands["Storage.runBounceTrackingMitigations"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.runBounceTrackingMitigations",
+        "command",
+      ),
+      getRelatedWebsiteSets: withCdpName(
+        async (params?: cdp.types.ts.Storage.GetRelatedWebsiteSetsParams) =>
+          commands["Storage.getRelatedWebsiteSets"].result.parse(
+            await send(
+              "Storage.getRelatedWebsiteSets",
+              commands["Storage.getRelatedWebsiteSets"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.getRelatedWebsiteSets",
+        "command",
+      ),
+      setProtectedAudienceKAnonymity: withCdpName(
+        async (params?: cdp.types.ts.Storage.SetProtectedAudienceKAnonymityParams) =>
+          commands["Storage.setProtectedAudienceKAnonymity"].result.parse(
+            await send(
+              "Storage.setProtectedAudienceKAnonymity",
+              commands["Storage.setProtectedAudienceKAnonymity"].params.parse(params ?? {}),
+            ),
+          ),
+        "Storage.setProtectedAudienceKAnonymity",
+        "command",
+      ),
+      cacheStorageContentUpdated: withCdpName(
+        events["Storage.cacheStorageContentUpdated"],
+        "Storage.cacheStorageContentUpdated",
+        "event",
+      ),
+      cacheStorageListUpdated: withCdpName(
+        events["Storage.cacheStorageListUpdated"],
+        "Storage.cacheStorageListUpdated",
+        "event",
+      ),
+      indexedDBContentUpdated: withCdpName(
+        events["Storage.indexedDBContentUpdated"],
+        "Storage.indexedDBContentUpdated",
+        "event",
+      ),
+      indexedDBListUpdated: withCdpName(
+        events["Storage.indexedDBListUpdated"],
+        "Storage.indexedDBListUpdated",
+        "event",
+      ),
+      interestGroupAccessed: withCdpName(
+        events["Storage.interestGroupAccessed"],
+        "Storage.interestGroupAccessed",
+        "event",
+      ),
+      interestGroupAuctionEventOccurred: withCdpName(
+        events["Storage.interestGroupAuctionEventOccurred"],
+        "Storage.interestGroupAuctionEventOccurred",
+        "event",
+      ),
+      interestGroupAuctionNetworkRequestCreated: withCdpName(
+        events["Storage.interestGroupAuctionNetworkRequestCreated"],
+        "Storage.interestGroupAuctionNetworkRequestCreated",
+        "event",
+      ),
+      sharedStorageAccessed: withCdpName(
+        events["Storage.sharedStorageAccessed"],
+        "Storage.sharedStorageAccessed",
+        "event",
+      ),
+      sharedStorageWorkletOperationExecutionFinished: withCdpName(
+        events["Storage.sharedStorageWorkletOperationExecutionFinished"],
+        "Storage.sharedStorageWorkletOperationExecutionFinished",
+        "event",
+      ),
+      storageBucketCreatedOrUpdated: withCdpName(
+        events["Storage.storageBucketCreatedOrUpdated"],
+        "Storage.storageBucketCreatedOrUpdated",
+        "event",
+      ),
+      storageBucketDeleted: withCdpName(
+        events["Storage.storageBucketDeleted"],
+        "Storage.storageBucketDeleted",
+        "event",
+      ),
     },
     SystemInfo: {
-      getInfo: withCdpName(async (params?: cdp.types.ts.SystemInfo.GetInfoParams) => commands["SystemInfo.getInfo"].result.parse(await send("SystemInfo.getInfo", commands["SystemInfo.getInfo"].params.parse(params ?? {}))), "SystemInfo.getInfo", "command"),
-      getFeatureState: withCdpName(async (params?: cdp.types.ts.SystemInfo.GetFeatureStateParams) => commands["SystemInfo.getFeatureState"].result.parse(await send("SystemInfo.getFeatureState", commands["SystemInfo.getFeatureState"].params.parse(params ?? {}))), "SystemInfo.getFeatureState", "command"),
-      getProcessInfo: withCdpName(async (params?: cdp.types.ts.SystemInfo.GetProcessInfoParams) => commands["SystemInfo.getProcessInfo"].result.parse(await send("SystemInfo.getProcessInfo", commands["SystemInfo.getProcessInfo"].params.parse(params ?? {}))), "SystemInfo.getProcessInfo", "command"),
+      getInfo: withCdpName(
+        async (params?: cdp.types.ts.SystemInfo.GetInfoParams) =>
+          commands["SystemInfo.getInfo"].result.parse(
+            await send("SystemInfo.getInfo", commands["SystemInfo.getInfo"].params.parse(params ?? {})),
+          ),
+        "SystemInfo.getInfo",
+        "command",
+      ),
+      getFeatureState: withCdpName(
+        async (params?: cdp.types.ts.SystemInfo.GetFeatureStateParams) =>
+          commands["SystemInfo.getFeatureState"].result.parse(
+            await send("SystemInfo.getFeatureState", commands["SystemInfo.getFeatureState"].params.parse(params ?? {})),
+          ),
+        "SystemInfo.getFeatureState",
+        "command",
+      ),
+      getProcessInfo: withCdpName(
+        async (params?: cdp.types.ts.SystemInfo.GetProcessInfoParams) =>
+          commands["SystemInfo.getProcessInfo"].result.parse(
+            await send("SystemInfo.getProcessInfo", commands["SystemInfo.getProcessInfo"].params.parse(params ?? {})),
+          ),
+        "SystemInfo.getProcessInfo",
+        "command",
+      ),
     },
     Target: {
-      activateTarget: withCdpName(async (params?: cdp.types.ts.Target.ActivateTargetParams) => commands["Target.activateTarget"].result.parse(await send("Target.activateTarget", commands["Target.activateTarget"].params.parse(params ?? {}))), "Target.activateTarget", "command"),
-      attachToTarget: withCdpName(async (params?: cdp.types.ts.Target.AttachToTargetParams) => commands["Target.attachToTarget"].result.parse(await send("Target.attachToTarget", commands["Target.attachToTarget"].params.parse(params ?? {}))), "Target.attachToTarget", "command"),
-      attachToBrowserTarget: withCdpName(async (params?: cdp.types.ts.Target.AttachToBrowserTargetParams) => commands["Target.attachToBrowserTarget"].result.parse(await send("Target.attachToBrowserTarget", commands["Target.attachToBrowserTarget"].params.parse(params ?? {}))), "Target.attachToBrowserTarget", "command"),
-      closeTarget: withCdpName(async (params?: cdp.types.ts.Target.CloseTargetParams) => commands["Target.closeTarget"].result.parse(await send("Target.closeTarget", commands["Target.closeTarget"].params.parse(params ?? {}))), "Target.closeTarget", "command"),
-      exposeDevToolsProtocol: withCdpName(async (params?: cdp.types.ts.Target.ExposeDevToolsProtocolParams) => commands["Target.exposeDevToolsProtocol"].result.parse(await send("Target.exposeDevToolsProtocol", commands["Target.exposeDevToolsProtocol"].params.parse(params ?? {}))), "Target.exposeDevToolsProtocol", "command"),
-      createBrowserContext: withCdpName(async (params?: cdp.types.ts.Target.CreateBrowserContextParams) => commands["Target.createBrowserContext"].result.parse(await send("Target.createBrowserContext", commands["Target.createBrowserContext"].params.parse(params ?? {}))), "Target.createBrowserContext", "command"),
-      getBrowserContexts: withCdpName(async (params?: cdp.types.ts.Target.GetBrowserContextsParams) => commands["Target.getBrowserContexts"].result.parse(await send("Target.getBrowserContexts", commands["Target.getBrowserContexts"].params.parse(params ?? {}))), "Target.getBrowserContexts", "command"),
-      createTarget: withCdpName(async (params?: cdp.types.ts.Target.CreateTargetParams) => commands["Target.createTarget"].result.parse(await send("Target.createTarget", commands["Target.createTarget"].params.parse(params ?? {}))), "Target.createTarget", "command"),
-      detachFromTarget: withCdpName(async (params?: cdp.types.ts.Target.DetachFromTargetParams) => commands["Target.detachFromTarget"].result.parse(await send("Target.detachFromTarget", commands["Target.detachFromTarget"].params.parse(params ?? {}))), "Target.detachFromTarget", "command"),
-      disposeBrowserContext: withCdpName(async (params?: cdp.types.ts.Target.DisposeBrowserContextParams) => commands["Target.disposeBrowserContext"].result.parse(await send("Target.disposeBrowserContext", commands["Target.disposeBrowserContext"].params.parse(params ?? {}))), "Target.disposeBrowserContext", "command"),
-      getTargetInfo: withCdpName(async (params?: cdp.types.ts.Target.GetTargetInfoParams) => commands["Target.getTargetInfo"].result.parse(await send("Target.getTargetInfo", commands["Target.getTargetInfo"].params.parse(params ?? {}))), "Target.getTargetInfo", "command"),
-      getTargets: withCdpName(async (params?: cdp.types.ts.Target.GetTargetsParams) => commands["Target.getTargets"].result.parse(await send("Target.getTargets", commands["Target.getTargets"].params.parse(params ?? {}))), "Target.getTargets", "command"),
-      sendMessageToTarget: withCdpName(async (params?: cdp.types.ts.Target.SendMessageToTargetParams) => commands["Target.sendMessageToTarget"].result.parse(await send("Target.sendMessageToTarget", commands["Target.sendMessageToTarget"].params.parse(params ?? {}))), "Target.sendMessageToTarget", "command"),
-      setAutoAttach: withCdpName(async (params?: cdp.types.ts.Target.SetAutoAttachParams) => commands["Target.setAutoAttach"].result.parse(await send("Target.setAutoAttach", commands["Target.setAutoAttach"].params.parse(params ?? {}))), "Target.setAutoAttach", "command"),
-      autoAttachRelated: withCdpName(async (params?: cdp.types.ts.Target.AutoAttachRelatedParams) => commands["Target.autoAttachRelated"].result.parse(await send("Target.autoAttachRelated", commands["Target.autoAttachRelated"].params.parse(params ?? {}))), "Target.autoAttachRelated", "command"),
-      setDiscoverTargets: withCdpName(async (params?: cdp.types.ts.Target.SetDiscoverTargetsParams) => commands["Target.setDiscoverTargets"].result.parse(await send("Target.setDiscoverTargets", commands["Target.setDiscoverTargets"].params.parse(params ?? {}))), "Target.setDiscoverTargets", "command"),
-      setRemoteLocations: withCdpName(async (params?: cdp.types.ts.Target.SetRemoteLocationsParams) => commands["Target.setRemoteLocations"].result.parse(await send("Target.setRemoteLocations", commands["Target.setRemoteLocations"].params.parse(params ?? {}))), "Target.setRemoteLocations", "command"),
-      getDevToolsTarget: withCdpName(async (params?: cdp.types.ts.Target.GetDevToolsTargetParams) => commands["Target.getDevToolsTarget"].result.parse(await send("Target.getDevToolsTarget", commands["Target.getDevToolsTarget"].params.parse(params ?? {}))), "Target.getDevToolsTarget", "command"),
-      openDevTools: withCdpName(async (params?: cdp.types.ts.Target.OpenDevToolsParams) => commands["Target.openDevTools"].result.parse(await send("Target.openDevTools", commands["Target.openDevTools"].params.parse(params ?? {}))), "Target.openDevTools", "command"),
+      activateTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.ActivateTargetParams) =>
+          commands["Target.activateTarget"].result.parse(
+            await send("Target.activateTarget", commands["Target.activateTarget"].params.parse(params ?? {})),
+          ),
+        "Target.activateTarget",
+        "command",
+      ),
+      attachToTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.AttachToTargetParams) =>
+          commands["Target.attachToTarget"].result.parse(
+            await send("Target.attachToTarget", commands["Target.attachToTarget"].params.parse(params ?? {})),
+          ),
+        "Target.attachToTarget",
+        "command",
+      ),
+      attachToBrowserTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.AttachToBrowserTargetParams) =>
+          commands["Target.attachToBrowserTarget"].result.parse(
+            await send(
+              "Target.attachToBrowserTarget",
+              commands["Target.attachToBrowserTarget"].params.parse(params ?? {}),
+            ),
+          ),
+        "Target.attachToBrowserTarget",
+        "command",
+      ),
+      closeTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.CloseTargetParams) =>
+          commands["Target.closeTarget"].result.parse(
+            await send("Target.closeTarget", commands["Target.closeTarget"].params.parse(params ?? {})),
+          ),
+        "Target.closeTarget",
+        "command",
+      ),
+      exposeDevToolsProtocol: withCdpName(
+        async (params?: cdp.types.ts.Target.ExposeDevToolsProtocolParams) =>
+          commands["Target.exposeDevToolsProtocol"].result.parse(
+            await send(
+              "Target.exposeDevToolsProtocol",
+              commands["Target.exposeDevToolsProtocol"].params.parse(params ?? {}),
+            ),
+          ),
+        "Target.exposeDevToolsProtocol",
+        "command",
+      ),
+      createBrowserContext: withCdpName(
+        async (params?: cdp.types.ts.Target.CreateBrowserContextParams) =>
+          commands["Target.createBrowserContext"].result.parse(
+            await send(
+              "Target.createBrowserContext",
+              commands["Target.createBrowserContext"].params.parse(params ?? {}),
+            ),
+          ),
+        "Target.createBrowserContext",
+        "command",
+      ),
+      getBrowserContexts: withCdpName(
+        async (params?: cdp.types.ts.Target.GetBrowserContextsParams) =>
+          commands["Target.getBrowserContexts"].result.parse(
+            await send("Target.getBrowserContexts", commands["Target.getBrowserContexts"].params.parse(params ?? {})),
+          ),
+        "Target.getBrowserContexts",
+        "command",
+      ),
+      createTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.CreateTargetParams) =>
+          commands["Target.createTarget"].result.parse(
+            await send("Target.createTarget", commands["Target.createTarget"].params.parse(params ?? {})),
+          ),
+        "Target.createTarget",
+        "command",
+      ),
+      detachFromTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.DetachFromTargetParams) =>
+          commands["Target.detachFromTarget"].result.parse(
+            await send("Target.detachFromTarget", commands["Target.detachFromTarget"].params.parse(params ?? {})),
+          ),
+        "Target.detachFromTarget",
+        "command",
+      ),
+      disposeBrowserContext: withCdpName(
+        async (params?: cdp.types.ts.Target.DisposeBrowserContextParams) =>
+          commands["Target.disposeBrowserContext"].result.parse(
+            await send(
+              "Target.disposeBrowserContext",
+              commands["Target.disposeBrowserContext"].params.parse(params ?? {}),
+            ),
+          ),
+        "Target.disposeBrowserContext",
+        "command",
+      ),
+      getTargetInfo: withCdpName(
+        async (params?: cdp.types.ts.Target.GetTargetInfoParams) =>
+          commands["Target.getTargetInfo"].result.parse(
+            await send("Target.getTargetInfo", commands["Target.getTargetInfo"].params.parse(params ?? {})),
+          ),
+        "Target.getTargetInfo",
+        "command",
+      ),
+      getTargets: withCdpName(
+        async (params?: cdp.types.ts.Target.GetTargetsParams) =>
+          commands["Target.getTargets"].result.parse(
+            await send("Target.getTargets", commands["Target.getTargets"].params.parse(params ?? {})),
+          ),
+        "Target.getTargets",
+        "command",
+      ),
+      sendMessageToTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.SendMessageToTargetParams) =>
+          commands["Target.sendMessageToTarget"].result.parse(
+            await send("Target.sendMessageToTarget", commands["Target.sendMessageToTarget"].params.parse(params ?? {})),
+          ),
+        "Target.sendMessageToTarget",
+        "command",
+      ),
+      setAutoAttach: withCdpName(
+        async (params?: cdp.types.ts.Target.SetAutoAttachParams) =>
+          commands["Target.setAutoAttach"].result.parse(
+            await send("Target.setAutoAttach", commands["Target.setAutoAttach"].params.parse(params ?? {})),
+          ),
+        "Target.setAutoAttach",
+        "command",
+      ),
+      autoAttachRelated: withCdpName(
+        async (params?: cdp.types.ts.Target.AutoAttachRelatedParams) =>
+          commands["Target.autoAttachRelated"].result.parse(
+            await send("Target.autoAttachRelated", commands["Target.autoAttachRelated"].params.parse(params ?? {})),
+          ),
+        "Target.autoAttachRelated",
+        "command",
+      ),
+      setDiscoverTargets: withCdpName(
+        async (params?: cdp.types.ts.Target.SetDiscoverTargetsParams) =>
+          commands["Target.setDiscoverTargets"].result.parse(
+            await send("Target.setDiscoverTargets", commands["Target.setDiscoverTargets"].params.parse(params ?? {})),
+          ),
+        "Target.setDiscoverTargets",
+        "command",
+      ),
+      setRemoteLocations: withCdpName(
+        async (params?: cdp.types.ts.Target.SetRemoteLocationsParams) =>
+          commands["Target.setRemoteLocations"].result.parse(
+            await send("Target.setRemoteLocations", commands["Target.setRemoteLocations"].params.parse(params ?? {})),
+          ),
+        "Target.setRemoteLocations",
+        "command",
+      ),
+      getDevToolsTarget: withCdpName(
+        async (params?: cdp.types.ts.Target.GetDevToolsTargetParams) =>
+          commands["Target.getDevToolsTarget"].result.parse(
+            await send("Target.getDevToolsTarget", commands["Target.getDevToolsTarget"].params.parse(params ?? {})),
+          ),
+        "Target.getDevToolsTarget",
+        "command",
+      ),
+      openDevTools: withCdpName(
+        async (params?: cdp.types.ts.Target.OpenDevToolsParams) =>
+          commands["Target.openDevTools"].result.parse(
+            await send("Target.openDevTools", commands["Target.openDevTools"].params.parse(params ?? {})),
+          ),
+        "Target.openDevTools",
+        "command",
+      ),
       attachedToTarget: withCdpName(events["Target.attachedToTarget"], "Target.attachedToTarget", "event"),
       detachedFromTarget: withCdpName(events["Target.detachedFromTarget"], "Target.detachedFromTarget", "event"),
-      receivedMessageFromTarget: withCdpName(events["Target.receivedMessageFromTarget"], "Target.receivedMessageFromTarget", "event"),
+      receivedMessageFromTarget: withCdpName(
+        events["Target.receivedMessageFromTarget"],
+        "Target.receivedMessageFromTarget",
+        "event",
+      ),
       targetCreated: withCdpName(events["Target.targetCreated"], "Target.targetCreated", "event"),
       targetDestroyed: withCdpName(events["Target.targetDestroyed"], "Target.targetDestroyed", "event"),
       targetCrashed: withCdpName(events["Target.targetCrashed"], "Target.targetCrashed", "event"),
       targetInfoChanged: withCdpName(events["Target.targetInfoChanged"], "Target.targetInfoChanged", "event"),
     },
     Tethering: {
-      bind: withCdpName(async (params?: cdp.types.ts.Tethering.BindParams) => commands["Tethering.bind"].result.parse(await send("Tethering.bind", commands["Tethering.bind"].params.parse(params ?? {}))), "Tethering.bind", "command"),
-      unbind: withCdpName(async (params?: cdp.types.ts.Tethering.UnbindParams) => commands["Tethering.unbind"].result.parse(await send("Tethering.unbind", commands["Tethering.unbind"].params.parse(params ?? {}))), "Tethering.unbind", "command"),
+      bind: withCdpName(
+        async (params?: cdp.types.ts.Tethering.BindParams) =>
+          commands["Tethering.bind"].result.parse(
+            await send("Tethering.bind", commands["Tethering.bind"].params.parse(params ?? {})),
+          ),
+        "Tethering.bind",
+        "command",
+      ),
+      unbind: withCdpName(
+        async (params?: cdp.types.ts.Tethering.UnbindParams) =>
+          commands["Tethering.unbind"].result.parse(
+            await send("Tethering.unbind", commands["Tethering.unbind"].params.parse(params ?? {})),
+          ),
+        "Tethering.unbind",
+        "command",
+      ),
       accepted: withCdpName(events["Tethering.accepted"], "Tethering.accepted", "event"),
     },
     Tracing: {
-      end: withCdpName(async (params?: cdp.types.ts.Tracing.EndParams) => commands["Tracing.end"].result.parse(await send("Tracing.end", commands["Tracing.end"].params.parse(params ?? {}))), "Tracing.end", "command"),
-      getCategories: withCdpName(async (params?: cdp.types.ts.Tracing.GetCategoriesParams) => commands["Tracing.getCategories"].result.parse(await send("Tracing.getCategories", commands["Tracing.getCategories"].params.parse(params ?? {}))), "Tracing.getCategories", "command"),
-      getTrackEventDescriptor: withCdpName(async (params?: cdp.types.ts.Tracing.GetTrackEventDescriptorParams) => commands["Tracing.getTrackEventDescriptor"].result.parse(await send("Tracing.getTrackEventDescriptor", commands["Tracing.getTrackEventDescriptor"].params.parse(params ?? {}))), "Tracing.getTrackEventDescriptor", "command"),
-      recordClockSyncMarker: withCdpName(async (params?: cdp.types.ts.Tracing.RecordClockSyncMarkerParams) => commands["Tracing.recordClockSyncMarker"].result.parse(await send("Tracing.recordClockSyncMarker", commands["Tracing.recordClockSyncMarker"].params.parse(params ?? {}))), "Tracing.recordClockSyncMarker", "command"),
-      requestMemoryDump: withCdpName(async (params?: cdp.types.ts.Tracing.RequestMemoryDumpParams) => commands["Tracing.requestMemoryDump"].result.parse(await send("Tracing.requestMemoryDump", commands["Tracing.requestMemoryDump"].params.parse(params ?? {}))), "Tracing.requestMemoryDump", "command"),
-      start: withCdpName(async (params?: cdp.types.ts.Tracing.StartParams) => commands["Tracing.start"].result.parse(await send("Tracing.start", commands["Tracing.start"].params.parse(params ?? {}))), "Tracing.start", "command"),
+      end: withCdpName(
+        async (params?: cdp.types.ts.Tracing.EndParams) =>
+          commands["Tracing.end"].result.parse(
+            await send("Tracing.end", commands["Tracing.end"].params.parse(params ?? {})),
+          ),
+        "Tracing.end",
+        "command",
+      ),
+      getCategories: withCdpName(
+        async (params?: cdp.types.ts.Tracing.GetCategoriesParams) =>
+          commands["Tracing.getCategories"].result.parse(
+            await send("Tracing.getCategories", commands["Tracing.getCategories"].params.parse(params ?? {})),
+          ),
+        "Tracing.getCategories",
+        "command",
+      ),
+      getTrackEventDescriptor: withCdpName(
+        async (params?: cdp.types.ts.Tracing.GetTrackEventDescriptorParams) =>
+          commands["Tracing.getTrackEventDescriptor"].result.parse(
+            await send(
+              "Tracing.getTrackEventDescriptor",
+              commands["Tracing.getTrackEventDescriptor"].params.parse(params ?? {}),
+            ),
+          ),
+        "Tracing.getTrackEventDescriptor",
+        "command",
+      ),
+      recordClockSyncMarker: withCdpName(
+        async (params?: cdp.types.ts.Tracing.RecordClockSyncMarkerParams) =>
+          commands["Tracing.recordClockSyncMarker"].result.parse(
+            await send(
+              "Tracing.recordClockSyncMarker",
+              commands["Tracing.recordClockSyncMarker"].params.parse(params ?? {}),
+            ),
+          ),
+        "Tracing.recordClockSyncMarker",
+        "command",
+      ),
+      requestMemoryDump: withCdpName(
+        async (params?: cdp.types.ts.Tracing.RequestMemoryDumpParams) =>
+          commands["Tracing.requestMemoryDump"].result.parse(
+            await send("Tracing.requestMemoryDump", commands["Tracing.requestMemoryDump"].params.parse(params ?? {})),
+          ),
+        "Tracing.requestMemoryDump",
+        "command",
+      ),
+      start: withCdpName(
+        async (params?: cdp.types.ts.Tracing.StartParams) =>
+          commands["Tracing.start"].result.parse(
+            await send("Tracing.start", commands["Tracing.start"].params.parse(params ?? {})),
+          ),
+        "Tracing.start",
+        "command",
+      ),
       bufferUsage: withCdpName(events["Tracing.bufferUsage"], "Tracing.bufferUsage", "event"),
       dataCollected: withCdpName(events["Tracing.dataCollected"], "Tracing.dataCollected", "event"),
       tracingComplete: withCdpName(events["Tracing.tracingComplete"], "Tracing.tracingComplete", "event"),
     },
     WebAudio: {
-      enable: withCdpName(async (params?: cdp.types.ts.WebAudio.EnableParams) => commands["WebAudio.enable"].result.parse(await send("WebAudio.enable", commands["WebAudio.enable"].params.parse(params ?? {}))), "WebAudio.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.WebAudio.DisableParams) => commands["WebAudio.disable"].result.parse(await send("WebAudio.disable", commands["WebAudio.disable"].params.parse(params ?? {}))), "WebAudio.disable", "command"),
-      getRealtimeData: withCdpName(async (params?: cdp.types.ts.WebAudio.GetRealtimeDataParams) => commands["WebAudio.getRealtimeData"].result.parse(await send("WebAudio.getRealtimeData", commands["WebAudio.getRealtimeData"].params.parse(params ?? {}))), "WebAudio.getRealtimeData", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.WebAudio.EnableParams) =>
+          commands["WebAudio.enable"].result.parse(
+            await send("WebAudio.enable", commands["WebAudio.enable"].params.parse(params ?? {})),
+          ),
+        "WebAudio.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.WebAudio.DisableParams) =>
+          commands["WebAudio.disable"].result.parse(
+            await send("WebAudio.disable", commands["WebAudio.disable"].params.parse(params ?? {})),
+          ),
+        "WebAudio.disable",
+        "command",
+      ),
+      getRealtimeData: withCdpName(
+        async (params?: cdp.types.ts.WebAudio.GetRealtimeDataParams) =>
+          commands["WebAudio.getRealtimeData"].result.parse(
+            await send("WebAudio.getRealtimeData", commands["WebAudio.getRealtimeData"].params.parse(params ?? {})),
+          ),
+        "WebAudio.getRealtimeData",
+        "command",
+      ),
       contextCreated: withCdpName(events["WebAudio.contextCreated"], "WebAudio.contextCreated", "event"),
-      contextWillBeDestroyed: withCdpName(events["WebAudio.contextWillBeDestroyed"], "WebAudio.contextWillBeDestroyed", "event"),
+      contextWillBeDestroyed: withCdpName(
+        events["WebAudio.contextWillBeDestroyed"],
+        "WebAudio.contextWillBeDestroyed",
+        "event",
+      ),
       contextChanged: withCdpName(events["WebAudio.contextChanged"], "WebAudio.contextChanged", "event"),
-      audioListenerCreated: withCdpName(events["WebAudio.audioListenerCreated"], "WebAudio.audioListenerCreated", "event"),
-      audioListenerWillBeDestroyed: withCdpName(events["WebAudio.audioListenerWillBeDestroyed"], "WebAudio.audioListenerWillBeDestroyed", "event"),
+      audioListenerCreated: withCdpName(
+        events["WebAudio.audioListenerCreated"],
+        "WebAudio.audioListenerCreated",
+        "event",
+      ),
+      audioListenerWillBeDestroyed: withCdpName(
+        events["WebAudio.audioListenerWillBeDestroyed"],
+        "WebAudio.audioListenerWillBeDestroyed",
+        "event",
+      ),
       audioNodeCreated: withCdpName(events["WebAudio.audioNodeCreated"], "WebAudio.audioNodeCreated", "event"),
-      audioNodeWillBeDestroyed: withCdpName(events["WebAudio.audioNodeWillBeDestroyed"], "WebAudio.audioNodeWillBeDestroyed", "event"),
+      audioNodeWillBeDestroyed: withCdpName(
+        events["WebAudio.audioNodeWillBeDestroyed"],
+        "WebAudio.audioNodeWillBeDestroyed",
+        "event",
+      ),
       audioParamCreated: withCdpName(events["WebAudio.audioParamCreated"], "WebAudio.audioParamCreated", "event"),
-      audioParamWillBeDestroyed: withCdpName(events["WebAudio.audioParamWillBeDestroyed"], "WebAudio.audioParamWillBeDestroyed", "event"),
+      audioParamWillBeDestroyed: withCdpName(
+        events["WebAudio.audioParamWillBeDestroyed"],
+        "WebAudio.audioParamWillBeDestroyed",
+        "event",
+      ),
       nodesConnected: withCdpName(events["WebAudio.nodesConnected"], "WebAudio.nodesConnected", "event"),
       nodesDisconnected: withCdpName(events["WebAudio.nodesDisconnected"], "WebAudio.nodesDisconnected", "event"),
       nodeParamConnected: withCdpName(events["WebAudio.nodeParamConnected"], "WebAudio.nodeParamConnected", "event"),
-      nodeParamDisconnected: withCdpName(events["WebAudio.nodeParamDisconnected"], "WebAudio.nodeParamDisconnected", "event"),
+      nodeParamDisconnected: withCdpName(
+        events["WebAudio.nodeParamDisconnected"],
+        "WebAudio.nodeParamDisconnected",
+        "event",
+      ),
     },
     WebAuthn: {
-      enable: withCdpName(async (params?: cdp.types.ts.WebAuthn.EnableParams) => commands["WebAuthn.enable"].result.parse(await send("WebAuthn.enable", commands["WebAuthn.enable"].params.parse(params ?? {}))), "WebAuthn.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.WebAuthn.DisableParams) => commands["WebAuthn.disable"].result.parse(await send("WebAuthn.disable", commands["WebAuthn.disable"].params.parse(params ?? {}))), "WebAuthn.disable", "command"),
-      addVirtualAuthenticator: withCdpName(async (params?: cdp.types.ts.WebAuthn.AddVirtualAuthenticatorParams) => commands["WebAuthn.addVirtualAuthenticator"].result.parse(await send("WebAuthn.addVirtualAuthenticator", commands["WebAuthn.addVirtualAuthenticator"].params.parse(params ?? {}))), "WebAuthn.addVirtualAuthenticator", "command"),
-      setResponseOverrideBits: withCdpName(async (params?: cdp.types.ts.WebAuthn.SetResponseOverrideBitsParams) => commands["WebAuthn.setResponseOverrideBits"].result.parse(await send("WebAuthn.setResponseOverrideBits", commands["WebAuthn.setResponseOverrideBits"].params.parse(params ?? {}))), "WebAuthn.setResponseOverrideBits", "command"),
-      removeVirtualAuthenticator: withCdpName(async (params?: cdp.types.ts.WebAuthn.RemoveVirtualAuthenticatorParams) => commands["WebAuthn.removeVirtualAuthenticator"].result.parse(await send("WebAuthn.removeVirtualAuthenticator", commands["WebAuthn.removeVirtualAuthenticator"].params.parse(params ?? {}))), "WebAuthn.removeVirtualAuthenticator", "command"),
-      addCredential: withCdpName(async (params?: cdp.types.ts.WebAuthn.AddCredentialParams) => commands["WebAuthn.addCredential"].result.parse(await send("WebAuthn.addCredential", commands["WebAuthn.addCredential"].params.parse(params ?? {}))), "WebAuthn.addCredential", "command"),
-      getCredential: withCdpName(async (params?: cdp.types.ts.WebAuthn.GetCredentialParams) => commands["WebAuthn.getCredential"].result.parse(await send("WebAuthn.getCredential", commands["WebAuthn.getCredential"].params.parse(params ?? {}))), "WebAuthn.getCredential", "command"),
-      getCredentials: withCdpName(async (params?: cdp.types.ts.WebAuthn.GetCredentialsParams) => commands["WebAuthn.getCredentials"].result.parse(await send("WebAuthn.getCredentials", commands["WebAuthn.getCredentials"].params.parse(params ?? {}))), "WebAuthn.getCredentials", "command"),
-      removeCredential: withCdpName(async (params?: cdp.types.ts.WebAuthn.RemoveCredentialParams) => commands["WebAuthn.removeCredential"].result.parse(await send("WebAuthn.removeCredential", commands["WebAuthn.removeCredential"].params.parse(params ?? {}))), "WebAuthn.removeCredential", "command"),
-      clearCredentials: withCdpName(async (params?: cdp.types.ts.WebAuthn.ClearCredentialsParams) => commands["WebAuthn.clearCredentials"].result.parse(await send("WebAuthn.clearCredentials", commands["WebAuthn.clearCredentials"].params.parse(params ?? {}))), "WebAuthn.clearCredentials", "command"),
-      setUserVerified: withCdpName(async (params?: cdp.types.ts.WebAuthn.SetUserVerifiedParams) => commands["WebAuthn.setUserVerified"].result.parse(await send("WebAuthn.setUserVerified", commands["WebAuthn.setUserVerified"].params.parse(params ?? {}))), "WebAuthn.setUserVerified", "command"),
-      setAutomaticPresenceSimulation: withCdpName(async (params?: cdp.types.ts.WebAuthn.SetAutomaticPresenceSimulationParams) => commands["WebAuthn.setAutomaticPresenceSimulation"].result.parse(await send("WebAuthn.setAutomaticPresenceSimulation", commands["WebAuthn.setAutomaticPresenceSimulation"].params.parse(params ?? {}))), "WebAuthn.setAutomaticPresenceSimulation", "command"),
-      setCredentialProperties: withCdpName(async (params?: cdp.types.ts.WebAuthn.SetCredentialPropertiesParams) => commands["WebAuthn.setCredentialProperties"].result.parse(await send("WebAuthn.setCredentialProperties", commands["WebAuthn.setCredentialProperties"].params.parse(params ?? {}))), "WebAuthn.setCredentialProperties", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.EnableParams) =>
+          commands["WebAuthn.enable"].result.parse(
+            await send("WebAuthn.enable", commands["WebAuthn.enable"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.DisableParams) =>
+          commands["WebAuthn.disable"].result.parse(
+            await send("WebAuthn.disable", commands["WebAuthn.disable"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.disable",
+        "command",
+      ),
+      addVirtualAuthenticator: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.AddVirtualAuthenticatorParams) =>
+          commands["WebAuthn.addVirtualAuthenticator"].result.parse(
+            await send(
+              "WebAuthn.addVirtualAuthenticator",
+              commands["WebAuthn.addVirtualAuthenticator"].params.parse(params ?? {}),
+            ),
+          ),
+        "WebAuthn.addVirtualAuthenticator",
+        "command",
+      ),
+      setResponseOverrideBits: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.SetResponseOverrideBitsParams) =>
+          commands["WebAuthn.setResponseOverrideBits"].result.parse(
+            await send(
+              "WebAuthn.setResponseOverrideBits",
+              commands["WebAuthn.setResponseOverrideBits"].params.parse(params ?? {}),
+            ),
+          ),
+        "WebAuthn.setResponseOverrideBits",
+        "command",
+      ),
+      removeVirtualAuthenticator: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.RemoveVirtualAuthenticatorParams) =>
+          commands["WebAuthn.removeVirtualAuthenticator"].result.parse(
+            await send(
+              "WebAuthn.removeVirtualAuthenticator",
+              commands["WebAuthn.removeVirtualAuthenticator"].params.parse(params ?? {}),
+            ),
+          ),
+        "WebAuthn.removeVirtualAuthenticator",
+        "command",
+      ),
+      addCredential: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.AddCredentialParams) =>
+          commands["WebAuthn.addCredential"].result.parse(
+            await send("WebAuthn.addCredential", commands["WebAuthn.addCredential"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.addCredential",
+        "command",
+      ),
+      getCredential: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.GetCredentialParams) =>
+          commands["WebAuthn.getCredential"].result.parse(
+            await send("WebAuthn.getCredential", commands["WebAuthn.getCredential"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.getCredential",
+        "command",
+      ),
+      getCredentials: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.GetCredentialsParams) =>
+          commands["WebAuthn.getCredentials"].result.parse(
+            await send("WebAuthn.getCredentials", commands["WebAuthn.getCredentials"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.getCredentials",
+        "command",
+      ),
+      removeCredential: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.RemoveCredentialParams) =>
+          commands["WebAuthn.removeCredential"].result.parse(
+            await send("WebAuthn.removeCredential", commands["WebAuthn.removeCredential"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.removeCredential",
+        "command",
+      ),
+      clearCredentials: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.ClearCredentialsParams) =>
+          commands["WebAuthn.clearCredentials"].result.parse(
+            await send("WebAuthn.clearCredentials", commands["WebAuthn.clearCredentials"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.clearCredentials",
+        "command",
+      ),
+      setUserVerified: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.SetUserVerifiedParams) =>
+          commands["WebAuthn.setUserVerified"].result.parse(
+            await send("WebAuthn.setUserVerified", commands["WebAuthn.setUserVerified"].params.parse(params ?? {})),
+          ),
+        "WebAuthn.setUserVerified",
+        "command",
+      ),
+      setAutomaticPresenceSimulation: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.SetAutomaticPresenceSimulationParams) =>
+          commands["WebAuthn.setAutomaticPresenceSimulation"].result.parse(
+            await send(
+              "WebAuthn.setAutomaticPresenceSimulation",
+              commands["WebAuthn.setAutomaticPresenceSimulation"].params.parse(params ?? {}),
+            ),
+          ),
+        "WebAuthn.setAutomaticPresenceSimulation",
+        "command",
+      ),
+      setCredentialProperties: withCdpName(
+        async (params?: cdp.types.ts.WebAuthn.SetCredentialPropertiesParams) =>
+          commands["WebAuthn.setCredentialProperties"].result.parse(
+            await send(
+              "WebAuthn.setCredentialProperties",
+              commands["WebAuthn.setCredentialProperties"].params.parse(params ?? {}),
+            ),
+          ),
+        "WebAuthn.setCredentialProperties",
+        "command",
+      ),
       credentialAdded: withCdpName(events["WebAuthn.credentialAdded"], "WebAuthn.credentialAdded", "event"),
       credentialDeleted: withCdpName(events["WebAuthn.credentialDeleted"], "WebAuthn.credentialDeleted", "event"),
       credentialUpdated: withCdpName(events["WebAuthn.credentialUpdated"], "WebAuthn.credentialUpdated", "event"),
       credentialAsserted: withCdpName(events["WebAuthn.credentialAsserted"], "WebAuthn.credentialAsserted", "event"),
     },
     WebMCP: {
-      enable: withCdpName(async (params?: cdp.types.ts.WebMCP.EnableParams) => commands["WebMCP.enable"].result.parse(await send("WebMCP.enable", commands["WebMCP.enable"].params.parse(params ?? {}))), "WebMCP.enable", "command"),
-      disable: withCdpName(async (params?: cdp.types.ts.WebMCP.DisableParams) => commands["WebMCP.disable"].result.parse(await send("WebMCP.disable", commands["WebMCP.disable"].params.parse(params ?? {}))), "WebMCP.disable", "command"),
-      invokeTool: withCdpName(async (params?: cdp.types.ts.WebMCP.InvokeToolParams) => commands["WebMCP.invokeTool"].result.parse(await send("WebMCP.invokeTool", commands["WebMCP.invokeTool"].params.parse(params ?? {}))), "WebMCP.invokeTool", "command"),
-      cancelInvocation: withCdpName(async (params?: cdp.types.ts.WebMCP.CancelInvocationParams) => commands["WebMCP.cancelInvocation"].result.parse(await send("WebMCP.cancelInvocation", commands["WebMCP.cancelInvocation"].params.parse(params ?? {}))), "WebMCP.cancelInvocation", "command"),
+      enable: withCdpName(
+        async (params?: cdp.types.ts.WebMCP.EnableParams) =>
+          commands["WebMCP.enable"].result.parse(
+            await send("WebMCP.enable", commands["WebMCP.enable"].params.parse(params ?? {})),
+          ),
+        "WebMCP.enable",
+        "command",
+      ),
+      disable: withCdpName(
+        async (params?: cdp.types.ts.WebMCP.DisableParams) =>
+          commands["WebMCP.disable"].result.parse(
+            await send("WebMCP.disable", commands["WebMCP.disable"].params.parse(params ?? {})),
+          ),
+        "WebMCP.disable",
+        "command",
+      ),
+      invokeTool: withCdpName(
+        async (params?: cdp.types.ts.WebMCP.InvokeToolParams) =>
+          commands["WebMCP.invokeTool"].result.parse(
+            await send("WebMCP.invokeTool", commands["WebMCP.invokeTool"].params.parse(params ?? {})),
+          ),
+        "WebMCP.invokeTool",
+        "command",
+      ),
+      cancelInvocation: withCdpName(
+        async (params?: cdp.types.ts.WebMCP.CancelInvocationParams) =>
+          commands["WebMCP.cancelInvocation"].result.parse(
+            await send("WebMCP.cancelInvocation", commands["WebMCP.cancelInvocation"].params.parse(params ?? {})),
+          ),
+        "WebMCP.cancelInvocation",
+        "command",
+      ),
       toolsAdded: withCdpName(events["WebMCP.toolsAdded"], "WebMCP.toolsAdded", "event"),
       toolsRemoved: withCdpName(events["WebMCP.toolsRemoved"], "WebMCP.toolsRemoved", "event"),
       toolInvoked: withCdpName(events["WebMCP.toolInvoked"], "WebMCP.toolInvoked", "event"),
       toolResponded: withCdpName(events["WebMCP.toolResponded"], "WebMCP.toolResponded", "event"),
     },
     Mod: {
-      evaluate: withCdpName(async (params?: cdp.types.ts.Mod.EvaluateParams) => {
-        const parsed = Mod.EvaluateParams.parse(params ?? {});
-        return Mod.EvaluateResponse.parse(await send("Mod.evaluate", parsed));
-      }, "Mod.evaluate", "command"),
-      addCustomCommand: withCdpName(async (params_or_name?: cdp.types.ts.Mod.AddCustomCommandParams | string, options: ModCustomCommandOptions = {}) => {
-        const input = typeof params_or_name === "string" ? { name: params_or_name, expression: options.expression ?? null, params_schema: options.params_schema ?? null, result_schema: options.result_schema ?? null } : params_or_name;
-        const parsed = Mod.AddCustomCommandParams.parse(input ?? {});
-        const name = normalizeModCDPName(parsed.name);
-        const params_schema = validateZodSchema(parsed.params_schema);
-        const result_schema = validateZodSchema(parsed.result_schema);
-        const response = Mod.AddCustomCommandResponse.parse(await send("Mod.addCustomCommand", { ...parsed, name }));
-        hooks.onCustomCommand?.(name, params_schema, result_schema);
-        return response;
-      }, "Mod.addCustomCommand", "command"),
-      addCustomEvent: withCdpName(async (params_or_name?: cdp.types.ts.Mod.AddCustomEventParams | string, options: { event_schema?: z.ZodType | null } = {}) => {
-        const input = typeof params_or_name === "string" ? { name: params_or_name, event_schema: options.event_schema ?? null } : params_or_name;
-        const parsed = Mod.AddCustomEventParams.parse(input ?? {});
-        const direct_schema = Mod.ZodType.safeParse(parsed);
-        if (direct_schema.success) {
-          const name = normalizeModCDPName(direct_schema.data);
-          const event_schema = validateZodSchema(direct_schema.data);
-          const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { name, event_schema }));
+      evaluate: withCdpName(
+        async (params?: cdp.types.ts.Mod.EvaluateParams) => {
+          const parsed = Mod.EvaluateParams.parse(params ?? {});
+          return Mod.EvaluateResponse.parse(await send("Mod.evaluate", parsed));
+        },
+        "Mod.evaluate",
+        "command",
+      ),
+      addCustomCommand: withCdpName(
+        async (
+          params_or_name?: cdp.types.ts.Mod.AddCustomCommandParams | string,
+          config: ModCustomCommandConfig = {},
+        ) => {
+          const input =
+            typeof params_or_name === "string"
+              ? {
+                  name: params_or_name,
+                  expression: config.expression ?? null,
+                  params_schema: config.params_schema ?? null,
+                  result_schema: config.result_schema ?? null,
+                }
+              : params_or_name;
+          const parsed = Mod.AddCustomCommandParams.parse(input ?? {});
+          const name = normalizeModCDPName(parsed.name);
+          const params_schema = validateZodSchema(parsed.params_schema);
+          const result_schema = validateZodSchema(parsed.result_schema);
+          const response = Mod.AddCustomCommandResponse.parse(await send("Mod.addCustomCommand", { ...parsed, name }));
+          hooks.onCustomCommand?.(name, params_schema, result_schema);
+          return response;
+        },
+        "Mod.addCustomCommand",
+        "command",
+      ),
+      addCustomEvent: withCdpName(
+        async (
+          params_or_name?: cdp.types.ts.Mod.AddCustomEventParams | string,
+          config: { event_schema?: z.ZodType | null } = {},
+        ) => {
+          const input =
+            typeof params_or_name === "string"
+              ? { name: params_or_name, event_schema: config.event_schema ?? null }
+              : params_or_name;
+          const parsed = Mod.AddCustomEventParams.parse(input ?? {});
+          const direct_schema = Mod.ZodType.safeParse(parsed);
+          if (direct_schema.success) {
+            const name = normalizeModCDPName(direct_schema.data);
+            const event_schema = validateZodSchema(direct_schema.data);
+            const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { name, event_schema }));
+            hooks.onCustomEvent?.(name, event_schema);
+            return response;
+          }
+          const object_params = Mod.AddCustomEventObjectParams.parse(parsed);
+          const name = normalizeModCDPName(object_params.name);
+          const event_schema = validateZodSchema(object_params.event_schema);
+          const response = Mod.AddCustomEventResponse.parse(
+            await send("Mod.addCustomEvent", { ...object_params, name, event_schema }),
+          );
           hooks.onCustomEvent?.(name, event_schema);
           return response;
-        }
-        const object_params = Mod.AddCustomEventObjectParams.parse(parsed);
-        const name = normalizeModCDPName(object_params.name);
-        const event_schema = validateZodSchema(object_params.event_schema);
-        const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { ...object_params, name, event_schema }));
-        hooks.onCustomEvent?.(name, event_schema);
-        return response;
-      }, "Mod.addCustomEvent", "command"),
-      addMiddleware: withCdpName(async (params?: cdp.types.ts.Mod.AddMiddlewareParams) => {
-        const parsed = Mod.AddMiddlewareParams.parse(params ?? {});
-        const name = parsed.name == null ? undefined : normalizeModCDPName(parsed.name);
-        return Mod.AddMiddlewareResponse.parse(await send("Mod.addMiddleware", { ...parsed, name }));
-      }, "Mod.addMiddleware", "command"),
-      configure: withCdpName(async (params?: cdp.types.ts.Mod.ConfigureParams) => {
-        const parsed = Mod.ConfigureParams.parse(params ?? {});
-        return Mod.ConfigureResponse.parse(await send("Mod.configure", parsed));
-      }, "Mod.configure", "command"),
-      ping: withCdpName(async (params?: cdp.types.ts.Mod.PingParams) => {
-        const parsed = Mod.PingParams.parse(params ?? {});
-        return Mod.PingResponse.parse(await send("Mod.ping", parsed));
-      }, "Mod.ping", "command"),
-      getTopology: withCdpName(async (params?: cdp.types.ts.Mod.GetTopologyParams) => {
-        const parsed = Mod.GetTopologyParams.parse(params ?? {});
-        return Mod.GetTopologyResponse.parse(await send("Mod.getTopology", parsed));
-      }, "Mod.getTopology", "command"),
+        },
+        "Mod.addCustomEvent",
+        "command",
+      ),
+      addMiddleware: withCdpName(
+        async (params?: cdp.types.ts.Mod.AddMiddlewareParams) => {
+          const parsed = Mod.AddMiddlewareParams.parse(params ?? {});
+          const name = parsed.name == null ? undefined : normalizeModCDPName(parsed.name);
+          return Mod.AddMiddlewareResponse.parse(await send("Mod.addMiddleware", { ...parsed, name }));
+        },
+        "Mod.addMiddleware",
+        "command",
+      ),
+      configure: withCdpName(
+        async (params?: cdp.types.ts.Mod.ConfigureParams) => {
+          const parsed = Mod.ConfigureParams.parse(params ?? {});
+          return Mod.ConfigureResponse.parse(await send("Mod.configure", parsed));
+        },
+        "Mod.configure",
+        "command",
+      ),
+      ping: withCdpName(
+        async (params?: cdp.types.ts.Mod.PingParams) => {
+          const parsed = Mod.PingParams.parse(params ?? {});
+          return Mod.PingResponse.parse(await send("Mod.ping", parsed));
+        },
+        "Mod.ping",
+        "command",
+      ),
+      getTopology: withCdpName(
+        async (params?: cdp.types.ts.Mod.GetTopologyParams) => {
+          const parsed = Mod.GetTopologyParams.parse(params ?? {});
+          return Mod.GetTopologyResponse.parse(await send("Mod.getTopology", parsed));
+        },
+        "Mod.getTopology",
+        "command",
+      ),
       pong: withCdpName(Mod.PongEvent, "Mod.pong", "event"),
     },
   };

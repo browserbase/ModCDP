@@ -30,7 +30,7 @@ const DEFAULT_CLIENT_ROUTES = {
   "*.*": "service_worker",
 } satisfies ModCDPRoutes;
 
-type TranslateOptions = { routes?: ModCDPRoutes; cdpSessionId?: string | null };
+type TranslateConfig = { routes?: ModCDPRoutes; cdpSessionId?: string | null };
 
 function normalizeModCDPName(
   value:
@@ -113,7 +113,7 @@ function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, c
 function wrapCommandIfNeeded(
   method: string,
   params: ProtocolParams = {},
-  { routes = DEFAULT_CLIENT_ROUTES, cdpSessionId = null }: TranslateOptions = {},
+  { routes = DEFAULT_CLIENT_ROUTES, cdpSessionId = null }: TranslateConfig = {},
 ): TranslatedCommand {
   params = params ?? {};
   const route = routeFor(method, routes);

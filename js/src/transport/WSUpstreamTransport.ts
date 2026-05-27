@@ -13,8 +13,8 @@ class WSUpstreamTransport extends UpstreamTransport {
   ws: WebSocket | null = null;
   private connect_promise: Promise<void> | null = null;
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    super({ ...options, upstream_mode: "ws" });
+  constructor(config: UpstreamTransportConfig = {}) {
+    super({ ...config, upstream_mode: "ws" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -22,7 +22,7 @@ class WSUpstreamTransport extends UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: string | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,
@@ -41,7 +41,7 @@ class WSUpstreamTransport extends UpstreamTransport {
     command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
-    options: { timeout_ms?: number | null } = {},
+    config: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command !== "string" && "method" in command) {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) throw new Error("CDP websocket is not connected.");
@@ -55,7 +55,7 @@ class WSUpstreamTransport extends UpstreamTransport {
             command,
             params as ProtocolPayload,
             typeof route_or_sessionId === "string" ? route_or_sessionId : null,
-            options,
+            config,
           ) as Promise<ProtocolResult>,
       );
     }

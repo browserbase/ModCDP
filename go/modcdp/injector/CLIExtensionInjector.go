@@ -35,13 +35,6 @@ func (i *CLIExtensionInjector) Prepare() error {
 	return err
 }
 
-func (i *CLIExtensionInjector) ConfigForLauncher() LauncherConfig {
-	if i.UnpackedExtensionPath == "" {
-		return LauncherConfig{}
-	}
-	return LauncherConfig{LauncherLocalExtraArgs: []string{"--load-extension=" + i.UnpackedExtensionPath}}
-}
-
 func (i *CLIExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 	discovered, err := i.discoverReadyServiceWorker(i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || discovered == nil {
@@ -75,6 +68,9 @@ func (i *CLIExtensionInjector) resolveExtensionID() (string, error) {
 	if i.ExtensionID != "" {
 		i.Config.InjectorCLIExtensionID = i.ExtensionID
 		i.Config.InjectorServiceWorkerExtensionID = i.ExtensionID
+	}
+	if i.UnpackedExtensionPath != "" {
+		i.ExtraArgs = []string{"--load-extension=" + i.UnpackedExtensionPath}
 	}
 	return i.ExtensionID, nil
 }

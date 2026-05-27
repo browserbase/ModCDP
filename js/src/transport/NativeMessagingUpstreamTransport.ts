@@ -10,8 +10,8 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    super({ ...options, upstream_mode: "nativemessaging" });
+  constructor(config: UpstreamTransportConfig = {}) {
+    super({ ...config, upstream_mode: "nativemessaging" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -19,7 +19,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: string | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,
@@ -38,7 +38,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
     command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
-    options: { timeout_ms?: number | null } = {},
+    config: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command !== "string" && "method" in command) {
       if (!this.read_native_message)
@@ -53,7 +53,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
         command,
         params as ProtocolPayload,
         typeof route_or_sessionId === "string" ? route_or_sessionId : null,
-        options,
+        config,
       );
     }
     return super.send(command, params as z.input<Params>, route_or_sessionId);

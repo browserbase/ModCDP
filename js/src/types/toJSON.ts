@@ -4,7 +4,7 @@
 // - ./go/modcdp/types/types.go
 type ModCDPJSONChild = { toJSON(): unknown } | null | undefined;
 
-type ModCDPJSONOptions = {
+type ModCDPJSONConfig = {
   config?: unknown;
   state?: object;
   children?: Record<string, ModCDPJSONChild>;
@@ -19,15 +19,15 @@ function simpleState(input: object) {
   return state;
 }
 
-function modCDPToJSON(instance: object & { config?: unknown }, options: ModCDPJSONOptions = {}) {
+function modCDPToJSON(instance: object & { config?: unknown }, config: ModCDPJSONConfig = {}) {
   const children: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(options.children ?? {})) {
+  for (const [key, child] of Object.entries(config.children ?? {})) {
     if (child) children[key] = child.toJSON();
   }
   return {
     type: instance.constructor.name,
-    config: options.config ?? instance.config ?? {},
-    state: { ...simpleState(instance), ...simpleState(options.state ?? {}) },
+    config: config.config ?? instance.config ?? {},
+    state: { ...simpleState(instance), ...simpleState(config.state ?? {}) },
     ...(Object.keys(children).length > 0 ? { children } : {}),
   };
 }

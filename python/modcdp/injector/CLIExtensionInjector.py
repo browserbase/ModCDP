@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import tempfile
 
-from ..launcher.BrowserLauncher import LauncherConfig
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
@@ -35,11 +34,6 @@ class CLIExtensionInjector(ExtensionInjector):
         self._resolveExtensionId()
         super().prepare()
 
-    def configForLauncher(self) -> LauncherConfig | dict:
-        if not self.unpacked_extension_path:
-            return {}
-        return {"launcher_local_extra_args": [f"--load-extension={self.unpacked_extension_path}"]}
-
     def inject(self) -> ExtensionInjectionResult | None:
         discovered = self._discoverReadyServiceWorker(
             matched_only=self.config.injector_trust_service_worker_target,
@@ -62,4 +56,6 @@ class CLIExtensionInjector(ExtensionInjector):
             self.extension_id = extensionIdFromManifestKey(self.unpacked_extension_path)
         if self.extension_id:
             self.update({"injector_cli_extension_id": self.extension_id, "injector_service_worker_extension_id": self.extension_id})
+        if self.unpacked_extension_path:
+            self.extra_args = [f"--load-extension={self.unpacked_extension_path}"]
         return self.extension_id

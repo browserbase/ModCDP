@@ -40,9 +40,9 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
             self.assertEqual(from_host_port["cdp_url"], local["cdp_url"])
             from_host_port["close"]()
 
-            from_options = RemoteBrowserLauncher({"launcher_remote_cdp_url": local["cdp_url"]}).launch()
-            self.assertEqual(from_options["cdp_url"], local["cdp_url"])
-            from_options["close"]()
+            from_config = RemoteBrowserLauncher({"launcher_remote_cdp_url": local["cdp_url"]}).launch()
+            self.assertEqual(from_config["cdp_url"], local["cdp_url"])
+            from_config["close"]()
 
             from_override = RemoteBrowserLauncher({"launcher_remote_cdp_url": "http://127.0.0.1:1"}).launch({"launcher_remote_cdp_url": f"127.0.0.1:{port}"})
             self.assertEqual(from_override["cdp_url"], local["cdp_url"])

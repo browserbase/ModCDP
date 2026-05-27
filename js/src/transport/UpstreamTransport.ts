@@ -33,7 +33,7 @@ type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
   sessionId?: cdp.types.ts.Target.SessionID | null;
 };
-type UpstreamPeerWaitOptions = { connected_after_ms?: number | null };
+type UpstreamPeerWaitConfig = { connected_after_ms?: number | null };
 
 type UpstreamEventListener = (
   payload: ProtocolPayload,
@@ -57,8 +57,8 @@ class UpstreamTransport {
   private close_listeners = new Set<(error: Error) => void>();
   private event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<UpstreamEventListener>>();
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    this.config = ModCDPUpstreamConfigSchema.parse(options);
+  constructor(config: UpstreamTransportConfig = {}) {
+    this.config = ModCDPUpstreamConfigSchema.parse(config);
   }
 
   async connect() {
@@ -81,7 +81,7 @@ class UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: cdp.types.ts.Target.SessionID | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   send<
     Params extends z.ZodType<Record<string, unknown>>,
@@ -100,7 +100,7 @@ class UpstreamTransport {
     command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | cdp.types.ts.Target.SessionID | null = null,
-    options: { timeout_ms?: number | null } = {},
+    config: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command !== "string" && "method" in command) {
       throw new Error(`${this.constructor.name}.send is not implemented.`);
@@ -108,7 +108,7 @@ class UpstreamTransport {
     if (typeof command === "string") {
       const method = command;
       const sessionId = typeof route_or_sessionId === "string" ? route_or_sessionId : null;
-      const timeout_ms = options.timeout_ms ?? this.config.upstream_cdp_send_timeout_ms;
+      const timeout_ms = config.timeout_ms ?? this.config.upstream_cdp_send_timeout_ms;
       const id = this.next_id++;
       const message: CdpCommandMessage = {
         id,
@@ -245,7 +245,7 @@ class UpstreamTransport {
     }
   }
 
-  async waitForPeer(_options: UpstreamPeerWaitOptions = {}) {}
+  async waitForPeer(_options: UpstreamPeerWaitConfig = {}) {}
 
   toJSON() {
     const { upstream_pipe_read, upstream_pipe_write, ...config } = this.config;
@@ -275,6 +275,6 @@ export type {
   UpstreamNatsRole,
   UpstreamTransportConfig,
   TargetRoute,
-  UpstreamPeerWaitOptions,
+  UpstreamPeerWaitConfig,
   UpstreamEventListener,
 };

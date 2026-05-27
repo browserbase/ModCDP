@@ -53,7 +53,7 @@ const DEFAULT_PROXY_ROUTER_ROUTES = {
   "*.*": "direct_cdp",
 } as const;
 
-type StartProxyOptions = {
+type StartProxyConfig = {
   proxy_listen_host?: string;
   proxy_listen_port?: number;
   launcher?: LauncherConfig;
@@ -75,7 +75,7 @@ async function startProxy({
   router = {},
   client_config = {},
   server_config = {},
-}: StartProxyOptions = {}) {
+}: StartProxyConfig = {}) {
   const { WebSocketServer } = await loadWsForProxy();
   const active_clients = new Set<ModCDPClient>();
   const http_server = http.createServer((req, res) => {
@@ -142,12 +142,12 @@ async function startProxy({
   };
 }
 
-async function connectDownstream(socket: WebSocket, options: ModCDPClientConfig, active_clients: Set<ModCDPClient>) {
+async function connectDownstream(socket: WebSocket, config: ModCDPClientConfig, active_clients: Set<ModCDPClient>) {
   const queued_raw_messages: RawData[] = [];
   let connected = false;
   const cdp = new ModCDPClient({
-    ...options,
-    client_config: { client_hydrate_aliases: false, ...(options.client_config ?? {}) },
+    ...config,
+    client_config: { client_hydrate_aliases: false, ...(config.client_config ?? {}) },
   });
   active_clients.add(cdp);
   socket.on("message", (raw) => {

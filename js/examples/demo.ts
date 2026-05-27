@@ -102,10 +102,10 @@ function clientRoutesFor(mode) {
   };
 }
 
-function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
+function clientConfigFor(mode, upstream_mode, cdp_url, launcher_config = {}) {
   const launcher = cdp_url
     ? ({ launcher_mode: "remote" } as const)
-    : ({ launcher_mode: "local", ...launch_options } as const);
+    : ({ launcher_mode: "local", ...launcher_config } as const);
   const upstream = {
     upstream_mode,
     ...(cdp_url ? { upstream_ws_cdp_url: cdp_url } : {}),
@@ -231,19 +231,19 @@ async function main() {
   }
 
   let cdp_url;
-  let launch_options = {};
+  let launcher_config = {};
   if (live) {
     cdp_url = await waitForLiveCdpUrl();
   } else {
     cdp_url = null;
-    launch_options = {
+    launcher_config = {
       launcher_local_chrome_ready_timeout_ms: 60_000,
       launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
       launcher_local_sandbox: process.platform !== "linux",
     };
   }
 
-  const cdp = new ModCDPClient(clientOptionsFor(mode, upstream_mode, cdp_url, launch_options));
+  const cdp = new ModCDPClient(clientConfigFor(mode, upstream_mode, cdp_url, launcher_config));
 
   try {
     await cdp.connect();

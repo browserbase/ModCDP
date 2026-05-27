@@ -75,9 +75,9 @@ class NATSDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the NATS downstream connection. */
-  start(endpoint?: string, options: z.input<typeof NATSDownstreamTransportConfigSchema> = {}) {
+  start(endpoint?: string, config: z.input<typeof NATSDownstreamTransportConfigSchema> = {}) {
     this.config = NATSDownstreamTransportConfigSchema.parse({
-      ...options,
+      ...config,
       upstream_nats_url: endpoint,
     });
     this.started = true;
@@ -172,7 +172,7 @@ class NATSDownstreamTransport extends DownstreamTransport {
     this.socket = ws;
     this.buffer = "";
     ws.addEventListener("open", () => {
-      this.write(`CONNECT ${JSON.stringify(this.connectOptions())}\r\nPING\r\n`);
+      this.write(`CONNECT ${JSON.stringify(this.connectConfig())}\r\nPING\r\n`);
       this.write(`SUB ${this.config.upstream_nats_subject_prefix}.client_to_browser 1\r\n`);
       this.publish(`${this.config.upstream_nats_subject_prefix}.browser_to_client`, {
         type: "modcdp.nats.hello",
@@ -267,7 +267,7 @@ class NATSDownstreamTransport extends DownstreamTransport {
     await this.handleRequest(message);
   }
 
-  private connectOptions() {
+  private connectConfig() {
     return {
       verbose: false,
       pedantic: false,

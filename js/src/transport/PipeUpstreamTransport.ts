@@ -9,8 +9,8 @@ class PipeUpstreamTransport extends UpstreamTransport {
   private buffer = "";
   private pipe_cleanup: (() => void) | null = null;
 
-  constructor(options: UpstreamTransportConfig = {}) {
-    super({ ...options, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
+  constructor(config: UpstreamTransportConfig = {}) {
+    super({ ...config, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -18,7 +18,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
     method: string,
     params?: ProtocolPayload,
     sessionId?: string | null,
-    options?: { timeout_ms?: number | null },
+    config?: { timeout_ms?: number | null },
   ): Promise<ProtocolResult>;
   override send<
     Params extends z.ZodType<Record<string, unknown>>,
@@ -37,7 +37,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
     command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
-    options: { timeout_ms?: number | null } = {},
+    config: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command !== "string" && "method" in command) {
       if (!this.config.upstream_pipe_write || !this.pipe_cleanup) throw new Error("CDP pipe is not connected.");
@@ -49,7 +49,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
         command,
         params as ProtocolPayload,
         typeof route_or_sessionId === "string" ? route_or_sessionId : null,
-        options,
+        config,
       );
     }
     return super.send(command, params as z.input<Params>, route_or_sessionId);

@@ -14,8 +14,8 @@ class CLIExtensionInjector extends ExtensionInjector {
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...options, injector_mode: "cli" });
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...config, injector_mode: "cli" });
   }
 
   async prepare() {

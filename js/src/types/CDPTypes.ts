@@ -53,7 +53,7 @@ type CDPTypesCustomEvents<TEvents extends CDPEventMap = {}> =
   | {
       [TName in keyof TEvents]: TEvents[TName];
     };
-type CDPTypesOptions<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap = {}> = {
+type CDPTypesConfig<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap = {}> = {
   custom_commands?: CDPTypesCustomCommands<TCommands>;
   custom_events?: CDPTypesCustomEvents<TEvents>;
   custom_middlewares?: ModCDPAddMiddlewareParams[];
@@ -115,7 +115,7 @@ const DEFAULT_BUILTIN_COMMANDS: ReadonlyArray<ModCDPAddCustomCommandParams> = [
     name: "Mod.configure",
     params_schema: Mod.ConfigureParams,
     result_schema: Mod.ConfigureResponse,
-    expression: `async (params) => { await ModCDP.configure(params); return {}; }`,
+    expression: `async (params) => { await ModCDP.configure(params); return params; }`,
   },
   {
     name: "Mod.evaluate",
@@ -232,16 +232,16 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
   private readonly alias_bindings: CDPAliasBinding[] = [];
   private readonly alias_targets = new WeakSet<object>();
 
-  constructor(options: CDPTypesOptions<TCommands, TEvents> = {}) {
+  constructor(config: CDPTypesConfig<TCommands, TEvents> = {}) {
     this.custom_commands = new Map();
     this.custom_events = new Map();
     this.custom_middlewares = [];
     this.hydrateBuiltinSchemas();
     for (const command of DEFAULT_BUILTIN_COMMANDS) this.addCustomCommand(command);
     for (const event of DEFAULT_BUILTIN_EVENTS) this.addCustomEvent(event);
-    this.registerCustomCommands(options.custom_commands ?? []);
-    this.registerCustomEvents(options.custom_events ?? []);
-    for (const middleware of options.custom_middlewares ?? []) this.addCustomMiddleware(middleware);
+    this.registerCustomCommands(config.custom_commands ?? []);
+    this.registerCustomEvents(config.custom_events ?? []);
+    for (const middleware of config.custom_middlewares ?? []) this.addCustomMiddleware(middleware);
     this.service_worker_expression_builders.set("Mod.evaluate", (params) => {
       const parsed = Mod.EvaluateParams.parse(params);
       return `
@@ -254,12 +254,12 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
   }
 
   update<TMoreCommands extends CDPCommandMap = {}, TMoreEvents extends CDPEventMap = {}>(
-    options: CDPTypesOptions<TMoreCommands, TMoreEvents>,
+    config: CDPTypesConfig<TMoreCommands, TMoreEvents>,
   ): CDPTypes<TCommands & TMoreCommands, TEvents & TMoreEvents> {
     const updated = new CDPTypes<TCommands & TMoreCommands, TEvents & TMoreEvents>({
-      custom_commands: [...this.custom_commands.values(), ...this.customCommandEntries(options.custom_commands ?? [])],
-      custom_events: [...this.custom_events.values(), ...this.customEventEntries(options.custom_events ?? [])],
-      custom_middlewares: [...this.custom_middlewares, ...(options.custom_middlewares ?? [])],
+      custom_commands: [...this.custom_commands.values(), ...this.customCommandEntries(config.custom_commands ?? [])],
+      custom_events: [...this.custom_events.values(), ...this.customEventEntries(config.custom_events ?? [])],
+      custom_middlewares: [...this.custom_middlewares, ...(config.custom_middlewares ?? [])],
     });
     for (const binding of this.alias_bindings) updated.installAliases(binding.target, binding.send);
     return updated;
@@ -752,7 +752,7 @@ export type {
   CDPEventMap,
   CDPTypesCustomCommands,
   CDPTypesCustomEvents,
-  CDPTypesOptions,
+  CDPTypesConfig,
   CDPTypesCommandRegistration,
   CDPTypesEventRegistration,
   CDPAliasSend,

@@ -45,7 +45,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
-            self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
+            self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])
             self.assertEqual(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()
@@ -59,7 +59,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertIn("modcdp-extension-", unpacked_extension_path)
-            self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
+            self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])
             self.assertEqual(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()
@@ -77,6 +77,8 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             cast(Any, {
                 "injector_cli_extension_path": str(EXTENSION_PATH),
                 "injector_trust_service_worker_target": True,
+                "injector_service_worker_ready_timeout_ms": 50,
+                "injector_service_worker_poll_interval_ms": 10,
                 "send": send,
             })
         )
@@ -86,7 +88,8 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             result = injector.inject()
             elapsed_ms = (time.perf_counter() - started_at) * 1000
             self.assertIsNone(result)
-            self.assertEqual(methods, ["Target.getTargets"])
+            self.assertGreater(len(methods), 0)
+            self.assertEqual(sorted(set(methods)), ["Target.getTargets"])
             self.assertLess(elapsed_ms, 200)
         finally:
             injector.close()

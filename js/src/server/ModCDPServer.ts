@@ -69,31 +69,31 @@ class ModCDPServer {
   private creating_offscreen_keep_alive: Promise<void> | null = null;
   private offscreen_keep_alive_port: chrome.runtime.Port | null = null;
 
-  constructor(options: z.input<typeof ModCDPServerConfigSchema> = {}) {
-    options = ModCDPServerConfigSchema.parse(options);
-    this.server_browser_token = options.server_browser_token ?? null;
+  constructor(config: z.input<typeof ModCDPServerConfigSchema> = {}) {
+    config = ModCDPServerConfigSchema.parse(config);
+    this.server_browser_token = config.server_browser_token ?? null;
     this.started_at = null;
     this.downstream = new DownstreamTransportSet({
-      ...(options.downstream ?? {}),
+      ...(config.downstream ?? {}),
       closeBrowser: () => this.client.router.send(Browser.CloseCommand.id, {}).then(() => {}),
     });
     this.client = new ModCDPClient({
       launcher: { launcher_mode: "none" },
       injector: { injector_mode: "none" },
-      upstream: options.upstream ?? { upstream_mode: "chromedebugger" },
+      upstream: config.upstream ?? { upstream_mode: "chromedebugger" },
       router: {
-        ...(options.router ?? {}),
+        ...(config.router ?? {}),
         router_routes: {
           ...DEFAULT_ROUTES,
-          ...(options.router?.router_routes ?? {}),
+          ...(config.router?.router_routes ?? {}),
         },
       },
-      client_config: options.client_config ?? {},
+      client_config: config.client_config ?? {},
       server_config: null,
       types: {
-        custom_commands: options.custom_commands ?? [],
-        custom_events: options.custom_events ?? [],
-        custom_middlewares: options.custom_middlewares ?? [],
+        custom_commands: config.custom_commands ?? [],
+        custom_events: config.custom_events ?? [],
+        custom_middlewares: config.custom_middlewares ?? [],
       },
     });
   }
@@ -289,7 +289,7 @@ class ModCDPServer {
        * registry entries used by later service-worker commands.
        */
       await this.configure(ModCDPConfigureParamsSchema.parse(params));
-      return types.parseCommandResult(method, {}) as ProtocolResult;
+      return types.parseCommandResult(method, params) as ProtocolResult;
     }
     let result;
     const command = types.custom_commands.get(method);
@@ -431,7 +431,7 @@ class ModCDPServer {
       void chrome.runtime.openOptionsPage();
     });
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message?.type !== "modcdp.options.status") return false;
+      if (message?.type !== "modcdp.config.status") return false;
       sendResponse(this.toJSON());
       return false;
     });

@@ -31,8 +31,8 @@ class BorrowExtensionInjector extends ExtensionInjector {
   private cleanup: (() => Promise<void>) | null = null;
   private bootstrap_modcdp_server_expression: string | null = null;
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...options, injector_mode: "borrow" });
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...config, injector_mode: "borrow" });
   }
 
   async prepare() {

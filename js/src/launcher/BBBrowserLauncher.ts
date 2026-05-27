@@ -74,21 +74,21 @@ async function closeBrowserCDP(cdp_url: string | undefined) {
 }
 
 class BBBrowserLauncher extends BrowserLauncher {
-  constructor(options: LauncherConfig = {}) {
-    super({ ...options, launcher_mode: "bb" });
+  constructor(config: LauncherConfig = {}) {
+    super({ ...config, launcher_mode: "bb" });
   }
 
-  async launch(options: LauncherConfig = {}): Promise<LaunchedBrowser> {
-    const config = ModCDPLauncherConfigSchema.parse({ ...this.config, ...options });
-    const browserbase_api_key = config.launcher_bb_api_key ?? process.env.BROWSERBASE_API_KEY;
+  async launch(config: LauncherConfig = {}): Promise<LaunchedBrowser> {
+    const launch_config = ModCDPLauncherConfigSchema.parse({ ...this.config, ...config });
+    const browserbase_api_key = launch_config.launcher_bb_api_key ?? process.env.BROWSERBASE_API_KEY;
     if (!browserbase_api_key) {
       throw new Error("launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.");
     }
 
-    const base_url = config.launcher_bb_base_url;
-    const resume_session_id = config.launcher_bb_session_id;
-    const keep_alive = config.launcher_bb_keep_alive;
-    const close_session_on_close = config.launcher_bb_close_session_on_close ?? !keep_alive;
+    const base_url = launch_config.launcher_bb_base_url;
+    const resume_session_id = launch_config.launcher_bb_session_id;
+    const keep_alive = launch_config.launcher_bb_keep_alive;
+    const close_session_on_close = launch_config.launcher_bb_close_session_on_close ?? !keep_alive;
 
     let created_session = false;
     let session: BrowserbaseSession;
@@ -100,25 +100,27 @@ class BBBrowserLauncher extends BrowserLauncher {
         pathname: `/v1/sessions/${resume_session_id}`,
       });
     } else {
-      const session_create_params = config.launcher_bb_session_create_params;
+      const session_create_params = launch_config.launcher_bb_session_create_params;
       const browser_settings = {
         ...(session_create_params.browserSettings ?? {}),
-        ...config.launcher_bb_browser_settings,
+        ...launch_config.launcher_bb_browser_settings,
       };
       const user_metadata = {
         ...session_create_params.userMetadata,
-        ...config.launcher_bb_user_metadata,
+        ...launch_config.launcher_bb_user_metadata,
       };
       const extension_id =
-        config.launcher_bb_extension_id ??
+        launch_config.launcher_bb_extension_id ??
         session_create_params.extensionId ??
         session_create_params.browserSettings?.extensionId;
-      const region = config.launcher_bb_region ?? session_create_params.region;
+      const region = launch_config.launcher_bb_region ?? session_create_params.region;
       const body = {
         ...session_create_params,
         ...(keep_alive ? { keepAlive: true } : {}),
         ...(region ? { region } : {}),
-        ...(typeof config.launcher_bb_timeout === "number" ? { timeout: config.launcher_bb_timeout } : {}),
+        ...(typeof launch_config.launcher_bb_timeout === "number"
+          ? { timeout: launch_config.launcher_bb_timeout }
+          : {}),
         ...(extension_id ? { extensionId: extension_id } : {}),
         browserSettings: {
           ...browser_settings,

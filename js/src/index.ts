@@ -91,7 +91,7 @@ export type {
   CDPCommandSpec,
   CDPEventMap,
   CDPEventSpec,
-  CDPTypesOptions,
+  CDPTypesConfig,
 } from "./types/CDPTypes.js";
 export { wrapCommandIfNeeded, unwrapResponseIfNeeded, unwrapEventIfNeeded } from "./translate/translate.js";
 export * as server from "./server/ModCDPServer.js";

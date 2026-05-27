@@ -66,9 +66,9 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the reversews downstream connection. */
-  start(endpoint?: string, options: z.input<typeof ReverseWSDownstreamTransportConfigSchema> = {}) {
+  start(endpoint?: string, config: z.input<typeof ReverseWSDownstreamTransportConfigSchema> = {}) {
     this.config = ReverseWSDownstreamTransportConfigSchema.parse({
-      ...options,
+      ...config,
       upstream_reversews_url: endpoint,
     });
     if (!/^wss?:\/\//i.test(this.config.upstream_reversews_url)) {

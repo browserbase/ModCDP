@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import json
 import time
 import unittest
@@ -446,68 +445,70 @@ class ModCDPClientTests(unittest.TestCase):
     def test_event_dispatch_snapshots_handlers_when_once_removes_itself(self) -> None:
         client = ModCDPClient()
         client.ext_session_id = "ext-session"
-        modcdp_client_module = importlib.import_module("modcdp.client.ModCDPClient")
-        original_thread = modcdp_client_module.threading.Thread
-        seen: list[str] = []
-
-        class ImmediateThread:
-            def __init__(self, target, daemon=False):  # noqa: ANN001
-                self.target = target
-
-            def start(self) -> None:
-                self.target()
+        seen: Queue[str] = Queue()
 
         def persistent(_payload: Mapping[str, Any]) -> None:
-            seen.append("persistent")
+            seen.put("persistent")
 
-        try:
-            cast(Any, modcdp_client_module.threading).Thread = ImmediateThread
-            client.once("Target.targetCreated", lambda _payload: seen.append("once"))
-            client.on("Target.targetCreated", persistent)
-            client._on_recv(
-                {
-                    "method": "Target.targetCreated",
-                    "params": {"targetInfo": {"targetId": "target-1", "type": "page", "url": "about:blank"}},
-                }
-            )
-            self.assertEqual(seen, ["once", "persistent"])
+        client.once("Target.targetCreated", lambda _payload: seen.put("once"))
+        client.on("Target.targetCreated", persistent)
+        client._on_recv(
+            {
+                "method": "Target.targetCreated",
+                "params": {
+                    "targetInfo": {
+                        "targetId": "target-1",
+                        "type": "page",
+                        "title": "about:blank",
+                        "url": "about:blank",
+                        "attached": False,
+                        "canAccessOpener": False,
+                    }
+                },
+            }
+        )
+        self.assertEqual([seen.get(timeout=1), seen.get(timeout=1)], ["once", "persistent"])
 
-            seen.clear()
-            client._on_recv(
-                {
-                    "method": "Target.targetCreated",
-                    "params": {"targetInfo": {"targetId": "target-2", "type": "page", "url": "about:blank"}},
-                }
-            )
-            self.assertEqual(seen, ["persistent"])
-        finally:
-            cast(Any, modcdp_client_module.threading).Thread = original_thread
+        client._on_recv(
+            {
+                "method": "Target.targetCreated",
+                "params": {
+                    "targetInfo": {
+                        "targetId": "target-2",
+                        "type": "page",
+                        "title": "about:blank",
+                        "url": "about:blank",
+                        "attached": False,
+                        "canAccessOpener": False,
+                    }
+                },
+            }
+        )
+        self.assertEqual(seen.get(timeout=1), "persistent")
+        with self.assertRaises(Empty):
+            seen.get(timeout=0.1)
 
     def test_root_events_dispatch_before_extension_session_is_attached(self) -> None:
         client = ModCDPClient()
-        modcdp_client_module = importlib.import_module("modcdp.client.ModCDPClient")
-        original_thread = modcdp_client_module.threading.Thread
-        seen: list[str] = []
+        seen: Queue[str] = Queue()
 
-        class ImmediateThread:
-            def __init__(self, target, daemon=False):  # noqa: ANN001
-                self.target = target
-
-            def start(self) -> None:
-                self.target()
-
-        try:
-            cast(Any, modcdp_client_module.threading).Thread = ImmediateThread
-            client.on("Target.targetCreated", lambda payload: seen.append(str(payload["targetInfo"]["targetId"])))
-            client._on_recv(
-                {
-                    "method": "Target.targetCreated",
-                    "params": {"targetInfo": {"targetId": "target-1", "type": "page", "url": "about:blank"}},
-                }
-            )
-            self.assertEqual(seen, ["target-1"])
-        finally:
-            cast(Any, modcdp_client_module.threading).Thread = original_thread
+        client.on("Target.targetCreated", lambda payload: seen.put(str(payload["targetInfo"]["targetId"])))
+        client._on_recv(
+            {
+                "method": "Target.targetCreated",
+                "params": {
+                    "targetInfo": {
+                        "targetId": "target-1",
+                        "type": "page",
+                        "title": "about:blank",
+                        "url": "about:blank",
+                        "attached": False,
+                        "canAccessOpener": False,
+                    }
+                },
+            }
+        )
+        self.assertEqual(seen.get(timeout=1), "target-1")
 
     def test_schema_only_custom_command_registers_without_websocket(self) -> None:
         client = ModCDPClient()

@@ -14,8 +14,8 @@ class BBExtensionInjector extends ExtensionInjector {
   private zip_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...options, injector_mode: "bb" });
+  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...config, injector_mode: "bb" });
   }
 
   async prepare() {

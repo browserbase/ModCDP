@@ -87,7 +87,7 @@ def parse_args(argv):
     return mode, live, upstream_mode
 
 
-def client_config_for(mode, upstream_mode, cdp_url, launch_options=None):
+def client_config_for(mode, upstream_mode, cdp_url, launcher_config=None):
     upstream: ProtocolPayload = {"upstream_mode": upstream_mode, "upstream_ws_cdp_url": cdp_url}
     injector: ProtocolPayload = {
         "injector_mode": "discover" if cdp_url else "cli",
@@ -99,19 +99,21 @@ def client_config_for(mode, upstream_mode, cdp_url, launch_options=None):
         injector["injector_cli_extension_path"] = str(EXTENSION_PATH)
     if mode == "direct":
         return {
-            "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
+            "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launcher_config or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
             "upstream": upstream,
             "injector": injector,
-            "client_config": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
+            "router": {"router_routes": client_routes_for(mode)},
+            "client_config": {"client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
         }
     server_config = {
         "router": {"router_routes": server_router_routes_for(mode, upstream_mode), "loopback_execution_context_timeout_ms": DEMO_EXECUTION_CONTEXT_TIMEOUT_MS},
     }
     return {
-        "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
+        "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launcher_config or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
         "upstream": upstream,
         "injector": injector,
-        "client_config": {"client_routes": client_routes_for(mode), "client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
+        "router": {"router_routes": client_routes_for(mode)},
+        "client_config": {"client_cdp_send_timeout_ms": DEMO_CDP_SEND_TIMEOUT_MS},
         "server_config": server_config,
     }
 
@@ -143,18 +145,18 @@ def main():
     try:
         if live:
             cdp_url = wait_for_live_cdp_url()
-            launch_options: dict[str, object] = {}
+            launcher_config: dict[str, object] = {}
         else:
             cdp_url = None
-            launch_options: dict[str, object] = {
+            launcher_config: dict[str, object] = {
                 "launcher_local_chrome_ready_timeout_ms": 60_000,
                 "launcher_local_headless": sys.platform.startswith("linux") and not os.environ.get("DISPLAY"),
                 "launcher_local_sandbox": not sys.platform.startswith("linux"),
             }
             if os.environ.get("CHROME_PATH"):
-                launch_options["launcher_local_executable_path"] = os.environ["CHROME_PATH"]
+                launcher_config["launcher_local_executable_path"] = os.environ["CHROME_PATH"]
 
-        cdp = ModCDPClient(**client_config_for(mode, upstream_mode, cdp_url, launch_options))
+        cdp = ModCDPClient(**client_config_for(mode, upstream_mode, cdp_url, launcher_config))
 
         cdp.connect()
         print(f"upstream cdp: {cdp.cdp_url}")
@@ -162,12 +164,10 @@ def main():
         print(f"connect timing    -> {cdp.connect_timing}")
 
         configure_params: ProtocolPayload = {
-            "upstream": {"upstream_mode": upstream_mode},
             "router": {
                 "router_routes": server_router_routes_for(mode, upstream_mode),
                 "loopback_execution_context_timeout_ms": DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
             },
-            "client_config": {"client_routes": client_routes_for(mode)},
         }
         configure_result = expect_object(cdp.send("Mod.configure", configure_params), "Mod.configure")
         if expect_object(expect_object(configure_result.get("router"), "Mod.configure.router").get("router_routes"), "Mod.configure.router.router_routes").get("*.*") != server_router_routes_for(mode, upstream_mode)["*.*"]:

@@ -5,8 +5,8 @@
 import { BrowserLauncher, type LauncherConfig, type LaunchedBrowser } from "./BrowserLauncher.js";
 
 class NoneBrowserLauncher extends BrowserLauncher {
-  constructor(options: LauncherConfig = {}) {
-    super({ ...options, launcher_mode: "none" });
+  constructor(config: LauncherConfig = {}) {
+    super({ ...config, launcher_mode: "none" });
   }
 
   async launch(_options: LauncherConfig = {}): Promise<LaunchedBrowser> {
