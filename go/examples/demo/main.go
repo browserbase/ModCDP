@@ -224,7 +224,7 @@ func main() {
 	}
 	defer cdp.Close()
 	fmt.Println("upstream cdp:", cdp.CDPURL)
-	fmt.Printf("connected; ext %s session %s\n", cdp.ExtensionID, cdp.ExtSessionID)
+	fmt.Printf("connected; ext %s session %s\n", cdp.Injector.ExtensionID, cdp.Injector.SessionID)
 	if b, err := json.Marshal(cdp.ConnectTiming); err == nil {
 		fmt.Println("connect timing    ->", string(b))
 	}
@@ -282,7 +282,7 @@ func main() {
 	} else {
 		modcdpEval, _ := r.(map[string]any)
 		extensionID, _ := modcdpEval["extension_id"].(string)
-		if extensionID == "" || (cdp.ExtensionID != "" && extensionID != cdp.ExtensionID) {
+		if extensionID == "" || (cdp.Injector.ExtensionID != "" && extensionID != cdp.Injector.ExtensionID) {
 			log.Fatalf("unexpected Mod.evaluate result: %v", modcdpEval)
 		}
 		b, _ := json.Marshal(r)
