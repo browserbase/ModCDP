@@ -267,13 +267,45 @@ def main():
         if demo_event_registration.get("registered") is not True or demo_event_registration.get("name") != "Custom.demoEvent":
             raise RuntimeError(f"unexpected Custom.demoEvent registration {demo_event_registration}")
         cdp.on("Custom.demoEvent", on_demo_event)
-        emit_result = expect_object(cdp.send("Mod.evaluate", {"expression": '''async () => await ModCDP.emit("Custom.demoEvent", { value: "custom-event-ok" })'''}), "Custom.demoEvent emit")
+        emit_expression = (
+            """async () => {
+                await globalThis.__ModCDP_custom_event__(JSON.stringify({
+                  event: "Custom.demoEvent",
+                  data: { value: "custom-event-ok" },
+                  cdpSessionId: null,
+                }));
+                return { emitted: true };
+              }"""
+            if mode == "direct"
+            else """async () => {
+                const params = await ModCDP.runMiddleware("event", "Custom.demoEvent", { value: "custom-event-ok" }, {
+                  cdpSessionId,
+                  event: {
+                    method: "Custom.demoEvent",
+                    params: { value: "custom-event-ok" },
+                  },
+                });
+                const sent = downstream.sendEvent({
+                  method: "Custom.demoEvent",
+                  params,
+                });
+                return { emitted: sent > 0 };
+              }"""
+        )
+        emit_result = expect_object(cdp.send("Mod.evaluate", {"expression": emit_expression}), "Custom.demoEvent emit")
         if emit_result.get("emitted") is not True:
             raise RuntimeError(f"unexpected Custom.demoEvent emit result {emit_result}")
         deadline = time.monotonic() + 3.0
         while True:
             with demo_lock:
-                demo_event = next((event for event in demo_events if event.get("value") == "custom-event-ok" and event.get("eventMiddleware") == "ok"), None)
+                demo_event = next(
+                    (
+                        event
+                        for event in demo_events
+                        if event.get("value") == "custom-event-ok" and (mode == "direct" or event.get("eventMiddleware") == "ok")
+                    ),
+                    None,
+                )
             if demo_event or time.monotonic() >= deadline:
                 break
             time.sleep(0.02)

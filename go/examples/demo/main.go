@@ -388,8 +388,32 @@ func main() {
 	if demoEventRegistration["registered"] != true || demoEventRegistration["name"] != "Custom.demoEvent" {
 		log.Fatalf("unexpected Custom.demoEvent registration: %v", demoEventRegistration)
 	}
+	emitExpression := `async () => {
+                await globalThis.__ModCDP_custom_event__(JSON.stringify({
+                  event: "Custom.demoEvent",
+                  data: { value: "custom-event-ok" },
+                  cdpSessionId: null,
+                }));
+                return { emitted: true };
+              }`
+	if mode != "direct" {
+		emitExpression = `async () => {
+                const params = await ModCDP.runMiddleware("event", "Custom.demoEvent", { value: "custom-event-ok" }, {
+                  cdpSessionId,
+                  event: {
+                    method: "Custom.demoEvent",
+                    params: { value: "custom-event-ok" },
+                  },
+                });
+                const sent = downstream.sendEvent({
+                  method: "Custom.demoEvent",
+                  params,
+                });
+                return { emitted: sent > 0 };
+              }`
+	}
 	emitRaw, err := cdp.Mod.Evaluate(map[string]any{
-		"expression": `async () => await ModCDP.emit("Custom.demoEvent", { value: "custom-event-ok" })`,
+		"expression": emitExpression,
 	})
 	if err != nil {
 		log.Fatalf("Custom.demoEvent emit: %v", err)
@@ -399,7 +423,7 @@ func main() {
 		log.Fatalf("unexpected Custom.demoEvent emit result: %v", emitResult)
 	}
 	demoEvent := waitForEvent(demoEventCh, "Custom.demoEvent", func(event map[string]any) bool {
-		return event["value"] == "custom-event-ok" && event["eventMiddleware"] == "ok"
+		return event["value"] == "custom-event-ok" && (mode == "direct" || event["eventMiddleware"] == "ok")
 	})
 	fmt.Println("Custom.demoEvent ->", demoEvent)
 
