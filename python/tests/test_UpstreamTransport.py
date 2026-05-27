@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unittest
 
-from modcdp.transport.UpstreamTransport import UpstreamTransport
+from modcdp.transport.UpstreamTransport import UpstreamTransport, parseHostPort
 
 
 class TestTransport(UpstreamTransport):
@@ -24,6 +24,7 @@ class UpstreamTransportTests(unittest.TestCase):
         received = []
         stop = transport.onRecv(lambda message: received.append(message))
 
+        self.assertEqual(parseHostPort("127.0.0.1:29292", "0.0.0.0", 80), {"host": "127.0.0.1", "port": 29292})
         self.assertIs(transport.update(), transport)
         self.assertEqual(transport.configForLauncher(), {})
         self.assertEqual(transport.configForServer(), {})
@@ -33,11 +34,15 @@ class UpstreamTransportTests(unittest.TestCase):
         test_transport = TestTransport()
         test_transport.onRecv(lambda message: parsed.append(message))
         test_transport.emit('{"id":1,"result":{"ok":true}}')
+        test_transport.emit('{"id":2,"result":true}')
+        test_transport.emit('{"id":3,"result":0}')
         test_transport.emit('{"method":"Runtime.executionContextCreated","params":{}}')
         self.assertEqual(
             parsed,
             [
                 {"id": 1, "result": {"ok": True}},
+                {"id": 2, "result": True},
+                {"id": 3, "result": 0},
                 {"method": "Runtime.executionContextCreated", "params": {}},
             ],
         )

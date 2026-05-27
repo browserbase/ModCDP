@@ -25,6 +25,13 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	received := []map[string]any{}
 	stop := transport.OnRecv(func(message map[string]any) { received = append(received, message) })
 
+	parsedHostPort, err := ParseHostPort("127.0.0.1:29292", "0.0.0.0", 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsedHostPort.Host != "127.0.0.1" || parsedHostPort.Port != 29292 {
+		t.Fatalf("ParseHostPort = %#v", parsedHostPort)
+	}
 	transport.Update(nil)
 	if len(transport.ConfigForLauncher().LauncherLocalExtraArgs) != 0 {
 		t.Fatal("expected empty launcher config")
@@ -37,8 +44,10 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	parsed := []map[string]any{}
 	testTransport.OnRecv(func(message map[string]any) { parsed = append(parsed, message) })
 	testTransport.emit(map[string]any{"id": 1, "result": map[string]any{"ok": true}})
+	testTransport.emit(map[string]any{"id": 2, "result": true})
+	testTransport.emit(map[string]any{"id": 3, "result": 0})
 	testTransport.emit(map[string]any{"method": "Runtime.executionContextCreated", "params": map[string]any{}})
-	if len(parsed) != 2 {
+	if len(parsed) != 4 {
 		t.Fatalf("parsed = %#v", parsed)
 	}
 

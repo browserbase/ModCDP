@@ -7,6 +7,9 @@ package transport
 import (
 	"fmt"
 	"net"
+	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,6 +55,11 @@ type UpstreamMode string
 const (
 	UpstreamModeWS UpstreamMode = "ws"
 )
+
+type HostPort struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
 
 type UpstreamTransport struct {
 	Config         UpstreamTransportConfig
@@ -165,6 +173,51 @@ func (e *UpstreamTransport) ConfigForServer() map[string]any {
 	return map[string]any{}
 }
 
+func (e *UpstreamTransport) GetTargets() ([]map[string]any, error) {
+	result, err := e.Send("Target.getTargets", map[string]any{}, "")
+	if err != nil {
+		return nil, err
+	}
+	targetInfos, _ := result["targetInfos"].([]any)
+	targets := []map[string]any{}
+	for _, targetInfo := range targetInfos {
+		target, _ := targetInfo.(map[string]any)
+		targets = append(targets, target)
+	}
+	return targets, nil
+}
+
+func (e *UpstreamTransport) ResolveTargetID(params map[string]any) string {
+	targetID, _ := params["targetId"].(string)
+	return targetID
+}
+
+func (e *UpstreamTransport) CreateTarget(url string) (string, error) {
+	result, err := e.Send("Target.createTarget", map[string]any{"url": url}, "")
+	if err != nil {
+		return "", err
+	}
+	targetID, _ := result["targetId"].(string)
+	if targetID == "" {
+		return "", fmt.Errorf("Target.createTarget returned no targetId")
+	}
+	return targetID, nil
+}
+
+func (e *UpstreamTransport) AttachToTarget(targetID string) (string, error) {
+	result, err := e.Send("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "")
+	if err != nil {
+		return "", err
+	}
+	sessionID, _ := result["sessionId"].(string)
+	return sessionID, nil
+}
+
+func (e *UpstreamTransport) DetachFromTarget(sessionID string) error {
+	_, err := e.Send("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, "")
+	return err
+}
+
 func (e *UpstreamTransport) OnRecv(listener func(map[string]any)) func() {
 	e.listenerMu.Lock()
 	e.nextListenerID++
@@ -259,6 +312,33 @@ func (e *UpstreamTransport) PeerGeneration() int64 {
 	return 0
 }
 
+func ParseHostPort(value string, defaultHost string, defaultPort int) (HostPort, error) {
+	parseValue := value
+	if !strings.Contains(value, "://") {
+		parseValue = "ws://" + value
+	}
+	parsed, err := url.Parse(parseValue)
+	if err != nil {
+		return HostPort{}, err
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		host = defaultHost
+	}
+	port := defaultPort
+	if parsed.Port() != "" {
+		parsedPort, ok := intFromConfig(parsed.Port())
+		if !ok {
+			return HostPort{}, fmt.Errorf("Invalid host:port %s", value)
+		}
+		port = parsedPort
+	}
+	if port <= 0 || port > 65_535 {
+		return HostPort{}, fmt.Errorf("Invalid host:port %s", value)
+	}
+	return HostPort{Host: host, Port: port}, nil
+}
+
 func intFromConfig(value any) (int, bool) {
 	switch typed := value.(type) {
 	case int:
@@ -269,6 +349,12 @@ func intFromConfig(value any) (int, bool) {
 		return int(typed), true
 	case float32:
 		return int(typed), true
+	case string:
+		parsed, err := strconv.Atoi(typed)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
 	default:
 		return 0, false
 	}

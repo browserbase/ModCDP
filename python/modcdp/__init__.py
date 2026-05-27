@@ -16,7 +16,7 @@ from .client.ModCDPClient import ModCDPClient
 from .types.CDPTypes import CDPTypes
 from .launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from .launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
-from .transport.UpstreamTransport import UpstreamTransport
+from .transport.UpstreamTransport import UpstreamTransport, parseHostPort
 from .transport.WSUpstreamTransport import WSUpstreamTransport
 from .types.generated.cdp import CDPEvent, CDPModel, CDPParams
 
@@ -37,6 +37,7 @@ __all__ = [
     "NoneBrowserLauncher",
     "RemoteBrowserLauncher",
     "UpstreamTransport",
+    "parseHostPort",
     "WSUpstreamTransport",
     "CDPEvent",
     "CDPModel",

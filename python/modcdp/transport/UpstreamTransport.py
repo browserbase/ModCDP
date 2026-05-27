@@ -9,6 +9,7 @@ import threading
 from collections.abc import Callable
 from queue import Empty, Queue
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict
 from ..types.modcdp import ProtocolPayload, ProtocolResult
@@ -127,7 +128,31 @@ class UpstreamTransport:
 
         return stop
 
-    def waitForPeer(self) -> None:
+    def getTargets(self) -> list[dict[str, Any]]:
+        result = self.send("Target.getTargets", {})
+        target_infos = result.get("targetInfos") if isinstance(result, dict) else None
+        return [dict(target) for target in target_infos] if isinstance(target_infos, list) else []
+
+    def resolveTargetId(self, params: dict[str, Any] | None = None) -> str | None:
+        target_id = (params or {}).get("targetId")
+        return target_id if isinstance(target_id, str) and target_id else None
+
+    def createTarget(self, url: str) -> str:
+        result = self.send("Target.createTarget", {"url": url})
+        target_id = result.get("targetId") if isinstance(result, dict) else None
+        if not isinstance(target_id, str) or not target_id:
+            raise RuntimeError("Target.createTarget returned no targetId")
+        return target_id
+
+    def attachToTarget(self, target_id: str) -> str | None:
+        result = self.send("Target.attachToTarget", {"targetId": target_id, "flatten": True})
+        session_id = result.get("sessionId") if isinstance(result, dict) else None
+        return session_id if isinstance(session_id, str) and session_id else None
+
+    def detachFromTarget(self, session_id: str) -> None:
+        self.send("Target.detachFromTarget", {"sessionId": session_id})
+
+    def waitForPeer(self, config: dict[str, Any] | None = None) -> None:
         return None
 
     def _emit_recv(self, message: dict[str, Any]) -> None:
@@ -156,6 +181,15 @@ class UpstreamTransport:
             self._emit_recv(parsed)
             return
         self._emit_recv(parsed)
+
+
+def parseHostPort(value: str, defaultHost: str, defaultPort: int) -> dict[str, int | str]:
+    parsed = urlparse(value if "://" in value else f"ws://{value}")
+    host = parsed.hostname or defaultHost
+    port = parsed.port or defaultPort
+    if port <= 0 or port > 65_535:
+        raise ValueError(f"Invalid host:port {value}")
+    return {"host": host, "port": port}
 
 
 def _upstream_transport_config(config: UpstreamTransportConfig | dict[str, Any] | None = None) -> UpstreamTransportConfig:

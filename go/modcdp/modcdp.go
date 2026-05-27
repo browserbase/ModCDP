@@ -42,6 +42,7 @@ type UpstreamMode = transport.UpstreamMode
 type UpstreamTransportConfig = transport.UpstreamTransportConfig
 type UpstreamTransport = transport.UpstreamTransport
 type WSUpstreamTransport = transport.WSUpstreamTransport
+type HostPort = transport.HostPort
 type AutoSessionRouter = client.AutoSessionRouter
 type CdpCommandParams = types.CdpCommandParams
 type CdpCommandResult = types.CdpCommandResult
@@ -101,6 +102,7 @@ var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewUpstreamTransport = transport.NewUpstreamTransport
 var NewWSUpstreamTransport = transport.NewWSUpstreamTransport
 var NewAutoSessionRouter = client.NewAutoSessionRouter
+var ParseHostPort = transport.ParseHostPort
 
 const UpstreamModeWS = transport.UpstreamModeWS
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
