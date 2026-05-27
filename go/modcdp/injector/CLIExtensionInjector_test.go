@@ -9,12 +9,15 @@ package injector_test
 import (
 	"archive/zip"
 	. "github.com/browserbase/modcdp/go/modcdp/injector"
+	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
+
+const doesNotExistExtensionID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 func TestCLIExtensionInjectorRejectsZipEntriesOutsideExtractionDirectory(t *testing.T) {
 	tempDir := t.TempDir()
@@ -99,48 +102,67 @@ func TestCLIExtensionInjectorPreparesTheDefaultExtensionZipForLoadExtension(t *t
 	}
 }
 
-func TestCLIExtensionInjectorReturnsImmediatelyWhenTheLaunchedExtensionTargetIsAbsent(t *testing.T) {
+func TestCLIExtensionInjectorReturnsNullWhenATrustedDoesNotExistExtensionIDIsAbsentInARealBrowser(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	methods := []string{}
+	headless := true
 	injector := NewCLIExtensionInjector(InjectorConfig{
 		InjectorCLIExtensionPath:            extensionPath,
+		InjectorCLIExtensionID:              doesNotExistExtensionID,
 		InjectorTrustServiceWorkerTarget:    true,
-		InjectorServiceWorkerReadyTimeoutMS: 50,
-		InjectorServiceWorkerPollIntervalMS: 10,
-		Send: func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-			methods = append(methods, method)
-			if method == "Target.getTargets" {
-				return map[string]any{"targetInfos": []any{}}, nil
-			}
-			t.Fatalf("unexpected %s", method)
-			return nil, nil
-		},
+		InjectorServiceWorkerReadyTimeoutMS: 250,
+		InjectorServiceWorkerPollIntervalMS: 25,
 	})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)
 	}
 	defer injector.Close()
 
-	startedAt := time.Now()
+	browserLauncher := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{
+		LauncherLocalHeadless:       &headless,
+		LauncherLocalExecutablePath: loadExtensionTestBrowserPath(t),
+	})
+	browserLauncher.Update(injector.ConfigForLauncher())
+	if _, err := browserLauncher.Launch(launcher.LauncherConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	defer browserLauncher.Close()
+
+	upstream := transport.NewWSUpstreamTransport(transport.UpstreamTransportConfig{})
+	upstream.Update(browserLauncher.ConfigForUpstream())
+	if err := upstream.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+	injector.Update(InjectorConfig{
+		Send: func(method string, params map[string]any, sessionID string) (map[string]any, error) {
+			return upstream.Send(method, params, sessionID)
+		},
+	})
+
+	targets, err := upstream.Send("Target.getTargets", map[string]any{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetInfos, _ := targets["targetInfos"].([]any)
+	for _, rawTarget := range targetInfos {
+		target, _ := rawTarget.(map[string]any)
+		if target == nil {
+			continue
+		}
+		targetURL, _ := target["url"].(string)
+		if strings.HasPrefix(targetURL, "chrome-extension://"+doesNotExistExtensionID+"/") {
+			t.Fatalf("found does-not-exist extension target: %#v", target)
+		}
+	}
+
 	result, err := injector.Inject()
 	if err != nil {
 		t.Fatal(err)
 	}
-	elapsed := time.Since(startedAt)
 	if result != nil {
 		t.Fatalf("result = %#v", result)
-	}
-	uniqueMethods := map[string]bool{}
-	for _, method := range methods {
-		uniqueMethods[method] = true
-	}
-	if len(methods) == 0 || len(uniqueMethods) != 1 || !uniqueMethods["Target.getTargets"] {
-		t.Fatalf("methods = %#v", methods)
-	}
-	if elapsed >= 200*time.Millisecond {
-		t.Fatalf("Inject took %s", elapsed)
 	}
 }

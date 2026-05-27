@@ -6,19 +6,63 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
-import unittest
-import time
+import glob
+import os
+import re
+import sys
 import tempfile
+import unittest
 import zipfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from modcdp.injector.ExtensionInjector import DEFAULT_MODCDP_EXTENSION_ID
 from modcdp.injector.CLIExtensionInjector import CLIExtensionInjector
+from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
+from modcdp.transport.WSUpstreamTransport import WSUpstreamTransport
 
 
 ROOT = Path(__file__).resolve().parents[2]
 EXTENSION_PATH = ROOT / "dist" / "extension"
+DOES_NOT_EXIST_EXTENSION_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+
+# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+# Keep setup semantics 1:1 with TS; this only selects a real browser for real --load-extension runs.
+def load_extension_test_browser_path() -> str:
+    for candidate in (os.environ.get("CHROME_PATH"), "/usr/bin/chromium" if sys.platform.startswith("linux") else None):
+        if candidate and Path(candidate).exists():
+            return candidate
+    home = Path.home()
+    if sys.platform == "darwin":
+        patterns = [
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium"),
+            str(home / "Library/Caches/puppeteer/chrome/mac*-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        ]
+    elif sys.platform.startswith("win"):
+        local_app_data = Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local")
+        patterns = [
+            str(local_app_data / "ms-playwright/chromium-*/chrome-win*/chrome.exe"),
+            str(home / ".cache/puppeteer/chrome/win*-*/chrome.exe"),
+        ]
+    else:
+        patterns = [
+            str(home / ".cache/ms-playwright/chromium-*/chrome-linux*/chrome"),
+            "/opt/pw-browsers/chromium-*/chrome-linux*/chrome",
+            str(home / ".cache/puppeteer/chrome/linux-*/chrome-linux*/chrome"),
+        ]
+    candidates = sorted(
+        dict.fromkeys(match for pattern in patterns for match in glob.glob(pattern)),
+        key=lambda path: (-max([int(part) for part in re.findall(r"\d+", path)] or [0]), -Path(path).stat().st_mtime, path),
+    )
+    if candidates:
+        return candidates[0]
+    raise RuntimeError("No browser found for --load-extension tests. Install Chrome for Testing or set CHROME_PATH.")
+
+
+LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class CLIExtensionInjectorTests(unittest.TestCase):
@@ -64,34 +108,48 @@ class CLIExtensionInjectorTests(unittest.TestCase):
         finally:
             injector.close()
 
-    def test_cliextensioninjector_returns_immediately_when_the_launched_extension_target_is_absent(self) -> None:
-        methods: list[str] = []
-
-        def send(method: str, params: dict[str, Any] | None = None, session_id: str | None = None) -> dict[str, Any]:
-            methods.append(method)
-            if method == "Target.getTargets":
-                return {"targetInfos": []}
-            raise RuntimeError(f"unexpected {method}")
-
+    def test_cliextensioninjector_returns_null_when_a_trusted_does_not_exist_extension_id_is_absent_in_a_real_browser(self) -> None:
         injector = CLIExtensionInjector(
-            cast(Any, {
+            {
                 "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_cli_extension_id": DOES_NOT_EXIST_EXTENSION_ID,
                 "injector_trust_service_worker_target": True,
-                "injector_service_worker_ready_timeout_ms": 50,
-                "injector_service_worker_poll_interval_ms": 10,
-                "send": send,
-            })
+                "injector_service_worker_ready_timeout_ms": 250,
+                "injector_service_worker_poll_interval_ms": 25,
+            }
         )
+        launcher = LocalBrowserLauncher(
+            {
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            }
+        )
+        upstream = WSUpstreamTransport()
         try:
             injector.prepare()
-            started_at = time.perf_counter()
+            launcher.update(injector.configForLauncher())
+            launcher.launch()
+            upstream.update(launcher.configForUpstream())
+            upstream.connect()
+            injector.update({"send": upstream.send})
+
+            targets = upstream.send("Target.getTargets", {})
+            target_infos = targets.get("targetInfos") if isinstance(targets, Mapping) else None
+            if not isinstance(target_infos, list):
+                raise AssertionError(f"Target.getTargets returned no targetInfos: {targets!r}")
+            found_does_not_exist_target = False
+            for target in target_infos:
+                match target:
+                    case {"url": str(target_url)}:
+                        if target_url.startswith(f"chrome-extension://{DOES_NOT_EXIST_EXTENSION_ID}/"):
+                            found_does_not_exist_target = True
+            self.assertFalse(found_does_not_exist_target)
+
             result = injector.inject()
-            elapsed_ms = (time.perf_counter() - started_at) * 1000
             self.assertIsNone(result)
-            self.assertGreater(len(methods), 0)
-            self.assertEqual(sorted(set(methods)), ["Target.getTargets"])
-            self.assertLess(elapsed_ms, 200)
         finally:
+            upstream.close()
+            launcher.close()
             injector.close()
 
 

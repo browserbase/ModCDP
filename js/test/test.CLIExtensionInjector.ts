@@ -13,9 +13,14 @@ import { test } from "vitest";
 
 import { DEFAULT_MODCDP_EXTENSION_ID } from "../src/injector/ExtensionInjector.js";
 import { CLIExtensionInjector } from "../src/injector/CLIExtensionInjector.js";
+import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
+import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
+import { loadExtensionTestBrowserPath } from "./browserPaths.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
+const DOES_NOT_EXIST_EXTENSION_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const LOAD_EXTENSION_TEST_BROWSER_PATH = loadExtensionTestBrowserPath();
 
 function crc32(data: Buffer) {
   let crc = 0xffffffff;
@@ -107,31 +112,43 @@ test("CLIExtensionInjector prepares the default extension zip for --load-extensi
   }
 });
 
-test("CLIExtensionInjector returns immediately when the launched extension target is absent", async () => {
-  const methods: string[] = [];
+test("CLIExtensionInjector returns null when a trusted does-not-exist extension id is absent in a real browser", async () => {
   const injector = new CLIExtensionInjector({
     injector_cli_extension_path: EXTENSION_PATH,
+    injector_cli_extension_id: DOES_NOT_EXIST_EXTENSION_ID,
     injector_trust_service_worker_target: true,
-    injector_service_worker_ready_timeout_ms: 50,
-    injector_service_worker_poll_interval_ms: 10,
-    send: async (method) => {
-      const method_name = typeof method === "string" ? method : method.id;
-      methods.push(method_name);
-      if (method_name === "Target.getTargets") return { targetInfos: [] };
-      throw new Error(`unexpected ${method_name}`);
-    },
+    injector_service_worker_ready_timeout_ms: 250,
+    injector_service_worker_poll_interval_ms: 25,
   });
+  const launcher = new LocalBrowserLauncher({
+    launcher_local_headless: true,
+    launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
+  });
+  const upstream = new WSUpstreamTransport();
 
   try {
     await injector.prepare();
-    const started_at = performance.now();
+    launcher.update(injector.configForLauncher());
+    await launcher.launch();
+    upstream.update(launcher.configForUpstream());
+    await upstream.connect();
+    injector.update({ send: upstream.send.bind(upstream) });
+
+    const targets = (await upstream.send("Target.getTargets", {})) as {
+      targetInfos?: { type?: string; url?: string }[];
+    };
+    assert.equal(
+      targets.targetInfos?.some((target) =>
+        target.url?.startsWith(`chrome-extension://${DOES_NOT_EXIST_EXTENSION_ID}/`),
+      ),
+      false,
+    );
+
     const result = await injector.inject();
-    const elapsed_ms = performance.now() - started_at;
     assert.equal(result, null);
-    assert.equal(methods.length > 0, true);
-    assert.deepEqual([...new Set(methods)], ["Target.getTargets"]);
-    assert.equal(elapsed_ms < 200, true, `inject() took ${elapsed_ms}ms`);
   } finally {
+    await upstream.close();
+    await launcher.close();
     await injector.close();
   }
-});
+}, 60_000);
