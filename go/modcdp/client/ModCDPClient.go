@@ -325,6 +325,7 @@ type ModCDPClient struct {
 
 type extensionInjector interface {
 	Update(InjectorConfig) *ExtensionInjector
+	RecordInjectionResult(*ExtensionInjectionResult) *ExtensionInjector
 	ConfigForLauncher() LauncherConfig
 	ConfigForUpstream() map[string]any
 	Prepare() error
@@ -1321,6 +1322,7 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 			continue
 		}
 		if result != nil {
+			injector.RecordInjectionResult(result)
 			return result, nil
 		}
 	}

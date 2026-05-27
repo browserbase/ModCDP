@@ -79,6 +79,7 @@ class ExtensionInjector:
         self.unusable_target_ids: set[str] = set()
         self.source: str | None = None
         self.extension_id: str | None = None
+        self.service_worker_extension_id: str | None = None
         self.target_id: str | None = None
         self.url: str | None = None
         self.session_id: str | None = None
@@ -115,6 +116,8 @@ class ExtensionInjector:
     def recordInjectionResult(self, result: ExtensionInjectionResult) -> "ExtensionInjector":
         self.source = result["source"]
         self.extension_id = result.get("extension_id")
+        if result.get("extension_id") is not None:
+            self.service_worker_extension_id = result.get("extension_id")
         self.target_id = result["target_id"]
         self.url = result.get("url")
         self.session_id = result["session_id"]
@@ -271,6 +274,8 @@ class ExtensionInjector:
         if not target_url.startswith("chrome-extension://"):
             return False
         extension_id = self.config.injector_service_worker_extension_id
+        if extension_id is None:
+            extension_id = self.service_worker_extension_id
         has_extension_id = bool(extension_id)
         if extension_id and not target_url.startswith(f"chrome-extension://{extension_id}/"):
             return False

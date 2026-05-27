@@ -7,7 +7,11 @@
 from __future__ import annotations
 
 import asyncio
+import glob
 import json
+import os
+import re
+import sys
 import time
 import unittest
 from collections.abc import Mapping
@@ -20,8 +24,44 @@ from websocket import create_connection
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
 
+
+# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+# Keep setup semantics 1:1 with TS; this only selects a real browser for real --load-extension runs.
+def load_extension_test_browser_path() -> str:
+    for candidate in (os.environ.get("CHROME_PATH"), "/usr/bin/chromium" if sys.platform.startswith("linux") else None):
+        if candidate and Path(candidate).exists():
+            return candidate
+    home = Path.home()
+    if sys.platform == "darwin":
+        patterns = [
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium"),
+            str(home / "Library/Caches/puppeteer/chrome/mac*-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        ]
+    elif sys.platform.startswith("win"):
+        local_app_data = Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local")
+        patterns = [
+            str(local_app_data / "ms-playwright/chromium-*/chrome-win*/chrome.exe"),
+            str(home / ".cache/puppeteer/chrome/win*-*/chrome.exe"),
+        ]
+    else:
+        patterns = [
+            str(home / ".cache/ms-playwright/chromium-*/chrome-linux*/chrome"),
+            "/opt/pw-browsers/chromium-*/chrome-linux*/chrome",
+            str(home / ".cache/puppeteer/chrome/linux-*/chrome-linux*/chrome"),
+        ]
+    candidates = sorted(
+        dict.fromkeys(match for pattern in patterns for match in glob.glob(pattern)),
+        key=lambda path: (-max([int(part) for part in re.findall(r"\d+", path)] or [0]), -Path(path).stat().st_mtime, path),
+    )
+    if candidates:
+        return candidates[0]
+    raise RuntimeError("No browser found for --load-extension tests. Install Chrome for Testing or set CHROME_PATH.")
+
+
 HERE = Path(__file__).resolve().parent
 EXTENSION_PATH = HERE.parents[1] / "dist" / "extension"
+LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class ModCDPClientTests(unittest.TestCase):
@@ -247,7 +287,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "launcher_local_chrome_ready_timeout_ms": 60_000,
                 # This test manually supplies --load-extension, so it intentionally uses
                 # the launch-flag browser path instead of relying on the client fallback.
-                "launcher_local_executable_path": LocalBrowserLauncher.findChromeBinary(),
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
                 "launcher_local_extra_args": [f"--load-extension={EXTENSION_PATH}"],
             }
         ).launch()
@@ -284,7 +324,7 @@ class ModCDPClientTests(unittest.TestCase):
             launcher={
                 "launcher_mode": "local",
                 "launcher_local_headless": True,
-                "launcher_local_executable_path": LocalBrowserLauncher.findChromeBinary(),
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
             },
             upstream={"upstream_mode": "ws"},
             injector={

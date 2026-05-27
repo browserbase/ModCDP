@@ -29,7 +29,7 @@ class DiscoverExtensionInjector(ExtensionInjector):
             if extension_path.endswith(".zip"):
                 self.prepared_extension = prepareUnpackedExtension(extension_path)
                 manifest_path = self.prepared_extension.unpacked_extension_path
-            self.update({"injector_service_worker_extension_id": extensionIdFromManifestKey(manifest_path)})
+            self.service_worker_extension_id = extensionIdFromManifestKey(manifest_path)
         super().prepare()
 
     def inject(self) -> ExtensionInjectionResult | None:

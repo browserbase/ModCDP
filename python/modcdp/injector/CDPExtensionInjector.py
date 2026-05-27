@@ -44,6 +44,8 @@ class CDPExtensionInjector(ExtensionInjector):
         extension_id = load_result.get("id") or load_result.get("extensionId")
         if not isinstance(extension_id, str) or not extension_id:
             raise RuntimeError(f"Extensions.loadUnpacked returned no extension id (got {load_result})")
+        self.extension_id = extension_id
+        self.service_worker_extension_id = extension_id
         self.update({"injector_cdp_extension_id": extension_id, "injector_service_worker_extension_id": extension_id})
 
         sw_url_prefix = f"chrome-extension://{extension_id}/"

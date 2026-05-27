@@ -36,7 +36,7 @@ func (i *DiscoverExtensionInjector) Prepare() error {
 		if err != nil {
 			return err
 		}
-		i.Config.InjectorServiceWorkerExtensionID = extensionID
+		i.ServiceWorkerExtensionID = extensionID
 	}
 	return nil
 }

@@ -36,10 +36,16 @@ func boolPtr(value bool) *bool {
 }
 
 type ExtensionInjector struct {
-	Config            InjectorConfig
-	UnusableTargetIDs map[string]bool
-	LastError         error
-	ExtraArgs         []string
+	Config                   InjectorConfig
+	Source                   string
+	ExtensionID              string
+	ServiceWorkerExtensionID string
+	TargetID                 string
+	URL                      string
+	SessionID                string
+	UnusableTargetIDs        map[string]bool
+	LastError                error
+	ExtraArgs                []string
 }
 
 func NewExtensionInjector(config InjectorConfig) ExtensionInjector {
@@ -137,6 +143,18 @@ func (i *ExtensionInjector) Update(config InjectorConfig) *ExtensionInjector {
 	if config.InjectorBBBaseURL != "" {
 		i.Config.InjectorBBBaseURL = config.InjectorBBBaseURL
 	}
+	return i
+}
+
+func (i *ExtensionInjector) RecordInjectionResult(result *ExtensionInjectionResult) *ExtensionInjector {
+	i.Source = result.Source
+	i.ExtensionID = result.ExtensionID
+	if result.ExtensionID != "" {
+		i.ServiceWorkerExtensionID = result.ExtensionID
+	}
+	i.TargetID = result.TargetID
+	i.URL = result.URL
+	i.SessionID = result.SessionID
 	return i
 }
 
@@ -324,8 +342,12 @@ func (i ExtensionInjector) serviceWorkerTargetMatches(target map[string]any) boo
 	if targetType != "service_worker" || !strings.HasPrefix(targetURL, "chrome-extension://") {
 		return false
 	}
-	hasExtensionID := i.Config.InjectorServiceWorkerExtensionID != ""
-	if i.Config.InjectorServiceWorkerExtensionID != "" && !strings.HasPrefix(targetURL, "chrome-extension://"+i.Config.InjectorServiceWorkerExtensionID+"/") {
+	serviceWorkerExtensionID := i.Config.InjectorServiceWorkerExtensionID
+	if serviceWorkerExtensionID == "" {
+		serviceWorkerExtensionID = i.ServiceWorkerExtensionID
+	}
+	hasExtensionID := serviceWorkerExtensionID != ""
+	if serviceWorkerExtensionID != "" && !strings.HasPrefix(targetURL, "chrome-extension://"+serviceWorkerExtensionID+"/") {
 		return false
 	}
 	for _, part := range i.Config.InjectorServiceWorkerURLIncludes {

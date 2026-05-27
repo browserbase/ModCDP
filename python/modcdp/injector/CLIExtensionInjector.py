@@ -59,6 +59,7 @@ class CLIExtensionInjector(ExtensionInjector):
         elif self.unpacked_extension_path:
             self.extension_id = extensionIdFromManifestKey(self.unpacked_extension_path)
         if self.extension_id:
+            self.service_worker_extension_id = self.extension_id
             self.update({"injector_cli_extension_id": self.extension_id, "injector_service_worker_extension_id": self.extension_id})
         if self.unpacked_extension_path:
             self.extra_args = [f"--load-extension={self.unpacked_extension_path}"]

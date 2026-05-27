@@ -66,6 +66,7 @@ func (i *CLIExtensionInjector) resolveExtensionID() (string, error) {
 		i.ExtensionID = extensionID
 	}
 	if i.ExtensionID != "" {
+		i.ServiceWorkerExtensionID = i.ExtensionID
 		i.Config.InjectorCLIExtensionID = i.ExtensionID
 		i.Config.InjectorServiceWorkerExtensionID = i.ExtensionID
 	}

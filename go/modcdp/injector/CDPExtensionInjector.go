@@ -55,6 +55,8 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 	if extensionID == "" {
 		return nil, fmt.Errorf("Extensions.loadUnpacked returned no extension id")
 	}
+	i.ExtensionID = extensionID
+	i.ServiceWorkerExtensionID = extensionID
 	i.Config.InjectorCDPExtensionID = extensionID
 	i.Config.InjectorServiceWorkerExtensionID = extensionID
 	swURLPrefix := "chrome-extension://" + extensionID + "/"

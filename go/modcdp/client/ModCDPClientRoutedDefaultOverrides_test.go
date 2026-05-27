@@ -72,8 +72,9 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	}
 	owner := New(Config{
 		Launcher: LauncherConfig{
-			LauncherMode:          "local",
-			LauncherLocalHeadless: &headless,
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       &headless,
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: InjectorConfig{
