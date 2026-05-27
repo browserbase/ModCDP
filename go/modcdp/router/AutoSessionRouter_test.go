@@ -165,8 +165,10 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		}
 		return ""
 	})
-	if _, ok := router.Execution_contexts[sessionID]; ok {
-		t.Fatal("execution context remained after detach")
+	for _, context := range router.Contexts {
+		if context["sessionId"] == sessionID {
+			t.Fatal("execution context remained after detach")
+		}
 	}
 	if _, err := send("Target.closeTarget", map[string]any{"targetId": targetID}, ""); err != nil {
 		t.Fatal(err)
@@ -201,8 +203,10 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		}
 		return ""
 	})
-	if _, ok := router.Execution_contexts[pendingSessionID]; ok {
-		t.Fatal("execution context was recorded for detached pending session")
+	for _, context := range router.Contexts {
+		if context["sessionId"] == pendingSessionID {
+			t.Fatal("execution context was recorded for detached pending session")
+		}
 	}
 	if _, err := send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, ""); err != nil {
 		t.Fatal(err)
