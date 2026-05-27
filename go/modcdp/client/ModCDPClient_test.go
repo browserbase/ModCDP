@@ -459,7 +459,7 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 		{
 			name: "upstream",
 			cdp:  New(Config{Upstream: UpstreamTransportConfig{UpstreamMode: "bogus"}}),
-			want: "unknown upstream.upstream_mode=bogus",
+			want: "unknown upstream_mode=bogus",
 		},
 		{
 			name: "launch",
@@ -467,7 +467,7 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 				Launcher: LauncherConfig{LauncherMode: "bogus"},
 				Upstream: UpstreamTransportConfig{UpstreamMode: "ws", UpstreamWSCDPURL: "ws://127.0.0.1:1/devtools/browser/test"},
 			}),
-			want: "unknown launcher.launcher_mode=bogus",
+			want: "unknown launcher_mode=bogus",
 		},
 		{
 			name: "injector",

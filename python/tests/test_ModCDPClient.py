@@ -163,7 +163,7 @@ class ModCDPClientTests(unittest.TestCase):
         )
 
     def test_rejects_unknown_component_modes_at_their_owning_factory_boundary(self) -> None:
-        with self.assertRaisesRegex(Exception, r"unknown upstream\.upstream_mode=bogus"):
+        with self.assertRaisesRegex(Exception, r"unknown upstream_mode=bogus"):
             ModCDPClient(upstream={"upstream_mode": "bogus"})
         with self.assertRaisesRegex(Exception, r"Input should be"):
             ModCDPClient(launcher={"launcher_mode": "bogus"})

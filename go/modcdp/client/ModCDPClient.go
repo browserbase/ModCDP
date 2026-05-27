@@ -656,10 +656,10 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		return nil
 	}
 	if !isKnownLaunchMode(c.Config.Launcher.LauncherMode) {
-		return fmt.Errorf("unknown launcher.launcher_mode=%s", c.Config.Launcher.LauncherMode)
+		return fmt.Errorf("unknown launcher_mode=%s", c.Config.Launcher.LauncherMode)
 	}
 	if !isKnownUpstreamMode(c.Config.Upstream.UpstreamMode) {
-		return fmt.Errorf("unknown upstream.upstream_mode=%s", c.Config.Upstream.UpstreamMode)
+		return fmt.Errorf("unknown upstream_mode=%s", c.Config.Upstream.UpstreamMode)
 	}
 	if !isKnownExtensionMode(c.Config.Injector.InjectorMode) {
 		return fmt.Errorf("unknown injector.injector_mode=%s", c.Config.Injector.InjectorMode)

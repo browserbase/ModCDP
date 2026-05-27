@@ -200,7 +200,7 @@ class ModCDPClient(CDPSurfaceMixin):
         client_config_input = dict(client_config or {})
         upstream_mode_input = upstream_input.get("upstream_mode") or "ws"
         if upstream_mode_input != "ws":
-            raise RuntimeError(f"unknown upstream.upstream_mode={upstream_mode_input}")
+            raise RuntimeError(f"unknown upstream_mode={upstream_mode_input}")
         upstream_mode: UpstreamMode = upstream_mode_input
         upstream_config = UpstreamTransportConfig.model_validate({**upstream_input, "upstream_mode": upstream_mode})
         launcher_mode = launcher_input.get("launcher_mode") or "none"
@@ -227,7 +227,7 @@ class ModCDPClient(CDPSurfaceMixin):
         elif launcher_config.launcher_mode == "none":
             self.launcher = NoneBrowserLauncher(launcher_config)
         else:
-            raise RuntimeError(f"unknown launcher.launcher_mode={launcher_config.launcher_mode}")
+            raise RuntimeError(f"unknown launcher_mode={launcher_config.launcher_mode}")
         self.upstream = WSUpstreamTransport(upstream_config)
         if injector_config.injector_mode == "none":
             self.injector: ExtensionInjector | None = None
