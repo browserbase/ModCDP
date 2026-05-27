@@ -74,3 +74,58 @@ type ExtensionInjectionResult struct {
 	URL         string `json:"url,omitempty"`
 	SessionID   string `json:"session_id"`
 }
+
+type ModCDPGetTopologyParams struct {
+	RootTargetID string `json:"rootTargetId,omitempty"`
+	TargetID     string `json:"targetId,omitempty"`
+	Active       *bool  `json:"active,omitempty"`
+}
+
+type ModCDPTopologyFrame struct {
+	TargetID           string `json:"targetId"`
+	URL                string `json:"url,omitempty"`
+	ParentFrameID      string `json:"parentFrameId,omitempty"`
+	OuterBackendNodeID *int   `json:"outerBackendNodeId,omitempty"`
+}
+
+type ModCDPTopologyDomRoot struct {
+	Kind               string `json:"kind"`
+	FrameID            string `json:"frameId"`
+	OuterBackendNodeID *int   `json:"outerBackendNodeId,omitempty"`
+	InnerBackendNodeID *int   `json:"innerBackendNodeId,omitempty"`
+	Mode               string `json:"mode,omitempty"`
+	ExecutionContextID *int   `json:"executionContextId,omitempty"`
+	UniqueContextID    string `json:"uniqueContextId,omitempty"`
+}
+
+type ModCDPTopologyTarget struct {
+	TargetID      string `json:"targetId"`
+	Type          string `json:"type"`
+	Title         string `json:"title,omitempty"`
+	URL           string `json:"url,omitempty"`
+	Attached      *bool  `json:"attached,omitempty"`
+	ParentID      string `json:"parentId,omitempty"`
+	ParentFrameID string `json:"parentFrameId,omitempty"`
+	SessionID     string `json:"sessionId,omitempty"`
+}
+
+type ModCDPTopologyExecutionContext struct {
+	ID       int            `json:"id"`
+	Origin   string         `json:"origin,omitempty"`
+	Name     string         `json:"name,omitempty"`
+	UniqueID string         `json:"uniqueId,omitempty"`
+	AuxData  map[string]any `json:"auxData,omitempty"`
+	SessionID *string       `json:"sessionId"`
+	TargetID string         `json:"targetId"`
+	FrameID  string         `json:"frameId,omitempty"`
+	World    string         `json:"world"`
+}
+
+type ModCDPTopology struct {
+	ObjectGroup string                                      `json:"objectGroup"`
+	RootFrameID string                                      `json:"rootFrameId"`
+	Frames      map[string]ModCDPTopologyFrame             `json:"frames"`
+	Roots       map[string]ModCDPTopologyDomRoot           `json:"roots"`
+	Targets     map[string]ModCDPTopologyTarget            `json:"targets"`
+	Contexts    map[string]ModCDPTopologyExecutionContext  `json:"contexts"`
+}

@@ -10,19 +10,22 @@ import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
 import { ModCDPClient } from "../src/index.js";
+import { loadExtensionTestBrowserPath } from "./browserPaths.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
+const LOAD_EXTENSION_TEST_BROWSER_PATH = loadExtensionTestBrowserPath();
 
 test("AutoSessionRouter tracks real target sessions and execution contexts from live CDP events", async () => {
   const cdp = new ModCDPClient({
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "cdp",
+      injector_mode: "cli",
       injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,

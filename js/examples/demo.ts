@@ -30,6 +30,7 @@ import { createInterface } from "node:readline/promises";
 import { spawn } from "node:child_process";
 
 import { ModCDPClient } from "../src/index.js";
+import { loadExtensionBrowserPath } from "./browserPaths.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH =
@@ -240,6 +241,7 @@ async function main() {
       launcher_local_chrome_ready_timeout_ms: 60_000,
       launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
       launcher_local_sandbox: process.platform !== "linux",
+      launcher_local_executable_path: loadExtensionBrowserPath(),
     };
   }
 
@@ -324,16 +326,18 @@ async function main() {
       throw new Error(`unexpected response middleware registration ${JSON.stringify(responseMiddlewareRegistration)}`);
     }
 
-    const eventMiddlewareRegistration = assertObject(
-      await cdp.Mod.addMiddleware({
-        name: "Custom.demoEvent",
-        phase: cdp.EVENT,
-        expression: `async (payload, next) => next({ ...payload, eventMiddleware: "ok" })`,
-      }),
-      "Mod.addMiddleware event",
-    );
-    if (eventMiddlewareRegistration.registered !== true || eventMiddlewareRegistration.phase !== cdp.EVENT) {
-      throw new Error(`unexpected event middleware registration ${JSON.stringify(eventMiddlewareRegistration)}`);
+    if (mode !== "direct") {
+      const eventMiddlewareRegistration = assertObject(
+        await cdp.Mod.addMiddleware({
+          name: "Custom.demoEvent",
+          phase: cdp.EVENT,
+          expression: `async (payload, next) => next({ ...payload, eventMiddleware: "ok" })`,
+        }),
+        "Mod.addMiddleware event",
+      );
+      if (eventMiddlewareRegistration.registered !== true || eventMiddlewareRegistration.phase !== cdp.EVENT) {
+        throw new Error(`unexpected event middleware registration ${JSON.stringify(eventMiddlewareRegistration)}`);
+      }
     }
 
     const echoRegistration = assertObject(
@@ -366,11 +370,27 @@ async function main() {
     const demoEventPromise = waitForEvent(
       cdp,
       "Custom.demoEvent",
-      (event) => event?.value === "custom-event-ok" && event?.eventMiddleware === "ok",
+      (event) => event?.value === "custom-event-ok" && (mode === "direct" || event?.eventMiddleware === "ok"),
     );
     const emitResult = assertObject(
       await cdp.Mod.evaluate({
-        expression: `async () => await ModCDP.emit("Custom.demoEvent", { value: "custom-event-ok" })`,
+        expression:
+          mode === "direct"
+            ? `async () => {
+                await globalThis.__ModCDP_custom_event__(JSON.stringify({
+                  event: "Custom.demoEvent",
+                  data: { value: "custom-event-ok" },
+                  cdpSessionId: null,
+                }));
+                return { emitted: true };
+              }`
+            : `async () => {
+                const sent = downstream.sendEvent({
+                  method: "Custom.demoEvent",
+                  params: { value: "custom-event-ok" },
+                });
+                return { emitted: sent > 0 };
+              }`,
       }),
       "Custom.demoEvent emit",
     );

@@ -12,6 +12,7 @@ import puppeteer from "puppeteer-core";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { startProxy } from "../src/proxy/proxy.js";
+import { loadExtensionBrowserPath } from "./browserPaths.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const extension_path =
@@ -29,12 +30,18 @@ try {
     launcher_local_chrome_ready_timeout_ms: 60_000,
     launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
     launcher_local_sandbox: process.platform !== "linux",
+    launcher_local_executable_path: loadExtensionBrowserPath(),
+    launcher_local_extra_args: [`--load-extension=${extension_path}`],
   });
   proxy = await startProxy({
     proxy_listen_port: await LocalBrowserLauncher.freePort(),
     launcher: { launcher_mode: "remote", launcher_remote_cdp_url: chrome.cdp_url },
     upstream: { upstream_mode: "ws" },
-    injector: { injector_mode: "cdp", injector_cdp_extension_path: extension_path },
+    injector: {
+      injector_mode: "discover",
+      injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
+      injector_trust_service_worker_target: true,
+    },
   });
 
   browser = await puppeteer.connect({ browserURL: proxy.url });

@@ -12,9 +12,11 @@ import { z } from "zod";
 
 import { ModCDPClient } from "../src/index.js";
 import { ModCDPServer } from "../src/server/ModCDPServer.js";
+import { loadExtensionTestBrowserPath } from "./browserPaths.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
+const LOAD_EXTENSION_TEST_BROWSER_PATH = loadExtensionTestBrowserPath();
 
 test("custom commands install flat namespace methods through a real service worker", async () => {
   const params_schema = z.object({ id: z.string(), suffix: z.string().optional() });
@@ -23,11 +25,12 @@ test("custom commands install flat namespace methods through a real service work
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "cdp",
-      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_mode: "cli",
+      injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
@@ -94,11 +97,12 @@ test("custom events validate raw string handlers through a real service worker",
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "cdp",
-      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_mode: "cli",
+      injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
@@ -143,11 +147,12 @@ test("dynamic custom command, event, and middleware registration validates throu
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "cdp",
-      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_mode: "cli",
+      injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
@@ -254,11 +259,12 @@ test("assigned type registry validates updated custom command, event, and middle
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
-      injector_mode: "cdp",
-      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_mode: "cli",
+      injector_cli_extension_path: EXTENSION_PATH,
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
