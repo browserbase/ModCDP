@@ -763,11 +763,11 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 	if _, err := os.Stat(unpackedExtensionPath); err == nil {
 		t.Fatalf("expected prepared temp extension files to be cleaned up after close")
 	}
-	if cdp.transport != nil {
-		t.Fatal("expected transport to be nil")
-	}
 	if cdp.launchedBrowser != nil {
 		t.Fatal("expected launchedBrowser to be nil")
+	}
+	if launcher, ok := cdp.Launcher.(*LocalBrowserLauncher); ok && launcher.Launched != nil {
+		t.Fatal("expected launcher launched state to be nil")
 	}
 	if cdp.extensionInjectors != nil {
 		t.Fatal("expected extensionInjectors to be nil")
@@ -798,8 +798,11 @@ func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
 		t.Fatal("expected transport-owned websocket conn")
 	}
 	cdp.Close()
-	if cdp.transport != nil {
-		t.Fatal("Close left transport set")
+	if transport.Conn != nil {
+		t.Fatal("Close left websocket connection set")
+	}
+	if launcher, ok := cdp.Launcher.(*LocalBrowserLauncher); !ok || launcher.Launched != nil {
+		t.Fatalf("Close left launcher launched state set: %T", cdp.Launcher)
 	}
 }
 

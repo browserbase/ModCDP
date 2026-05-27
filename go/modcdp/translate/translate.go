@@ -192,18 +192,14 @@ func UnwrapEventIfNeeded(method string, params map[string]any, sessionID string,
 }
 
 func EncodeBindingPayload(payload types.ModCDPBindingPayload) (string, error) {
-	var cdpSessionID any
-	if payload.CDPSessionID != "" {
-		cdpSessionID = payload.CDPSessionID
-	}
 	encoded, err := json.Marshal(struct {
-		Event        string `json:"event"`
-		Data         any    `json:"data"`
-		CDPSessionID any    `json:"cdpSessionId"`
+		Event        string  `json:"event"`
+		Data         any     `json:"data"`
+		CDPSessionID *string `json:"cdpSessionId"`
 	}{
 		Event:        payload.Event,
 		Data:         payload.Data,
-		CDPSessionID: cdpSessionID,
+		CDPSessionID: payload.CDPSessionID,
 	})
 	if err != nil {
 		return "", err

@@ -100,7 +100,7 @@ class WSUpstreamTransport(UpstreamTransport):
     def toJSON(self) -> dict[str, object]:
         json_value = super().toJSON()
         state_raw = json_value.get("state")
-        state: dict[str, object] = dict(state_raw) if isinstance(state_raw, dict) else {}
+        state: dict[str, object] = {str(key): value for key, value in state_raw.items()} if isinstance(state_raw, dict) else {}
         state["connected"] = self.ws is not None
         return {**json_value, "state": state}
 

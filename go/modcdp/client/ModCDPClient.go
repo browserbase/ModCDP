@@ -304,6 +304,8 @@ type ModCDPClient struct {
 	Config                   Config
 	Types                    *CDPTypes
 	CDPURL                   string
+	Launcher                 browserLauncherClient
+	Injector                 extensionInjector
 	transport                upstreamTransportClient
 	handlers                 map[string][]handlerEntry
 	handlersMu               sync.Mutex
@@ -335,6 +337,7 @@ type browserLauncherClient interface {
 	ConfigForUpstream() map[string]any
 	ConfigForServer(UpstreamTransportConfig) map[string]any
 	Launch(LauncherConfig) (*LaunchedBrowser, error)
+	Close()
 }
 
 type upstreamTransportClient interface {
@@ -422,6 +425,12 @@ func New(config Config) *ModCDPClient {
 	}
 	client.Mod = ModDomain{client: client}
 	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, config.Router)
+	client.Launcher = client.browserLauncher()
+	injectors := client.extensionInjectorsForConfig()
+	if len(injectors) > 0 {
+		client.Injector = injectors[0]
+		client.extensionInjectors = injectors
+	}
 	if *client.Config.ClientConfig.ClientHydrateAliases {
 		initCDPSurface(client)
 	}
@@ -430,8 +439,14 @@ func New(config Config) *ModCDPClient {
 
 func (c *ModCDPClient) ToJSON() map[string]any {
 	children := map[string]types.ModCDPJSONChild{}
+	if child, ok := c.Launcher.(types.ModCDPJSONChild); ok {
+		children["launcher"] = child
+	}
 	if child, ok := c.transport.(types.ModCDPJSONChild); ok {
 		children["upstream"] = child
+	}
+	if child, ok := c.Injector.(types.ModCDPJSONChild); ok {
+		children["injector"] = child
 	}
 	if child, ok := any(c.Router).(types.ModCDPJSONChild); ok {
 		children["router"] = child
@@ -657,13 +672,23 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	if !isKnownExtensionMode(c.Config.Injector.InjectorMode) {
 		return fmt.Errorf("unknown injector.injector_mode=%s", c.Config.Injector.InjectorMode)
 	}
-	launcher := c.browserLauncher()
+	launcher := c.Launcher
+	if launcher == nil {
+		launcher = c.browserLauncher()
+		c.Launcher = launcher
+	}
 	transport := c.transport
 	if transport == nil {
 		transport = c.upstreamTransport()
 	}
-	injectors := c.extensionInjectorsForConfig()
-	c.extensionInjectors = injectors
+	injectors := c.extensionInjectors
+	if len(injectors) == 0 && c.Config.Injector.InjectorMode != "none" {
+		injectors = c.extensionInjectorsForConfig()
+		c.extensionInjectors = injectors
+		if len(injectors) > 0 {
+			c.Injector = injectors[0]
+		}
+	}
 	initialTransportConfig := c.upstreamTransportConfig()
 
 	transport.Update(initialTransportConfig)
@@ -1168,10 +1193,10 @@ func handlerPointer(handler Handler) uintptr {
 func (c *ModCDPClient) Close() {
 	c.stopHeartbeat()
 	c.Router.Stop()
-	if c.launchedBrowser != nil {
-		c.launchedBrowser.Close()
-		c.launchedBrowser = nil
+	if c.Launcher != nil {
+		c.Launcher.Close()
 	}
+	c.launchedBrowser = nil
 	if c.transport != nil {
 		_ = c.transport.Close()
 	}

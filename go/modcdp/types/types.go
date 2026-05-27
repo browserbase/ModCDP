@@ -261,9 +261,9 @@ type ModCDPAddMiddlewareResponse struct {
 type ModCDPPingResponse = ModCDPOkResponse
 
 type ModCDPBindingPayload struct {
-	Event        string `json:"event"`
-	Data         any    `json:"data"`
-	CDPSessionID string `json:"cdpSessionId,omitempty"`
+	Event        string  `json:"event"`
+	Data         any     `json:"data"`
+	CDPSessionID *string `json:"cdpSessionId"`
 }
 
 type CdpDebuggeeCommandParams struct {

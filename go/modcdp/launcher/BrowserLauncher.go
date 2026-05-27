@@ -151,6 +151,14 @@ func (l BrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error)
 	return nil, fmt.Errorf("%T.Launch is not implemented", l)
 }
 
+func (l *BrowserLauncher) Close() {
+	launched := l.Launched
+	l.Launched = nil
+	if launched != nil && launched.Close != nil {
+		launched.Close()
+	}
+}
+
 func (l BrowserLauncher) ToJSON() map[string]any {
 	state := map[string]any{"launched": l.Launched != nil}
 	if l.Launched != nil {

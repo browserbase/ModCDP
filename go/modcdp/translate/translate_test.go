@@ -147,10 +147,11 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 		t.Fatalf("raw = %#v", raw)
 	}
 
+	payloadSessionID := "session-2"
 	payload, err := encodeBindingPayload(types.ModCDPBindingPayload{
 		Event:        "Custom.ready",
 		Data:         map[string]any{"ready": true},
-		CDPSessionID: "session-2",
+		CDPSessionID: &payloadSessionID,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -125,7 +125,7 @@ class _ModDomain:
         result_schema: Any | None = None,
         expression: str | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = dict(name) if isinstance(name, Mapping) else {"name": name}
+        payload: dict[str, Any] = {str(key): value for key, value in name.items()} if isinstance(name, Mapping) else {"name": name}
         if params_schema is not None:
             payload["params_schema"] = params_schema
         if result_schema is not None:
@@ -140,7 +140,7 @@ class _ModDomain:
         *,
         event_schema: Any | None = None,
     ) -> AwaitableDict | AwaitableValue:
-        payload: dict[str, Any] = dict(name) if isinstance(name, Mapping) else {"name": name}
+        payload: dict[str, Any] = {str(key): value for key, value in name.items()} if isinstance(name, Mapping) else {"name": name}
         if event_schema is not None:
             payload["event_schema"] = event_schema
         return self._client._send_command("Mod.addCustomEvent", payload)
