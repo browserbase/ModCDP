@@ -19,12 +19,13 @@ func TestRemoteBrowserLauncherRequiresLauncherRemoteCDPURL(t *testing.T) {
 }
 
 func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoints(t *testing.T) {
+	headless := true
 	port, err := freePort()
 	if err != nil {
 		t.Fatal(err)
 	}
 	local, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
-		LauncherLocalHeadless:      boolPtr(true),
+		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: port,
 	})
 	if err != nil {
@@ -92,6 +93,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 }
 
 func TestRemoteBrowserLauncherLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
+	headless := true
 	firstPort, err := freePort()
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +103,7 @@ func TestRemoteBrowserLauncherLetsLaunchConfigOverrideConstructorCDPURL(t *testi
 		t.Fatal(err)
 	}
 	first, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
-		LauncherLocalHeadless:      boolPtr(true),
+		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: firstPort,
 	})
 	if err != nil {
@@ -109,7 +111,7 @@ func TestRemoteBrowserLauncherLetsLaunchConfigOverrideConstructorCDPURL(t *testi
 	}
 	defer first.Close()
 	second, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
-		LauncherLocalHeadless:      boolPtr(true),
+		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: secondPort,
 	})
 	if err != nil {

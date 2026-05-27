@@ -320,7 +320,7 @@ func waitForCdpWebSocketURL(cdpURL string, timeout time.Duration, pollInterval t
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		loopbackCDPURL, err := websocketURLFor(cdpURL)
+		loopbackCDPURL, err := WebsocketURLFor(cdpURL)
 		if err == nil && loopbackCDPURL != "" {
 			return loopbackCDPURL, nil
 		}
@@ -362,7 +362,7 @@ func waitForBrowserSelectedCdpWebSocketURL(profileDir string, timeout time.Durat
 		}
 		if ready {
 			cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
-			loopbackCDPURL, err := websocketURLFor(cdpURL)
+			loopbackCDPURL, err := WebsocketURLFor(cdpURL)
 			if err == nil && loopbackCDPURL != "" {
 				return loopbackCDPURL, port, nil
 			}

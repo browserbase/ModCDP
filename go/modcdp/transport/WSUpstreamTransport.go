@@ -11,6 +11,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/browserbase/modcdp/go/modcdp/launcher"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 )
@@ -55,7 +56,7 @@ func (t *WSUpstreamTransport) Connect() error {
 		return fmt.Errorf("WSUpstreamTransport requires upstream_ws_cdp_url or launcher-provided cdp_url")
 	}
 	// URL may start as an HTTP upstream_ws_cdp_url; from here on it is the resolved WebSocket CDP endpoint.
-	resolvedURL, err := websocketURLFor(t.URL)
+	resolvedURL, err := launcher.WebsocketURLFor(t.URL)
 	if err != nil {
 		return err
 	}

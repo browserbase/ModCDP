@@ -25,12 +25,6 @@ type UpstreamTransportConfig = types.UpstreamTransportConfig
 const DefaultChromeReadyTimeoutMS = 45_000
 const DefaultChromeReadyPollIntervalMS = 100
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
-var writePipeMessage = WritePipeMessage
-var readPipeMessage = ReadPipeMessage
 var cdpHTTPClient = &http.Client{Timeout: 2 * time.Second}
 
 func freePort() (int, error) {
@@ -40,10 +34,6 @@ func freePort() (int, error) {
 	}
 	defer listener.Close()
 	return listener.Addr().(*net.TCPAddr).Port, nil
-}
-
-func websocketURLFor(endpoint string) (string, error) {
-	return WebsocketURLFor(endpoint)
 }
 
 func WebsocketURLFor(endpoint string) (string, error) {

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/injector"
-	"github.com/browserbase/modcdp/go/modcdp/launcher"
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
@@ -33,10 +32,6 @@ func firstNonEmptyString(values ...string) string {
 	return ""
 }
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func freePort() (int, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -44,10 +39,6 @@ func freePort() (int, error) {
 	}
 	defer listener.Close()
 	return listener.Addr().(*net.TCPAddr).Port, nil
-}
-
-func websocketURLFor(endpoint string) (string, error) {
-	return launcher.WebsocketURLFor(endpoint)
 }
 
 type UpstreamMode string

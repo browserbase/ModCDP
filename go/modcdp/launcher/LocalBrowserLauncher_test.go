@@ -137,10 +137,10 @@ func TestLocalBrowserLauncherLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeak
 	if chrome.PipeRead == nil || chrome.PipeWrite == nil {
 		t.Fatal("expected pipe handles")
 	}
-	if err := writePipeMessage(chrome.PipeWrite, map[string]any{"id": 10, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
+	if err := WritePipeMessage(chrome.PipeWrite, map[string]any{"id": 10, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
 		t.Fatal(err)
 	}
-	response, err := readPipeMessage(chrome.PipeRead)
+	response, err := ReadPipeMessage(chrome.PipeRead)
 	if err != nil {
 		t.Fatal(err)
 	}

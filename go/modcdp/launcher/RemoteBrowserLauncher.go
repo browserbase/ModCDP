@@ -20,7 +20,7 @@ func (l *RemoteBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser,
 	if cdpURL == "" {
 		return nil, fmt.Errorf("launcher_mode=remote requires launcher_remote_cdp_url.")
 	}
-	resolvedCDPURL, err := websocketURLFor(cdpURL)
+	resolvedCDPURL, err := WebsocketURLFor(cdpURL)
 	if err != nil {
 		return nil, err
 	}
