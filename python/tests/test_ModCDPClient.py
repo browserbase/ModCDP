@@ -277,7 +277,7 @@ class ModCDPClientTests(unittest.TestCase):
             self.assertEqual(runtime_evaluation.result["type"], "number")
             self.assertEqual(runtime_evaluation.result["value"], 2)
             with self.assertRaisesRegex(Exception, "expression"):
-                cdp.Runtime.evaluate(returnByValue=True)
+                cdp.send("Runtime.evaluate", {"returnByValue": True})
             with self.assertRaisesRegex(Exception, "number"):
                 cdp.Mod.ping(sent_at="bad")
             self.assertEqual(
