@@ -325,7 +325,7 @@ class ModCDPClient(CDPSurfaceMixin):
 
         injector_started_at = int(time.time() * 1000)
         if self.injector is None:
-            raise RuntimeError("injector.injector_mode='none' cannot be used with a raw_cdp upstream.")
+            raise RuntimeError("injector.injector_mode=none cannot be used with an extension-routed browser upstream.")
         ext = self._inject_extension()
         injector_completed_at = int(time.time() * 1000)
         self.extension_id = ext["extension_id"]

@@ -1290,7 +1290,7 @@ func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 
 func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*ExtensionInjectionResult, error) {
 	if len(injectors) == 0 {
-		return nil, fmt.Errorf("injector.injector_mode='none' cannot be used with a raw_cdp upstream")
+		return nil, fmt.Errorf("injector.injector_mode=none cannot be used with an extension-routed browser upstream")
 	}
 	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
 		if c.transport == nil {
