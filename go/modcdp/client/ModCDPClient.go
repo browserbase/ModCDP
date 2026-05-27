@@ -590,10 +590,6 @@ func (c *ModCDPClient) Connect() error {
 		}
 		return nil
 	}
-	if err := c.initializeRawCDPTransport(); err != nil {
-		c.Close()
-		return err
-	}
 	if c.Config.Injector.InjectorMode == "none" && c.Config.ServerConfig == nil {
 		connectedAt := time.Now().UnixMilli()
 		c.ConnectTiming = map[string]any{
@@ -606,6 +602,10 @@ func (c *ModCDPClient) Connect() error {
 			"duration_ms":            connectedAt - connectStartedAt,
 		}
 		return nil
+	}
+	if err := c.initializeRawCDPTransport(); err != nil {
+		c.Close()
+		return err
 	}
 	extensionStartedAt := time.Now().UnixMilli()
 	ext, err := c.injectExtension(c.extensionInjectors)

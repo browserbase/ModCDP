@@ -308,9 +308,6 @@ class ModCDPClient(CDPSurfaceMixin):
         self.upstream.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
         self.upstream.onClose(lambda error: self._handle_transport_close(error))
 
-        self._initialize_raw_cdp_transport()
-
-        injector_started_at = int(time.time() * 1000)
         if self.injector is None and self.server_config is None:
             connected_at = int(time.time() * 1000)
             self.connect_timing = cast(ModCDPConnectTiming, {
@@ -323,6 +320,10 @@ class ModCDPClient(CDPSurfaceMixin):
                 "duration_ms": connected_at - connect_started_at,
             })
             return self
+
+        self._initialize_raw_cdp_transport()
+
+        injector_started_at = int(time.time() * 1000)
         if self.injector is None:
             raise RuntimeError("injector.injector_mode='none' cannot be used with a raw_cdp upstream.")
         ext = self._inject_extension()
