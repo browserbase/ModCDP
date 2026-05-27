@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
-	"github.com/browserbase/modcdp/go/modcdp/translate"
 	modtypes "github.com/browserbase/modcdp/go/modcdp/types"
 )
 
@@ -680,7 +679,7 @@ func (types *CDPTypes) CustomMiddlewareRegistrations(phase string, name string) 
 	return middlewares
 }
 
-func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string]any, cdpSessionID string, executionContextID int) (translate.RawStep, error) {
+func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string]any, cdpSessionID string, executionContextID int) (modtypes.TranslatedStep, error) {
 	if params == nil {
 		params = map[string]any{}
 	}
@@ -706,11 +705,11 @@ func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string
 		if executionContextID != 0 {
 			runtimeParams["contextId"] = executionContextID
 		}
-		return translate.RawStep{Method: "Runtime.evaluate", Params: runtimeParams, Unwrap: "runtime"}, nil
+		return modtypes.TranslatedStep{Method: "Runtime.evaluate", Params: runtimeParams, Unwrap: "runtime"}, nil
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		return translate.RawStep{}, err
+		return modtypes.TranslatedStep{}, err
 	}
 	runtimeParams := map[string]any{
 		"functionDeclaration": `async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }`,
@@ -724,7 +723,7 @@ func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string
 	if executionContextID != 0 {
 		runtimeParams["executionContextId"] = executionContextID
 	}
-	return translate.RawStep{Method: "Runtime.callFunctionOn", Params: runtimeParams, Unwrap: "runtime_json"}, nil
+	return modtypes.TranslatedStep{Method: "Runtime.callFunctionOn", Params: runtimeParams, Unwrap: "runtime_json"}, nil
 }
 
 func (types *CDPTypes) serviceWorkerRuntimeExpression(method string, params map[string]any, cdpSessionID string, commandExpression string) string {

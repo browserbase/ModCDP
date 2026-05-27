@@ -48,31 +48,6 @@ func RouteFor(method string, routes map[string]string) string {
 	return "direct_cdp"
 }
 
-type rawStep struct {
-	Method    string
-	Params    map[string]any
-	Unwrap    string
-	SessionID string
-}
-
-type rawCommand struct {
-	Route  string
-	Target string
-	Steps  []rawStep
-}
-
-type RawStep = rawStep
-type RawCommand = rawCommand
-
-var routeFor = RouteFor
-var wrapCommandIfNeeded = WrapCommandIfNeeded
-var unwrapResponseIfNeeded = UnwrapResponseIfNeeded
-var unwrapEventIfNeeded = UnwrapEventIfNeeded
-var encodeBindingPayload = EncodeBindingPayload
-
-const upstreamEventBindingName = UpstreamEventBindingName
-const customEventBindingName = CustomEventBindingName
-
 func stringValue(value any) string {
 	if typed, ok := value.(string); ok {
 		return typed
@@ -95,7 +70,7 @@ func wrapCustomCommand(method string, params map[string]any, sessionID any) map[
 	return runtimeParams
 }
 
-func wrapServiceWorkerCommand(method string, params map[string]any, sessionID string) []rawStep {
+func wrapServiceWorkerCommand(method string, params map[string]any, sessionID string) []types.TranslatedStep {
 	if params == nil {
 		params = map[string]any{}
 	}
@@ -105,18 +80,18 @@ func wrapServiceWorkerCommand(method string, params map[string]any, sessionID st
 	} else if sessionID != "" {
 		cdpSessionID = sessionID
 	}
-	return []rawStep{{Method: "Runtime.callFunctionOn", Params: wrapCustomCommand(method, params, cdpSessionID), Unwrap: "runtime_json"}}
+	return []types.TranslatedStep{{Method: "Runtime.callFunctionOn", Params: wrapCustomCommand(method, params, cdpSessionID), Unwrap: "runtime_json"}}
 }
 
-func WrapCommandIfNeeded(method string, params map[string]any, routes map[string]string, sessionID string) (rawCommand, error) {
+func WrapCommandIfNeeded(method string, params map[string]any, routes map[string]string, sessionID string) (types.TranslatedCommand, error) {
 	route := RouteFor(method, routes)
 	if route == "direct_cdp" {
-		return rawCommand{Route: route, Target: "direct_cdp", Steps: []rawStep{{Method: method, Params: params, SessionID: sessionID}}}, nil
+		return types.TranslatedCommand{Route: route, Target: "direct_cdp", Steps: []types.TranslatedStep{{Method: method, Params: params, SessionID: sessionID}}}, nil
 	}
 	if route == "service_worker" {
-		return rawCommand{Route: route, Target: "service_worker", Steps: wrapServiceWorkerCommand(method, params, sessionID)}, nil
+		return types.TranslatedCommand{Route: route, Target: "service_worker", Steps: wrapServiceWorkerCommand(method, params, sessionID)}, nil
 	}
-	return rawCommand{}, fmt.Errorf("unsupported client route %q for %s", route, method)
+	return types.TranslatedCommand{}, fmt.Errorf("unsupported client route %q for %s", route, method)
 }
 
 func UnwrapResponseIfNeeded(result map[string]any, unwrap string) (any, error) {
