@@ -36,7 +36,8 @@ type UpstreamEventListener = (
 ) => void;
 
 class UpstreamTransport {
-  readonly upstream_mode: UpstreamMode;
+  config: ReturnType<typeof ModCDPUpstreamConfigSchema.parse>;
+  readonly upstream_mode!: UpstreamMode;
   upstream_ws_cdp_url?: string | null = null;
   upstream_nats_url?: string | null = null;
   upstream_nats_subject_prefix?: string | null = null;
@@ -61,17 +62,8 @@ class UpstreamTransport {
   private event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<UpstreamEventListener>>();
 
   constructor(options: UpstreamTransportConfig = {}) {
-    options = ModCDPUpstreamConfigSchema.parse(options);
-    this.upstream_mode = options.upstream_mode ?? "ws";
-    this.upstream_ws_cdp_url = options.upstream_ws_cdp_url ?? null;
-    this.upstream_nats_url = options.upstream_nats_url ?? null;
-    this.upstream_nats_subject_prefix = options.upstream_nats_subject_prefix ?? null;
-    this.upstream_nats_wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? null;
-    this.upstream_reversews_bind = options.upstream_reversews_bind ?? null;
-    this.upstream_reversews_wait_timeout_ms = options.upstream_reversews_wait_timeout_ms ?? null;
-    this.upstream_nativemessaging_host_name = options.upstream_nativemessaging_host_name ?? null;
-    this.upstream_ws_connect_error_settle_timeout_ms = options.upstream_ws_connect_error_settle_timeout_ms ?? null;
-    this.upstream_cdp_send_timeout_ms = options.upstream_cdp_send_timeout_ms ?? 10_000;
+    this.config = ModCDPUpstreamConfigSchema.parse(options);
+    Object.assign(this, this.config);
   }
 
   async connect() {
@@ -79,19 +71,8 @@ class UpstreamTransport {
   }
 
   update(config: UpstreamTransportConfig = {}) {
-    config = ModCDPUpstreamConfigSchema.parse(config);
-    this.upstream_ws_cdp_url = config.upstream_ws_cdp_url ?? this.upstream_ws_cdp_url;
-    this.upstream_nats_url = config.upstream_nats_url ?? this.upstream_nats_url;
-    this.upstream_nats_subject_prefix = config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix;
-    this.upstream_nats_wait_timeout_ms = config.upstream_nats_wait_timeout_ms ?? this.upstream_nats_wait_timeout_ms;
-    this.upstream_reversews_bind = config.upstream_reversews_bind ?? this.upstream_reversews_bind;
-    this.upstream_reversews_wait_timeout_ms =
-      config.upstream_reversews_wait_timeout_ms ?? this.upstream_reversews_wait_timeout_ms;
-    this.upstream_nativemessaging_host_name =
-      config.upstream_nativemessaging_host_name ?? this.upstream_nativemessaging_host_name;
-    this.upstream_ws_connect_error_settle_timeout_ms =
-      config.upstream_ws_connect_error_settle_timeout_ms ?? this.upstream_ws_connect_error_settle_timeout_ms;
-    this.upstream_cdp_send_timeout_ms = config.upstream_cdp_send_timeout_ms ?? this.upstream_cdp_send_timeout_ms;
+    this.config = ModCDPUpstreamConfigSchema.parse({ ...this.config, ...config });
+    Object.assign(this, this.config);
     return this;
   }
 

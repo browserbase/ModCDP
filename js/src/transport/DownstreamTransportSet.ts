@@ -29,6 +29,7 @@ type DownstreamTransportSetConfig = ModCDPDownstreamConfig;
  * transport talks to its peers.
  */
 class DownstreamTransportSet {
+  config: ReturnType<typeof ModCDPDownstreamConfigSchema.parse>;
   downstream_client_timeout_ms: number;
   downstream_close_browser_on_disconnect: boolean;
   closeBrowser: () => void | Promise<void>;
@@ -39,18 +40,13 @@ class DownstreamTransportSet {
   private downstream_client_lease: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: DownstreamTransportSetConfig = {}) {
-    options = ModCDPDownstreamConfigSchema.parse(options);
-    this.downstream_client_timeout_ms = options.downstream_client_timeout_ms ?? DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS;
-    this.downstream_close_browser_on_disconnect = options.downstream_close_browser_on_disconnect ?? false;
-    this.closeBrowser = options.closeBrowser ?? (() => {});
+    this.config = ModCDPDownstreamConfigSchema.parse(options);
+    Object.assign(this, this.config);
   }
 
   update(config: DownstreamTransportSetConfig = {}) {
-    config = ModCDPDownstreamConfigSchema.parse(config);
-    this.downstream_client_timeout_ms = config.downstream_client_timeout_ms ?? this.downstream_client_timeout_ms;
-    this.downstream_close_browser_on_disconnect =
-      config.downstream_close_browser_on_disconnect ?? this.downstream_close_browser_on_disconnect;
-    this.closeBrowser = config.closeBrowser ?? this.closeBrowser;
+    this.config = ModCDPDownstreamConfigSchema.parse({ ...this.config, ...config });
+    Object.assign(this, this.config);
     return this;
   }
 

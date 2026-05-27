@@ -46,6 +46,8 @@ function mergeChromeArgs(existing: string[] = [], incoming: string[] = []) {
 }
 
 class BrowserLauncher {
+  config: ReturnType<typeof ModCDPLauncherConfigSchema.parse>;
+
   // setup options
   launcher_mode: LauncherMode;
   launcher_local_executable_path: string | null;
@@ -77,73 +79,23 @@ class BrowserLauncher {
   launched: LaunchedBrowser | null = null;
 
   constructor(options: LauncherConfig = {}) {
-    options = ModCDPLauncherConfigSchema.parse(options);
-    this.launcher_mode = options.launcher_mode ?? "none";
-    this.launcher_local_executable_path = options.launcher_local_executable_path ?? null;
-    this.launcher_local_user_data_dir = options.launcher_local_user_data_dir ?? null;
-    this.launcher_remote_cdp_url = options.launcher_remote_cdp_url ?? null;
-    this.launcher_local_cdp_listen_port = options.launcher_local_cdp_listen_port ?? null;
-    this.launcher_local_headless = options.launcher_local_headless;
-    this.launcher_local_sandbox = options.launcher_local_sandbox;
-    this.launcher_local_args = options.launcher_local_args;
-    this.launcher_local_extra_args = options.launcher_local_extra_args;
-    this.launcher_local_cdp_transport = options.launcher_local_cdp_transport;
-    this.launcher_local_loopback_cdp = options.launcher_local_loopback_cdp;
-    this.launcher_local_cleanup_user_data_dir = options.launcher_local_cleanup_user_data_dir;
-    this.launcher_local_chrome_ready_timeout_ms =
-      options.launcher_local_chrome_ready_timeout_ms ?? DEFAULT_CHROME_READY_TIMEOUT_MS;
-    this.launcher_local_chrome_ready_poll_interval_ms =
-      options.launcher_local_chrome_ready_poll_interval_ms ?? DEFAULT_CHROME_READY_POLL_INTERVAL_MS;
-    this.launcher_bb_api_key = options.launcher_bb_api_key ?? null;
-    this.launcher_bb_base_url = options.launcher_bb_base_url ?? null;
-    this.launcher_bb_session_id = options.launcher_bb_session_id ?? null;
-    this.launcher_bb_keep_alive = options.launcher_bb_keep_alive;
-    this.launcher_bb_close_session_on_close = options.launcher_bb_close_session_on_close;
-    this.launcher_bb_region = options.launcher_bb_region ?? null;
-    this.launcher_bb_timeout = options.launcher_bb_timeout ?? null;
-    this.launcher_bb_extension_id = options.launcher_bb_extension_id ?? null;
-    this.launcher_bb_browser_settings = options.launcher_bb_browser_settings ?? null;
-    this.launcher_bb_user_metadata = options.launcher_bb_user_metadata ?? null;
-    this.launcher_bb_session_create_params = options.launcher_bb_session_create_params ?? null;
+    this.config = ModCDPLauncherConfigSchema.parse(options);
+    Object.assign(this, this.config);
   }
 
   update(config: LauncherConfig = {}) {
-    config = ModCDPLauncherConfigSchema.parse(config);
-    this.launcher_mode = config.launcher_mode ?? this.launcher_mode;
-    this.launcher_local_executable_path = config.launcher_local_executable_path ?? this.launcher_local_executable_path;
-    this.launcher_local_user_data_dir = config.launcher_local_user_data_dir ?? this.launcher_local_user_data_dir;
-    this.launcher_remote_cdp_url = config.launcher_remote_cdp_url ?? this.launcher_remote_cdp_url;
-    this.launcher_local_cdp_listen_port = config.launcher_local_cdp_listen_port ?? this.launcher_local_cdp_listen_port;
-    this.launcher_local_headless = config.launcher_local_headless ?? this.launcher_local_headless;
-    this.launcher_local_sandbox = config.launcher_local_sandbox ?? this.launcher_local_sandbox;
-    if (config.launcher_local_args)
-      this.launcher_local_args = mergeChromeArgs(this.launcher_local_args, config.launcher_local_args);
-    if (config.launcher_local_extra_args)
-      this.launcher_local_extra_args = mergeChromeArgs(
-        this.launcher_local_extra_args,
+    const next_config = ModCDPLauncherConfigSchema.parse({ ...this.config, ...config });
+    if (config.launcher_local_args) {
+      next_config.launcher_local_args = mergeChromeArgs(this.config.launcher_local_args, config.launcher_local_args);
+    }
+    if (config.launcher_local_extra_args) {
+      next_config.launcher_local_extra_args = mergeChromeArgs(
+        this.config.launcher_local_extra_args,
         config.launcher_local_extra_args,
       );
-    this.launcher_local_cdp_transport = config.launcher_local_cdp_transport ?? this.launcher_local_cdp_transport;
-    this.launcher_local_loopback_cdp = config.launcher_local_loopback_cdp ?? this.launcher_local_loopback_cdp;
-    this.launcher_local_cleanup_user_data_dir =
-      config.launcher_local_cleanup_user_data_dir ?? this.launcher_local_cleanup_user_data_dir;
-    this.launcher_local_chrome_ready_timeout_ms =
-      config.launcher_local_chrome_ready_timeout_ms ?? this.launcher_local_chrome_ready_timeout_ms;
-    this.launcher_local_chrome_ready_poll_interval_ms =
-      config.launcher_local_chrome_ready_poll_interval_ms ?? this.launcher_local_chrome_ready_poll_interval_ms;
-    this.launcher_bb_api_key = config.launcher_bb_api_key ?? this.launcher_bb_api_key;
-    this.launcher_bb_base_url = config.launcher_bb_base_url ?? this.launcher_bb_base_url;
-    this.launcher_bb_session_id = config.launcher_bb_session_id ?? this.launcher_bb_session_id;
-    this.launcher_bb_keep_alive = config.launcher_bb_keep_alive ?? this.launcher_bb_keep_alive;
-    this.launcher_bb_close_session_on_close =
-      config.launcher_bb_close_session_on_close ?? this.launcher_bb_close_session_on_close;
-    this.launcher_bb_region = config.launcher_bb_region ?? this.launcher_bb_region;
-    this.launcher_bb_timeout = config.launcher_bb_timeout ?? this.launcher_bb_timeout;
-    this.launcher_bb_extension_id = config.launcher_bb_extension_id ?? this.launcher_bb_extension_id;
-    this.launcher_bb_browser_settings = config.launcher_bb_browser_settings ?? this.launcher_bb_browser_settings;
-    this.launcher_bb_user_metadata = config.launcher_bb_user_metadata ?? this.launcher_bb_user_metadata;
-    this.launcher_bb_session_create_params =
-      config.launcher_bb_session_create_params ?? this.launcher_bb_session_create_params;
+    }
+    this.config = next_config;
+    Object.assign(this, this.config);
     return this;
   }
 
