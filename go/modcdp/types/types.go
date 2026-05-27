@@ -313,7 +313,7 @@ type TranslatedCommand struct {
 }
 
 type UnwrappedModCDPEvent struct {
-	Event     string         `json:"event"`
-	Data      map[string]any `json:"data"`
-	SessionID *string        `json:"sessionId"`
+	Event     string  `json:"event"`
+	Data      any     `json:"data"`
+	SessionID *string `json:"sessionId"`
 }

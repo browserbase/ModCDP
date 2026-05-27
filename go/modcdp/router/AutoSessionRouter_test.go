@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/types"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 )
@@ -76,7 +77,7 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 			return nil, fmt.Errorf("%s timed out", method)
 		}
 	}
-	router = NewAutoSessionRouter(send, func() int { return 30000 })
+	router = NewAutoSessionRouter(send, types.ModCDPRouterConfig{LoopbackExecutionContextTimeoutMS: 30000})
 
 	go func() {
 		for {

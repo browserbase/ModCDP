@@ -9,35 +9,55 @@ import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+from ..translate.translate import DEFAULT_CLIENT_ROUTES
+from ..types.modcdp import ModCDPRoutes
 from ..types.toJSON import modCDPToJSON
 
 
 SendCDP = Callable[[str, Mapping[str, Any], str | None], dict[str, Any]]
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
 browserLevelDomains = {"Browser", "Target", "SystemInfo"}
+DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
+
+
+class RouterConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    router_routes: ModCDPRoutes = Field(default_factory=lambda: dict(DEFAULT_CLIENT_ROUTES))
+    loopback_execution_context_timeout_ms: int = DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS
 
 
 class AutoSessionRouter:
-    def __init__(self, send: SendCDP, defaultExecutionContextTimeoutMs: Callable[[], int], config: dict[str, Any] | None = None) -> None:
-        self.config: dict[str, Any] = {
-            "router_routes": {},
-            "loopback_execution_context_timeout_ms": defaultExecutionContextTimeoutMs(),
-            **(config or {}),
-        }
+    def __init__(self, send: SendCDP, config: RouterConfig | Mapping[str, Any] | None = None) -> None:
+        raw_config = dict(config.model_dump() if isinstance(config, RouterConfig) else config or {})
+        self.config = RouterConfig.model_validate(
+            {
+                **raw_config,
+                "router_routes": {
+                    **DEFAULT_CLIENT_ROUTES,
+                    **dict(raw_config.get("router_routes") or {}),
+                },
+            }
+        )
         self._send = send
-        self.defaultExecutionContextTimeoutMs = defaultExecutionContextTimeoutMs
         self.sessionId_from_targetId: dict[str, str] = {}
         self.targetId_from_sessionId: dict[str, str] = {}
         self.targets: dict[str, dict[str, Any]] = {}
         self.contexts: dict[str, dict[str, Any]] = {}
         self._execution_context_waiters: dict[str, list[tuple[threading.Event, dict[str, Any], Callable[[dict[str, Any]], bool]]]] = {}
         self._lock = threading.RLock()
+        self._started = False
 
     def start(self) -> None:
+        if self._started:
+            return None
         self._send("Target.setAutoAttach", targetAutoAttachParams, None)
         self._send("Target.setDiscoverTargets", {"discover": True}, None)
+        self._started = True
 
     def stop(self) -> None:
+        self._started = False
         return None
 
     def toJSON(self) -> dict[str, object]:
@@ -45,11 +65,11 @@ class AutoSessionRouter:
             self,
             {
                 "config": {
-                    "router_routes": self.config["router_routes"],
-                    "loopback_execution_context_timeout_ms": self.config["loopback_execution_context_timeout_ms"],
+                    "router_routes": self.config.router_routes,
+                    "loopback_execution_context_timeout_ms": self.config.loopback_execution_context_timeout_ms,
                 },
                 "state": {
-                    "started": False,
+                    "started": self._started,
                     "sessions": len(self.sessionId_from_targetId),
                     "targets": len(self.targets),
                     "contexts": len(self.contexts),
@@ -555,7 +575,7 @@ class AutoSessionRouter:
         waiter_key: str | None,
         timeout_ms: int | None = None,
     ) -> dict[str, Any]:
-        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.config["loopback_execution_context_timeout_ms"]
+        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.config.loopback_execution_context_timeout_ms
         with self._lock:
             for context in self.contexts.values():
                 if matches(context):

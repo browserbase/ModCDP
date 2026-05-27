@@ -23,8 +23,8 @@ from collections.abc import Mapping
 from queue import Queue, Empty
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field
-from ..router.AutoSessionRouter import AutoSessionRouter
+from pydantic import BaseModel, ConfigDict
+from ..router.AutoSessionRouter import AutoSessionRouter, RouterConfig
 from ..types.generated.cdp import AwaitableDict, CDPEvent, CDPModel, CDPParams, CDPSurfaceMixin, cdp_event_name, install_cdp_surface
 from ..types.CDPTypes import CDPTypes
 from ..launcher.BBBrowserLauncher import BBBrowserLauncher
@@ -41,7 +41,6 @@ from ..transport.UpstreamTransport import UpstreamMode, UpstreamTransport, Upstr
 from ..transport.WSUpstreamTransport import WSUpstreamTransport
 from ..translate.translate import (
     CUSTOM_EVENT_BINDING_NAME,
-    DEFAULT_CLIENT_ROUTES,
     UPSTREAM_EVENT_BINDING_NAME,
     wrap_command_if_needed,
     unwrap_event_if_needed,
@@ -52,7 +51,6 @@ from ..types.modcdp import (
     ModCDPCommandTiming,
     ModCDPConnectTiming,
     ModCDPPingLatency,
-    ModCDPRoutes,
     ModCDPServerConfig,
     CdpMessage,
     ExtensionInfo,
@@ -166,7 +164,6 @@ MODCDP_READY_EXPRESSION = (
 DEFAULT_SERVER = object()
 DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000
 DEFAULT_EVENT_WAIT_TIMEOUT_MS = 10_000
-DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
 DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS = 10_000
 DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000
 DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100
@@ -183,13 +180,6 @@ class ClientConfig(BaseModel):
     client_cdp_send_timeout_ms: int = DEFAULT_CDP_SEND_TIMEOUT_MS
     client_event_wait_timeout_ms: int = DEFAULT_EVENT_WAIT_TIMEOUT_MS
     client_heartbeat_interval_ms: int = DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS
-
-
-class RouterConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    router_routes: ModCDPRoutes = Field(default_factory=lambda: dict(DEFAULT_CLIENT_ROUTES))
-    loopback_execution_context_timeout_ms: int = DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS
 
 
 class ModCDPClient(CDPSurfaceMixin):
@@ -216,15 +206,7 @@ class ModCDPClient(CDPSurfaceMixin):
         launcher_mode = launcher_input.get("launcher_mode") or "none"
         launcher_config = LauncherConfig.model_validate({**launcher_input, "launcher_mode": launcher_mode})
         injector_config = InjectorConfig.model_validate(injector_input)
-        parsed_router_config = RouterConfig.model_validate(
-            {
-                **router_input,
-                "router_routes": {
-                    **DEFAULT_CLIENT_ROUTES,
-                    **dict(cast(Mapping[str, str], router_input.get("router_routes") or {})),
-                },
-            }
-        )
+        parsed_router_config = RouterConfig.model_validate(router_input)
         parsed_client_config = ClientConfig.model_validate(client_config_input)
         if server_config is DEFAULT_SERVER:
             parsed_server_config: ModCDPServerConfig | None = {}
@@ -285,9 +267,6 @@ class ModCDPClient(CDPSurfaceMixin):
         self._handler_wrappers: dict[tuple[str, Handler], Handler] = {}
         self.router = AutoSessionRouter(
             lambda method, params=None, session_id=None: self.upstream.send(method, dict(params or {}), session_id) or {},
-            lambda: self.injector.config.injector_execution_context_timeout_ms
-            if self.injector is not None
-            else DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
             parsed_router_config.model_dump(),
         )
         if self.config.client_hydrate_aliases:
@@ -397,7 +376,7 @@ class ModCDPClient(CDPSurfaceMixin):
         command = wrap_command_if_needed(
             method,
             command_params,
-            routes=cast(ModCDPRoutes, self.router.config["router_routes"]),
+            routes=self.router.config.router_routes,
             cdp_session_id=session_id,
         )
         if command["target"] == "direct_cdp":
@@ -506,19 +485,18 @@ class ModCDPClient(CDPSurfaceMixin):
         if upstream is not None:
             self.upstream.update(dict(upstream))
         if router is not None:
-            raw_current_routes = self.router.config.get("router_routes")
-            current_routes = dict(raw_current_routes) if isinstance(raw_current_routes, Mapping) else {}
+            current_routes = dict(self.router.config.router_routes)
             incoming_routes = dict(cast(Mapping[str, str], router.get("router_routes") or {}))
             self.router.config = RouterConfig.model_validate(
                 {
-                    **self.router.config,
+                    **self.router.config.model_dump(),
                     **dict(router),
                     "router_routes": {
                         **current_routes,
                         **incoming_routes,
                     },
                 }
-            ).model_dump()
+            )
         if server_config is not DEFAULT_SERVER:
             self.server_config = None if server_config is None else cast(ModCDPServerConfig, dict(cast(Mapping[str, JsonValue], server_config)))
         return self
@@ -560,7 +538,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "router": {
                 "loopback_execution_context_timeout_ms": self.injector.config.injector_execution_context_timeout_ms
                 if self.injector is not None
-                else self.router.config["loopback_execution_context_timeout_ms"],
+                else self.router.config.loopback_execution_context_timeout_ms,
                 **router,
             },
             "client_config": {

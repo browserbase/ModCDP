@@ -74,6 +74,7 @@ type NoneBrowserLauncher = launcher.NoneBrowserLauncher
 type InjectorConfig = types.InjectorConfig
 type ExtensionInjectionResult = types.ExtensionInjectionResult
 type SendCDP = types.SendCDP
+type RouterConfig = types.ModCDPRouterConfig
 type ExtensionInjector = injector.ExtensionInjector
 type DiscoverExtensionInjector = injector.DiscoverExtensionInjector
 type BBExtensionInjector = injector.BBExtensionInjector
@@ -161,11 +162,6 @@ func freePort() (int, error) {
 }
 
 // --- public types --------------------------------------------------------
-
-type RouterConfig struct {
-	RouterRoutes                      map[string]string `json:"router_routes,omitempty"`
-	LoopbackExecutionContextTimeoutMS int               `json:"loopback_execution_context_timeout_ms,omitempty"`
-}
 
 type DownstreamConfig struct {
 	DownstreamClientTimeoutMS          int   `json:"downstream_client_timeout_ms,omitempty"`
@@ -452,7 +448,7 @@ func New(config Config) *ModCDPClient {
 			}
 			return client.transport.Send(method, params, sessionID)
 		},
-		func() int { return client.Config.Injector.InjectorExecutionContextTimeoutMS },
+		config.Router,
 	)
 	if *client.Config.ClientConfig.ClientHydrateAliases {
 		initCDPSurface(client)
@@ -533,6 +529,15 @@ func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
 	}
 	if config.Router.LoopbackExecutionContextTimeoutMS != 0 {
 		c.Config.Router.LoopbackExecutionContextTimeoutMS = config.Router.LoopbackExecutionContextTimeoutMS
+	}
+	if c.Router != nil {
+		if c.Config.Router.RouterRoutes == nil {
+			c.Config.Router.RouterRoutes = translate.DefaultClientRoutes()
+		}
+		if c.Config.Router.LoopbackExecutionContextTimeoutMS == 0 {
+			c.Config.Router.LoopbackExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
+		}
+		c.Router.Config = c.Config.Router
 	}
 	if config.serverConfigConfigured {
 		c.Config.ServerConfig = config.ServerConfig
@@ -1407,13 +1412,13 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	params, _ := msg["params"].(map[string]any)
 	c.Router.RecordProtocolEvent(method, params, sessionID)
 	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
-		if event, data, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
-			validatedData, valid := c.Types.ParseEventPayload(event, data)
+		if unwrapped, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
+			validatedData, valid := c.Types.ParseEventPayload(unwrapped.Event, unwrapped.Data)
 			if !valid {
 				return
 			}
 			c.handlersMu.Lock()
-			hs := append([]handlerEntry(nil), c.handlers[event]...)
+			hs := append([]handlerEntry(nil), c.handlers[unwrapped.Event]...)
 			c.handlersMu.Unlock()
 			for _, h := range hs {
 				go h.handler(validatedData)

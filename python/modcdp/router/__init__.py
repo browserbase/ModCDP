@@ -2,4 +2,4 @@
 # Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
 # - ./js/src/router/AutoSessionRouter.ts
 # - ./go/modcdp/router/AutoSessionRouter.go
-from .AutoSessionRouter import AutoSessionRouter
+from .AutoSessionRouter import AutoSessionRouter, RouterConfig

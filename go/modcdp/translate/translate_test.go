@@ -147,16 +147,16 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 		"data":         map[string]any{"ready": true},
 		"cdpSessionId": "session-2",
 	})
-	event, data, ok := unwrapEventIfNeeded(
+	unwrappedEvent, ok := UnwrapEventIfNeeded(
 		"Runtime.bindingCalled",
 		map[string]any{"name": customEventBindingName, "payload": string(payload)},
 		"session-1",
 		"session-1",
 	)
-	if !ok || event != "Custom.ready" || data.(map[string]any)["ready"] != true {
-		t.Fatalf("event=%q data=%#v ok=%v", event, data, ok)
+	if !ok || unwrappedEvent.Event != "Custom.ready" || unwrappedEvent.Data.(map[string]any)["ready"] != true || unwrappedEvent.SessionID == nil || *unwrappedEvent.SessionID != "session-2" {
+		t.Fatalf("unwrappedEvent=%#v ok=%v", unwrappedEvent, ok)
 	}
-	if _, _, ok := unwrapEventIfNeeded("Runtime.consoleAPICalled", map[string]any{"name": customEventBindingName, "payload": string(payload)}, "", ""); ok {
+	if _, ok := UnwrapEventIfNeeded("Runtime.consoleAPICalled", map[string]any{"name": customEventBindingName, "payload": string(payload)}, "", ""); ok {
 		t.Fatal("expected console event to ignore binding payload")
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
 const UpstreamEventBindingName = "__ModCDP_event_from_upstream__"
@@ -151,31 +153,39 @@ func UnwrapResponseIfNeeded(result map[string]any, unwrap string) (any, error) {
 	return value, nil
 }
 
-func UnwrapEventIfNeeded(method string, params map[string]any, sessionID string, ourSessionID string) (string, any, bool) {
+func UnwrapEventIfNeeded(method string, params map[string]any, sessionID string, ourSessionID string) (*types.UnwrappedModCDPEvent, bool) {
 	if method != "Runtime.bindingCalled" {
-		return "", nil, false
+		return nil, false
 	}
 	name, _ := params["name"].(string)
 	payloadStr, _ := params["payload"].(string)
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil || payload == nil {
-		return "", nil, false
+		return nil, false
 	}
 	isUpstreamEventBinding := name == UpstreamEventBindingName
 	isCustomEventBinding := name == CustomEventBindingName
 	if !isUpstreamEventBinding && !isCustomEventBinding {
-		return "", nil, false
+		return nil, false
 	}
 	payloadEvent, _ := payload["event"].(string)
 	if payloadEvent == "" {
-		return "", nil, false
+		return nil, false
 	}
 	resolvedEvent := payloadEvent
 	if resolvedEvent == UpstreamEventBindingName || resolvedEvent == CustomEventBindingName {
-		return "", nil, false
+		return nil, false
+	}
+	sourceSessionID := sessionID
+	if payloadSessionID, ok := payload["cdpSessionId"].(string); ok {
+		sourceSessionID = payloadSessionID
+	}
+	var sourceSessionIDPtr *string
+	if sourceSessionID != "" {
+		sourceSessionIDPtr = &sourceSessionID
 	}
 	if data, ok := payload["data"]; ok {
-		return resolvedEvent, data, true
+		return &types.UnwrappedModCDPEvent{Event: resolvedEvent, Data: data, SessionID: sourceSessionIDPtr}, true
 	}
-	return resolvedEvent, payload, true
+	return &types.UnwrappedModCDPEvent{Event: resolvedEvent, Data: payload, SessionID: sourceSessionIDPtr}, true
 }

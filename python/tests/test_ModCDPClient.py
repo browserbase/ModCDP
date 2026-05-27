@@ -81,7 +81,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(injector.config.injector_service_worker_ready_timeout_ms, 6543)
         self.assertEqual(injector.config.injector_service_worker_poll_interval_ms, 76)
         self.assertEqual(injector.config.injector_target_session_poll_interval_ms, 87)
-        router_routes = cdp.router.config["router_routes"]
+        router_routes = cdp.router.config.router_routes
         if not isinstance(router_routes, Mapping):
             self.fail("router_routes must be a mapping")
         self.assertEqual(router_routes["*.*"], "direct_cdp")

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/browserbase/modcdp/go/modcdp/translate"
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
@@ -19,14 +20,15 @@ var targetAutoAttachParams = map[string]any{"autoAttach": true, "waitForDebugger
 var browserLevelDomains = map[string]bool{"Browser": true, "Target": true, "SystemInfo": true}
 
 type AutoSessionRouter struct {
-	sessionId_from_targetId          map[string]string
-	targetId_from_sessionId          map[string]string
-	targets                          map[string]map[string]any
-	contexts                         map[string]map[string]any
-	sendRaw                          AutoSessionRouterSend
-	defaultExecutionContextTimeoutMS func() int
-	execution_context_waiters        map[string][]chan executionContextResult
-	mu                               sync.Mutex
+	Config                    types.ModCDPRouterConfig
+	sessionId_from_targetId   map[string]string
+	targetId_from_sessionId   map[string]string
+	targets                   map[string]map[string]any
+	contexts                  map[string]map[string]any
+	sendRaw                   AutoSessionRouterSend
+	execution_context_waiters map[string][]chan executionContextResult
+	started                   bool
+	mu                        sync.Mutex
 }
 
 type executionContextResult struct {
@@ -35,27 +37,54 @@ type executionContextResult struct {
 	err       error
 }
 
-func NewAutoSessionRouter(send AutoSessionRouterSend, defaultExecutionContextTimeoutMS func() int) *AutoSessionRouter {
+func NewAutoSessionRouter(send AutoSessionRouterSend, config types.ModCDPRouterConfig) *AutoSessionRouter {
+	if config.RouterRoutes == nil {
+		config.RouterRoutes = translate.DefaultClientRoutes()
+	} else {
+		merged := translate.DefaultClientRoutes()
+		for key, value := range config.RouterRoutes {
+			merged[key] = value
+		}
+		config.RouterRoutes = merged
+	}
+	if config.LoopbackExecutionContextTimeoutMS == 0 {
+		config.LoopbackExecutionContextTimeoutMS = 10_000
+	}
 	return &AutoSessionRouter{
-		sessionId_from_targetId:          map[string]string{},
-		targetId_from_sessionId:          map[string]string{},
-		targets:                          map[string]map[string]any{},
-		contexts:                         map[string]map[string]any{},
-		sendRaw:                          send,
-		defaultExecutionContextTimeoutMS: defaultExecutionContextTimeoutMS,
-		execution_context_waiters:        map[string][]chan executionContextResult{},
+		Config:                    config,
+		sessionId_from_targetId:   map[string]string{},
+		targetId_from_sessionId:   map[string]string{},
+		targets:                   map[string]map[string]any{},
+		contexts:                  map[string]map[string]any{},
+		sendRaw:                   send,
+		execution_context_waiters: map[string][]chan executionContextResult{},
 	}
 }
 
 func (r *AutoSessionRouter) Start() error {
+	r.mu.Lock()
+	if r.started {
+		r.mu.Unlock()
+		return nil
+	}
+	r.mu.Unlock()
 	if _, err := r.sendRaw("Target.setAutoAttach", targetAutoAttachParams, ""); err != nil {
 		return err
 	}
-	_, err := r.sendRaw("Target.setDiscoverTargets", map[string]any{"discover": true}, "")
-	return err
+	if _, err := r.sendRaw("Target.setDiscoverTargets", map[string]any{"discover": true}, ""); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.started = true
+	r.mu.Unlock()
+	return nil
 }
 
-func (r *AutoSessionRouter) Stop() {}
+func (r *AutoSessionRouter) Stop() {
+	r.mu.Lock()
+	r.started = false
+	r.mu.Unlock()
+}
 
 func (r *AutoSessionRouter) ToJSON() map[string]any {
 	r.mu.Lock()
@@ -63,15 +92,17 @@ func (r *AutoSessionRouter) ToJSON() map[string]any {
 	targets := len(r.targets)
 	contexts := len(r.contexts)
 	waiters := len(r.execution_context_waiters)
-	timeoutMS := r.defaultExecutionContextTimeoutMS()
+	started := r.started
+	routerRoutes := cloneStringMap(r.Config.RouterRoutes)
+	timeoutMS := r.Config.LoopbackExecutionContextTimeoutMS
 	r.mu.Unlock()
 	return types.ModCDPToJSON(r, types.ModCDPJSONConfig{
 		Config: map[string]any{
-			"router_routes":                         map[string]string{},
+			"router_routes":                         routerRoutes,
 			"loopback_execution_context_timeout_ms": timeoutMS,
 		},
 		State: map[string]any{
-			"started":                   false,
+			"started":                   started,
 			"sessions":                  sessions,
 			"targets":                   targets,
 			"contexts":                  contexts,
@@ -883,7 +914,7 @@ func (r *AutoSessionRouter) findExecutionContext(targetID string, sessionID stri
 
 func (r *AutoSessionRouter) waitForExecutionContextMatching(matches func(map[string]any) bool, waiterKey string, timeoutMS int) (map[string]any, error) {
 	if timeoutMS == 0 {
-		timeoutMS = r.defaultExecutionContextTimeoutMS()
+		timeoutMS = r.Config.LoopbackExecutionContextTimeoutMS
 	}
 	r.mu.Lock()
 	for _, context := range r.contexts {
@@ -973,6 +1004,14 @@ func firstNonEmptyString(values ...string) string {
 
 func cloneMap(input map[string]any) map[string]any {
 	output := map[string]any{}
+	for key, value := range input {
+		output[key] = value
+	}
+	return output
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	output := map[string]string{}
 	for key, value := range input {
 		output[key] = value
 	}

@@ -45,7 +45,7 @@ class AutoSessionRouterTests(unittest.TestCase):
             result = response.get("result")
             return result if isinstance(result, dict) else {}
 
-        router = AutoSessionRouter(send, lambda: 30_000)
+        router = AutoSessionRouter(send, {"loopback_execution_context_timeout_ms": 30_000})
 
         def reader() -> None:
             while not closed:
