@@ -413,21 +413,15 @@ func New(config Config) *ModCDPClient {
 	if config.Types != nil {
 		typesConfig = *config.Types
 	}
+	upstream := NewWSUpstreamTransport(config.Upstream)
 	client := &ModCDPClient{
-		Config:   config,
-		Types:    NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
-		handlers: map[string][]handlerEntry{},
+		Config:    config,
+		Types:     NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
+		transport: upstream,
+		handlers:  map[string][]handlerEntry{},
 	}
 	client.Mod = ModDomain{client: client}
-	client.Router = NewAutoSessionRouter(
-		func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-			if client.transport == nil {
-				return nil, fmt.Errorf("ModCDP upstream is not connected")
-			}
-			return client.transport.Send(method, params, sessionID)
-		},
-		config.Router,
-	)
+	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, config.Router)
 	if *client.Config.ClientConfig.ClientHydrateAliases {
 		initCDPSurface(client)
 	}
@@ -651,7 +645,7 @@ func (c *ModCDPClient) Connect() error {
 }
 
 func (c *ModCDPClient) connectUpstreamTransport() error {
-	if c.transport != nil {
+	if wsTransport, ok := c.transport.(*WSUpstreamTransport); ok && wsTransport.Conn != nil {
 		return nil
 	}
 	if !isKnownLaunchMode(c.Config.Launcher.LauncherMode) {
@@ -664,7 +658,10 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		return fmt.Errorf("unknown injector.injector_mode=%s", c.Config.Injector.InjectorMode)
 	}
 	launcher := c.browserLauncher()
-	transport := c.upstreamTransport()
+	transport := c.transport
+	if transport == nil {
+		transport = c.upstreamTransport()
+	}
 	injectors := c.extensionInjectorsForConfig()
 	c.extensionInjectors = injectors
 	initialTransportConfig := c.upstreamTransportConfig()
@@ -1177,7 +1174,6 @@ func (c *ModCDPClient) Close() {
 	}
 	if c.transport != nil {
 		_ = c.transport.Close()
-		c.transport = nil
 	}
 	for _, injector := range c.extensionInjectors {
 		_ = injector.Close()
@@ -1420,7 +1416,6 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	method, _ := msg["method"].(string)
 	sessionID, _ := msg["sessionId"].(string)
 	params, _ := msg["params"].(map[string]any)
-	c.Router.RecordProtocolEvent(method, params, sessionID)
 	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
 		if unwrapped, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
 			validatedData, valid := c.Types.ParseEventPayload(unwrapped.Event, unwrapped.Data)

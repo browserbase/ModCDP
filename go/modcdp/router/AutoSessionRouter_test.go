@@ -7,18 +7,13 @@
 package router
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 	"github.com/browserbase/modcdp/go/modcdp/types"
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
 )
 
 func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testing.T) {
@@ -30,85 +25,25 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	defer chrome.Close()
-	conn, _, _, err := ws.Dial(context.Background(), chrome.CDPURL)
-	if err != nil {
+	upstream := transport.NewWSUpstreamTransport(types.UpstreamTransportConfig{
+		UpstreamMode:             "ws",
+		UpstreamWSCDPURL:         chrome.CDPURL,
+		UpstreamCDPSendTimeoutMS: 10000,
+	})
+	if err := upstream.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer upstream.Close()
 
-	type pendingResponse struct {
-		ch chan map[string]any
+	router := NewAutoSessionRouter(&upstream.UpstreamTransport, types.ModCDPRouterConfig{LoopbackExecutionContextTimeoutMS: 30000})
+	if err := router.Start(); err != nil {
+		t.Fatal(err)
 	}
-	nextID := int64(0)
-	pending := map[int64]pendingResponse{}
-	done := make(chan struct{})
-	var writeMu sync.Mutex
-	var pendingMu sync.Mutex
-	var router *AutoSessionRouter
+	defer router.Stop()
+
 	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-		pendingMu.Lock()
-		nextID += 1
-		id := nextID
-		response := pendingResponse{ch: make(chan map[string]any, 1)}
-		pending[id] = response
-		pendingMu.Unlock()
-		message := map[string]any{"id": id, "method": method, "params": params}
-		if sessionID != "" {
-			message["sessionId"] = sessionID
-		}
-		body, _ := json.Marshal(message)
-		writeMu.Lock()
-		err := wsutil.WriteClientText(conn, body)
-		writeMu.Unlock()
-		if err != nil {
-			return nil, err
-		}
-		select {
-		case received := <-response.ch:
-			if rawError, ok := received["error"]; ok {
-				return nil, fmt.Errorf("%v", rawError)
-			}
-			result, _ := received["result"].(map[string]any)
-			if result == nil {
-				result = map[string]any{}
-			}
-			return result, nil
-		case <-time.After(10 * time.Second):
-			return nil, fmt.Errorf("%s timed out", method)
-		}
+		return upstream.Send(method, params, sessionID)
 	}
-	router = NewAutoSessionRouter(send, types.ModCDPRouterConfig{LoopbackExecutionContextTimeoutMS: 30000})
-
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			default:
-			}
-			data, err := wsutil.ReadServerText(conn)
-			if err != nil {
-				return
-			}
-			var message map[string]any
-			if err := json.Unmarshal(data, &message); err != nil {
-				return
-			}
-			if id, ok := int64FromAny(message["id"]); ok {
-				pendingMu.Lock()
-				response, found := pending[id]
-				delete(pending, id)
-				pendingMu.Unlock()
-				if found {
-					response.ch <- message
-				}
-				continue
-			}
-			method, _ := message["method"].(string)
-			sessionID, _ := message["sessionId"].(string)
-			router.RecordProtocolEvent(method, message["params"], sessionID)
-		}
-	}()
 
 	var targetID string
 	var pendingTargetID string
@@ -119,15 +54,8 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		if pendingTargetID != "" {
 			_, _ = send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, "")
 		}
-		close(done)
 	}()
 
-	if _, err := send("Target.setAutoAttach", map[string]any{"autoAttach": true, "waitForDebuggerOnStart": false, "flatten": true}, ""); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := send("Target.setDiscoverTargets", map[string]any{"discover": true}, ""); err != nil {
-		t.Fatal(err)
-	}
 	created, err := send("Target.createTarget", map[string]any{"url": "about:blank#modcdp-auto-session-router"}, "")
 	if err != nil {
 		t.Fatal(err)
@@ -227,17 +155,4 @@ func waitForString(t *testing.T, fn func() string) string {
 	}
 	t.Fatal("timed out waiting for string")
 	return ""
-}
-
-func int64FromAny(value any) (int64, bool) {
-	switch typed := value.(type) {
-	case int64:
-		return typed, true
-	case int:
-		return int64(typed), true
-	case float64:
-		return int64(typed), true
-	default:
-		return 0, false
-	}
 }

@@ -11,22 +11,22 @@ import (
 	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/translate"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
-
-type AutoSessionRouterSend func(method string, params map[string]any, sessionID string) (map[string]any, error)
 
 var targetAutoAttachParams = map[string]any{"autoAttach": true, "waitForDebuggerOnStart": false, "flatten": true}
 var browserLevelDomains = map[string]bool{"Browser": true, "Target": true, "SystemInfo": true}
 
 type AutoSessionRouter struct {
 	Config                    types.ModCDPRouterConfig
+	upstream                  *transport.UpstreamTransport
 	sessionId_from_targetId   map[string]string
 	targetId_from_sessionId   map[string]string
 	targets                   map[string]map[string]any
 	contexts                  map[string]map[string]any
-	sendRaw                   AutoSessionRouterSend
 	execution_context_waiters map[string][]chan executionContextResult
+	subscription_cleanups     []func()
 	started                   bool
 	mu                        sync.Mutex
 }
@@ -37,7 +37,7 @@ type executionContextResult struct {
 	err       error
 }
 
-func NewAutoSessionRouter(send AutoSessionRouterSend, config types.ModCDPRouterConfig) *AutoSessionRouter {
+func NewAutoSessionRouter(upstream *transport.UpstreamTransport, config types.ModCDPRouterConfig) *AutoSessionRouter {
 	if config.RouterRoutes == nil {
 		config.RouterRoutes = translate.DefaultClientRoutes()
 	} else {
@@ -52,12 +52,13 @@ func NewAutoSessionRouter(send AutoSessionRouterSend, config types.ModCDPRouterC
 	}
 	return &AutoSessionRouter{
 		Config:                    config,
+		upstream:                  upstream,
 		sessionId_from_targetId:   map[string]string{},
 		targetId_from_sessionId:   map[string]string{},
 		targets:                   map[string]map[string]any{},
 		contexts:                  map[string]map[string]any{},
-		sendRaw:                   send,
 		execution_context_waiters: map[string][]chan executionContextResult{},
+		subscription_cleanups:     []func(){},
 	}
 }
 
@@ -67,23 +68,29 @@ func (r *AutoSessionRouter) Start() error {
 		r.mu.Unlock()
 		return nil
 	}
-	r.mu.Unlock()
-	if _, err := r.sendRaw("Target.setAutoAttach", targetAutoAttachParams, ""); err != nil {
-		return err
-	}
-	if _, err := r.sendRaw("Target.setDiscoverTargets", map[string]any{"discover": true}, ""); err != nil {
-		return err
-	}
-	r.mu.Lock()
+	r.subscription_cleanups = r.listen()
 	r.started = true
 	r.mu.Unlock()
+	if _, err := r.upstream.Send("Target.setAutoAttach", targetAutoAttachParams, ""); err != nil {
+		r.Stop()
+		return err
+	}
+	if _, err := r.upstream.Send("Target.setDiscoverTargets", map[string]any{"discover": true}, ""); err != nil {
+		r.Stop()
+		return err
+	}
 	return nil
 }
 
 func (r *AutoSessionRouter) Stop() {
 	r.mu.Lock()
+	cleanups := r.subscription_cleanups
+	r.subscription_cleanups = []func(){}
 	r.started = false
 	r.mu.Unlock()
+	for _, cleanup := range cleanups {
+		cleanup()
+	}
 }
 
 func (r *AutoSessionRouter) ToJSON() map[string]any {
@@ -132,10 +139,10 @@ func (r *AutoSessionRouter) Send(method string, params map[string]any, requested
 				return nil, err
 			}
 		}
-		return r.sendRaw(method, routedParams, requestedSessionID)
+		return r.upstream.Send(method, routedParams, requestedSessionID)
 	}
 	if browserLevelDomains[domain] {
-		return r.sendRaw(method, params, "")
+		return r.upstream.Send(method, params, "")
 	}
 	targetID, err := r.resolveTargetID(params)
 	if err != nil {
@@ -152,7 +159,7 @@ func (r *AutoSessionRouter) Send(method string, params map[string]any, requested
 			return nil, err
 		}
 	}
-	return r.sendRaw(method, routedParams, sessionID)
+	return r.upstream.Send(method, routedParams, sessionID)
 }
 
 func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
@@ -162,7 +169,7 @@ func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
 	if sessionID != "" {
 		return sessionID
 	}
-	result, err := r.sendRaw("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "")
+	result, err := r.upstream.Send("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "")
 	if err != nil {
 		return ""
 	}
@@ -208,7 +215,7 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 		}
 	}
 	if resolvedTargetID == "" {
-		created, err := r.sendRaw("Target.createTarget", map[string]any{"url": "about:blank#modcdp"}, "")
+		created, err := r.upstream.Send("Target.createTarget", map[string]any{"url": "about:blank#modcdp"}, "")
 		if err != nil {
 			return "", "", err
 		}
@@ -226,7 +233,39 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 	return resolvedTargetID, sessionID, nil
 }
 
-func (r *AutoSessionRouter) RecordProtocolEvent(method string, data any, sessionID string) {
+func (r *AutoSessionRouter) listen() []func() {
+	return []func(){
+		r.upstream.On("Target.attachedToTarget", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Target.attachedToTarget", event, sessionID)
+		}),
+		r.upstream.On("Target.detachedFromTarget", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Target.detachedFromTarget", event, sessionID)
+		}),
+		r.upstream.On("Target.targetInfoChanged", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Target.targetInfoChanged", event, sessionID)
+		}),
+		r.upstream.On("Target.targetDestroyed", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Target.targetDestroyed", event, sessionID)
+		}),
+		r.upstream.On("Runtime.executionContextCreated", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextCreated", event, sessionID)
+		}),
+		r.upstream.On("Runtime.executionContextDestroyed", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextDestroyed", event, sessionID)
+		}),
+		r.upstream.On("Runtime.executionContextsCleared", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextsCleared", event, sessionID)
+		}),
+		r.upstream.On("Page.frameNavigated", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Page.frameNavigated", event, sessionID)
+		}),
+		r.upstream.On("Page.frameDetached", func(event map[string]any, _ string, sessionID string) {
+			r.recordProtocolEvent("Page.frameDetached", event, sessionID)
+		}),
+	}
+}
+
+func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, sessionID string) {
 	eventData, _ := data.(map[string]any)
 	if eventData == nil {
 		eventData = map[string]any{}
@@ -331,7 +370,7 @@ func (r *AutoSessionRouter) EnsureExecutionContext(frame map[string]string, sele
 	if existing != nil {
 		return existing, nil
 	}
-	if _, err := r.sendRaw("Runtime.enable", map[string]any{}, sessionID); err != nil {
+	if _, err := r.upstream.Send("Runtime.enable", map[string]any{}, sessionID); err != nil {
 		return nil, err
 	}
 	if selector["world"] == "isolated" || selector["world"] == "piercer" {
@@ -341,7 +380,7 @@ func (r *AutoSessionRouter) EnsureExecutionContext(frame map[string]string, sele
 		} else if selector["worldName"] != "" {
 			params["worldName"] = selector["worldName"]
 		}
-		created, err := r.sendRaw("Page.createIsolatedWorld", params, sessionID)
+		created, err := r.upstream.Send("Page.createIsolatedWorld", params, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +415,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		params = map[string]any{}
 	}
 	objectGroup := fmt.Sprintf("modcdp-topology-%d", time.Now().UnixMilli())
-	targetResult, err := r.sendRaw("Target.getTargets", map[string]any{}, "")
+	targetResult, err := r.upstream.Send("Target.getTargets", map[string]any{}, "")
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +439,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 	if err != nil {
 		return nil, err
 	}
-	rootTreeResult, err := r.sendRaw("Page.getFrameTree", map[string]any{}, rootSessionID)
+	rootTreeResult, err := r.upstream.Send("Page.getFrameTree", map[string]any{}, rootSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +462,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		frameTreeResult, err := r.sendRaw("Page.getFrameTree", map[string]any{}, sessionID)
+		frameTreeResult, err := r.upstream.Send("Page.getFrameTree", map[string]any{}, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -449,7 +488,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		owner, err := r.sendRaw("DOM.getFrameOwner", map[string]any{"frameId": frameID}, parentSessionID)
+		owner, err := r.upstream.Send("DOM.getFrameOwner", map[string]any{"frameId": frameID}, parentSessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -477,7 +516,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		} else {
 			evaluateParams["contextId"] = contextID
 		}
-		rootObject, err := r.sendRaw("Runtime.evaluate", evaluateParams, contextSessionID)
+		rootObject, err := r.upstream.Send("Runtime.evaluate", evaluateParams, contextSessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +525,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		if objectID == "" {
 			return nil, fmt.Errorf("Mod.getTopology could not resolve document root for frameId=%s.", frameID)
 		}
-		described, err := r.sendRaw("DOM.describeNode", map[string]any{"objectId": objectID}, contextSessionID)
+		described, err := r.upstream.Send("DOM.describeNode", map[string]any{"objectId": objectID}, contextSessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -521,7 +560,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		document, err := r.sendRaw("DOM.getDocument", map[string]any{"depth": -1, "pierce": true}, sessionID)
+		document, err := r.upstream.Send("DOM.getDocument", map[string]any{"depth": -1, "pierce": true}, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -598,7 +637,7 @@ func (r *AutoSessionRouter) enableTarget(targetID string) (string, string, error
 		{method: "Runtime.enable", params: map[string]any{}},
 		{method: "Target.setAutoAttach", params: targetAutoAttachParams},
 	} {
-		if _, err := r.sendRaw(command.method, command.params, sessionID); err != nil && command.method != "Target.setAutoAttach" {
+		if _, err := r.upstream.Send(command.method, command.params, sessionID); err != nil && command.method != "Target.setAutoAttach" {
 			return "", "", err
 		}
 	}
@@ -656,7 +695,7 @@ func (r *AutoSessionRouter) recordShadowRoots(node map[string]any, frames map[st
 				if context != nil && backendNodeIDOK {
 					contextSessionID, _ := context["sessionId"].(string)
 					contextID, _ := intFromAny(context["id"])
-					resolved, err := r.sendRaw(
+					resolved, err := r.upstream.Send(
 						"DOM.resolveNode",
 						map[string]any{"backendNodeId": backendNodeID, "executionContextId": contextID, "objectGroup": objectGroup},
 						contextSessionID,
@@ -957,7 +996,7 @@ func (r *AutoSessionRouter) resolveTargetID(params map[string]any) (string, erro
 	if explicitTargetID != "" {
 		return explicitTargetID, nil
 	}
-	result, err := r.sendRaw("Target.getTargets", map[string]any{}, "")
+	result, err := r.upstream.Send("Target.getTargets", map[string]any{}, "")
 	if err != nil {
 		return "", err
 	}
