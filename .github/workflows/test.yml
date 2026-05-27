@@ -93,6 +93,15 @@ jobs:
             mode: debugger
           - upstream: nativemessaging
             mode: direct
+          # Native messaging is a Chrome-launched host process contract, not a
+          # standalone shell process. The shell demo would only write native
+          # message frames to stdout and wait forever for a browser-owned host.
+          - client: js
+            upstream: nativemessaging
+            mode: loopback
+          - client: js
+            upstream: nativemessaging
+            mode: debugger
     env:
       CI: "true"
       CHROME_PATH: /usr/bin/chromium
