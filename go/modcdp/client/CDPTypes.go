@@ -137,9 +137,18 @@ var modConfigureParamsSchema = map[string]any{
 			},
 			"additionalProperties": false,
 		},
-		"custom_commands":    map[string]any{"type": "array", "items": modCommandRegistrationSchema},
-		"custom_events":      map[string]any{"type": "array", "items": modEventRegistrationSchema},
-		"custom_middlewares": map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
+		"downstream": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"downstream_client_timeout_ms":           map[string]any{"type": "number"},
+				"downstream_close_browser_on_disconnect": map[string]any{"type": "boolean"},
+			},
+			"additionalProperties": false,
+		},
+		"server_browser_token": map[string]any{"type": "string"},
+		"custom_commands":      map[string]any{"type": "array", "items": modCommandRegistrationSchema},
+		"custom_events":        map[string]any{"type": "array", "items": modEventRegistrationSchema},
+		"custom_middlewares":   map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
 	},
 	"additionalProperties": false,
 }
@@ -540,22 +549,22 @@ func (types *CDPTypes) ParseCommandResult(method string, result any) (any, error
 	return result, nil
 }
 
-func (types *CDPTypes) ParseEventPayload(event string, payload any) (any, bool) {
+func (types *CDPTypes) ParseEventPayload(event string, payload any) (any, error) {
 	schema, ok := types.EventPayloadSchema(event)
 	if !ok {
-		return payload, true
+		return payload, nil
 	}
 	if err := abxjsonschema.Validate(schema, payload); err != nil {
 		if payloadMap, ok := payload.(map[string]any); ok && len(payloadMap) == 1 {
 			if value, exists := payloadMap["value"]; exists {
 				if valueErr := abxjsonschema.Validate(schema, value); valueErr == nil {
-					return payload, true
+					return payload, nil
 				}
 			}
 		}
-		panic(fmt.Errorf("%s event did not match event_schema: %w", event, err))
+		return nil, fmt.Errorf("%s event did not match event_schema: %w", event, err)
 	}
-	return payload, true
+	return payload, nil
 }
 
 func (types *CDPTypes) AddCustomCommand(command CustomCommand) (string, bool, error) {

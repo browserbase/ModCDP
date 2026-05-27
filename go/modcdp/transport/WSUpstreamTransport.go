@@ -52,6 +52,12 @@ func (t *WSUpstreamTransport) Update(config map[string]any) {
 }
 
 func (t *WSUpstreamTransport) Connect() error {
+	t.writeMu.Lock()
+	if t.Conn != nil {
+		t.writeMu.Unlock()
+		return nil
+	}
+	t.writeMu.Unlock()
 	if t.URL == "" {
 		return fmt.Errorf("WSUpstreamTransport requires upstream_ws_cdp_url or launcher-provided cdp_url")
 	}
@@ -61,6 +67,7 @@ func (t *WSUpstreamTransport) Connect() error {
 		return err
 	}
 	t.URL = resolvedURL
+	t.Config.UpstreamWSCDPURL = resolvedURL
 	conn, _, _, err := ws.Dial(context.Background(), t.URL)
 	if err != nil {
 		return err

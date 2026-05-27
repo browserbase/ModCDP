@@ -21,7 +21,7 @@ import threading
 import time
 from collections.abc import Mapping
 from queue import Queue, Empty
-from typing import Any, cast
+from typing import Any
 
 from ..router.AutoSessionRouter import AutoSessionRouter, RouterConfig
 from ..types.generated.cdp import AwaitableDict, CDPEvent, CDPModel, CDPParams, CDPSurfaceMixin, cdp_event_name, install_cdp_surface
@@ -60,10 +60,6 @@ from ..types.modcdp import (
     ProtocolResult,
 )
 from ..types.toJSON import modCDPToJSON
-
-
-def _defaulted(value: Any, fallback: Any) -> Any:
-    return fallback if value is None else value
 
 
 class AwaitableValue:
@@ -250,11 +246,7 @@ class ModCDPClient(CDPSurfaceMixin):
         if isinstance(types, CDPTypes):
             self.types = types
         elif isinstance(types, Mapping):
-            self.types = CDPTypes(
-                cast(Any, types.get("custom_commands")),
-                cast(Any, types.get("custom_events")),
-                cast(Any, types.get("custom_middlewares")),
-            )
+            self.types = CDPTypes(types)
         else:
             self.types = CDPTypes()
 
@@ -301,7 +293,7 @@ class ModCDPClient(CDPSurfaceMixin):
         transport_started_at = int(time.time() * 1000)
         self._connect_upstream_transport()
         transport_connected_at = int(time.time() * 1000)
-        self.upstream.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
+        self.upstream.onRecv(lambda message: self._on_recv(message))
         self.upstream.onClose(lambda error: self._handle_transport_close(error))
 
         if self.injector is None and self.server_config is None:
@@ -445,9 +437,9 @@ class ModCDPClient(CDPSurfaceMixin):
         if not isinstance(event, str):
             event_class = event
 
-            def typed_handler(payload):
+            def typed_handler(payload: object, session_id: str | None = None) -> object:
                 typed_payload = event_class.model_validate(payload) if isinstance(payload, Mapping) else payload
-                return handler(typed_payload)
+                return _call_handler(handler, typed_payload, session_id)
 
             wrapped_handler = typed_handler
         self._handler_wrappers[(event_name, handler)] = wrapped_handler
@@ -457,9 +449,9 @@ class ModCDPClient(CDPSurfaceMixin):
         return self
 
     def once(self, event: str | type[CDPEvent], handler: Handler) -> "ModCDPClient":
-        def wrapped_handler(payload: Any) -> Any:
+        def wrapped_handler(payload: object, session_id: str | None = None) -> object:
             self.off(event, wrapped_handler)
-            return handler(payload)
+            return _call_handler(handler, payload, session_id)
 
         return self.on(event, wrapped_handler)
 
@@ -496,7 +488,8 @@ class ModCDPClient(CDPSurfaceMixin):
             self.upstream.update(dict(upstream))
         if router is not None:
             current_routes = dict(self.router.config.router_routes)
-            incoming_routes = dict(cast(Mapping[str, str], router.get("router_routes") or {}))
+            raw_incoming_routes = router.get("router_routes") or {}
+            incoming_routes = {str(key): str(value) for key, value in raw_incoming_routes.items()} if isinstance(raw_incoming_routes, Mapping) else {}
             self.router.config = RouterConfig.model_validate(
                 {
                     **self.router.config.model_dump(),
@@ -511,9 +504,10 @@ class ModCDPClient(CDPSurfaceMixin):
             self.server_config = None if server_config is None else ModCDPServerConfig.model_validate(server_config)
         return self
 
-    def _run_handler(self, handler: Handler, payload: Any, event_name: str) -> None:
+    def _run_handler(self, handler: Handler, *args: object) -> None:
+        event_name = str(args[0]) if args else ""
         try:
-            result = handler(payload)
+            result = _call_handler(handler, *args)
             if inspect.iscoroutine(result):
                 asyncio.run(result)
         except Exception as e:
@@ -586,10 +580,26 @@ class ModCDPClient(CDPSurfaceMixin):
 
     def _handle_transport_close(self, error: Exception) -> None:
         self._stop_heartbeat()
+        self._emit_event("error", error, None)
 
     def _start_heartbeat(self) -> None:
         self._stop_heartbeat()
-        return
+        if self.server_config is None or self.server_config.downstream is None:
+            return
+        if self.server_config.downstream.downstream_close_browser_on_disconnect is not True:
+            return
+        stop = threading.Event()
+
+        def heartbeat() -> None:
+            while not stop.wait(self.config.client_heartbeat_interval_ms / 1000):
+                try:
+                    self.send("Mod.ping", {"sent_at": int(time.time() * 1000)})
+                except Exception:
+                    pass
+
+        self._heartbeat_stop = stop
+        self._heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+        self._heartbeat_thread.start()
 
     def _stop_heartbeat(self) -> None:
         stop = self._heartbeat_stop
@@ -631,7 +641,8 @@ class ModCDPClient(CDPSurfaceMixin):
             self.upstream.config = UpstreamTransportConfig.model_validate({**self.upstream.config.model_dump(), "upstream_ws_cdp_url": transport.url})
         server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream.config.upstream_mode == "ws" and transport.url else {}
         server_config.update(launcher.configForServer(transport))
-        server_upstream = cast(Mapping[str, Any], server_config.get("upstream") or {})
+        raw_server_upstream = server_config.get("upstream") or {}
+        server_upstream = raw_server_upstream if isinstance(raw_server_upstream, Mapping) else {}
         server_upstream_ws_cdp_url = server_upstream.get("upstream_ws_cdp_url")
         if self.server_config is not None and server_upstream_ws_cdp_url:
             configured_loopback = self.server_config.upstream.upstream_ws_cdp_url if self.server_config.upstream is not None else None
@@ -706,14 +717,32 @@ class ModCDPClient(CDPSurfaceMixin):
             )
             if u:
                 validated_payload = self.types.parseEventPayload(u.event, u.data)
-                for handler in list(self._handlers.get(u.event, [])):
-                    def run_wrapped_event(handler=handler, payload=validated_payload, event_name=u.event):
-                        self._run_handler(handler, payload, event_name)
-                    threading.Thread(target=run_wrapped_event, daemon=True).start()
+                self._emit_event(u.event, validated_payload, u.sessionId)
             return
         if isinstance(method, str):
             validated_payload = self.types.parseEventPayload(method, dict(params))
-            for handler in list(self._handlers.get(method, [])):
-                def run_method_event(handler=handler, payload=validated_payload, event_name=method):
-                    self._run_handler(handler, payload, event_name)
-                threading.Thread(target=run_method_event, daemon=True).start()
+            session_id = msg.get("sessionId")
+            self._emit_event(method, validated_payload, session_id if isinstance(session_id, str) else None)
+
+    def _emit_event(self, event_name: str, payload: object, session_id: str | None) -> None:
+        for handler in list(self._handlers.get(event_name, [])):
+            def run_method_event(handler=handler, payload=payload, session_id=session_id):
+                self._run_handler(handler, payload, session_id)
+            threading.Thread(target=run_method_event, daemon=True).start()
+        for handler in list(self._handlers.get("*", [])):
+            def run_wildcard_event(handler=handler, event_name=event_name, payload=payload, session_id=session_id):
+                self._run_handler(handler, event_name, payload, session_id)
+            threading.Thread(target=run_wildcard_event, daemon=True).start()
+
+
+def _call_handler(handler: Handler, *args: object) -> object:
+    signature = inspect.signature(handler)
+    parameters = list(signature.parameters.values())
+    if any(parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in parameters):
+        return handler(*args)
+    positional_parameters = [
+        parameter
+        for parameter in parameters
+        if parameter.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    return handler(*args[: len(positional_parameters)])

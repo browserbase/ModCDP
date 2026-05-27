@@ -192,14 +192,16 @@ class ModCDPClientProtocolValidationTests(unittest.TestCase):
     def test_client_types_update_replaces_the_registry_with_extended_runtime_validation_and_preserves_static_custom_aliases_on_typed_clients(self) -> None:
         client = ModCDPClient(launcher={"launcher_mode": "none"}, upstream={"upstream_mode": "ws"}, injector={"injector_mode": "none"}, server_config=None)
         updated_types = client.types.update(
-            custom_commands={
-                "Custom.updated": {
-                    "params_schema": UpdatedParams,
-                    "result_schema": UpdatedResult,
-                }
-            },
-            custom_events={"Custom.updatedReady": {"event_schema": UpdatedReadyEvent}},
-            custom_middlewares=[{"name": "Custom.updated", "phase": "request", "expression": "async (payload, next) => next(payload)"}],
+            {
+                "custom_commands": {
+                    "Custom.updated": {
+                        "params_schema": UpdatedParams,
+                        "result_schema": UpdatedResult,
+                    }
+                },
+                "custom_events": {"Custom.updatedReady": {"event_schema": UpdatedReadyEvent}},
+                "custom_middlewares": [{"name": "Custom.updated", "phase": "request", "expression": "async (payload, next) => next(payload)"}],
+            }
         )
         typed_client = ModCDPClient(
             launcher={"launcher_mode": "none"},

@@ -59,7 +59,6 @@ class BBBrowserLauncher(BrowserLauncher):
                 _object_value(session_create_params.get("browserSettings")).get("extensionId"),
             )
             region = _first_string(merged.launcher_bb_region, session_create_params.get("region"))
-            viewport = _object_value(browser_settings.get("viewport"))
             body: dict[str, Any] = {
                 **session_create_params,
                 **({"keepAlive": True} if keep_alive else {}),
@@ -69,7 +68,7 @@ class BBBrowserLauncher(BrowserLauncher):
                 "browserSettings": {
                     **browser_settings,
                     **({"extensionId": extension_id} if extension_id else {}),
-                    "viewport": viewport if viewport.get("width") else DEFAULT_BROWSERBASE_VIEWPORT,
+                    "viewport": browser_settings.get("viewport"),
                 },
                 "userMetadata": {
                     **user_metadata,

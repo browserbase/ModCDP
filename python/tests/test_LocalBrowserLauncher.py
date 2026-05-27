@@ -6,14 +6,12 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from websocket import create_connection
-
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
+from modcdp.transport.WSUpstreamTransport import WSUpstreamTransport
 
 
 class LocalBrowserLauncherTests(unittest.TestCase):
@@ -34,15 +32,16 @@ class LocalBrowserLauncherTests(unittest.TestCase):
             cdp_url = chrome["cdp_url"]
             if cdp_url is None:
                 raise AssertionError("expected launcher to return cdp_url")
-            ws = create_connection(cdp_url, timeout=10)
+            transport = WSUpstreamTransport({"upstream_ws_cdp_url": cdp_url})
+            transport.connect()
 
             try:
                 self.assertEqual(chrome.get("cdp_listen_port"), port)
                 self.assertRegex(cdp_url, rf"^ws://127\.0\.0\.1:{port}/")
                 self.assertEqual(chrome.get("profile_dir"), user_data_dir)
-                expect_cdp_browser_surface(ws)
+                expect_cdp_browser_surface(transport)
             finally:
-                ws.close()
+                transport.close()
                 chrome["close"]()
 
             self.assertTrue(Path(user_data_dir).exists())
@@ -63,45 +62,22 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         self.assertFalse(Path(user_data_dir).exists())
 
 
-# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
-# Keep the setup semantics above 1:1 with translated tests; helpers here only send real CDP messages to real browser endpoints.
-def send_ws_cdp(ws, request_id: int, method: str, params: dict | None = None, session_id: str | None = None) -> dict:
-    message: dict[str, object] = {"id": request_id, "method": method, "params": params or {}}
-    if session_id is not None:
-        message["sessionId"] = session_id
-    ws.send(json.dumps(message))
-    while True:
-        response = json.loads(ws.recv())
-        if not isinstance(response, dict):
-            raise AssertionError(f"CDP response is not an object: {response!r}")
-        if response.get("id") != request_id:
-            continue
-        if "error" in response:
-            raise AssertionError(f"CDP response error: {response!r}")
-        result = response.get("result", {})
-        if not isinstance(result, dict):
-            raise AssertionError(f"CDP response result is not an object: {response!r}")
-        return result
-
-
-def expect_cdp_browser_surface(ws) -> None:
-    version = send_ws_cdp(ws, 1, "Browser.getVersion")
+def expect_cdp_browser_surface(transport: WSUpstreamTransport) -> None:
+    version = transport.send("Browser.getVersion")
     expect_version_result(version)
 
-    created = send_ws_cdp(ws, 2, "Target.createTarget", {"url": "about:blank#modcdp-launcher-test"})
+    created = transport.send("Target.createTarget", {"url": "about:blank#modcdp-launcher-test"})
     target_id = created.get("targetId")
     if not isinstance(target_id, str):
         raise AssertionError(f"Target.createTarget result = {created!r}")
 
     try:
-        attached = send_ws_cdp(ws, 3, "Target.attachToTarget", {"targetId": target_id, "flatten": True})
+        attached = transport.send("Target.attachToTarget", {"targetId": target_id, "flatten": True})
         session_id = attached.get("sessionId")
         if not isinstance(session_id, str):
             raise AssertionError(f"Target.attachToTarget result = {attached!r}")
-        send_ws_cdp(ws, 4, "Runtime.enable", {}, session_id)
-        evaluated = send_ws_cdp(
-            ws,
-            5,
+        transport.send("Runtime.enable", {}, session_id)
+        evaluated = transport.send(
             "Runtime.evaluate",
             {"expression": "(() => ({ ok: true, value: 42 }))()", "returnByValue": True},
             session_id,
@@ -111,7 +87,7 @@ def expect_cdp_browser_surface(ws) -> None:
             raise AssertionError(f"Runtime.evaluate result = {evaluated!r}")
     finally:
         try:
-            send_ws_cdp(ws, 6, "Target.closeTarget", {"targetId": target_id})
+            transport.send("Target.closeTarget", {"targetId": target_id})
         except Exception:
             pass
 

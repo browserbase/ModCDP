@@ -85,14 +85,15 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		fmt.Sprintf("--user-data-dir=%s", profileDir),
 	}
 	args = append(args, "--remote-debugging-address=127.0.0.1", fmt.Sprintf("--remote-debugging-port=%d", port))
-	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
+	defaultHeadless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
+	headless := defaultHeadless
 	if config.LauncherLocalHeadless != nil {
 		headless = *config.LauncherLocalHeadless
 	}
 	if headless {
 		args = append(args, "--headless=new")
 	}
-	sandbox := !headless
+	sandbox := !defaultHeadless
 	if config.LauncherLocalSandbox != nil {
 		sandbox = *config.LauncherLocalSandbox
 	}

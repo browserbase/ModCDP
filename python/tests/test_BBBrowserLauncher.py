@@ -11,11 +11,9 @@ import os
 import time
 import unittest
 import urllib.request
-from typing import Any, cast
-
-from websocket import create_connection
 
 from modcdp.launcher.BBBrowserLauncher import BBBrowserLauncher
+from modcdp.transport.WSUpstreamTransport import WSUpstreamTransport
 
 
 LIVE_BROWSERBASE_TIMEOUT_S = 120
@@ -26,7 +24,7 @@ class BBBrowserLauncherTests(unittest.TestCase):
         if not os.environ.get("BROWSERBASE_API_KEY", "").strip():
             self.fail("BROWSERBASE_API_KEY is required for live Browserbase tests")
         launcher = BBBrowserLauncher(
-            cast(Any, {
+            {
                 "launcher_bb_timeout": 120,
                 **({"launcher_bb_region": os.environ["BROWSERBASE_REGION"]} if os.environ.get("BROWSERBASE_REGION") else {}),
                 "launcher_bb_browser_settings": {
@@ -36,11 +34,11 @@ class BBBrowserLauncherTests(unittest.TestCase):
                 "launcher_bb_user_metadata": {
                     "modcdp_launcher_test": "BBBrowserLauncher",
                 },
-            })
+            }
         )
         browser = launcher.launch()
         resumed = None
-        ws = None
+        transport = None
         session_id = browser.get("browserbase_session_id")
         try:
             if not isinstance(session_id, str):
@@ -50,8 +48,9 @@ class BBBrowserLauncherTests(unittest.TestCase):
             if not isinstance(cdp_url, str):
                 self.fail(f"cdp_url = {cdp_url!r}")
             self.assertRegex(cdp_url, r"^wss://")
-            ws = create_connection(cdp_url, timeout=LIVE_BROWSERBASE_TIMEOUT_S)
-            expect_cdp_browser_surface(ws)
+            transport = WSUpstreamTransport({"upstream_ws_cdp_url": cdp_url})
+            transport.connect()
+            expect_cdp_browser_surface(transport)
 
             retrieved = retrieve_browserbase_session(session_id)
             self.assertEqual(retrieved.get("id"), session_id)
@@ -65,10 +64,10 @@ class BBBrowserLauncherTests(unittest.TestCase):
             ).launch()
             self.assertEqual(resumed.get("browserbase_session_id"), session_id)
             self.assertRegex(resumed.get("cdp_url") or "", r"^wss://")
-            expect_cdp_browser_surface(ws)
+            expect_cdp_browser_surface(transport)
         finally:
-            if ws is not None:
-                ws.close()
+            if transport is not None:
+                transport.close()
             if resumed is not None:
                 resumed["close"]()
             browser["close"]()
@@ -100,13 +99,11 @@ def browserbase_api_url(pathname: str) -> str:
     return f"{base_url}/{pathname.lstrip('/')}"
 
 
-def expect_cdp_browser_surface(ws) -> None:
-    ws.send(json.dumps({"id": 1, "method": "Browser.getVersion", "params": {}}))
-    message = json.loads(ws.recv())
-    result = message.get("result", {}) if isinstance(message, dict) else {}
-    product = result.get("product") if isinstance(result, dict) else None
+def expect_cdp_browser_surface(transport: WSUpstreamTransport) -> None:
+    result = transport.send("Browser.getVersion")
+    product = result.get("product")
     if not isinstance(product, str) or ("Chrome" not in product and "Chromium" not in product):
-        raise AssertionError(f"Browser.getVersion result = {message!r}")
+        raise AssertionError(f"Browser.getVersion result = {result!r}")
 
 
 if __name__ == "__main__":

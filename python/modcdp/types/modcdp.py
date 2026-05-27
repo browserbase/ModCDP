@@ -212,6 +212,11 @@ class ModCDPClientConfig(ModCDPModel):
     client_heartbeat_interval_ms: int = Field(default=250, gt=0)
 
 
+class ModCDPDownstreamConfig(ModCDPModel):
+    downstream_client_timeout_ms: int = Field(default=1_000, gt=0)
+    downstream_close_browser_on_disconnect: bool = False
+
+
 class ModCDPUpstreamConfig(ModCDPModel):
     upstream_mode: Literal["ws"] = "ws"
     upstream_ws_cdp_url: str | None = None
@@ -250,6 +255,8 @@ class ModCDPServerConfig(ModCDPModel):
     upstream: ModCDPUpstreamConfig | None = None
     router: ModCDPRouterConfig | None = None
     client_config: ModCDPClientConfig | None = None
+    downstream: ModCDPDownstreamConfig | None = None
+    server_browser_token: str | None = None
     custom_commands: list[ModCDPAddCustomCommandParams] | None = None
     custom_events: list[ModCDPAddCustomEventObjectParams] | None = None
     custom_middlewares: list[ModCDPAddMiddlewareParams] | None = None

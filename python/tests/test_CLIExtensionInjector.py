@@ -15,7 +15,6 @@ import unittest
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
 
 from modcdp.injector.ExtensionInjector import DEFAULT_MODCDP_EXTENSION_ID
 from modcdp.injector.CLIExtensionInjector import CLIExtensionInjector
@@ -86,7 +85,6 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             injector.prepare()
             unpacked_extension_path = injector.unpacked_extension_path
             self.assertIsInstance(unpacked_extension_path, str)
-            unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])
@@ -100,7 +98,6 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             injector.prepare()
             unpacked_extension_path = injector.unpacked_extension_path
             self.assertIsInstance(unpacked_extension_path, str)
-            unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertIn("modcdp-extension-", unpacked_extension_path)
             self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])

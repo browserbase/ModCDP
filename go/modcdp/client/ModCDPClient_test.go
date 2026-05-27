@@ -7,8 +7,6 @@
 package client
 
 import (
-	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,8 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
+	transportpkg "github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
 func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
@@ -564,13 +561,11 @@ func TestModCDPClientCloseDoesNotCloseARemoteBrowserItDidNotLaunch(t *testing.T)
 	}
 	defer chrome.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	rawConn, _, _, err := ws.Dial(ctx, chrome.CDPURL)
-	if err != nil {
+	cdp_transport := transportpkg.NewWSUpstreamTransport(transportpkg.UpstreamTransportConfig{UpstreamWSCDPURL: chrome.CDPURL})
+	if err := cdp_transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	defer rawConn.Close()
+	defer cdp_transport.Close()
 	cdp := New(Config{
 		Launcher: LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: chrome.CDPURL},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws", UpstreamWSCDPURL: chrome.CDPURL},
@@ -590,27 +585,13 @@ func TestModCDPClientCloseDoesNotCloseARemoteBrowserItDidNotLaunch(t *testing.T)
 	cdp.Close()
 	time.Sleep(500 * time.Millisecond)
 
-	if err := wsutil.WriteClientText(rawConn, []byte(`{"id":1,"method":"Browser.getVersion","params":{}}`)); err != nil {
-		t.Fatal(err)
-	}
-	body, err := wsutil.ReadServerText(rawConn)
+	response, err := cdp_transport.Send("Browser.getVersion", map[string]any{}, "", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var response struct {
-		ID     int `json:"id"`
-		Result struct {
-			Product string `json:"product"`
-		} `json:"result"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
-		t.Fatal(err)
-	}
-	if response.ID != 1 {
-		t.Fatalf("unexpected response id %d", response.ID)
-	}
-	if !strings.Contains(response.Result.Product, "Chrome") && !strings.Contains(response.Result.Product, "Chromium") {
-		t.Fatalf("unexpected product %q", response.Result.Product)
+	product, _ := response["product"].(string)
+	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
+		t.Fatalf("unexpected product %q", product)
 	}
 }
 

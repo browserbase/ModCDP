@@ -36,7 +36,7 @@ class InjectorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     injector_mode: Literal["cli", "cdp", "bb", "discover", "none"] = "none"
-    send: Any | None = None
+    send: SendCDP | None = None
     injector_cli_extension_path: str | None = None
     injector_cli_extension_id: str | None = None
     injector_cdp_extension_path: str | None = None
@@ -50,18 +50,14 @@ class InjectorConfig(BaseModel):
     injector_trust_service_worker_target: bool = False
     injector_require_service_worker_target: bool = False
     injector_service_worker_ready_expression: str = MODCDP_READY_EXPRESSION
-    injector_cdp_send_timeout_ms: int = DEFAULT_CDP_SEND_TIMEOUT_MS
-    injector_execution_context_timeout_ms: int = DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS
-    injector_service_worker_probe_timeout_ms: int = DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS
-    injector_service_worker_ready_timeout_ms: int = DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS
-    injector_service_worker_poll_interval_ms: int = DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS
-    injector_target_session_poll_interval_ms: int = DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS
+    injector_cdp_send_timeout_ms: int = Field(default=DEFAULT_CDP_SEND_TIMEOUT_MS, gt=0)
+    injector_execution_context_timeout_ms: int = Field(default=DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS, gt=0)
+    injector_service_worker_probe_timeout_ms: int = Field(default=DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS, gt=0)
+    injector_service_worker_ready_timeout_ms: int = Field(default=DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS, gt=0)
+    injector_service_worker_poll_interval_ms: int = Field(default=DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS, gt=0)
+    injector_target_session_poll_interval_ms: int = Field(default=DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS, gt=0)
     injector_bb_api_key: str | None = None
     injector_bb_base_url: str = "https://api.browserbase.com"
-
-
-def _defaulted(value: Any, fallback: int) -> int:
-    return fallback if value is None else int(value)
 
 
 ExtensionInjectionResult: TypeAlias = ExtensionInfo
@@ -133,10 +129,7 @@ class ExtensionInjector:
         send = self.config.send
         if send is None:
             raise RuntimeError(f"{type(self).__name__} requires a CDP send function.")
-        effective_timeout_ms = _defaulted(
-            timeout_ms if timeout_ms is not None else self.config.injector_cdp_send_timeout_ms,
-            DEFAULT_CDP_SEND_TIMEOUT_MS,
-        )
+        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.config.injector_cdp_send_timeout_ms
         if effective_timeout_ms <= 0:
             return send(method, params or {}, session_id)
 

@@ -149,13 +149,20 @@ type ModCDPClientConfig struct {
 	ClientHeartbeatIntervalMS  int   `json:"client_heartbeat_interval_ms,omitempty"`
 }
 
+type ModCDPDownstreamConfig struct {
+	DownstreamClientTimeoutMS          int   `json:"downstream_client_timeout_ms,omitempty"`
+	DownstreamCloseBrowserOnDisconnect *bool `json:"downstream_close_browser_on_disconnect,omitempty"`
+}
+
 type ModCDPServerConfig struct {
-	Upstream          UpstreamTransportConfig            `json:"upstream,omitempty"`
-	Router            ModCDPRouterConfig                 `json:"router,omitempty"`
-	ClientConfig      ModCDPClientConfig                 `json:"client_config,omitempty"`
-	CustomCommands    []ModCDPAddCustomCommandParams     `json:"custom_commands,omitempty"`
-	CustomEvents      []ModCDPAddCustomEventObjectParams `json:"custom_events,omitempty"`
-	CustomMiddlewares []ModCDPAddMiddlewareParams        `json:"custom_middlewares,omitempty"`
+	Upstream           UpstreamTransportConfig            `json:"upstream,omitempty"`
+	Router             ModCDPRouterConfig                 `json:"router,omitempty"`
+	ClientConfig       ModCDPClientConfig                 `json:"client_config,omitempty"`
+	Downstream         ModCDPDownstreamConfig             `json:"downstream,omitempty"`
+	ServerBrowserToken string                             `json:"server_browser_token,omitempty"`
+	CustomCommands     []ModCDPAddCustomCommandParams     `json:"custom_commands,omitempty"`
+	CustomEvents       []ModCDPAddCustomEventObjectParams `json:"custom_events,omitempty"`
+	CustomMiddlewares  []ModCDPAddMiddlewareParams        `json:"custom_middlewares,omitempty"`
 }
 
 type ModCDPGetTopologyParams struct {

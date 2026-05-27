@@ -4,10 +4,9 @@
 // - ./python/tests/test_BBBrowserLauncher.py
 // NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
 // USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
-package launcher
+package launcher_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,15 +15,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
+	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
 func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("BROWSERBASE_API_KEY")) == "" {
 		t.Fatal("BROWSERBASE_API_KEY is required for live Browserbase tests")
 	}
-	config := LauncherConfig{
+	config := launcher.LauncherConfig{
 		LauncherBBTimeout: 120,
 		LauncherBBBrowserSettings: map[string]any{
 			"viewport":      map[string]any{"width": 900, "height": 700},
@@ -37,16 +36,16 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 	if region := os.Getenv("BROWSERBASE_REGION"); region != "" {
 		config.LauncherBBRegion = region
 	}
-	launcher := NewBBBrowserLauncher(config)
-	browser, err := launcher.Launch(LauncherConfig{})
+	bb_launcher := launcher.NewBBBrowserLauncher(config)
+	browser, err := bb_launcher.Launch(launcher.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var resumed *LaunchedBrowser
-	var conn io.ReadWriteCloser
+	var resumed *launcher.LaunchedBrowser
+	var cdp_transport *transport.WSUpstreamTransport
 	defer func() {
-		if conn != nil {
-			_ = conn.Close()
+		if cdp_transport != nil {
+			_ = cdp_transport.Close()
 		}
 		if resumed != nil {
 			resumed.Close()
@@ -58,10 +57,10 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 	if browser.BrowserbaseSessionID == "" {
 		t.Fatal("expected browserbase session id")
 	}
-	if launcher.Launched != browser {
+	if bb_launcher.Launched != browser {
 		t.Fatal("expected launcher to retain launched browser")
 	}
-	transportConfig := launcher.ConfigForUpstream()
+	transportConfig := bb_launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != browser.CDPURL {
 		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["upstream_ws_cdp_url"], browser.CDPURL)
 	}
@@ -71,8 +70,8 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 	if !strings.HasPrefix(browser.CDPURL, "wss://") {
 		t.Fatalf("ws url = %q", browser.CDPURL)
 	}
-	conn = connectBrowserbaseCDP(t, browser.CDPURL)
-	expectCDPBrowserSurface(t, conn)
+	cdp_transport = connectBrowserbaseCDP(t, browser.CDPURL)
+	expectBrowserbaseCDPBrowserSurface(t, cdp_transport)
 
 	retrieved := retrieveBrowserbaseSession(t, browser.BrowserbaseSessionID)
 	if retrieved["id"] != browser.BrowserbaseSessionID {
@@ -83,10 +82,10 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 	}
 
 	closeSessionOnClose := false
-	resumed, err = NewBBBrowserLauncher(LauncherConfig{
+	resumed, err = launcher.NewBBBrowserLauncher(launcher.LauncherConfig{
 		LauncherBBSessionID:           browser.BrowserbaseSessionID,
 		LauncherBBCloseSessionOnClose: &closeSessionOnClose,
-	}).Launch(LauncherConfig{})
+	}).Launch(launcher.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,10 +95,10 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 	if !strings.HasPrefix(resumed.CDPURL, "wss://") {
 		t.Fatalf("resumed ws url = %q", resumed.CDPURL)
 	}
-	expectCDPBrowserSurface(t, conn)
+	expectBrowserbaseCDPBrowserSurface(t, cdp_transport)
 
-	_ = conn.Close()
-	conn = nil
+	_ = cdp_transport.Close()
+	cdp_transport = nil
 	resumed.Close()
 	browser.Close()
 	browser.Close()
@@ -116,35 +115,27 @@ func TestCreatesVerifiesResumesAndReleasesARealBrowserbaseBrowserSession(t *test
 
 // MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
 // Keep the setup semantics above 1:1 with translated tests; helpers here only call real Browserbase APIs and real CDP endpoints.
-func connectBrowserbaseCDP(t *testing.T, rawURL string) io.ReadWriteCloser {
+func connectBrowserbaseCDP(t *testing.T, rawURL string) *transport.WSUpstreamTransport {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-	conn, _, _, err := ws.Dial(ctx, rawURL)
-	if err != nil {
+	cdp_transport := transport.NewWSUpstreamTransport(transport.UpstreamTransportConfig{
+		UpstreamWSCDPURL:         rawURL,
+		UpstreamCDPSendTimeoutMS: 120_000,
+	})
+	if err := cdp_transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
-	return conn
+	return cdp_transport
 }
 
-func expectCDPBrowserSurface(t *testing.T, conn io.ReadWriter) {
+func expectBrowserbaseCDPBrowserSurface(t *testing.T, cdp_transport *transport.WSUpstreamTransport) {
 	t.Helper()
-	body, _ := json.Marshal(map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}})
-	if err := wsutil.WriteClientText(conn, body); err != nil {
-		t.Fatal(err)
-	}
-	data, _, err := wsutil.ReadServerData(conn)
+	result, err := cdp_transport.Send("Browser.getVersion", map[string]any{}, "", 120*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var message map[string]any
-	if err := json.Unmarshal(data, &message); err != nil {
-		t.Fatal(err)
-	}
-	result, _ := message["result"].(map[string]any)
 	product, _ := result["product"].(string)
 	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
-		t.Fatalf("Browser.getVersion result = %#v", message)
+		t.Fatalf("Browser.getVersion result = %#v", result)
 	}
 }
 
@@ -172,6 +163,9 @@ func retrieveBrowserbaseSession(t *testing.T, sessionID string) map[string]any {
 }
 
 func browserbaseAPIURL(pathname string) string {
-	baseURL := firstString(os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseLauncherBaseURL)
+	baseURL := os.Getenv("BROWSERBASE_BASE_URL")
+	if baseURL == "" {
+		baseURL = launcher.DefaultBrowserbaseLauncherBaseURL
+	}
 	return strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(pathname, "/")
 }

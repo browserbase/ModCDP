@@ -24,6 +24,7 @@ class WSUpstreamTransport(UpstreamTransport):
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None
         self._generation = 0
+        self._connect_lock = threading.Lock()
 
     def update(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> "WSUpstreamTransport":
         super().update(config)
@@ -32,18 +33,19 @@ class WSUpstreamTransport(UpstreamTransport):
         return self
 
     def connect(self) -> None:
-        if not self.url:
-            raise RuntimeError("WSUpstreamTransport requires upstream_ws_cdp_url or launcher-provided cdp_url.")
-        # cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
-        self.url = resolveCdpWebSocketUrl(self.url, "upstream_ws_cdp_url")
-        self._generation += 1
-        generation = self._generation
-        previous_ws = self.ws
-        if previous_ws is not None:
-            previous_ws.close()
-        self.ws = create_connection(self.url, timeout=10)
-        self._reader_thread = threading.Thread(target=lambda: self._read_loop(generation), daemon=True)
-        self._reader_thread.start()
+        with self._connect_lock:
+            if self.ws is not None:
+                return
+            if not self.url:
+                raise RuntimeError("WSUpstreamTransport requires upstream_ws_cdp_url or launcher-provided cdp_url.")
+            # cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
+            self.url = resolveCdpWebSocketUrl(self.url, "upstream_ws_cdp_url")
+            self.config = UpstreamTransportConfig.model_validate({**self.config.model_dump(), "upstream_ws_cdp_url": self.url})
+            self._generation += 1
+            generation = self._generation
+            self.ws = create_connection(self.url, timeout=10)
+            self._reader_thread = threading.Thread(target=lambda: self._read_loop(generation), daemon=True)
+            self._reader_thread.start()
 
     @overload
     def send(

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from typing import cast
 
 from modcdp.injector.CDPExtensionInjector import CDPExtensionInjector
 
@@ -20,7 +19,6 @@ class CDPExtensionInjectorTests(unittest.TestCase):
             injector.prepare()
             unpacked_extension_path = injector.unpacked_extension_path
             self.assertIsInstance(unpacked_extension_path, str)
-            unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertIn("modcdp-extension-", unpacked_extension_path)
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
         finally:

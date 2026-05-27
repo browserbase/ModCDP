@@ -4,15 +4,20 @@
 // - ./python/tests/test_RemoteBrowserLauncher.py
 // NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
 // USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
-package launcher
+package launcher_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
 func TestRequiresLauncherRemoteCDPURL(t *testing.T) {
-	_, err := NewRemoteBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{})
+	_, err := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{}).Launch(launcher.LauncherConfig{})
 	if err == nil || err.Error() != "launcher_mode=remote requires launcher_remote_cdp_url." {
 		t.Fatalf("Launch error = %v", err)
 	}
@@ -20,11 +25,11 @@ func TestRequiresLauncherRemoteCDPURL(t *testing.T) {
 
 func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *testing.T) {
 	headless := true
-	port, err := freePort()
+	port, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).FreePort()
 	if err != nil {
 		t.Fatal(err)
 	}
-	local, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
+	local, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).Launch(launcher.LauncherConfig{
 		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: port,
 	})
@@ -33,8 +38,8 @@ func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *
 	}
 	defer local.Close()
 
-	httpLauncher := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: fmt.Sprintf("http://127.0.0.1:%d", port)})
-	fromHTTP, err := httpLauncher.Launch(LauncherConfig{})
+	httpLauncher := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{LauncherRemoteCDPURL: fmt.Sprintf("http://127.0.0.1:%d", port)})
+	fromHTTP, err := httpLauncher.Launch(launcher.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,13 +53,13 @@ func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *
 	if fromHTTP.CDPURL != local.CDPURL {
 		t.Fatalf("fromHTTP.CDPURL = %q, want %q", fromHTTP.CDPURL, local.CDPURL)
 	}
-	conn := connectBrowserbaseCDP(t, fromHTTP.CDPURL)
-	defer conn.Close()
-	expectCDPBrowserSurface(t, conn)
+	cdp_transport := connectLauncherCDP(t, fromHTTP.CDPURL)
+	defer cdp_transport.Close()
+	expectCDPBrowserSurface(t, cdp_transport)
 	fromHTTP.Close()
 
-	hostPortLauncher := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: fmt.Sprintf("127.0.0.1:%d", port)})
-	fromHostPort, err := hostPortLauncher.Launch(LauncherConfig{})
+	hostPortLauncher := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{LauncherRemoteCDPURL: fmt.Sprintf("127.0.0.1:%d", port)})
+	fromHostPort, err := hostPortLauncher.Launch(launcher.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +68,8 @@ func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *
 	}
 	fromHostPort.Close()
 
-	configLauncher := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
-	fromConfig, err := configLauncher.Launch(LauncherConfig{})
+	configLauncher := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
+	fromConfig, err := configLauncher.Launch(launcher.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,8 +78,8 @@ func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *
 	}
 	fromConfig.Close()
 
-	wsLauncher := NewRemoteBrowserLauncher(LauncherConfig{})
-	fromWS, err := wsLauncher.Launch(LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
+	wsLauncher := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{})
+	fromWS, err := wsLauncher.Launch(launcher.LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,21 +93,21 @@ func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *
 	if fromWS.CDPURL != local.CDPURL {
 		t.Fatalf("fromWS.CDPURL = %q", fromWS.CDPURL)
 	}
-	expectCDPBrowserSurface(t, conn)
+	expectCDPBrowserSurface(t, cdp_transport)
 	fromWS.Close()
 }
 
 func TestLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
 	headless := true
-	firstPort, err := freePort()
+	firstPort, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).FreePort()
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondPort, err := freePort()
+	secondPort, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).FreePort()
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
+	first, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).Launch(launcher.LauncherConfig{
 		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: firstPort,
 	})
@@ -110,7 +115,7 @@ func TestLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer first.Close()
-	second, err := NewLocalBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{
+	second, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).Launch(launcher.LauncherConfig{
 		LauncherLocalHeadless:      &headless,
 		LauncherLocalCDPListenPort: secondPort,
 	})
@@ -119,7 +124,7 @@ func TestLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
 	}
 	defer second.Close()
 
-	launched, err := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: first.CDPURL}).Launch(LauncherConfig{
+	launched, err := launcher.NewRemoteBrowserLauncher(launcher.LauncherConfig{LauncherRemoteCDPURL: first.CDPURL}).Launch(launcher.LauncherConfig{
 		LauncherRemoteCDPURL: fmt.Sprintf("127.0.0.1:%d", second.CDPListenPort),
 	})
 	if err != nil {
@@ -128,5 +133,28 @@ func TestLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
 	defer launched.Close()
 	if launched.CDPURL != second.CDPURL {
 		t.Fatalf("launched.CDPURL = %q, want %q", launched.CDPURL, second.CDPURL)
+	}
+}
+
+// MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+// Keep the setup semantics above 1:1 with translated tests; helpers here only call real transport classes and real CDP endpoints.
+func connectLauncherCDP(t *testing.T, rawURL string) *transport.WSUpstreamTransport {
+	t.Helper()
+	cdp_transport := transport.NewWSUpstreamTransport(transport.UpstreamTransportConfig{UpstreamWSCDPURL: rawURL})
+	if err := cdp_transport.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	return cdp_transport
+}
+
+func expectCDPBrowserSurface(t *testing.T, cdp_transport *transport.WSUpstreamTransport) {
+	t.Helper()
+	result, err := cdp_transport.Send("Browser.getVersion", map[string]any{}, "", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	product, _ := result["product"].(string)
+	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
+		t.Fatalf("Browser.getVersion result = %#v", result)
 	}
 }

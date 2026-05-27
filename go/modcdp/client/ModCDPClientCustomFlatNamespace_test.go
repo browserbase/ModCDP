@@ -497,10 +497,12 @@ func TestServiceWorkerServerValidatesRegisteredCustomCommandAndEventSchemas(t *t
 	} else {
 		assertRegistration(t, result, "Custom.ready", "registered")
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": true}); !ok {
-		t.Fatal("expected Custom.ready event to validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": true}); err != nil {
+		t.Fatalf("expected Custom.ready event to validate: %v", err)
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": "yes"}) })
+	if _, err := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": "yes"}); err == nil {
+		t.Fatal("expected Custom.ready event validation to reject string ok")
+	}
 
 	seen := make(chan bool, 1)
 	cdp.On("Custom.ready", func(data any) {
@@ -623,16 +625,18 @@ func TestConstructorCustomCommandAndEventSchemasValidateNestedPayloads(t *testin
 	if _, err := cdp.Types.ParseCommandParams("Custom.collect", map[string]any{"items": []any{}}); err == nil {
 		t.Fatal("expected Custom.collect params to reject empty items")
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "https://example.com", "ready": true}); !ok {
-		t.Fatal("expected Custom.ready event to validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "https://example.com", "ready": true}); err != nil {
+		t.Fatalf("expected Custom.ready event to validate: %v", err)
 	}
-	expectPanic(t, func() {
-		cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "http://example.com", "ready": true})
-	})
-	if _, ok := cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 3}); !ok {
-		t.Fatal("expected Custom.count event to validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "http://example.com", "ready": true}); err == nil {
+		t.Fatal("expected Custom.ready event validation to reject http url")
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 0}) })
+	if _, err := cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 3}); err != nil {
+		t.Fatalf("expected Custom.count event to validate: %v", err)
+	}
+	if _, err := cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 0}); err == nil {
+		t.Fatal("expected Custom.count event validation to reject zero value")
+	}
 }
 
 func TestAssignedTypeRegistryUpdatesRuntimeValidationAndAliases(t *testing.T) {
@@ -679,8 +683,8 @@ func TestAssignedTypeRegistryUpdatesRuntimeValidationAndAliases(t *testing.T) {
 	if _, err := cdp.Types.ParseCommandResult("Custom.later", map[string]any{"ok": true}); err != nil {
 		t.Fatalf("expected Custom.later result to validate: %v", err)
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.laterReady", map[string]any{"value": "ok"}); !ok {
-		t.Fatal("expected Custom.laterReady event to validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.laterReady", map[string]any{"value": "ok"}); err != nil {
+		t.Fatalf("expected Custom.laterReady event to validate: %v", err)
 	}
 }
 

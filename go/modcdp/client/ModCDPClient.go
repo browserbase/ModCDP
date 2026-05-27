@@ -169,13 +169,15 @@ type CDPTypesConfig struct {
 }
 
 type ServerConfig struct {
-	Upstream          UpstreamTransportConfig `json:"upstream,omitempty"`
-	Router            RouterConfig            `json:"router,omitempty"`
-	ClientConfig      ClientConfig            `json:"client_config,omitempty"`
-	CustomCommands    []CustomCommand         `json:"custom_commands,omitempty"`
-	CustomEvents      []CustomEvent           `json:"custom_events,omitempty"`
-	CustomMiddlewares []CustomMiddleware      `json:"custom_middlewares,omitempty"`
-	disabled          bool
+	Upstream           UpstreamTransportConfig      `json:"upstream,omitempty"`
+	Router             RouterConfig                 `json:"router,omitempty"`
+	ClientConfig       ClientConfig                 `json:"client_config,omitempty"`
+	Downstream         types.ModCDPDownstreamConfig `json:"downstream,omitempty"`
+	ServerBrowserToken string                       `json:"server_browser_token,omitempty"`
+	CustomCommands     []CustomCommand              `json:"custom_commands,omitempty"`
+	CustomEvents       []CustomEvent                `json:"custom_events,omitempty"`
+	CustomMiddlewares  []CustomMiddleware           `json:"custom_middlewares,omitempty"`
+	disabled           bool
 }
 
 var ServerConfigNone = &ServerConfig{disabled: true}
@@ -222,10 +224,10 @@ func (o *Config) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type Handler func(data any)
+type Handler any
 
 type handlerEntry struct {
-	handler Handler
+	handler reflect.Value
 	pointer uintptr
 }
 
@@ -796,6 +798,19 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		if c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS != 0 {
 			clientConfig["client_cdp_send_timeout_ms"] = c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS
 		}
+		downstream := map[string]any{}
+		if c.Config.ServerConfig.Downstream.DownstreamClientTimeoutMS != 0 {
+			downstream["downstream_client_timeout_ms"] = c.Config.ServerConfig.Downstream.DownstreamClientTimeoutMS
+		}
+		if c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect != nil {
+			downstream["downstream_close_browser_on_disconnect"] = *c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect
+		}
+		if len(downstream) > 0 {
+			params["downstream"] = downstream
+		}
+		if c.Config.ServerConfig.ServerBrowserToken != "" {
+			params["server_browser_token"] = c.Config.ServerConfig.ServerBrowserToken
+		}
 	}
 	if hasUpstreamConfig {
 		if _, ok := upstream["upstream_ws_connect_error_settle_timeout_ms"]; !ok {
@@ -1028,23 +1043,27 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 }
 
 func (c *ModCDPClient) On(event string, handler Handler) *ModCDPClient {
+	handlerValue := reflect.ValueOf(handler)
+	if handlerValue.Kind() != reflect.Func {
+		panic("handler must be a function")
+	}
 	c.handlersMu.Lock()
 	defer c.handlersMu.Unlock()
-	pointer := handlerPointer(handler)
+	pointer := handlerValue.Pointer()
 	for _, existing := range c.handlers[event] {
 		if existing.pointer == pointer {
 			return c
 		}
 	}
-	c.handlers[event] = append(c.handlers[event], handlerEntry{handler: handler, pointer: pointer})
+	c.handlers[event] = append(c.handlers[event], handlerEntry{handler: handlerValue, pointer: pointer})
 	return c
 }
 
 func (c *ModCDPClient) Once(event string, handler Handler) *ModCDPClient {
 	var wrapped Handler
-	wrapped = func(data any) {
+	wrapped = func(args ...any) {
 		c.Off(event, wrapped)
-		handler(data)
+		callHandler(reflect.ValueOf(handler), args...)
 	}
 	return c.On(event, wrapped)
 }
@@ -1073,6 +1092,32 @@ func handlerPointer(handler Handler) uintptr {
 		return 0
 	}
 	return reflect.ValueOf(handler).Pointer()
+}
+
+func callHandler(handler reflect.Value, args ...any) {
+	handlerType := handler.Type()
+	inputs := make([]reflect.Value, 0, len(args))
+	if handlerType.IsVariadic() {
+		for _, arg := range args {
+			inputs = append(inputs, reflect.ValueOf(arg))
+		}
+		handler.Call(inputs)
+		return
+	}
+	for index := 0; index < handlerType.NumIn() && index < len(args); index++ {
+		input := reflect.ValueOf(args[index])
+		expected := handlerType.In(index)
+		if input.IsValid() && input.Type().AssignableTo(expected) {
+			inputs = append(inputs, input)
+			continue
+		}
+		if input.IsValid() && input.Type().ConvertibleTo(expected) {
+			inputs = append(inputs, input.Convert(expected))
+			continue
+		}
+		inputs = append(inputs, reflect.Zero(expected))
+	}
+	handler.Call(inputs)
 }
 
 func (c *ModCDPClient) Close() {
@@ -1258,6 +1303,27 @@ func (c *ModCDPClient) startPingLatencyMeasurement() {
 
 func (c *ModCDPClient) startHeartbeat() {
 	c.stopHeartbeat()
+	if c.Config.ServerConfig == nil || c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect == nil {
+		return
+	}
+	if !*c.Config.ServerConfig.Downstream.DownstreamCloseBrowserOnDisconnect {
+		return
+	}
+	stop := make(chan struct{})
+	c.heartbeatStop = stop
+	interval := time.Duration(c.Config.ClientConfig.ClientHeartbeatIntervalMS) * time.Millisecond
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				_, _ = c.Send("Mod.ping", map[string]any{"sent_at": time.Now().UnixMilli()})
+			}
+		}
+	}()
 }
 
 func (c *ModCDPClient) stopHeartbeat() {
@@ -1294,29 +1360,41 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	params, _ := msg["params"].(map[string]any)
 	if c.Injector != nil && c.Injector.SessionID != "" && sessionID == c.Injector.SessionID {
 		if unwrapped, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.Injector.SessionID); ok {
-			validatedData, valid := c.Types.ParseEventPayload(unwrapped.Event, unwrapped.Data)
-			if !valid {
-				return
+			validatedData, err := c.Types.ParseEventPayload(unwrapped.Event, unwrapped.Data)
+			if err != nil {
+				panic(err)
 			}
 			c.handlersMu.Lock()
 			hs := append([]handlerEntry(nil), c.handlers[unwrapped.Event]...)
 			c.handlersMu.Unlock()
 			for _, h := range hs {
-				go h.handler(validatedData)
+				go callHandler(h.handler, validatedData, unwrapped.SessionID)
+			}
+			c.handlersMu.Lock()
+			wildcardHandlers := append([]handlerEntry(nil), c.handlers["*"]...)
+			c.handlersMu.Unlock()
+			for _, h := range wildcardHandlers {
+				go callHandler(h.handler, unwrapped.Event, validatedData, unwrapped.SessionID)
 			}
 		}
 		return
 	}
 	if method != "" {
-		validatedParams, valid := c.Types.ParseEventPayload(method, params)
-		if !valid {
-			return
+		validatedParams, err := c.Types.ParseEventPayload(method, params)
+		if err != nil {
+			panic(err)
 		}
 		c.handlersMu.Lock()
 		hs := append([]handlerEntry(nil), c.handlers[method]...)
 		c.handlersMu.Unlock()
 		for _, h := range hs {
-			go h.handler(validatedParams)
+			go callHandler(h.handler, validatedParams, sessionID)
+		}
+		c.handlersMu.Lock()
+		wildcardHandlers := append([]handlerEntry(nil), c.handlers["*"]...)
+		c.handlersMu.Unlock()
+		for _, h := range wildcardHandlers {
+			go callHandler(h.handler, method, validatedParams, sessionID)
 		}
 	}
 }

@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, cast
+from typing import Any
 import unittest
 
 from modcdp import ModCDPClient
@@ -109,8 +109,15 @@ async (payload, next) => {
 
 
 def target_infos_from_result(result: Any) -> list[dict[str, Any]]:
-    result_map = cast(dict[str, Any], result)
-    return cast(list[dict[str, Any]], result_map["targetInfos"])
+    if not isinstance(result, dict):
+        raise AssertionError(f"result = {result!r}")
+    target_infos = result.get("targetInfos")
+    if not isinstance(target_infos, list):
+        raise AssertionError(f"targetInfos = {target_infos!r}")
+    for target_info in target_infos:
+        if not isinstance(target_info, dict):
+            raise AssertionError(f"targetInfo = {target_info!r}")
+    return target_infos
 
 
 class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
@@ -151,8 +158,8 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
             cdp.connect()
             self.assertEqual(cdp.cdp_url, owner.cdp_url)
             self.assertIsNotNone(cdp.server_config)
-            server_config = cast(dict[str, Any], cdp.server_config)
-            self.assertEqual(server_config["upstream"]["upstream_ws_cdp_url"], owner.cdp_url)
+            server_config = cdp.server_config
+            self.assertEqual(server_config.upstream.upstream_ws_cdp_url, owner.cdp_url)
 
             raw_targets = cdp.send("Target.getTargets")
             raw_target_infos = target_infos_from_result(raw_targets)
@@ -205,11 +212,19 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
                 )
             )
 
-            topology = cast(dict[str, Any], cdp.Mod.getTopology())
+            topology = cdp.Mod.getTopology()
+            if not isinstance(topology, dict):
+                self.fail(f"topology = {topology!r}")
             root_frame_id = topology.get("rootFrameId")
-            frames = cast(dict[str, Any], topology.get("frames"))
-            roots = cast(dict[str, dict[str, Any]], topology.get("roots"))
-            contexts = cast(dict[str, dict[str, Any]], topology.get("contexts"))
+            frames = topology.get("frames")
+            roots = topology.get("roots")
+            contexts = topology.get("contexts")
+            if not isinstance(frames, dict):
+                self.fail(f"frames = {frames!r}")
+            if not isinstance(roots, dict):
+                self.fail(f"roots = {roots!r}")
+            if not isinstance(contexts, dict):
+                self.fail(f"contexts = {contexts!r}")
             self.assertIsInstance(root_frame_id, str)
             self.assertIn(root_frame_id, frames)
             self.assertTrue(any(root.get("kind") == "document" for root in roots.values()))

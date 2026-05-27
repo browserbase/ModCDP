@@ -12,7 +12,7 @@ then validated with ``TypeAdapter`` at the client boundary.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal, TypeAlias, cast
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
 
@@ -46,12 +46,12 @@ _CONSTRAINT_MAPPING: dict[str, str] = {
 def _as_string_key_dict(value: object) -> dict[str, Any] | None:
     if not isinstance(value, Mapping):
         return None
-    return {key: raw_value for key, raw_value in cast(Mapping[object, Any], value).items() if isinstance(key, str)}
+    return {key: raw_value for key, raw_value in value.items() if isinstance(key, str)}
 
 
 def _as_sequence(value: object) -> Sequence[Any] | None:
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return cast(Sequence[Any], value)
+        return value
     return None
 
 
@@ -77,7 +77,7 @@ def _combine_union(types: list[Any]) -> Any:
 
 
 def _literal_type(values: Sequence[Any]) -> Any:
-    return cast(Any, Literal).__getitem__(tuple(values))
+    return Literal.__getitem__(tuple(values))
 
 
 def _create_dynamic_model(
@@ -85,12 +85,11 @@ def _create_dynamic_model(
     model_schema: Mapping[str, Any],
     fields: Mapping[str, FieldDefinition] | None = None,
 ) -> type[BaseModel]:
-    field_definitions = cast(Any, dict(fields or {}))
     return create_model(
         model_name,
         __config__=ConfigDict(extra="forbid" if model_schema.get("additionalProperties") is False else "allow"),
         __doc__=str(model_schema.get("description", "")),
-        **field_definitions,
+        **dict(fields or {}),
     )
 
 

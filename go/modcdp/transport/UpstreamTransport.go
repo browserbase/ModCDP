@@ -313,7 +313,10 @@ func (e *UpstreamTransport) emitRecv(message map[string]any) {
 		method, _ := message["method"].(string)
 		params, _ := message["params"].(map[string]any)
 		sessionID, _ := message["sessionId"].(string)
-		if method != "" && params != nil {
+		if method != "" {
+			if params == nil {
+				params = map[string]any{}
+			}
 			e.emitUpstreamEvent(method, params, "", sessionID)
 		}
 	}

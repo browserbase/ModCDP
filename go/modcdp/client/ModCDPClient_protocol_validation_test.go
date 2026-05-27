@@ -66,8 +66,8 @@ func TestNativeCDPSchemasValidateMethodParamsReturnValuesAndEventPayloadsStatica
 	if _, err := types.ParseCommandResult("Runtime.evaluate", runtimeResult); err != nil {
 		t.Fatalf("Runtime.evaluate result should validate: %v", err)
 	}
-	if _, ok := types.ParseEventPayload("Target.targetCreated", targetEvent); !ok {
-		t.Fatal("Target.targetCreated event should validate")
+	if _, err := types.ParseEventPayload("Target.targetCreated", targetEvent); err != nil {
+		t.Fatalf("Target.targetCreated event should validate: %v", err)
 	}
 	if _, err := types.ParseCommandParams("Runtime.evaluate", map[string]any{"returnByValue": true}); err == nil {
 		t.Fatal("expected Runtime.evaluate params validation to reject missing expression")
@@ -75,18 +75,18 @@ func TestNativeCDPSchemasValidateMethodParamsReturnValuesAndEventPayloadsStatica
 	if _, err := types.ParseCommandResult("Runtime.evaluate", map[string]any{}); err == nil {
 		t.Fatal("expected Runtime.evaluate result validation to reject missing result")
 	}
-	expectPanic(t, func() {
-		types.ParseEventPayload("Target.targetCreated", map[string]any{
-			"targetInfo": map[string]any{
-				"targetId":        1,
-				"type":            "page",
-				"title":           "Example",
-				"url":             "https://example.com",
-				"attached":        false,
-				"canAccessOpener": false,
-			},
-		})
-	})
+	if _, err := types.ParseEventPayload("Target.targetCreated", map[string]any{
+		"targetInfo": map[string]any{
+			"targetId":        1,
+			"type":            "page",
+			"title":           "Example",
+			"url":             "https://example.com",
+			"attached":        false,
+			"canAccessOpener": false,
+		},
+	}); err == nil {
+		t.Fatal("expected Target.targetCreated event validation to reject numeric targetId")
+	}
 }
 
 func TestModSchemasValidateMethodParamsReturnValuesEventPayloadsAndMiddlewareRegistrationsStaticallyAndAtRuntime(t *testing.T) {
@@ -107,8 +107,8 @@ func TestModSchemasValidateMethodParamsReturnValuesEventPayloadsAndMiddlewareReg
 	if parsed, err := types.ParseCommandResult("Mod.ping", pingResult); err != nil {
 		t.Fatalf("Mod.ping result should validate: %#v, %v", parsed, err)
 	}
-	if parsed, ok := types.ParseEventPayload("Mod.pong", pongEvent); !ok || parsed == nil {
-		t.Fatalf("Mod.pong event = %#v", parsed)
+	if parsed, err := types.ParseEventPayload("Mod.pong", pongEvent); err != nil || parsed == nil {
+		t.Fatalf("Mod.pong event = %#v, %v", parsed, err)
 	}
 	if parsed, err := types.ParseCommandParams("Mod.addMiddleware", middlewareParams); err != nil || parsed["phase"] != "response" {
 		t.Fatalf("Mod.addMiddleware params = %#v, %v", parsed, err)
@@ -122,9 +122,9 @@ func TestModSchemasValidateMethodParamsReturnValuesEventPayloadsAndMiddlewareReg
 	if _, err := types.ParseCommandResult("Mod.ping", map[string]any{"ok": "true"}); err == nil {
 		t.Fatal("expected Mod.ping result validation to reject string ok")
 	}
-	expectPanic(t, func() {
-		types.ParseEventPayload("Mod.pong", map[string]any{"sent_at": 123, "from": "extension-service-worker"})
-	})
+	if _, err := types.ParseEventPayload("Mod.pong", map[string]any{"sent_at": 123, "from": "extension-service-worker"}); err == nil {
+		t.Fatal("expected Mod.pong event validation to reject missing received_at")
+	}
 	if _, err := types.ParseCommandParams("Mod.addMiddleware", map[string]any{"name": "Custom.any", "phase": "after", "expression": "async (payload, next) => next(payload)"}); err == nil {
 		t.Fatal("expected Mod.addMiddleware params validation to reject invalid phase")
 	}
@@ -164,8 +164,8 @@ func TestConstructorCustomSchemasValidateCommandParamsReturnValuesEventsAndMiddl
 	if _, err := cdp.Types.ParseCommandResult("Custom.sum", map[string]any{"value": 3}); err != nil {
 		t.Fatalf("Custom.sum result should validate: %v", err)
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.finished", map[string]any{"total": 3, "label": "ok"}); !ok {
-		t.Fatal("Custom.finished event should validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.finished", map[string]any{"total": 3, "label": "ok"}); err != nil {
+		t.Fatalf("Custom.finished event should validate: %v", err)
 	}
 	if _, err := cdp.Types.ParseCommandParams("Custom.sum", map[string]any{"left": "1", "right": 2}); err == nil {
 		t.Fatal("expected Custom.sum params validation to reject string left")
@@ -173,7 +173,9 @@ func TestConstructorCustomSchemasValidateCommandParamsReturnValuesEventsAndMiddl
 	if _, err := cdp.Types.ParseCommandResult("Custom.sum", map[string]any{"value": "3"}); err == nil {
 		t.Fatal("expected Custom.sum result validation to reject string value")
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.finished", map[string]any{"total": "3", "label": "ok"}) })
+	if _, err := cdp.Types.ParseEventPayload("Custom.finished", map[string]any{"total": "3", "label": "ok"}); err == nil {
+		t.Fatal("expected Custom.finished event validation to reject string total")
+	}
 	middlewares := cdp.Types.CustomMiddlewareWireRegistrations()
 	if len(middlewares) != 1 || middlewares[0].Name != "Custom.sum" || middlewares[0].Phase != "response" || middlewares[0].Expression != "async (payload, next) => next(payload)" {
 		t.Fatalf("custom middlewares = %#v", middlewares)
@@ -243,8 +245,8 @@ func TestDynamicModRegistrationUpdatesCustomCommandEventAndMiddlewareValidation(
 	if _, err := cdp.Types.ParseCommandResult("Custom.dynamic", map[string]any{"ok": true}); err != nil {
 		t.Fatalf("Custom.dynamic result should validate: %v", err)
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.dynamicReady", map[string]any{"id": "550e8400-e29b-41d4-a716-446655440000"}); !ok {
-		t.Fatal("Custom.dynamicReady event should validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.dynamicReady", map[string]any{"id": "550e8400-e29b-41d4-a716-446655440000"}); err != nil {
+		t.Fatalf("Custom.dynamicReady event should validate: %v", err)
 	}
 	middlewares := cdp.Types.CustomMiddlewareWireRegistrations()
 	if len(middlewares) != 1 || middlewares[0].Name != "Custom.dynamic" || middlewares[0].Phase != "response" {
@@ -256,7 +258,9 @@ func TestDynamicModRegistrationUpdatesCustomCommandEventAndMiddlewareValidation(
 	if _, err := cdp.Types.ParseCommandResult("Custom.dynamic", map[string]any{"ok": "yes"}); err == nil {
 		t.Fatal("expected Custom.dynamic result validation to reject string ok")
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.dynamicReady", map[string]any{"id": "nope"}) })
+	if _, err := cdp.Types.ParseEventPayload("Custom.dynamicReady", map[string]any{"id": "nope"}); err == nil {
+		t.Fatal("expected Custom.dynamicReady event validation to reject invalid uuid")
+	}
 	if _, err := cdp.Mod.AddMiddleware(CustomMiddleware{Name: "Custom.dynamic", Phase: "after", Expression: "async (payload, next) => next(payload)"}); err == nil {
 		t.Fatal("expected invalid middleware phase to fail")
 	}
@@ -311,8 +315,8 @@ func TestClientTypesUpdateReplacesTheRegistryWithExtendedRuntimeValidationAndPre
 	if _, err := cdp.Types.ParseCommandResult("Custom.updated", map[string]any{"done": true}); err != nil {
 		t.Fatalf("Custom.updated result should validate: %v", err)
 	}
-	if _, ok := cdp.Types.ParseEventPayload("Custom.updatedReady", map[string]any{"ready": true}); !ok {
-		t.Fatal("Custom.updatedReady event should validate")
+	if _, err := cdp.Types.ParseEventPayload("Custom.updatedReady", map[string]any{"ready": true}); err != nil {
+		t.Fatalf("Custom.updatedReady event should validate: %v", err)
 	}
 	middlewares := cdp.Types.CustomMiddlewareWireRegistrations()
 	if len(middlewares) != 1 || middlewares[0].Name != "Custom.updated" || middlewares[0].Phase != "request" {
@@ -324,7 +328,9 @@ func TestClientTypesUpdateReplacesTheRegistryWithExtendedRuntimeValidationAndPre
 	if _, err := cdp.Types.ParseCommandResult("Custom.updated", map[string]any{"done": "true"}); err == nil {
 		t.Fatal("expected Custom.updated result validation to reject string done")
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.updatedReady", map[string]any{"ready": "true"}) })
+	if _, err := cdp.Types.ParseEventPayload("Custom.updatedReady", map[string]any{"ready": "true"}); err == nil {
+		t.Fatal("expected Custom.updatedReady event validation to reject string ready")
+	}
 }
 
 func mustParamsMap(t *testing.T, value any) map[string]any {

@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import glob
-import json
 import os
 import re
 import sys
@@ -16,12 +15,11 @@ import unittest
 from collections.abc import Mapping
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, cast
-
-from websocket import create_connection
+from typing import Any
 
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
+from modcdp.transport.WSUpstreamTransport import WSUpstreamTransport
 
 
 # MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
@@ -351,7 +349,11 @@ class ModCDPClientTests(unittest.TestCase):
                 "launcher_local_extra_args": [f"--load-extension={EXTENSION_PATH}"],
             }
         ).launch()
-        raw_ws = create_connection(cast(str, chrome["cdp_url"]), timeout=5)
+        cdp_url = chrome["cdp_url"]
+        if not isinstance(cdp_url, str):
+            self.fail(f"cdp_url = {cdp_url!r}")
+        transport = WSUpstreamTransport({"upstream_ws_cdp_url": cdp_url})
+        transport.connect()
         cdp = ModCDPClient(
             launcher={"launcher_mode": "remote", "launcher_remote_cdp_url": chrome["cdp_url"]},
             upstream={"upstream_mode": "ws", "upstream_ws_cdp_url": chrome["cdp_url"]},
@@ -370,12 +372,10 @@ class ModCDPClientTests(unittest.TestCase):
             cdp.connect()
             cdp.close()
             time.sleep(0.5)
-            raw_ws.send(json.dumps({"id": 1, "method": "Browser.getVersion", "params": {}}))
-            response = json.loads(raw_ws.recv())
-            self.assertEqual(response["id"], 1)
-            self.assertRegex(response["result"]["product"], r"Chrome|Chromium")
+            response = transport.send("Browser.getVersion")
+            self.assertRegex(response["product"], r"Chrome|Chromium")
         finally:
-            raw_ws.close()
+            transport.close()
             cdp.close()
             chrome["close"]()
 

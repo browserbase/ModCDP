@@ -4,27 +4,25 @@
 // - ./python/tests/test_LocalBrowserLauncher.py
 // NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
 // USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
-package launcher
+package launcher_test
 
 import (
-	"context"
-	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
+	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
 func TestClassHelpersMatchTheLocalLauncherSurface(t *testing.T) {
-	launcher := NewLocalBrowserLauncher(LauncherConfig{})
-	if chromePath, err := launcher.FindChromeBinary(""); err != nil || chromePath == "" {
+	local_launcher := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{})
+	if chromePath, err := local_launcher.FindChromeBinary(""); err != nil || chromePath == "" {
 		t.Fatalf("FindChromeBinary = %q, %v", chromePath, err)
 	}
-	if port, err := launcher.FreePort(); err != nil || port <= 0 {
+	if port, err := local_launcher.FreePort(); err != nil || port <= 0 {
 		t.Fatalf("FreePort = %d, %v", port, err)
 	}
 }
@@ -32,16 +30,16 @@ func TestClassHelpersMatchTheLocalLauncherSurface(t *testing.T) {
 func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.T) {
 	headless := true
 	profileDir := t.TempDir()
-	port, err := freePort()
+	port, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{}).FreePort()
 	if err != nil {
 		t.Fatal(err)
 	}
-	launcher := NewLocalBrowserLauncher(LauncherConfig{
+	local_launcher := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{
 		LauncherLocalHeadless:                  &headless,
 		LauncherLocalChromeReadyTimeoutMS:      45_000,
 		LauncherLocalChromeReadyPollIntervalMS: 50,
 	})
-	chrome, err := launcher.Launch(LauncherConfig{
+	chrome, err := local_launcher.Launch(launcher.LauncherConfig{
 		LauncherLocalCDPListenPort: port,
 		LauncherLocalUserDataDir:   profileDir,
 	})
@@ -54,7 +52,7 @@ func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.
 			t.Fatalf("expected explicit user data dir to remain after close: %v", err)
 		}
 	}()
-	if launcher.Launched != chrome {
+	if local_launcher.Launched != chrome {
 		t.Fatal("expected launcher to retain launched browser")
 	}
 	expectedPrefix := "ws://127.0.0.1:" + strconv.Itoa(port) + "/"
@@ -67,42 +65,25 @@ func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.
 	if chrome.CDPListenPort != port {
 		t.Fatalf("CDPListenPort = %d, want %d", chrome.CDPListenPort, port)
 	}
-	transportConfig := launcher.ConfigForUpstream()
+	transportConfig := local_launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != chrome.CDPURL {
 		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["upstream_ws_cdp_url"], chrome.CDPURL)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	conn, _, _, err := ws.Dial(ctx, chrome.CDPURL)
+	cdp_transport := transport.NewWSUpstreamTransport(transport.UpstreamTransportConfig{UpstreamWSCDPURL: chrome.CDPURL})
+	if err := cdp_transport.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	defer cdp_transport.Close()
+	response, err := cdp_transport.Send("Browser.getVersion", map[string]any{}, "", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
-
-	if err := wsutil.WriteClientText(conn, []byte(`{"id":1,"method":"Browser.getVersion","params":{}}`)); err != nil {
-		t.Fatal(err)
+	product, _ := response["product"].(string)
+	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
+		t.Fatalf("unexpected product %q", product)
 	}
-	body, err := wsutil.ReadServerText(conn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var response struct {
-		ID     int `json:"id"`
-		Result struct {
-			Product         string `json:"product"`
-			ProtocolVersion string `json:"protocolVersion"`
-		} `json:"result"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
-		t.Fatal(err)
-	}
-	if response.ID != 1 {
-		t.Fatalf("unexpected response id %d", response.ID)
-	}
-	if !strings.Contains(response.Result.Product, "Chrome") && !strings.Contains(response.Result.Product, "Chromium") {
-		t.Fatalf("unexpected product %q", response.Result.Product)
-	}
-	if response.Result.ProtocolVersion == "" {
+	protocolVersion, _ := response["protocolVersion"].(string)
+	if protocolVersion == "" {
 		t.Fatal("expected protocolVersion")
 	}
 }
@@ -110,10 +91,10 @@ func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.
 func TestLaunchesARealBrowserWithAnAuxiliaryLoopbackCDPEndpointWhenRequested(t *testing.T) {
 	headless := true
 	loopbackCDP := true
-	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
+	chrome, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	}).Launch(LauncherConfig{LauncherLocalLoopbackCDP: &loopbackCDP})
+	}).Launch(launcher.LauncherConfig{LauncherLocalLoopbackCDP: &loopbackCDP})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,26 +108,18 @@ func TestLaunchesARealBrowserWithAnAuxiliaryLoopbackCDPEndpointWhenRequested(t *
 	if chrome.CDPListenPort <= 0 {
 		t.Fatalf("CDPListenPort = %d", chrome.CDPListenPort)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	conn, _, _, err := ws.Dial(ctx, chrome.LoopbackCDPURL)
+	cdp_transport := transport.NewWSUpstreamTransport(transport.UpstreamTransportConfig{UpstreamWSCDPURL: chrome.LoopbackCDPURL})
+	if err := cdp_transport.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	defer cdp_transport.Close()
+	response, err := cdp_transport.Send("Browser.getVersion", map[string]any{}, "", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
-	if err := wsutil.WriteClientText(conn, []byte(`{"id":1,"method":"Browser.getVersion","params":{}}`)); err != nil {
-		t.Fatal(err)
-	}
-	body, err := wsutil.ReadServerText(conn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var response map[string]any
-	if err := json.Unmarshal(body, &response); err != nil {
-		t.Fatal(err)
-	}
-	if response["id"] != float64(1) {
-		t.Fatalf("response id = %v", response["id"])
+	product, _ := response["product"].(string)
+	if !strings.Contains(product, "Chrome") && !strings.Contains(product, "Chromium") {
+		t.Fatalf("unexpected product %q", product)
 	}
 }
 
@@ -157,10 +130,10 @@ func TestRemovesAnExplicitUserDataDirWhenCleanupUserDataDirIsSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
+	chrome, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	}).Launch(LauncherConfig{
+	}).Launch(launcher.LauncherConfig{
 		LauncherLocalUserDataDir:        profileDir,
 		LauncherLocalCleanupUserDataDir: &cleanupUserDataDir,
 	})

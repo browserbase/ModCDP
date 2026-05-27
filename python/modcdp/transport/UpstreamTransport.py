@@ -67,7 +67,7 @@ class UpstreamTransport:
 
     def send(
         self,
-        command: dict[str, Any] | str,
+        command: dict[str, Any] | str | object,
         params: ProtocolPayload | None = None,
         session_id: str | None = None,
         *,
@@ -75,7 +75,7 @@ class UpstreamTransport:
     ) -> ProtocolResult | None:
         if isinstance(command, dict):
             raise NotImplementedError(f"{type(self).__name__}.send is not implemented.")
-        method = command
+        method = _cdp_name(command)
         effective_timeout_ms = timeout_ms if timeout_ms is not None else self.config.upstream_cdp_send_timeout_ms
         with self._lock:
             self._next_id += 1
@@ -231,8 +231,9 @@ class UpstreamTransport:
         method = parsed.get("method")
         params = parsed.get("params")
         session_id = parsed.get("sessionId")
-        if isinstance(method, str) and isinstance(params, dict):
-            self._emit_upstream_event(method, params, None, session_id if isinstance(session_id, str) else None)
+        if isinstance(method, str):
+            event_params = params if isinstance(params, dict) else {}
+            self._emit_upstream_event(method, event_params, None, session_id if isinstance(session_id, str) else None)
         self._emit_recv(parsed)
 
     def _emit_upstream_event(
@@ -248,3 +249,21 @@ def _upstream_transport_config(config: UpstreamTransportConfig | dict[str, Any] 
     if isinstance(config, UpstreamTransportConfig):
         return config
     return UpstreamTransportConfig.model_validate(config or {})
+
+
+def _cdp_name(command: object) -> str:
+    if isinstance(command, str):
+        return command
+    meta = command.meta() if callable(getattr(command, "meta", None)) else None
+    candidates = (
+        getattr(command, "cdp_command_name", None),
+        getattr(command, "id", None),
+        getattr(meta, "cdp_command_name", None) if meta is not None else None,
+        meta.get("cdp_command_name") if isinstance(meta, Mapping) else None,
+        meta.get("id") if isinstance(meta, Mapping) else None,
+        getattr(command, "name", None),
+    )
+    name = next((candidate for candidate in candidates if isinstance(candidate, str) and candidate), None)
+    if name is None:
+        raise TypeError("command must be a CDP method string or generated command object")
+    return name
