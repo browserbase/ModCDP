@@ -22,7 +22,7 @@ LIVE_BROWSERBASE_TIMEOUT_S = 120
 
 
 class BBBrowserLauncherTests(unittest.TestCase):
-    def test_creates_verifies_resumes_and_releases_real_browserbase_session(self) -> None:
+    def test_creates_verifies_resumes_and_releases_a_real_browserbase_browser_session(self) -> None:
         if not os.environ.get("BROWSERBASE_API_KEY", "").strip():
             self.fail("BROWSERBASE_API_KEY is required for live Browserbase tests")
         launcher = BBBrowserLauncher(

@@ -12,7 +12,7 @@ from modcdp.launcher.NoneBrowserLauncher import NoneBrowserLauncher
 
 
 class NoneBrowserLauncherTests(unittest.TestCase):
-    def test_records_an_empty_launched_browser(self) -> None:
+    def test_nonebrowserlauncher_records_an_empty_launched_browser(self) -> None:
         launcher = NoneBrowserLauncher()
 
         launched = launcher.launch()

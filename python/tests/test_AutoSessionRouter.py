@@ -59,7 +59,7 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class AutoSessionRouterTests(unittest.TestCase):
-    def test_tracks_real_target_sessions_and_execution_contexts(self) -> None:
+    def test_autosessionrouter_tracks_real_target_sessions_and_execution_contexts_from_live_cdp_events(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",

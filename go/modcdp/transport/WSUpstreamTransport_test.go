@@ -15,7 +15,7 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
-func TestWSUpstreamTransportConstructorUpdateServerConfigAndUnconnectedErrorsMatchTheTransportSurface(t *testing.T) {
+func TestWSUpstreamConstructorUpdateServerConfigAndUnconnectedErrorsMatchTheTransportSurface(t *testing.T) {
 	transport := NewWSUpstreamTransport(UpstreamTransportConfig{})
 	if transport.URL != "" {
 		t.Fatalf("URL = %q", transport.URL)
@@ -36,7 +36,7 @@ func TestWSUpstreamTransportConstructorUpdateServerConfigAndUnconnectedErrorsMat
 	}
 }
 
-func TestWSUpstreamTransportLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
+func TestWSUpstreamLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
 	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: &headless,
@@ -64,7 +64,7 @@ func TestWSUpstreamTransportLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
 	}
 }
 
-func TestWSUpstreamTransportResolvesABareHostPortCDPEndpointToTheBrowserWebsocket(t *testing.T) {
+func TestWSUpstreamResolvesABareHostPortCDPEndpointToTheBrowserWebsocket(t *testing.T) {
 	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: &headless,
@@ -104,7 +104,7 @@ func TestWSUpstreamTransportResolvesABareHostPortCDPEndpointToTheBrowserWebsocke
 	}
 }
 
-func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
+func TestWSUpstreamCloseClearsConnectionState(t *testing.T) {
 	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: &headless,

@@ -13,16 +13,16 @@ from modcdp.types.modcdp import _isObjectMap
 
 
 class CDPTypesPayloadSchemaNormalizationTests(unittest.TestCase):
-    def test_payload_schema_normalization_accepts_empty_json_schema_objects(self) -> None:
+    def test_validatezodschema_accepts_empty_zod_shapes(self) -> None:
         types = CDPTypes()
         types.addCustomCommand({"name": "Custom.empty", "params_schema": {}})
         self.assertEqual(types.parseCommandParams("Custom.empty", {"value": 1}), {"value": 1})
 
-    def test_payload_schema_normalization_rejects_unsupported_schema_specs(self) -> None:
+    def test_validatezodschema_rejects_unsupported_schema_specs(self) -> None:
         with self.assertRaises(TypeError):
             CDPTypes().addCustomCommand({"name": "Custom.bad", "params_schema": "not-a-schema"})
 
-    def test_payload_schema_normalization_accepts_non_empty_json_schema_objects(self) -> None:
+    def test_validatezodschema_accepts_non_empty_zod_shapes(self) -> None:
         types = CDPTypes()
         types.addCustomCommand(
             {

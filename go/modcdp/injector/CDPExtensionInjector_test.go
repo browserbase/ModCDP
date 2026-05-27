@@ -15,7 +15,7 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/injector"
 )
 
-func TestCDPExtensionInjectorPreparesDefaultPackagedExtensionZip(t *testing.T) {
+func TestCDPExtensionInjectorPreparesTheDefaultPackagedExtensionZip(t *testing.T) {
 	injector := NewCDPExtensionInjector(InjectorConfig{})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)

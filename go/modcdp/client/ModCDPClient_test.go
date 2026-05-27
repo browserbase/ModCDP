@@ -138,7 +138,7 @@ func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 	}
 }
 
-func TestModCDPClientDispatchesRootEventsBeforeExtensionSessionAttached(t *testing.T) {
+func TestModCDPClientDispatchesRootEventsBeforeExtensionSessionIsAttached(t *testing.T) {
 	cdp := New(Config{})
 	seen := make(chan string, 1)
 	cdp.On("Target.targetCreated", func(payload any) {
@@ -287,7 +287,7 @@ func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.
 	}
 }
 
-func TestModCDPClientPreservesExplicitNoneServerConfig(t *testing.T) {
+func TestModCDPClientPreservesExplicitNullServerConfig(t *testing.T) {
 	cdp := New(Config{ServerConfig: ServerConfigNone})
 
 	if cdp.Config.ServerConfig != nil {
@@ -295,7 +295,7 @@ func TestModCDPClientPreservesExplicitNoneServerConfig(t *testing.T) {
 	}
 }
 
-func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.T) {
+func TestModCDPClientDefaultsServiceWorkerSuffixConfigToTheModCDPWorker(t *testing.T) {
 	cdp := New(Config{Injector: InjectorConfig{InjectorMode: "discover"}})
 
 	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Config.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
@@ -558,7 +558,7 @@ func TestModCDPClientConnectsWithNestedLaunchUpstreamExtensionClientServerConfig
 	}
 }
 
-func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) {
+func TestModCDPClientCloseDoesNotCloseARemoteBrowserItDidNotLaunch(t *testing.T) {
 	headless := true
 	extensionPath, err := filepath.Abs("../../../dist/extension")
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWithItInstalled(t *testing.T) {
+func TestUploadsTheRealExtensionAndLaunchesABrowserbaseBrowserWithItInstalled(t *testing.T) {
 	if os.Getenv("BROWSERBASE_API_KEY") == "" {
 		t.Fatal("BROWSERBASE_API_KEY is required for live Browserbase tests")
 	}

@@ -21,7 +21,7 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         self.assertIsInstance(LocalBrowserLauncher.findChromeBinary(), str)
         self.assertIsInstance(LocalBrowserLauncher.freePort(), int)
 
-    def test_launches_real_browser_over_chosen_cdp_port_and_explicit_profile_dir(self) -> None:
+    def test_launches_a_real_browser_over_a_chosen_cdp_port_and_explicit_profile_dir(self) -> None:
         with tempfile.TemporaryDirectory(prefix="modcdp-python-local-profile-") as user_data_dir:
             chrome = LocalBrowserLauncher(
                 {

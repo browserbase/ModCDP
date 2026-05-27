@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker(t *testing.T) {
+func TestBorrowExtensionInjectorBootstrapsModCDPInsideALiveExtensionServiceWorker(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)

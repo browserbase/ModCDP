@@ -64,7 +64,7 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class ModCDPClientTests(unittest.TestCase):
-    def test_uses_flat_owner_prefixed_config(self) -> None:
+    def test_modcdpclient_uses_flat_owner_prefixed_config(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -156,7 +156,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(upstream_config.get("upstream_ws_connect_error_settle_timeout_ms"), 7654)
         self.assertEqual(downstream_config.get("downstream_client_timeout_ms"), 4567)
 
-    def test_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
+    def test_modcdpclient_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
 
         self.assertIsNotNone(cdp.injector)
@@ -164,7 +164,7 @@ class ModCDPClientTests(unittest.TestCase):
         assert injector is not None
         self.assertEqual(injector.config.injector_service_worker_url_suffixes, [])
 
-    def test_defaults_service_worker_suffix_config_to_modcdp_worker(self) -> None:
+    def test_modcdpclient_defaults_service_worker_suffix_config_to_the_modcdp_worker(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "discover"})
 
         self.assertIsNotNone(cdp.injector)
@@ -172,12 +172,12 @@ class ModCDPClientTests(unittest.TestCase):
         assert injector is not None
         self.assertEqual(injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
 
-    def test_preserves_explicit_none_server_config(self) -> None:
+    def test_modcdpclient_preserves_explicit_null_server_config(self) -> None:
         cdp = ModCDPClient(server_config=None)
 
         self.assertIsNone(cdp.server_config)
 
-    def test_selects_exactly_one_injector_from_explicit_injector_mode(self) -> None:
+    def test_modcdpclient_selects_exactly_one_injector_from_explicit_injector_mode(self) -> None:
         cdp = ModCDPClient(
             launcher={"launcher_mode": "local"},
             injector={"injector_mode": "cli"},
@@ -201,7 +201,7 @@ class ModCDPClientTests(unittest.TestCase):
             "BorrowExtensionInjector",
         )
 
-    def test_rejects_unknown_component_modes_at_their_owning_factory_boundary(self) -> None:
+    def test_modcdpclient_rejects_unknown_component_modes_at_their_owning_factory_boundary(self) -> None:
         with self.assertRaisesRegex(Exception, r"unknown upstream_mode=bogus"):
             ModCDPClient(upstream={"upstream_mode": "bogus"})
         with self.assertRaisesRegex(Exception, r"Input should be"):
@@ -209,7 +209,7 @@ class ModCDPClientTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, r"Input should be"):
             ModCDPClient(injector={"injector_mode": "bogus"})
 
-    def test_connects_with_nested_launch_upstream_extension_client_server_config(self) -> None:
+    def test_modcdpclient_connects_with_nested_launch_upstream_extension_client_server_config(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -352,7 +352,7 @@ class ModCDPClientTests(unittest.TestCase):
         finally:
             cdp.close()
 
-    def test_close_does_not_close_a_remote_browser_it_did_not_launch(self) -> None:
+    def test_modcdpclient_close_does_not_close_a_remote_browser_it_did_not_launch(self) -> None:
         chrome = LocalBrowserLauncher(
             {
                 "launcher_local_headless": True,
@@ -391,7 +391,7 @@ class ModCDPClientTests(unittest.TestCase):
             cdp.close()
             chrome["close"]()
 
-    def test_close_keeps_injector_files_until_after_launched_browser_shutdown(self) -> None:
+    def test_modcdpclient_close_keeps_injector_files_until_after_launched_browser_shutdown(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -439,7 +439,7 @@ class ModCDPClientTests(unittest.TestCase):
 
         self.assertIsNone(cdp.launcher.launched)
 
-    def test_close_clears_top_level_connection_state(self) -> None:
+    def test_modcdpclient_close_clears_top_level_connection_state(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -461,7 +461,7 @@ class ModCDPClientTests(unittest.TestCase):
 
         self.assertIsNone(cdp.launcher.launched)
 
-    def test_event_dispatch_snapshots_handlers_when_once_removes_itself(self) -> None:
+    def test_modcdpclient_event_dispatch_snapshots_handlers_when_once_removes_itself(self) -> None:
         client = ModCDPClient()
         client.ext_session_id = "ext-session"
         seen: Queue[str] = Queue()
@@ -507,13 +507,13 @@ class ModCDPClientTests(unittest.TestCase):
         with self.assertRaises(Empty):
             seen.get(timeout=0.1)
 
-    def test_validates_native_command_params_before_sending(self) -> None:
+    def test_modcdpclient_validates_native_command_params_before_sending(self) -> None:
         client = ModCDPClient()
 
         with self.assertRaisesRegex(Exception, "expression"):
             client.send("Runtime.evaluate", {})
 
-    def test_validates_native_and_registered_custom_events_before_dispatch(self) -> None:
+    def test_modcdpclient_validates_native_and_registered_custom_events_before_dispatch(self) -> None:
         client = ModCDPClient()
 
         with self.assertRaisesRegex(Exception, "targetInfo"):
@@ -531,7 +531,7 @@ class ModCDPClientTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "boolean"):
             client._on_recv({"method": "Custom.ready", "params": {"ok": "yes"}})
 
-    def test_root_events_dispatch_before_extension_session_is_attached(self) -> None:
+    def test_modcdpclient_dispatches_root_events_before_extension_session_is_attached(self) -> None:
         client = ModCDPClient()
         seen: Queue[str] = Queue()
 
@@ -553,7 +553,7 @@ class ModCDPClientTests(unittest.TestCase):
         )
         self.assertEqual(seen.get(timeout=1), "target-1")
 
-    def test_uses_no_injector_unless_injector_mode_is_explicit(self) -> None:
+    def test_modcdpclient_uses_no_injector_unless_injector_mode_is_explicit(self) -> None:
         launched = ModCDPClient(launcher={"launcher_mode": "local"}, upstream={"upstream_mode": "ws"})
         self.assertEqual(launched.launcher.config.launcher_mode, "local")
         self.assertIsNone(launched.injector)

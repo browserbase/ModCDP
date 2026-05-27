@@ -19,7 +19,7 @@ import (
 	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
 )
 
-func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testing.T) {
+func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContextsFromLiveCDPEvents(t *testing.T) {
 	headless := true
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {

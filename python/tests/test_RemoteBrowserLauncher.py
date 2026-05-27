@@ -20,7 +20,7 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "launcher_mode=remote requires launcher_remote_cdp_url"):
             RemoteBrowserLauncher().launch()
 
-    def test_connects_to_real_browser_from_http_and_websocket_cdp_endpoints(self) -> None:
+    def test_connects_to_a_real_browser_from_both_http_discovery_and_websocket_cdp_endpoints(self) -> None:
         port = LocalBrowserLauncher.freePort()
         local = LocalBrowserLauncher().launch(
             {"launcher_local_cdp_listen_port": port, "launcher_local_headless": True, "launcher_local_chrome_ready_timeout_ms": 45_000}

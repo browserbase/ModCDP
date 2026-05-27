@@ -47,7 +47,7 @@ func TestCLIExtensionInjectorRejectsZipEntriesOutsideExtractionDirectory(t *test
 	}
 }
 
-func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(t *testing.T) {
+func TestCLIExtensionInjectorPreparesAnUnpackedExtensionDirectoryForLoadExtension(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(
 	}
 }
 
-func TestCLIExtensionInjectorPreparesDefaultExtensionZipForLoadExtension(t *testing.T) {
+func TestCLIExtensionInjectorPreparesTheDefaultExtensionZipForLoadExtension(t *testing.T) {
 	injector := NewCLIExtensionInjector(InjectorConfig{})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestCLIExtensionInjectorPreparesDefaultExtensionZipForLoadExtension(t *test
 	}
 }
 
-func TestCLIExtensionInjectorReturnsImmediatelyWhenLaunchedExtensionTargetIsAbsent(t *testing.T) {
+func TestCLIExtensionInjectorReturnsImmediatelyWhenTheLaunchedExtensionTargetIsAbsent(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)

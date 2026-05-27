@@ -22,7 +22,7 @@ EXTENSION_PATH = ROOT / "dist" / "extension"
 
 
 class CLIExtensionInjectorTests(unittest.TestCase):
-    def test_rejects_zip_entries_outside_extraction_directory(self) -> None:
+    def test_cliextensioninjector_rejects_zip_entries_outside_extraction_directory(self) -> None:
         with tempfile.TemporaryDirectory(prefix="modcdp-bad-zip-") as temp_dir:
             zip_path = Path(temp_dir) / "extension.zip"
             with zipfile.ZipFile(zip_path, "w") as archive:
@@ -36,7 +36,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             finally:
                 injector.close()
 
-    def test_prepares_unpacked_extension_directory_for_load_extension(self) -> None:
+    def test_cliextensioninjector_prepares_an_unpacked_extension_directory_for_load_extension(self) -> None:
         injector = CLIExtensionInjector({"injector_cli_extension_path": str(EXTENSION_PATH)})
         try:
             injector.prepare()
@@ -50,7 +50,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
         finally:
             injector.close()
 
-    def test_prepares_default_extension_zip_for_load_extension(self) -> None:
+    def test_cliextensioninjector_prepares_the_default_extension_zip_for_load_extension(self) -> None:
         injector = CLIExtensionInjector()
         try:
             injector.prepare()
@@ -64,7 +64,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
         finally:
             injector.close()
 
-    def test_returns_immediately_when_launched_extension_target_is_absent(self) -> None:
+    def test_cliextensioninjector_returns_immediately_when_the_launched_extension_target_is_absent(self) -> None:
         methods: list[str] = []
 
         def send(method: str, params: dict[str, Any] | None = None, session_id: str | None = None) -> dict[str, Any]:

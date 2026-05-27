@@ -19,7 +19,7 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
-func TestLocalBrowserLauncherClassHelpersMatchLocalLauncherSurface(t *testing.T) {
+func TestClassHelpersMatchTheLocalLauncherSurface(t *testing.T) {
 	launcher := NewLocalBrowserLauncher(LauncherConfig{})
 	if chromePath, err := launcher.FindChromeBinary(""); err != nil || chromePath == "" {
 		t.Fatalf("FindChromeBinary = %q, %v", chromePath, err)
@@ -29,7 +29,7 @@ func TestLocalBrowserLauncherClassHelpersMatchLocalLauncherSurface(t *testing.T)
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndExplicitProfileDir(t *testing.T) {
+func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.T) {
 	headless := true
 	profileDir := t.TempDir()
 	port, err := freePort()
@@ -104,7 +104,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndExplicitProf
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeaksCDPOverTheReturnedPipes(t *testing.T) {
+func TestLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeaksCDPOverTheReturnedPipes(t *testing.T) {
 	headless := true
 	launcher := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
@@ -154,7 +154,7 @@ func TestLocalBrowserLauncherLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeak
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpointOnlyWhenRequested(t *testing.T) {
+func TestLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpointOnlyWhenRequested(t *testing.T) {
 	headless := true
 	loopbackCDP := true
 	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
@@ -194,7 +194,7 @@ func TestLocalBrowserLauncherLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpo
 	}
 }
 
-func TestLocalBrowserLauncherRemovesAnExplicitUserDataDirWhenCleanupUserDataDirIsSet(t *testing.T) {
+func TestRemovesAnExplicitUserDataDirWhenCleanupUserDataDirIsSet(t *testing.T) {
 	headless := true
 	cleanupUserDataDir := true
 	profileDir, err := os.MkdirTemp("", "modcdp-go-local-profile-")

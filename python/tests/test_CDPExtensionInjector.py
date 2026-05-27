@@ -14,7 +14,7 @@ from modcdp.injector.CDPExtensionInjector import CDPExtensionInjector
 
 
 class CDPExtensionInjectorTests(unittest.TestCase):
-    def test_prepares_default_packaged_extension_zip(self) -> None:
+    def test_cdpextensioninjector_prepares_the_default_packaged_extension_zip(self) -> None:
         injector = CDPExtensionInjector()
         try:
             injector.prepare()

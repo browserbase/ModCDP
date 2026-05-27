@@ -56,7 +56,7 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class BorrowExtensionInjectorTests(unittest.TestCase):
-    def test_bootstraps_modcdp_inside_live_extension_service_worker(self) -> None:
+    def test_borrowextensioninjector_bootstraps_modcdp_inside_a_live_extension_service_worker(self) -> None:
         owner = ModCDPClient(
             launcher={
                 "launcher_mode": "local",

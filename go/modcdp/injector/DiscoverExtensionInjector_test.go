@@ -17,7 +17,7 @@ import (
 	"testing"
 )
 
-func TestDiscoverExtensionInjectorAttachesToAlreadyLoadedRealModCDPExtension(t *testing.T) {
+func TestDiscoverExtensionInjectorAttachesToAnAlreadyLoadedRealModCDPExtension(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)

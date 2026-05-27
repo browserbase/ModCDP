@@ -11,14 +11,14 @@ import (
 	"testing"
 )
 
-func TestRemoteBrowserLauncherRequiresLauncherRemoteCDPURL(t *testing.T) {
+func TestRequiresLauncherRemoteCDPURL(t *testing.T) {
 	_, err := NewRemoteBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{})
 	if err == nil || err.Error() != "launcher_mode=remote requires launcher_remote_cdp_url." {
 		t.Fatalf("Launch error = %v", err)
 	}
 }
 
-func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoints(t *testing.T) {
+func TestConnectsToARealBrowserFromBothHTTPDiscoveryAndWebSocketCDPEndpoints(t *testing.T) {
 	headless := true
 	port, err := freePort()
 	if err != nil {
@@ -92,7 +92,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	fromWS.Close()
 }
 
-func TestRemoteBrowserLauncherLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
+func TestLetsLaunchConfigOverrideConstructorCDPURL(t *testing.T) {
 	headless := true
 	firstPort, err := freePort()
 	if err != nil {

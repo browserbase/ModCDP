@@ -94,7 +94,7 @@ func TestCustomCommandsInstallFlatNamespaceMethodsThroughARealServiceWorker(t *t
 	}
 }
 
-func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testing.T) {
+func TestCustomEventsValidateRawStringHandlersThroughARealServiceWorker(t *testing.T) {
 	type EventSchema struct {
 		Data string `json:"data"`
 	}
@@ -289,7 +289,7 @@ func TestDynamicCustomCommandEventAndMiddlewareRegistrationValidatesThroughAReal
 	}
 }
 
-func TestAssignedTypeRegistryValidatesUpdatedCustomCommandEventAndMiddlewareSchemasThroughRealServiceWorker(t *testing.T) {
+func TestAssignedTypeRegistryValidatesUpdatedCustomCommandEventAndMiddlewareSchemasThroughARealServiceWorker(t *testing.T) {
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)

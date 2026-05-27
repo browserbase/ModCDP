@@ -13,7 +13,7 @@ import (
 	abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
 )
 
-func TestPayloadSchemaNormalizationAcceptsEmptyJSONSchemaObjects(t *testing.T) {
+func TestValidateZodSchemaAcceptsEmptyZodShapes(t *testing.T) {
 	schema := cloneSchema(map[string]any{})
 	if schema == nil {
 		t.Fatal("expected empty schema object to normalize")
@@ -23,7 +23,7 @@ func TestPayloadSchemaNormalizationAcceptsEmptyJSONSchemaObjects(t *testing.T) {
 	}
 }
 
-func TestPayloadSchemaNormalizationRejectsUnsupportedSchemaSpecs(t *testing.T) {
+func TestValidateZodSchemaRejectsUnsupportedSchemaSpecs(t *testing.T) {
 	_, err := New(Config{}).Send("Mod.addCustomCommand", map[string]any{
 		"name":          "Custom.bad",
 		"params_schema": "not-a-schema",
@@ -33,7 +33,7 @@ func TestPayloadSchemaNormalizationRejectsUnsupportedSchemaSpecs(t *testing.T) {
 	}
 }
 
-func TestPayloadSchemaNormalizationAcceptsNonEmptyJSONSchemaObjects(t *testing.T) {
+func TestValidateZodSchemaAcceptsNonEmptyZodShapes(t *testing.T) {
 	schema := cloneSchema(map[string]any{
 		"type":       "object",
 		"required":   []any{"value"},

@@ -12,7 +12,7 @@ from modcdp.injector.ExtensionInjector import ExtensionInjector
 
 
 class ExtensionInjectorTests(unittest.TestCase):
-    def test_owns_shared_injector_config(self) -> None:
+    def test_extensioninjector_owns_shared_injector_config(self) -> None:
         injector = ExtensionInjector(
             {
                 "injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -42,7 +42,7 @@ class ExtensionInjectorTests(unittest.TestCase):
             )
         )
 
-    def test_base_inject_reports_the_class_name(self) -> None:
+    def test_extensioninjector_base_inject_reports_the_subclass_name(self) -> None:
         with self.assertRaisesRegex(NotImplementedError, "ExtensionInjector.inject is not implemented"):
             ExtensionInjector().inject()
 

@@ -17,7 +17,7 @@ EXTENSION_PATH = HERE.parents[1] / "dist" / "extension"
 
 
 class BBExtensionInjectorTests(unittest.TestCase):
-    def test_uploads_real_extension_and_launches_browserbase_browser_with_it_installed(self) -> None:
+    def test_uploads_the_real_extension_and_launches_a_browserbase_browser_with_it_installed(self) -> None:
         if not os.environ.get("BROWSERBASE_API_KEY", "").strip():
             self.fail("BROWSERBASE_API_KEY is required for live Browserbase tests")
         cdp = ModCDPClient(

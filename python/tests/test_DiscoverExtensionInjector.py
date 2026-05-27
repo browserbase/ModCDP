@@ -56,7 +56,7 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class DiscoverExtensionInjectorTests(unittest.TestCase):
-    def test_attaches_to_already_loaded_real_modcdp_extension(self) -> None:
+    def test_discoverextensioninjector_attaches_to_an_already_loaded_real_modcdp_extension(self) -> None:
         owner = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
