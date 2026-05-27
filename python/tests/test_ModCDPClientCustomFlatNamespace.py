@@ -53,10 +53,10 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
                 expression="async ({ id }) => ({ success: id === 'abc' })",
             )
             self.assertEqual(registered, {"name": "Custom.doSomething", "registered": True})
-            success: bool = await client.Custom.doSomething(id="abc")
-            raw_success: bool = bool(await client.send("Custom.doSomething", {"id": "abc"}))
-            self.assertIs(success, True)
-            self.assertIs(raw_success, True)
+            success = await client.Custom.doSomething(id="abc")
+            raw_success = await client.send("Custom.doSomething", {"id": "abc"})
+            self.assertEqual(success, {"success": True})
+            self.assertEqual(raw_success, {"success": True})
 
         try:
             asyncio.run(run())
@@ -94,7 +94,7 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
             await client.Mod.addCustomEvent("Custom.someEvent", event_schema=EventSchema)
             await client.on("Custom.someEvent", callback)
             await client.Mod.evaluate(
-                expression="async () => await globalThis.ModCDP.emit('Custom.someEvent', { data: 'ok' })"
+                expression="async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.someEvent', data: { data: 'ok' }, cdpSessionId: null }))"
             )
 
         try:

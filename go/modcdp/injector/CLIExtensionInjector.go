@@ -36,7 +36,7 @@ func (i *CLIExtensionInjector) Prepare() error {
 }
 
 func (i *CLIExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
-	discovered, err := i.discoverReadyServiceWorker(i.Config.InjectorTrustServiceWorkerTarget)
+	discovered, err := i.waitForReadyServiceWorker(i.Config.InjectorServiceWorkerReadyTimeoutMS, i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || discovered == nil {
 		return discovered, err
 	}

@@ -309,7 +309,7 @@ class CDPTypes:
 
     def addCustomMiddleware(self, registration: ModCDPAddMiddlewareParams) -> str:
         parsed = _ModCDPAddMiddleware.model_validate(registration)
-        name = "*" if parsed.name is None else normalizeModCDPName(parsed.name)
+        name = "*" if parsed.name is None or parsed.name == "*" else normalizeModCDPName(parsed.name)
         if name != "*" and "." not in name:
             raise ValueError("name must be '*' or Domain.name form")
         middleware: ModCDPAddMiddlewareParams = {"phase": parsed.phase, "expression": parsed.expression}

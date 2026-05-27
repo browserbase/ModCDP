@@ -35,7 +35,8 @@ class CLIExtensionInjector(ExtensionInjector):
         super().prepare()
 
     def inject(self) -> ExtensionInjectionResult | None:
-        discovered = self._discoverReadyServiceWorker(
+        discovered = self._waitForReadyServiceWorker(
+            self.config.injector_service_worker_ready_timeout_ms,
             matched_only=self.config.injector_trust_service_worker_target,
         )
         return {**discovered, "source": "cli"} if discovered else None

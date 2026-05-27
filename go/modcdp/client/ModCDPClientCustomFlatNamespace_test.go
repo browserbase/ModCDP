@@ -67,7 +67,8 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != true {
+	resultMap, ok := result.(map[string]any)
+	if !ok || resultMap["success"] != true {
 		t.Fatalf("Custom.doSomething = %#v", result)
 	}
 	if _, err := cdp.Send("Custom.doSomething", map[string]any{"id": 123}); err == nil {
@@ -127,7 +128,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 		}
 	})
 	if _, err := cdp.Mod.Evaluate(map[string]any{
-		"expression": "async () => await globalThis.ModCDP.emit('Custom.someEvent', { data: 'ok' })",
+		"expression": "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.someEvent', data: { data: 'ok' }, cdpSessionId: null }))",
 	}); err != nil {
 		t.Fatal(err)
 	}

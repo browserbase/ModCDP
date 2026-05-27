@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import os
 
 from modcdp import ModCDPClient
 
@@ -19,11 +20,15 @@ EXTENSION_PATH = ROOT / "dist" / "extension"
 class BorrowExtensionInjectorTests(unittest.TestCase):
     def test_bootstraps_modcdp_inside_live_extension_service_worker(self) -> None:
         owner = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_local_headless": True},
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                **({"launcher_local_executable_path": os.environ["CHROME_PATH"]} if os.environ.get("CHROME_PATH") else {}),
+            },
             upstream={"upstream_mode": "ws"},
             injector={
-                "injector_mode": "cdp",
-                "injector_cdp_extension_path": str(EXTENSION_PATH),
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },

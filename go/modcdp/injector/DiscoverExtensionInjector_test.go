@@ -9,6 +9,7 @@ package injector_test
 import (
 	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
 	. "github.com/browserbase/modcdp/go/modcdp/injector"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -20,11 +21,11 @@ func TestDiscoverExtensionInjectorAttachesToAlreadyLoadedRealModCDPExtension(t *
 	}
 	headless := true
 	owner := modcdp.New(modcdp.Config{
-		Launcher: modcdp.LauncherConfig{LauncherMode: "local", LauncherLocalHeadless: &headless},
+		Launcher: modcdp.LauncherConfig{LauncherMode: "local", LauncherLocalHeadless: &headless, LauncherLocalExecutablePath: os.Getenv("CHROME_PATH")},
 		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorConfig{
-			InjectorMode:                     "cdp",
-			InjectorCDPExtensionPath:         extensionPath,
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
