@@ -460,6 +460,36 @@ class ModCDPClient(CDPSurfaceMixin):
 
         return _value().__await__()
 
+    def configure(
+        self,
+        *,
+        upstream: Mapping[str, Any] | None = None,
+        router: Mapping[str, Any] | None = None,
+        client_config: Mapping[str, Any] | None = None,
+        server_config: Mapping[str, JsonValue] | None | object = DEFAULT_SERVER,
+    ) -> "ModCDPClient":
+        if client_config is not None:
+            self.config = ClientConfig.model_validate({**self.config.model_dump(), **dict(client_config)})
+            self.upstream.update({"upstream_cdp_send_timeout_ms": self.config.client_cdp_send_timeout_ms})
+        if upstream is not None:
+            self.upstream.update(dict(upstream))
+        if router is not None:
+            current_routes = dict(self.router.config.get("router_routes") or {})
+            incoming_routes = dict(cast(Mapping[str, str], router.get("router_routes") or {}))
+            self.router.config = RouterConfig.model_validate(
+                {
+                    **self.router.config,
+                    **dict(router),
+                    "router_routes": {
+                        **current_routes,
+                        **incoming_routes,
+                    },
+                }
+            ).model_dump()
+        if server_config is not DEFAULT_SERVER:
+            self.server_config = None if server_config is None else cast(ModCDPServerConfig, dict(cast(Mapping[str, JsonValue], server_config)))
+        return self
+
     def _run_handler(self, handler: Handler, payload: Any, event_name: str) -> None:
         try:
             result = handler(payload)

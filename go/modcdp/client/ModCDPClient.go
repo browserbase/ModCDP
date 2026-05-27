@@ -461,6 +461,61 @@ func New(opts Config) *ModCDPClient {
 	return client
 }
 
+func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
+	if config.ClientConfig.ClientHydrateAliases != nil {
+		c.Config.ClientConfig.ClientHydrateAliases = config.ClientConfig.ClientHydrateAliases
+	}
+	if config.ClientConfig.ClientMirrorUpstreamEvents != nil {
+		c.Config.ClientConfig.ClientMirrorUpstreamEvents = config.ClientConfig.ClientMirrorUpstreamEvents
+	}
+	if config.ClientConfig.ClientCDPSendTimeoutMS != 0 {
+		c.Config.ClientConfig.ClientCDPSendTimeoutMS = config.ClientConfig.ClientCDPSendTimeoutMS
+	}
+	if config.ClientConfig.ClientEventWaitTimeoutMS != 0 {
+		c.Config.ClientConfig.ClientEventWaitTimeoutMS = config.ClientConfig.ClientEventWaitTimeoutMS
+	}
+	if config.ClientConfig.ClientHeartbeatIntervalMS != 0 {
+		c.Config.ClientConfig.ClientHeartbeatIntervalMS = config.ClientConfig.ClientHeartbeatIntervalMS
+	}
+	if c.transport != nil {
+		c.transport.Update(map[string]any{"upstream_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS})
+	}
+	if config.Upstream.UpstreamWSCDPURL != "" || config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 || config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
+		if config.Upstream.UpstreamWSCDPURL != "" {
+			c.Config.Upstream.UpstreamWSCDPURL = config.Upstream.UpstreamWSCDPURL
+		}
+		if config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
+			c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS
+		}
+		if config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
+			c.Config.Upstream.UpstreamCDPSendTimeoutMS = config.Upstream.UpstreamCDPSendTimeoutMS
+		}
+		if c.transport != nil {
+			c.transport.Update(c.upstreamTransportConfig())
+		}
+	}
+	if config.Router.RouterRoutes != nil {
+		if c.Config.Router.RouterRoutes == nil {
+			c.Config.Router.RouterRoutes = translate.DefaultClientRoutes()
+		}
+		for key, value := range config.Router.RouterRoutes {
+			c.Config.Router.RouterRoutes[key] = value
+		}
+	}
+	if config.Router.LoopbackExecutionContextTimeoutMS != 0 {
+		c.Config.Router.LoopbackExecutionContextTimeoutMS = config.Router.LoopbackExecutionContextTimeoutMS
+	}
+	if config.serverConfigConfigured {
+		c.Config.ServerConfig = config.ServerConfig
+	} else if config.ServerConfig != nil {
+		c.Config.ServerConfig = config.ServerConfig
+	}
+	if c.Config.ClientConfig.ClientHydrateAliases != nil && *c.Config.ClientConfig.ClientHydrateAliases {
+		initCDPSurface(c)
+	}
+	return c
+}
+
 func (c *ModCDPClient) Connect() error {
 	connectStartedAt := time.Now().UnixMilli()
 	transportStartedAt := time.Now().UnixMilli()
