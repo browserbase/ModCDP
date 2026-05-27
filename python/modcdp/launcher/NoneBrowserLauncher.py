@@ -4,10 +4,10 @@
 # - ./go/modcdp/launcher/NoneBrowserLauncher.go
 from __future__ import annotations
 
-from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser
+from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, LaunchedBrowser
 
 
 class NoneBrowserLauncher(BrowserLauncher):
-    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
+    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         self.launched = {"cdp_url": None, "close": lambda: None}
         return self.launched

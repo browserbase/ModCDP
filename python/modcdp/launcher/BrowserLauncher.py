@@ -44,9 +44,6 @@ class LauncherConfig(BaseModel):
     launcher_bb_session_create_params: dict[str, Any] = Field(default_factory=lambda: {"userMetadata": {}})
 
 
-LauncherOptions = LauncherConfig | dict[str, Any]
-
-
 class LaunchedBrowser(TypedDict):
     # Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
     cdp_url: str | None
@@ -70,11 +67,11 @@ CDP_URL_SCHEME_RE = re.compile(r"^[a-z][a-z\d+\-.]*://", re.I)
 class BrowserLauncher:
     launched: LaunchedBrowser | None
 
-    def __init__(self, options: LauncherOptions | None = None) -> None:
+    def __init__(self, options: LauncherConfig | dict[str, Any] | None = None) -> None:
         self.config = _launcher_config(options)
         self.launched = None
 
-    def update(self, config: LauncherOptions | None = None) -> "BrowserLauncher":
+    def update(self, config: LauncherConfig | dict[str, Any] | None = None) -> "BrowserLauncher":
         incoming = _launcher_config(config)
         updates = incoming.model_dump(exclude_unset=True)
         if "launcher_local_args" in incoming.model_fields_set:
@@ -93,14 +90,7 @@ class BrowserLauncher:
         loopback_cdp_url = (self.launched or {}).get("loopback_cdp_url")
         return {"upstream": {"upstream_ws_cdp_url": loopback_cdp_url}} if loopback_cdp_url else {}
 
-    def configForInjector(self) -> dict[str, Any]:
-        return {
-            "injector_bb_api_key": self.config.launcher_bb_api_key,
-            "injector_bb_base_url": self.config.launcher_bb_base_url,
-            "injector_bb_extension_id": self.config.launcher_bb_extension_id,
-        }
-
-    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
+    def launch(self, options: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")
 
     def close(self) -> None:
@@ -131,7 +121,7 @@ def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | N
     return merged
 
 
-def _launcher_config(options: LauncherOptions | None = None) -> LauncherConfig:
+def _launcher_config(options: LauncherConfig | dict[str, Any] | None = None) -> LauncherConfig:
     if isinstance(options, LauncherConfig):
         return options
     return LauncherConfig.model_validate(options or {})

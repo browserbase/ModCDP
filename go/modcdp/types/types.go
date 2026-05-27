@@ -4,7 +4,7 @@
 // - ./python/modcdp/types/modcdp.py
 package types
 
-type LaunchOptions struct {
+type LauncherConfig struct {
 	LauncherMode                           string         `json:"launcher_mode,omitempty"`
 	LauncherLocalExecutablePath            string         `json:"launcher_local_executable_path,omitempty"`
 	LauncherLocalExtraArgs                 []string       `json:"launcher_local_extra_args,omitempty"`
@@ -32,7 +32,7 @@ type LaunchOptions struct {
 	LauncherBBSessionCreateParams          map[string]any `json:"launcher_bb_session_create_params,omitempty"`
 }
 
-type UpstreamTransportOptions struct {
+type UpstreamTransportConfig struct {
 	UpstreamMode                          string `json:"upstream_mode,omitempty"`
 	UpstreamWSCDPURL                      string `json:"upstream_ws_cdp_url,omitempty"`
 	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
@@ -40,7 +40,7 @@ type UpstreamTransportOptions struct {
 }
 
 type SendCDP func(method string, params map[string]any, sessionID string) (map[string]any, error)
-type InjectorOptions struct {
+type InjectorConfig struct {
 	Send                                 SendCDP  `json:"-"`
 	InjectorMode                         string   `json:"injector_mode,omitempty"`
 	InjectorCLIExtensionPath             string   `json:"injector_cli_extension_path,omitempty"`

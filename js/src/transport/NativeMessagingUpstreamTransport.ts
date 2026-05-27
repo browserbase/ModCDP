@@ -35,28 +35,28 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+    if (typeof command !== "string" && "method" in command) {
       if (!this.read_native_message)
         throw new Error(
           `Native messaging stdio is not connected for ${this.config.upstream_nativemessaging_host_name}.`,
         );
-      writeLengthPrefixedJSON(process.stdout, command_or_message_or_method);
+      writeLengthPrefixedJSON(process.stdout, command);
       return;
     }
-    if (typeof command_or_message_or_method === "string") {
+    if (typeof command === "string") {
       return super.send(
-        command_or_message_or_method,
+        command,
         params as ProtocolPayload,
         typeof route_or_sessionId === "string" ? route_or_sessionId : null,
         options,
       );
     }
-    return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
+    return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
   update(config: UpstreamTransportConfig = {}) {

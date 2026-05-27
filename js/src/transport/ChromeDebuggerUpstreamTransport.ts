@@ -148,14 +148,14 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+    if (typeof command !== "string" && "method" in command) {
       throw new Error("chromedebugger does not support raw CDP command messages.");
     }
-    if (typeof command_or_message_or_method === "string") {
+    if (typeof command === "string") {
       throw new Error("chromedebugger raw string sends must go through ModCDPClient.router.");
     }
     let route: TargetRoute | undefined;
@@ -166,7 +166,7 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     } else {
       route = route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined;
     }
-    return this.sendCommand(command_or_message_or_method, params as z.input<Params>, route);
+    return this.sendCommand(command, params as z.input<Params>, route);
   }
 
   private async sendCommand<

@@ -35,11 +35,11 @@ type browserbaseSession struct {
 	Status                string `json:"status"`
 }
 
-func NewBBBrowserLauncher(options LaunchOptions) *BBBrowserLauncher {
+func NewBBBrowserLauncher(options LauncherConfig) *BBBrowserLauncher {
 	return &BBBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
 }
 
-func (l *BBBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
+func (l *BBBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
 	merged := mergeLaunchOptions(l.Config, options)
 	browserbaseAPIKey := firstString(merged.LauncherBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
 	if browserbaseAPIKey == "" {

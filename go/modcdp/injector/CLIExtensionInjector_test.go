@@ -38,7 +38,7 @@ func TestCLIExtensionInjectorRejectsZipEntriesOutsideExtractionDir(t *testing.T)
 		t.Fatal(err)
 	}
 
-	injector := NewCLIExtensionInjector(InjectorOptions{InjectorCLIExtensionPath: zipPath})
+	injector := NewCLIExtensionInjector(InjectorConfig{InjectorCLIExtensionPath: zipPath})
 	if err := injector.Prepare(); err == nil || !strings.Contains(err.Error(), "escapes extension extraction directory") {
 		t.Fatalf("Prepare error = %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(
 	if err != nil {
 		t.Fatal(err)
 	}
-	injector := NewCLIExtensionInjector(InjectorOptions{InjectorCLIExtensionPath: extensionPath})
+	injector := NewCLIExtensionInjector(InjectorConfig{InjectorCLIExtensionPath: extensionPath})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(
 }
 
 func TestCLIExtensionInjectorPreparesDefaultExtensionZipForLoadExtension(t *testing.T) {
-	injector := NewCLIExtensionInjector(InjectorOptions{})
+	injector := NewCLIExtensionInjector(InjectorConfig{})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestCLIExtensionInjectorReturnsImmediatelyWhenLaunchedExtensionTargetIsAbse
 		t.Fatal(err)
 	}
 	methods := []string{}
-	injector := NewCLIExtensionInjector(InjectorOptions{
+	injector := NewCLIExtensionInjector(InjectorConfig{
 		InjectorCLIExtensionPath:         extensionPath,
 		InjectorTrustServiceWorkerTarget: true,
 		Send: func(method string, params map[string]any, sessionID string) (map[string]any, error) {

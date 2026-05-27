@@ -19,7 +19,7 @@ from queue import Empty, Queue
 from typing import Any, Literal, TypedDict, cast
 
 from pydantic import BaseModel, ConfigDict, Field
-from ..launcher.BrowserLauncher import LauncherOptions
+from ..launcher.BrowserLauncher import LauncherConfig
 from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
 
 EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
@@ -65,9 +65,6 @@ class InjectorConfig(BaseModel):
     injector_target_session_poll_interval_ms: int = DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS
     injector_bb_api_key: str | None = None
     injector_bb_base_url: str = "https://api.browserbase.com"
-
-
-InjectorOptions = InjectorConfig | dict[str, Any]
 
 
 def defaultModCDPExtensionPath() -> str | None:
@@ -133,7 +130,7 @@ class ExtensionInjectionResult(TypedDict):
 
 
 class ExtensionInjector:
-    def __init__(self, options: InjectorOptions | None = None) -> None:
+    def __init__(self, options: InjectorConfig | dict[str, Any] | None = None) -> None:
         self.config = _injector_config(options)
         self.unusable_target_ids: set[str] = set()
         self.source: str | None = None
@@ -142,15 +139,12 @@ class ExtensionInjector:
         self.url: str | None = None
         self.session_id: str | None = None
 
-    def update(self, config: InjectorOptions | None = None) -> "ExtensionInjector":
+    def update(self, config: InjectorConfig | dict[str, Any] | None = None) -> "ExtensionInjector":
         incoming = _injector_config(config)
         self.config = InjectorConfig.model_validate({**self.config.model_dump(), **incoming.model_dump(exclude_unset=True)})
         return self
 
-    def configForInjector(self) -> InjectorOptions:
-        return self.config
-
-    def configForLauncher(self) -> LauncherOptions:
+    def configForLauncher(self) -> LauncherConfig | dict[str, Any]:
         return {}
 
     def configForUpstream(self) -> dict[str, Any]:
@@ -335,7 +329,7 @@ class ExtensionInjector:
         return bool(has_extension_id or includes or suffixes)
 
 
-def _injector_config(options: InjectorOptions | None = None) -> InjectorConfig:
+def _injector_config(options: InjectorConfig | dict[str, Any] | None = None) -> InjectorConfig:
     if isinstance(options, InjectorConfig):
         return options
     return InjectorConfig.model_validate(options or {})

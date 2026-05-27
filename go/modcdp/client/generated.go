@@ -106,7 +106,7 @@ func cdpParamsMap(params any) (map[string]any, error) {
 func sendCDPCommand[T any](client *ModCDPClient, method string, params any) (T, error) {
 	var typed T
 	if client == nil {
-		return typed, fmt.Errorf("client_hydrate_aliases is false; use Send or SendRaw for %s", method)
+		return typed, fmt.Errorf("client_hydrate_aliases is false; use Send for %s", method)
 	}
 	rawParams, err := cdpParamsMap(params)
 	if err != nil {

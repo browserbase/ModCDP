@@ -15,7 +15,7 @@ type CLIExtensionInjector struct {
 	CleanupPath           string
 }
 
-func NewCLIExtensionInjector(options InjectorOptions) CLIExtensionInjector {
+func NewCLIExtensionInjector(options InjectorConfig) CLIExtensionInjector {
 	return CLIExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
 }
 
@@ -34,11 +34,11 @@ func (i *CLIExtensionInjector) Prepare() error {
 	return err
 }
 
-func (i *CLIExtensionInjector) ConfigForLauncher() LaunchOptions {
+func (i *CLIExtensionInjector) ConfigForLauncher() LauncherConfig {
 	if i.UnpackedExtensionPath == "" {
-		return LaunchOptions{}
+		return LauncherConfig{}
 	}
-	return LaunchOptions{LauncherLocalExtraArgs: []string{"--load-extension=" + i.UnpackedExtensionPath}}
+	return LauncherConfig{LauncherLocalExtraArgs: []string{"--load-extension=" + i.UnpackedExtensionPath}}
 }
 
 func (i *CLIExtensionInjector) Inject() (*ExtensionInjectionResult, error) {

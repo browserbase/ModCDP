@@ -23,7 +23,7 @@ func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWit
 	if err != nil {
 		t.Fatal(err)
 	}
-	launchOptions := modcdp.LaunchOptions{
+	launchOptions := modcdp.LauncherConfig{
 		LauncherMode:      "bb",
 		LauncherBBTimeout: 120,
 	}
@@ -32,8 +32,8 @@ func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWit
 	}
 	cdp := modcdp.New(modcdp.Config{
 		Launcher: launchOptions,
-		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: modcdp.InjectorOptions{
+		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: modcdp.InjectorConfig{
 			InjectorMode:                     "bb",
 			InjectorBBExtensionPath:          extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},

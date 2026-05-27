@@ -14,7 +14,7 @@ from ..injector.ExtensionInjector import (
     MODCDP_READY_EXPRESSION,
     ExtensionInjectionResult,
     ExtensionInjector,
-    InjectorOptions,
+    InjectorConfig,
     defaultModCDPExtensionPath,
     prepareUnpackedExtension,
 )
@@ -30,7 +30,7 @@ BORROW_BOOTSTRAP_STATUS_EXPRESSION = """
 
 
 class BorrowExtensionInjector(ExtensionInjector):
-    def __init__(self, options: InjectorOptions | None = None) -> None:
+    def __init__(self, options: InjectorConfig | dict[str, Any] | None = None) -> None:
         super().__init__(options)
         self.unpacked_extension_path: str | None = None
         self.cleanup: tempfile.TemporaryDirectory[str] | None = None

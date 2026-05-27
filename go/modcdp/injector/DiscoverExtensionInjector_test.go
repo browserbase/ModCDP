@@ -20,9 +20,9 @@ func TestDiscoverExtensionInjectorAttachesToAlreadyLoadedRealModCDPExtension(t *
 	}
 	headless := true
 	owner := modcdp.New(modcdp.Config{
-		Launcher: modcdp.LaunchOptions{LauncherMode: "local", LauncherLocalHeadless: &headless},
-		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: modcdp.InjectorOptions{
+		Launcher: modcdp.LauncherConfig{LauncherMode: "local", LauncherLocalHeadless: &headless},
+		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: modcdp.InjectorConfig{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
@@ -35,9 +35,9 @@ func TestDiscoverExtensionInjectorAttachesToAlreadyLoadedRealModCDPExtension(t *
 		t.Fatal(err)
 	}
 	cdp := modcdp.New(modcdp.Config{
-		Launcher: modcdp.LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
-		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
-		Injector: modcdp.InjectorOptions{
+		Launcher: modcdp.LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
+		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
+		Injector: modcdp.InjectorConfig{
 			InjectorMode:                     "discover",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,

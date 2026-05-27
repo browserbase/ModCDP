@@ -16,7 +16,7 @@ import (
 )
 
 func TestCDPExtensionInjectorPreparesDefaultPackagedExtensionZip(t *testing.T) {
-	injector := NewCDPExtensionInjector(InjectorOptions{})
+	injector := NewCDPExtensionInjector(InjectorConfig{})
 	if err := injector.Prepare(); err != nil {
 		t.Fatal(err)
 	}

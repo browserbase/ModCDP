@@ -8,15 +8,16 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/injector"
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
-type InjectorOptions = types.InjectorOptions
-type LaunchOptions = types.LaunchOptions
-type UpstreamTransportOptions = types.UpstreamTransportOptions
+type InjectorConfig = types.InjectorConfig
+type LauncherConfig = types.LauncherConfig
+type UpstreamTransportConfig = types.UpstreamTransportConfig
 
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
 
@@ -53,11 +54,15 @@ const (
 )
 
 type UpstreamTransport struct {
-	Config         UpstreamTransportOptions
+	Config         UpstreamTransportConfig
 	recvListeners  []recvListener
 	closeListeners []closeListener
 	listenerMu     sync.Mutex
 	nextListenerID int64
+	nextID         int64
+	pending        map[int64]chan map[string]any
+	pendingMu      sync.Mutex
+	writeCommand   func(map[string]any) error
 }
 
 type recvListener struct {
@@ -70,8 +75,14 @@ type closeListener struct {
 	fn func(error)
 }
 
-func NewUpstreamTransport(options UpstreamTransportOptions) UpstreamTransport {
-	return UpstreamTransport{Config: options}
+func NewUpstreamTransport(options UpstreamTransportConfig) UpstreamTransport {
+	return UpstreamTransport{
+		Config:  options,
+		pending: map[int64]chan map[string]any{},
+		writeCommand: func(map[string]any) error {
+			return fmt.Errorf("UpstreamTransport.send is not implemented")
+		},
+	}
 }
 
 func (e *UpstreamTransport) Update(config map[string]any) {
@@ -97,16 +108,57 @@ func (e *UpstreamTransport) Close() error {
 	return nil
 }
 
-func (e *UpstreamTransport) Send(message map[string]any) error {
-	return fmt.Errorf("%T.Send is not implemented", e)
+func (e *UpstreamTransport) Send(command string, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error) {
+	e.pendingMu.Lock()
+	e.nextID++
+	id := e.nextID
+	done := make(chan map[string]any, 1)
+	e.pending[id] = done
+	e.pendingMu.Unlock()
+
+	message := map[string]any{"id": id, "method": command, "params": params}
+	if sessionID != "" {
+		message["sessionId"] = sessionID
+	}
+	if err := e.writeCommand(message); err != nil {
+		e.pendingMu.Lock()
+		delete(e.pending, id)
+		e.pendingMu.Unlock()
+		return nil, err
+	}
+	effectiveTimeout := time.Duration(e.Config.UpstreamCDPSendTimeoutMS) * time.Millisecond
+	if len(timeout) > 0 {
+		effectiveTimeout = timeout[0]
+	}
+	if effectiveTimeout <= 0 {
+		response := <-done
+		if errObj, ok := response["error"].(map[string]any); ok {
+			return nil, fmt.Errorf("%s failed: %v", command, errObj["message"])
+		}
+		if result, ok := response["result"].(map[string]any); ok {
+			return result, nil
+		}
+		return map[string]any{}, nil
+	}
+	select {
+	case <-time.After(effectiveTimeout):
+		e.pendingMu.Lock()
+		delete(e.pending, id)
+		e.pendingMu.Unlock()
+		return nil, fmt.Errorf("%s timed out after %s", command, effectiveTimeout)
+	case response := <-done:
+		if errObj, ok := response["error"].(map[string]any); ok {
+			return nil, fmt.Errorf("%s failed: %v", command, errObj["message"])
+		}
+		if result, ok := response["result"].(map[string]any); ok {
+			return result, nil
+		}
+		return map[string]any{}, nil
+	}
 }
 
-func (e *UpstreamTransport) ConfigForInjector() InjectorOptions {
-	return InjectorOptions{}
-}
-
-func (e *UpstreamTransport) ConfigForLauncher() LaunchOptions {
-	return LaunchOptions{}
+func (e *UpstreamTransport) ConfigForLauncher() LauncherConfig {
+	return LauncherConfig{}
 }
 
 func (e *UpstreamTransport) ConfigForServer() map[string]any {
@@ -158,6 +210,15 @@ func (e *UpstreamTransport) OnClose(listener func(error)) func() {
 }
 
 func (e *UpstreamTransport) emitRecv(message map[string]any) {
+	if id, ok := commandID(message["id"]); ok {
+		e.pendingMu.Lock()
+		done := e.pending[id]
+		delete(e.pending, id)
+		e.pendingMu.Unlock()
+		if done != nil {
+			done <- message
+		}
+	}
 	e.listenerMu.Lock()
 	listeners := append([]recvListener(nil), e.recvListeners...)
 	e.listenerMu.Unlock()
@@ -171,6 +232,13 @@ func (e *UpstreamTransport) EmitRecv(message map[string]any) {
 }
 
 func (e *UpstreamTransport) emitClose(err error) {
+	e.pendingMu.Lock()
+	pending := e.pending
+	e.pending = map[int64]chan map[string]any{}
+	e.pendingMu.Unlock()
+	for _, done := range pending {
+		done <- map[string]any{"error": map[string]any{"message": fmt.Sprintf("connection closed: %v", err)}}
+	}
 	e.listenerMu.Lock()
 	listeners := append([]closeListener(nil), e.closeListeners...)
 	e.listenerMu.Unlock()
@@ -201,6 +269,19 @@ func intFromConfig(value any) (int, bool) {
 		return int(typed), true
 	case float32:
 		return int(typed), true
+	default:
+		return 0, false
+	}
+}
+
+func commandID(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case float64:
+		return int64(typed), true
 	default:
 		return 0, false
 	}

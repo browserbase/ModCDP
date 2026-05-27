@@ -12,11 +12,11 @@ import (
 )
 
 func TestBrowserLauncherMergesLaunchConfigAndExposesUpstreamOptions(t *testing.T) {
-	launcher := NewBrowserLauncher(LaunchOptions{
+	launcher := NewBrowserLauncher(LauncherConfig{
 		LauncherRemoteCDPURL:     "ws://127.0.0.1:9222/devtools/browser/initial",
 		LauncherLocalUserDataDir: "/tmp/modcdp-browser-launcher",
 	})
-	launcher.Update(LaunchOptions{
+	launcher.Update(LauncherConfig{
 		LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/updated",
 	})
 
@@ -24,7 +24,7 @@ func TestBrowserLauncherMergesLaunchConfigAndExposesUpstreamOptions(t *testing.T
 	if transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/updated" {
 		t.Fatalf("cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
-	if _, err := launcher.Launch(LaunchOptions{}); err == nil || !strings.Contains(err.Error(), "BrowserLauncher.Launch is not implemented") {
+	if _, err := launcher.Launch(LauncherConfig{}); err == nil || !strings.Contains(err.Error(), "BrowserLauncher.Launch is not implemented") {
 		t.Fatalf("Launch error = %v", err)
 	}
 }

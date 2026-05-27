@@ -22,8 +22,22 @@ type WSUpstreamTransport struct {
 	writeMu sync.Mutex
 }
 
-func NewWSUpstreamTransport(options UpstreamTransportOptions) *WSUpstreamTransport {
-	return &WSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(options), URL: options.UpstreamWSCDPURL}
+func NewWSUpstreamTransport(options UpstreamTransportConfig) *WSUpstreamTransport {
+	transport := &WSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(options), URL: options.UpstreamWSCDPURL}
+	transport.writeCommand = func(command map[string]any) error {
+		body, err := json.Marshal(command)
+		if err != nil {
+			return err
+		}
+		transport.writeMu.Lock()
+		defer transport.writeMu.Unlock()
+		conn := transport.Conn
+		if conn == nil {
+			return fmt.Errorf("CDP websocket is not connected")
+		}
+		return wsutil.WriteClientText(conn, body)
+	}
+	return transport
 }
 
 func (t *WSUpstreamTransport) Update(config map[string]any) {
@@ -55,20 +69,6 @@ func (t *WSUpstreamTransport) Connect() error {
 	t.writeMu.Unlock()
 	go t.readLoop(conn)
 	return nil
-}
-
-func (t *WSUpstreamTransport) Send(message map[string]any) error {
-	body, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-	t.writeMu.Lock()
-	defer t.writeMu.Unlock()
-	conn := t.Conn
-	if conn == nil {
-		return fmt.Errorf("CDP websocket is not connected")
-	}
-	return wsutil.WriteClientText(conn, body)
 }
 
 func (t *WSUpstreamTransport) Close() error {

@@ -97,16 +97,16 @@ class UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | cdp.types.ts.Target.SessionID | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+    if (typeof command !== "string" && "method" in command) {
       throw new Error(`${this.constructor.name}.send is not implemented.`);
     }
-    if (typeof command_or_message_or_method === "string") {
-      const method = command_or_message_or_method;
+    if (typeof command === "string") {
+      const method = command;
       const sessionId = typeof route_or_sessionId === "string" ? route_or_sessionId : null;
       const timeout_ms = options.timeout_ms ?? this.config.upstream_cdp_send_timeout_ms;
       const id = this.next_id++;
@@ -137,18 +137,14 @@ class UpstreamTransport {
       });
     }
     if (typeof route_or_sessionId === "string")
-      return this.send(
-        command_or_message_or_method.id,
-        command_or_message_or_method.params.parse(params),
-        route_or_sessionId,
-      ).then((result) => command_or_message_or_method.result.parse(result));
+      return this.send(command.id, command.params.parse(params), route_or_sessionId).then((result) =>
+        command.result.parse(result),
+      );
     const route = route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined;
     if (route && route.sessionId == null) throw new Error(`No CDP session is attached for targetId=${route.targetId}.`);
-    return this.send(
-      command_or_message_or_method.id,
-      command_or_message_or_method.params.parse(params),
-      route?.sessionId ?? null,
-    ).then((result) => command_or_message_or_method.result.parse(result));
+    return this.send(command.id, command.params.parse(params), route?.sessionId ?? null).then((result) =>
+      command.result.parse(result),
+    );
   }
 
   on<Event extends CdpNamedSchema<z.ZodType>>(

@@ -27,12 +27,12 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 		t.Fatal(err)
 	}
 	cdp := New(Config{
-		Launcher: LaunchOptions{
+		Launcher: LauncherConfig{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: InjectorOptions{
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
@@ -43,7 +43,7 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		ServerConfig: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 
@@ -85,12 +85,12 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 		t.Fatal(err)
 	}
 	cdp := New(Config{
-		Launcher: LaunchOptions{
+		Launcher: LauncherConfig{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: InjectorOptions{
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
@@ -101,7 +101,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		ServerConfig: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 

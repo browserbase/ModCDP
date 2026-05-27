@@ -40,8 +40,8 @@ var bundledExtensionZip []byte
 const modcdpReadyExpression = `Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)`
 
 type SendCDP = types.SendCDP
-type LaunchOptions = types.LaunchOptions
-type InjectorOptions = types.InjectorOptions
+type LauncherConfig = types.LauncherConfig
+type InjectorConfig = types.InjectorConfig
 type ExtensionInjectionResult = types.ExtensionInjectionResult
 
 func boolPtr(value bool) *bool {
@@ -49,12 +49,12 @@ func boolPtr(value bool) *bool {
 }
 
 type ExtensionInjector struct {
-	Config            InjectorOptions
+	Config            InjectorConfig
 	UnusableTargetIDs map[string]bool
 	LastError         error
 }
 
-func NewExtensionInjector(options InjectorOptions) ExtensionInjector {
+func NewExtensionInjector(options InjectorConfig) ExtensionInjector {
 	if options.InjectorCDPSendTimeoutMS == 0 {
 		options.InjectorCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
 	}
@@ -76,7 +76,7 @@ func NewExtensionInjector(options InjectorOptions) ExtensionInjector {
 	return ExtensionInjector{Config: options, UnusableTargetIDs: map[string]bool{}}
 }
 
-func (i *ExtensionInjector) Update(config InjectorOptions) *ExtensionInjector {
+func (i *ExtensionInjector) Update(config InjectorConfig) *ExtensionInjector {
 	if config.Send != nil {
 		i.Config.Send = config.Send
 	}
@@ -149,12 +149,8 @@ func (i *ExtensionInjector) Update(config InjectorOptions) *ExtensionInjector {
 	return i
 }
 
-func (i ExtensionInjector) ConfigForInjector() InjectorOptions {
-	return i.Config
-}
-
-func (i ExtensionInjector) ConfigForLauncher() LaunchOptions {
-	return LaunchOptions{}
+func (i ExtensionInjector) ConfigForLauncher() LauncherConfig {
+	return LauncherConfig{}
 }
 
 func (i ExtensionInjector) ConfigForUpstream() map[string]any {

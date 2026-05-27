@@ -26,7 +26,7 @@ type BBExtensionInjector struct {
 	CleanupPath string
 }
 
-func NewBBExtensionInjector(options InjectorOptions) BBExtensionInjector {
+func NewBBExtensionInjector(options InjectorConfig) BBExtensionInjector {
 	return BBExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
 }
 
@@ -61,11 +61,11 @@ func (i *BBExtensionInjector) Prepare() error {
 	return nil
 }
 
-func (i *BBExtensionInjector) ConfigForLauncher() LaunchOptions {
+func (i *BBExtensionInjector) ConfigForLauncher() LauncherConfig {
 	if i.ExtensionID == "" {
-		return LaunchOptions{}
+		return LauncherConfig{}
 	}
-	return LaunchOptions{LauncherBBExtensionID: i.ExtensionID}
+	return LauncherConfig{LauncherBBExtensionID: i.ExtensionID}
 }
 
 func (i *BBExtensionInjector) Inject() (*ExtensionInjectionResult, error) {

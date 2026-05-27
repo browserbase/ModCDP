@@ -14,7 +14,7 @@ import (
 )
 
 func TestExtensionInjectorOwnsSharedInjectorOptions(t *testing.T) {
-	injector := NewExtensionInjector(InjectorOptions{
+	injector := NewExtensionInjector(InjectorConfig{
 		InjectorServiceWorkerExtensionID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 	})
@@ -43,7 +43,7 @@ func TestExtensionInjectorOwnsSharedInjectorOptions(t *testing.T) {
 }
 
 func TestExtensionInjectorBaseInjectReportsTheClassName(t *testing.T) {
-	injector := NewExtensionInjector(InjectorOptions{})
+	injector := NewExtensionInjector(InjectorConfig{})
 	if _, err := injector.Inject(); err == nil || !strings.Contains(err.Error(), "ExtensionInjector.Inject is not implemented") {
 		t.Fatalf("Inject error = %v", err)
 	}

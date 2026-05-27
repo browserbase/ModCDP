@@ -20,7 +20,7 @@ import (
 )
 
 func TestLocalBrowserLauncherClassHelpersMatchLocalLauncherSurface(t *testing.T) {
-	launcher := NewLocalBrowserLauncher(LaunchOptions{})
+	launcher := NewLocalBrowserLauncher(LauncherConfig{})
 	if chromePath, err := launcher.FindChromeBinary(""); err != nil || chromePath == "" {
 		t.Fatalf("FindChromeBinary = %q, %v", chromePath, err)
 	}
@@ -36,12 +36,12 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndExplicitProf
 	if err != nil {
 		t.Fatal(err)
 	}
-	launcher := NewLocalBrowserLauncher(LaunchOptions{
+	launcher := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:                  &headless,
 		LauncherLocalChromeReadyTimeoutMS:      45_000,
 		LauncherLocalChromeReadyPollIntervalMS: 50,
 	})
-	chrome, err := launcher.Launch(LaunchOptions{
+	chrome, err := launcher.Launch(LauncherConfig{
 		LauncherLocalCDPListenPort: port,
 		LauncherLocalUserDataDir:   profileDir,
 	})
@@ -106,11 +106,11 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndExplicitProf
 
 func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *testing.T) {
 	headless := true
-	launcher := NewLocalBrowserLauncher(LaunchOptions{
+	launcher := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
 	})
-	chrome, err := launcher.Launch(LaunchOptions{LauncherLocalCDPTransport: "pipe"})
+	chrome, err := launcher.Launch(LauncherConfig{LauncherLocalCDPTransport: "pipe"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,10 +151,10 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *tes
 func TestLocalBrowserLauncherLaunchesPipeBrowserWithAuxiliaryLoopbackOnlyWhenRequested(t *testing.T) {
 	headless := true
 	loopbackCDP := true
-	chrome, err := NewLocalBrowserLauncher(LaunchOptions{
+	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	}).Launch(LaunchOptions{LauncherLocalCDPTransport: "pipe", LauncherLocalLoopbackCDP: &loopbackCDP})
+	}).Launch(LauncherConfig{LauncherLocalCDPTransport: "pipe", LauncherLocalLoopbackCDP: &loopbackCDP})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,10 +195,10 @@ func TestLocalBrowserLauncherCleansExplicitUserDataDirWhenRequested(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	chrome, err := NewLocalBrowserLauncher(LaunchOptions{
+	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
 		LauncherLocalChromeReadyTimeoutMS: 45_000,
-	}).Launch(LaunchOptions{
+	}).Launch(LauncherConfig{
 		LauncherLocalUserDataDir:        profileDir,
 		LauncherLocalCleanupUserDataDir: &cleanupUserDataDir,
 	})

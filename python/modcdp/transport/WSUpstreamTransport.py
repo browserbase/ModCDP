@@ -11,20 +11,20 @@ from typing import Any
 from websocket import create_connection
 
 from ..launcher.BrowserLauncher import resolveCdpWebSocketUrl
-from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
+from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportConfig
 
 
 class WSUpstreamTransport(UpstreamTransport):
     upstream_mode = "ws"
 
-    def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
+    def __init__(self, options: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:
         super().__init__(options)
         self.url = self.config.upstream_ws_cdp_url or ""
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None
         self._generation = 0
 
-    def update(self, config: UpstreamTransportOptions | None = None) -> "WSUpstreamTransport":
+    def update(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> "WSUpstreamTransport":
         super().update(config)
         if self.config.upstream_ws_cdp_url:
             self.url = self.config.upstream_ws_cdp_url
@@ -44,10 +44,23 @@ class WSUpstreamTransport(UpstreamTransport):
         self._reader_thread = threading.Thread(target=lambda: self._read_loop(generation), daemon=True)
         self._reader_thread.start()
 
-    def send(self, message: dict[str, Any]) -> None:
+    def send(
+        self,
+        command: dict[str, Any] | str,
+        params: dict[str, Any] | None = None,
+        session_id: str | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> dict[str, Any] | None:
+        if isinstance(command, str):
+            if self.ws is None:
+                self.connect()
+            return super().send(command, params, session_id, timeout_ms=timeout_ms)
+        message = command
         if self.ws is None:
             raise RuntimeError("CDP websocket is not connected.")
         self.ws.send(json.dumps(message))
+        return None
 
     def _recv(self) -> Any:
         if self.ws is None:

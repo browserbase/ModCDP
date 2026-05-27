@@ -24,7 +24,7 @@ func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testin
 	if strings.TrimSpace(os.Getenv("BROWSERBASE_API_KEY")) == "" {
 		t.Fatal("BROWSERBASE_API_KEY is required for live Browserbase tests")
 	}
-	options := LaunchOptions{
+	options := LauncherConfig{
 		LauncherBBTimeout: 120,
 		LauncherBBBrowserSettings: map[string]any{
 			"viewport":      map[string]any{"width": 900, "height": 700},
@@ -38,7 +38,7 @@ func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testin
 		options.LauncherBBRegion = region
 	}
 	launcher := NewBBBrowserLauncher(options)
-	browser, err := launcher.Launch(LaunchOptions{})
+	browser, err := launcher.Launch(LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,10 +83,10 @@ func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testin
 	}
 
 	closeSessionOnClose := false
-	resumed, err = NewBBBrowserLauncher(LaunchOptions{
+	resumed, err = NewBBBrowserLauncher(LauncherConfig{
 		LauncherBBSessionID:           browser.BrowserbaseSessionID,
 		LauncherBBCloseSessionOnClose: &closeSessionOnClose,
-	}).Launch(LaunchOptions{})
+	}).Launch(LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}

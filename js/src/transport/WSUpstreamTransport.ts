@@ -38,21 +38,21 @@ class WSUpstreamTransport extends UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+    if (typeof command !== "string" && "method" in command) {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) throw new Error("CDP websocket is not connected.");
-      this.ws.send(JSON.stringify(command_or_message_or_method));
+      this.ws.send(JSON.stringify(command));
       return;
     }
-    if (typeof command_or_message_or_method === "string") {
+    if (typeof command === "string") {
       return this.connect().then(
         () =>
           super.send(
-            command_or_message_or_method,
+            command,
             params as ProtocolPayload,
             typeof route_or_sessionId === "string" ? route_or_sessionId : null,
             options,
@@ -60,10 +60,7 @@ class WSUpstreamTransport extends UpstreamTransport {
       );
     }
     return this.connect().then(
-      () =>
-        super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId) as Promise<
-          z.output<Result>
-        >,
+      () => super.send(command, params as z.input<Params>, route_or_sessionId) as Promise<z.output<Result>>,
     );
   }
 

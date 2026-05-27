@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import tempfile
 
-from ..launcher.BrowserLauncher import LauncherOptions
+from ..launcher.BrowserLauncher import LauncherConfig
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
@@ -33,7 +33,7 @@ class CLIExtensionInjector(ExtensionInjector):
         self._resolveExtensionId()
         super().prepare()
 
-    def configForLauncher(self) -> LauncherOptions:
+    def configForLauncher(self) -> LauncherConfig | dict:
         if not self.unpacked_extension_path:
             return {}
         return {"launcher_local_extra_args": [f"--load-extension={self.unpacked_extension_path}"]}

@@ -15,7 +15,7 @@ type DiscoverExtensionInjector struct {
 	CleanupPath string
 }
 
-func NewDiscoverExtensionInjector(options InjectorOptions) DiscoverExtensionInjector {
+func NewDiscoverExtensionInjector(options InjectorConfig) DiscoverExtensionInjector {
 	return DiscoverExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
 }
 

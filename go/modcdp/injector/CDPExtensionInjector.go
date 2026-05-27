@@ -17,7 +17,7 @@ type CDPExtensionInjector struct {
 	CleanupPath           string
 }
 
-func NewCDPExtensionInjector(options InjectorOptions) CDPExtensionInjector {
+func NewCDPExtensionInjector(options InjectorConfig) CDPExtensionInjector {
 	return CDPExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
 }
 

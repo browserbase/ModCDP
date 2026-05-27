@@ -21,7 +21,7 @@ func (t *testUpstreamTransport) emit(message map[string]any) {
 }
 
 func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
-	transport := &UpstreamTransport{}
+	transport := NewUpstreamTransport(UpstreamTransportConfig{})
 	received := []map[string]any{}
 	stop := transport.OnRecv(func(message map[string]any) { received = append(received, message) })
 
@@ -29,14 +29,11 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	if len(transport.ConfigForLauncher().LauncherLocalExtraArgs) != 0 {
 		t.Fatal("expected empty launcher config")
 	}
-	if transport.ConfigForInjector().InjectorServiceWorkerExtensionID != "" {
-		t.Fatal("expected empty injector config")
-	}
 	if len(transport.ConfigForServer()) != 0 {
 		t.Fatal("expected empty server config")
 	}
 
-	testTransport := &testUpstreamTransport{}
+	testTransport := &testUpstreamTransport{UpstreamTransport: NewUpstreamTransport(UpstreamTransportConfig{})}
 	parsed := []map[string]any{}
 	testTransport.OnRecv(func(message map[string]any) { parsed = append(parsed, message) })
 	testTransport.emit(map[string]any{"id": 1, "result": map[string]any{"ok": true}})
@@ -66,7 +63,7 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	if err := transport.Connect(); err == nil || !strings.Contains(err.Error(), "Connect is not implemented") {
 		t.Fatalf("connect error = %v", err)
 	}
-	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}}); err == nil || !strings.Contains(err.Error(), "Send is not implemented") {
+	if _, err := transport.Send("Browser.getVersion", map[string]any{}, ""); err == nil || !strings.Contains(err.Error(), "send is not implemented") {
 		t.Fatalf("send error = %v", err)
 	}
 }

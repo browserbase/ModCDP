@@ -71,12 +71,12 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner := New(Config{
-		Launcher: LaunchOptions{
+		Launcher: LauncherConfig{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: &headless,
 		},
-		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
-		Injector: InjectorOptions{
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
@@ -87,9 +87,9 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := New(Config{
-		Launcher: LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
-		Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
-		Injector: InjectorOptions{
+		Launcher: LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
+		Injector: InjectorConfig{
 			InjectorMode:                     "discover",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
@@ -102,8 +102,8 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 			},
 		},
 		ServerConfig: &ServerConfig{
-			Upstream: UpstreamTransportOptions{UpstreamWSCDPURL: owner.CDPURL},
-			Router:   RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
+			Upstream: UpstreamTransportConfig{UpstreamWSCDPURL: owner.CDPURL},
+			Router:   RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
 		},
 	})
 	defer owner.Close()

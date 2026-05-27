@@ -11,7 +11,7 @@ import urllib.request
 from typing import Any
 from websocket import create_connection
 
-from ..launcher.BrowserLauncher import LauncherOptions, BrowserLauncher, LaunchedBrowser, _launcher_config
+from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, LaunchedBrowser, _launcher_config
 
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
@@ -19,7 +19,7 @@ DEFAULT_BROWSERBASE_VIEWPORT = {"width": 1288, "height": 711}
 
 
 class BBBrowserLauncher(BrowserLauncher):
-    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
+    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
         browserbase_api_key = _first_string(merged.launcher_bb_api_key, os.environ.get("BROWSERBASE_API_KEY"))
         if not browserbase_api_key:

@@ -22,7 +22,7 @@ from typing import Protocol, cast
 from ..launcher.BrowserLauncher import (
     DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
     DEFAULT_CHROME_READY_TIMEOUT_MS,
-    LauncherOptions,
+    LauncherConfig,
     BrowserLauncher,
     LaunchedBrowser,
     _launcher_config,
@@ -43,7 +43,7 @@ class LocalBrowserLauncher(BrowserLauncher):
     def freePort() -> int:
         return _free_port()
 
-    def launch(self, options: LauncherOptions | None = None) -> LaunchedBrowser:
+    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
         executable_path = self.findChromeBinary(merged.launcher_local_executable_path)
         use_pipe = merged.launcher_local_cdp_transport == "pipe"

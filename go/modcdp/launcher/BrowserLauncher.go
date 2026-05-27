@@ -18,8 +18,8 @@ import (
 	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
-type LaunchOptions = types.LaunchOptions
-type InjectorOptions = types.InjectorOptions
+type LauncherConfig = types.LauncherConfig
+type InjectorConfig = types.InjectorConfig
 
 const DefaultChromeReadyTimeoutMS = 45_000
 const DefaultChromeReadyPollIntervalMS = 100
@@ -100,15 +100,15 @@ type LaunchedBrowser struct {
 }
 
 type BrowserLauncher struct {
-	Config   LaunchOptions
+	Config   LauncherConfig
 	Launched *LaunchedBrowser
 }
 
-func NewBrowserLauncher(options LaunchOptions) BrowserLauncher {
+func NewBrowserLauncher(options LauncherConfig) BrowserLauncher {
 	return BrowserLauncher{Config: options}
 }
 
-func (l *BrowserLauncher) Update(config LaunchOptions) *BrowserLauncher {
+func (l *BrowserLauncher) Update(config LauncherConfig) *BrowserLauncher {
 	l.Config = mergeLaunchOptions(l.Config, config)
 	return l
 }
@@ -126,19 +126,11 @@ func (l BrowserLauncher) ConfigForServer() map[string]any {
 	return map[string]any{}
 }
 
-func (l BrowserLauncher) ConfigForInjector() InjectorOptions {
-	return InjectorOptions{
-		InjectorBBAPIKey:      l.Config.LauncherBBAPIKey,
-		InjectorBBBaseURL:     l.Config.LauncherBBBaseURL,
-		InjectorBBExtensionID: l.Config.LauncherBBExtensionID,
-	}
-}
-
-func (l BrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
+func (l BrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
 	return nil, fmt.Errorf("%T.Launch is not implemented", l)
 }
 
-func mergeLaunchOptions(existing LaunchOptions, incoming LaunchOptions) LaunchOptions {
+func mergeLaunchOptions(existing LauncherConfig, incoming LauncherConfig) LauncherConfig {
 	merged := existing
 	if incoming.LauncherLocalExecutablePath != "" {
 		merged.LauncherLocalExecutablePath = incoming.LauncherLocalExecutablePath

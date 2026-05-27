@@ -8,31 +8,31 @@ package modcdp
 import "testing"
 
 func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
-	if NewLocalBrowserLauncher(LaunchOptions{}) == nil {
+	if NewLocalBrowserLauncher(LauncherConfig{}) == nil {
 		t.Fatal("NewLocalBrowserLauncher returned nil")
 	}
-	if NewRemoteBrowserLauncher(LaunchOptions{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/test"}) == nil {
+	if NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/test"}) == nil {
 		t.Fatal("NewRemoteBrowserLauncher returned nil")
 	}
-	if NewBBBrowserLauncher(LaunchOptions{}) == nil {
+	if NewBBBrowserLauncher(LauncherConfig{}) == nil {
 		t.Fatal("NewBBBrowserLauncher returned nil")
 	}
-	if NewNoneBrowserLauncher(LaunchOptions{}) == nil {
+	if NewNoneBrowserLauncher(LauncherConfig{}) == nil {
 		t.Fatal("NewNoneBrowserLauncher returned nil")
 	}
 
-	extensionInjector := NewExtensionInjector(InjectorOptions{})
-	discoveredInjector := NewDiscoverExtensionInjector(InjectorOptions{})
-	bbInjector := NewBBExtensionInjector(InjectorOptions{})
-	localLaunchInjector := NewCLIExtensionInjector(InjectorOptions{})
-	loadUnpackedInjector := NewCDPExtensionInjector(InjectorOptions{})
-	borrowedInjector := NewBorrowExtensionInjector(InjectorOptions{})
+	extensionInjector := NewExtensionInjector(InjectorConfig{})
+	discoveredInjector := NewDiscoverExtensionInjector(InjectorConfig{})
+	bbInjector := NewBBExtensionInjector(InjectorConfig{})
+	localLaunchInjector := NewCLIExtensionInjector(InjectorConfig{})
+	loadUnpackedInjector := NewCDPExtensionInjector(InjectorConfig{})
+	borrowedInjector := NewBorrowExtensionInjector(InjectorConfig{})
 	_ = []any{extensionInjector, discoveredInjector, bbInjector, localLaunchInjector, loadUnpackedInjector, borrowedInjector}
 
-	if NewUpstreamTransport(UpstreamTransportOptions{}).Config.UpstreamMode != "" {
+	if NewUpstreamTransport(UpstreamTransportConfig{}).Config.UpstreamMode != "" {
 		t.Fatal("NewUpstreamTransport returned non-empty mode")
 	}
-	if NewWSUpstreamTransport(UpstreamTransportOptions{}) == nil {
+	if NewWSUpstreamTransport(UpstreamTransportConfig{}) == nil {
 		t.Fatal("NewWSUpstreamTransport returned nil")
 	}
 

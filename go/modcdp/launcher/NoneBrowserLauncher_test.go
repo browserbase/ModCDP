@@ -9,14 +9,14 @@ package launcher
 import "testing"
 
 func TestNoneBrowserLauncherConstructorLaunchAndConfigMatchTSShape(t *testing.T) {
-	launcher := NewNoneBrowserLauncher(LaunchOptions{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/initial"})
+	launcher := NewNoneBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/initial"})
 	if launcher.Config.LauncherRemoteCDPURL != "ws://127.0.0.1:9222/devtools/browser/initial" {
-		t.Fatalf("Options.LauncherRemoteCDPURL = %q", launcher.Config.LauncherRemoteCDPURL)
+		t.Fatalf("Config.LauncherRemoteCDPURL = %q", launcher.Config.LauncherRemoteCDPURL)
 	}
 	if transportConfig := launcher.ConfigForUpstream(); transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/initial" {
 		t.Fatalf("transport config before launch = %#v", transportConfig)
 	}
-	launched, err := launcher.Launch(LaunchOptions{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/call"})
+	launched, err := launcher.Launch(LauncherConfig{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/call"})
 	if err != nil {
 		t.Fatal(err)
 	}

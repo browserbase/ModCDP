@@ -34,25 +34,25 @@ class PipeUpstreamTransport extends UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
+    command: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
+    if (typeof command !== "string" && "method" in command) {
       if (!this.config.upstream_pipe_write || !this.pipe_cleanup) throw new Error("CDP pipe is not connected.");
-      this.config.upstream_pipe_write.write(`${JSON.stringify(command_or_message_or_method)}\0`);
+      this.config.upstream_pipe_write.write(`${JSON.stringify(command)}\0`);
       return;
     }
-    if (typeof command_or_message_or_method === "string") {
+    if (typeof command === "string") {
       return super.send(
-        command_or_message_or_method,
+        command,
         params as ProtocolPayload,
         typeof route_or_sessionId === "string" ? route_or_sessionId : null,
         options,
       );
     }
-    return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
+    return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
   update(config: UpstreamTransportConfig = {}) {

@@ -128,16 +128,11 @@ class ModCDPClientTests(unittest.TestCase):
         cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
 
         self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, [])
-        self.assertEqual(cdp._base_extension_injector_config(None).get("injector_service_worker_url_suffixes"), [])
 
     def test_defaults_service_worker_suffix_config_to_modcdp_worker(self) -> None:
         cdp = ModCDPClient()
 
         self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
-        self.assertEqual(
-            cdp._base_extension_injector_config(None).get("injector_service_worker_url_suffixes"),
-            ["/modcdp/service_worker.js"],
-        )
 
     def test_preserves_explicit_none_server_config(self) -> None:
         cdp = ModCDPClient(server_config=None)
@@ -350,8 +345,6 @@ class ModCDPClientTests(unittest.TestCase):
         cdp.close()
 
         self.assertIsNone(cdp.transport)
-        with self.assertRaisesRegex(RuntimeError, "ModCDP upstream is not connected"):
-            cdp.sendRaw("Browser.getVersion")
 
     def test_generated_cdp_surface_exposes_direct_domain_commands(self) -> None:
         client = ModCDPClient(

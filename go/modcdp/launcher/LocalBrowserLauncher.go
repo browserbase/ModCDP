@@ -26,7 +26,7 @@ type LocalBrowserLauncher struct {
 	BrowserLauncher
 }
 
-func NewLocalBrowserLauncher(options LaunchOptions) *LocalBrowserLauncher {
+func NewLocalBrowserLauncher(options LauncherConfig) *LocalBrowserLauncher {
 	return &LocalBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
 }
 
@@ -38,7 +38,7 @@ func (l *LocalBrowserLauncher) FreePort() (int, error) {
 	return freePort()
 }
 
-func (l *LocalBrowserLauncher) Launch(options LaunchOptions) (*LaunchedBrowser, error) {
+func (l *LocalBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
 	options = mergeLaunchOptions(l.Config, options)
 
 	executablePath, err := l.FindChromeBinary(options.LauncherLocalExecutablePath)

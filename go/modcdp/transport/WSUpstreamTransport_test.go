@@ -16,7 +16,7 @@ import (
 )
 
 func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *testing.T) {
-	transport := NewWSUpstreamTransport(UpstreamTransportOptions{})
+	transport := NewWSUpstreamTransport(UpstreamTransportConfig{})
 	if transport.URL != "" {
 		t.Fatalf("URL = %q", transport.URL)
 	}
@@ -24,24 +24,24 @@ func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *test
 	if transport.URL != "ws://127.0.0.1:1/devtools/browser/test" {
 		t.Fatalf("URL = %q", transport.URL)
 	}
-	if err := NewWSUpstreamTransport(UpstreamTransportOptions{}).Connect(); err == nil || !strings.Contains(err.Error(), "WSUpstreamTransport requires") {
+	if err := NewWSUpstreamTransport(UpstreamTransportConfig{}).Connect(); err == nil || !strings.Contains(err.Error(), "WSUpstreamTransport requires") {
 		t.Fatalf("connect error = %v", err)
 	}
-	if err := NewWSUpstreamTransport(UpstreamTransportOptions{}).Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
+	if _, err := NewWSUpstreamTransport(UpstreamTransportConfig{}).Send("Browser.getVersion", map[string]any{}, ""); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
 		t.Fatalf("send error = %v", err)
 	}
 }
 
 func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
-	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LaunchOptions{
+	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: boolPtr(true),
-	}).Launch(modcdp.LaunchOptions{})
+	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chrome.Close()
 
-	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	transport := NewWSUpstreamTransport(UpstreamTransportConfig{UpstreamWSCDPURL: chrome.CDPURL})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -50,28 +50,25 @@ func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
 		t.Fatalf("transport.URL = %q", transport.URL)
 	}
 
-	received := make(chan map[string]any, 1)
-	transport.OnRecv(func(message map[string]any) { received <- message })
-	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
+	result, err := transport.Send("Browser.getVersion", map[string]any{}, "")
+	if err != nil {
 		t.Fatal(err)
 	}
-	message := <-received
-	result, _ := message["result"].(map[string]any)
 	if _, ok := result["product"].(string); !ok {
-		t.Fatalf("Browser.getVersion response = %#v", message)
+		t.Fatalf("Browser.getVersion result = %#v", result)
 	}
 }
 
 func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *testing.T) {
-	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LaunchOptions{
+	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: boolPtr(true),
-	}).Launch(modcdp.LaunchOptions{})
+	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chrome.Close()
 
-	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	transport := NewWSUpstreamTransport(UpstreamTransportConfig{UpstreamWSCDPURL: chrome.CDPURL})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -79,25 +76,19 @@ func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *tes
 	if !strings.HasPrefix(transport.URL, "ws://") {
 		t.Fatalf("transport.URL = %q", transport.URL)
 	}
-	received := make(chan map[string]any, 1)
-	transport.OnRecv(func(message map[string]any) { received <- message })
-	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion", "params": map[string]any{}}); err != nil {
+	result, err := transport.Send("Browser.getVersion", map[string]any{}, "")
+	if err != nil {
 		t.Fatal(err)
 	}
-	message := <-received
-	if message["id"] != float64(1) && message["id"] != 1 {
-		t.Fatalf("Browser.getVersion id = %#v", message["id"])
-	}
-	result, _ := message["result"].(map[string]any)
 	if _, ok := result["product"].(string); !ok {
-		t.Fatalf("Browser.getVersion response = %#v", message)
+		t.Fatalf("Browser.getVersion result = %#v", result)
 	}
 
 	parsedCDPURL, err := url.Parse(chrome.CDPURL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostPortTransport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: parsedCDPURL.Host})
+	hostPortTransport := NewWSUpstreamTransport(UpstreamTransportConfig{UpstreamWSCDPURL: parsedCDPURL.Host})
 	if err := hostPortTransport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -108,15 +99,15 @@ func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *tes
 }
 
 func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
-	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LaunchOptions{
+	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: boolPtr(true),
-	}).Launch(modcdp.LaunchOptions{})
+	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chrome.Close()
 
-	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	transport := NewWSUpstreamTransport(UpstreamTransportConfig{UpstreamWSCDPURL: chrome.CDPURL})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +120,7 @@ func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
 	if transport.Conn != nil {
 		t.Fatal("Close left Conn set")
 	}
-	if err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
+	if _, err := transport.Send("Browser.getVersion", map[string]any{}, ""); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
 		t.Fatalf("Send after close error = %v", err)
 	}
 }

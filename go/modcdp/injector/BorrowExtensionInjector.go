@@ -33,7 +33,7 @@ type borrowedExtensionCandidate struct {
 	hasDebugger bool
 }
 
-func NewBorrowExtensionInjector(options InjectorOptions) BorrowExtensionInjector {
+func NewBorrowExtensionInjector(options InjectorConfig) BorrowExtensionInjector {
 	return BorrowExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
 }
 
