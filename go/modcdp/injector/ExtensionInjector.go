@@ -203,10 +203,6 @@ func (i ExtensionInjector) sendWithTimeout(method string, params map[string]any,
 	}
 }
 
-func (i ExtensionInjector) SendWithTimeout(method string, params map[string]any, sessionID string, timeoutMS int) (map[string]any, error) {
-	return i.sendWithTimeout(method, params, sessionID, timeoutMS)
-}
-
 func (i ExtensionInjector) targetInfos() ([]map[string]any, error) {
 	result, err := i.sendWithTimeout("Target.getTargets", map[string]any{}, "", i.Config.InjectorCDPSendTimeoutMS)
 	if err != nil {
@@ -319,10 +315,6 @@ func (i ExtensionInjector) waitForReadyServiceWorker(timeoutMS int, matchedOnly 
 	return nil, nil
 }
 
-func (i ExtensionInjector) WaitForReadyServiceWorker(timeoutMS int, matchedOnly bool) (*ExtensionInjectionResult, error) {
-	return i.waitForReadyServiceWorker(timeoutMS, matchedOnly)
-}
-
 func (i ExtensionInjector) serviceWorkerTargetMatches(target map[string]any) bool {
 	targetURL, _ := target["url"].(string)
 	targetType, _ := target["type"].(string)
@@ -351,10 +343,6 @@ func (i ExtensionInjector) serviceWorkerTargetMatches(target map[string]any) boo
 		}
 	}
 	return hasExtensionID || len(i.Config.InjectorServiceWorkerURLIncludes) > 0 || len(i.Config.InjectorServiceWorkerURLSuffixes) > 0
-}
-
-func (i ExtensionInjector) ServiceWorkerTargetMatches(target map[string]any) bool {
-	return i.serviceWorkerTargetMatches(target)
 }
 
 func firstNonEmptyString(values ...string) string {

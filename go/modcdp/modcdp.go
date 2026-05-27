@@ -24,7 +24,6 @@ type CustomCommand = client.CustomCommand
 type CustomEvent = client.CustomEvent
 type CustomMiddleware = client.CustomMiddleware
 type CDPTypes = client.CDPTypes
-type CDPEvent = client.CDPEvent
 type LaunchedBrowser = launcher.LaunchedBrowser
 type BrowserLauncher = launcher.BrowserLauncher
 type LocalBrowserLauncher = launcher.LocalBrowserLauncher

@@ -4,13 +4,11 @@
 // - ./python/tests/test_ExtensionInjector.py
 // NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
 // USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
-package injector_test
+package injector
 
 import (
 	"strings"
 	"testing"
-
-	. "github.com/browserbase/modcdp/go/modcdp/injector"
 )
 
 func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
@@ -28,14 +26,14 @@ func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
 	if len(injector.ExtraArgs) != 0 {
 		t.Fatalf("expected empty extra args")
 	}
-	if !injector.ServiceWorkerTargetMatches(map[string]any{
+	if !injector.serviceWorkerTargetMatches(map[string]any{
 		"targetId": "target-1",
 		"type":     "service_worker",
 		"url":      "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/modcdp/service_worker.js",
 	}) {
 		t.Fatal("expected service worker target to match")
 	}
-	if injector.ServiceWorkerTargetMatches(map[string]any{
+	if injector.serviceWorkerTargetMatches(map[string]any{
 		"targetId": "target-1",
 		"type":     "service_worker",
 		"url":      "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/background.js",

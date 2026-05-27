@@ -29,8 +29,8 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	borrowedInjector := NewBorrowExtensionInjector(InjectorConfig{})
 	_ = []any{extensionInjector, discoveredInjector, bbInjector, localLaunchInjector, loadUnpackedInjector, borrowedInjector}
 
-	if NewUpstreamTransport(UpstreamTransportConfig{}).Config.UpstreamMode != "" {
-		t.Fatal("NewUpstreamTransport returned non-empty mode")
+	if NewUpstreamTransport(UpstreamTransportConfig{}).Config.UpstreamMode != string(UpstreamModeWS) {
+		t.Fatal("NewUpstreamTransport did not hydrate default ws mode")
 	}
 	if NewWSUpstreamTransport(UpstreamTransportConfig{}) == nil {
 		t.Fatal("NewWSUpstreamTransport returned nil")

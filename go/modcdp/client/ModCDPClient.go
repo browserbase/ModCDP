@@ -265,13 +265,6 @@ type handlerEntry struct {
 	pointer uintptr
 }
 
-type CDPEvent struct {
-	Method       string         `json:"method"`
-	Params       map[string]any `json:"params,omitempty"`
-	CDPSessionID string         `json:"cdpSessionId,omitempty"`
-	SessionID    string         `json:"sessionId,omitempty"`
-}
-
 type ModDomain struct {
 	client *ModCDPClient
 }
@@ -338,7 +331,6 @@ type ModCDPClient struct {
 	CDPURL                   string
 	transport                upstreamTransportClient
 	handlers                 map[string][]handlerEntry
-	cdpHandlers              map[string][]func(CDPEvent)
 	handlersMu               sync.Mutex
 	Router                   *AutoSessionRouter
 	ExtensionID              string
@@ -448,10 +440,9 @@ func New(config Config) *ModCDPClient {
 		typesConfig = *config.Types
 	}
 	client := &ModCDPClient{
-		Config:      config,
-		Types:       NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
-		handlers:    map[string][]handlerEntry{},
-		cdpHandlers: map[string][]func(CDPEvent){},
+		Config:   config,
+		Types:    NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
+		handlers: map[string][]handlerEntry{},
 	}
 	client.Mod = ModDomain{client: client}
 	client.Router = NewAutoSessionRouter(
@@ -1115,13 +1106,6 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 	return result, nil
 }
 
-func (c *ModCDPClient) OnCDP(event string, handler func(CDPEvent)) *ModCDPClient {
-	c.handlersMu.Lock()
-	defer c.handlersMu.Unlock()
-	c.cdpHandlers[event] = append(c.cdpHandlers[event], handler)
-	return c
-}
-
 func (c *ModCDPClient) On(event string, handler Handler) *ModCDPClient {
 	c.handlersMu.Lock()
 	defer c.handlersMu.Unlock()
@@ -1184,14 +1168,6 @@ func (c *ModCDPClient) Close() {
 		_ = injector.Close()
 	}
 	c.extensionInjectors = nil
-}
-
-func (c *ModCDPClient) Transport() any {
-	return c.transport
-}
-
-func (c *ModCDPClient) LaunchedBrowser() *LaunchedBrowser {
-	return c.launchedBrowser
 }
 
 func (c *ModCDPClient) browserLauncher() browserLauncherClient {
@@ -1431,7 +1407,6 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	params, _ := msg["params"].(map[string]any)
 	c.Router.RecordProtocolEvent(method, params, sessionID)
 	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
-		bindingName, _ := params["name"].(string)
 		if event, data, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
 			validatedData, valid := c.Types.ParseEventPayload(event, data)
 			if !valid {
@@ -1439,18 +1414,9 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 			}
 			c.handlersMu.Lock()
 			hs := append([]handlerEntry(nil), c.handlers[event]...)
-			cdpHandlers := append([]func(CDPEvent){}, c.cdpHandlers["*"]...)
-			cdpHandlers = append(cdpHandlers, c.cdpHandlers[event]...)
 			c.handlersMu.Unlock()
 			for _, h := range hs {
 				go h.handler(validatedData)
-			}
-			if bindingName == translate.UpstreamEventBindingName {
-				dataMap, _ := validatedData.(map[string]any)
-				cdpEvent := CDPEvent{Method: event, Params: dataMap, CDPSessionID: sessionID, SessionID: sessionID}
-				for _, h := range cdpHandlers {
-					go h(cdpEvent)
-				}
 			}
 		}
 		return
@@ -1460,23 +1426,11 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 		if !valid {
 			return
 		}
-		validatedParamsMap, _ := validatedParams.(map[string]any)
-		if validatedParamsMap == nil {
-			validatedParamsMap = map[string]any{}
-		}
 		c.handlersMu.Lock()
 		hs := append([]handlerEntry(nil), c.handlers[method]...)
-		cdpHandlers := append([]func(CDPEvent){}, c.cdpHandlers["*"]...)
-		cdpHandlers = append(cdpHandlers, c.cdpHandlers[method]...)
 		c.handlersMu.Unlock()
 		for _, h := range hs {
 			go h.handler(validatedParams)
-		}
-		if len(cdpHandlers) > 0 {
-			event := CDPEvent{Method: method, Params: validatedParamsMap, CDPSessionID: sessionID, SessionID: sessionID}
-			for _, h := range cdpHandlers {
-				go h(event)
-			}
 		}
 	}
 }
