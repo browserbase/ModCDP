@@ -62,8 +62,11 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
         )
 
         try:
+            second_cdp_listen_port = second.get("cdp_listen_port")
+            if not isinstance(second_cdp_listen_port, int):
+                raise AssertionError(f"second cdp_listen_port = {second_cdp_listen_port!r}")
             launched = RemoteBrowserLauncher({"launcher_remote_cdp_url": first["cdp_url"]}).launch(
-                {"launcher_remote_cdp_url": f"127.0.0.1:{second['cdp_listen_port']}"}
+                {"launcher_remote_cdp_url": f"127.0.0.1:{second_cdp_listen_port}"}
             )
             self.assertEqual(launched["cdp_url"], second["cdp_url"])
             launched["close"]()

@@ -13,6 +13,7 @@ from typing_extensions import NotRequired
 JsonPrimitive: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
+ModCDPPayloadSchemaSpec: TypeAlias = object
 
 CdpCommandParams: TypeAlias = dict[str, JsonValue]
 CdpCommandResult: TypeAlias = dict[str, JsonValue]
@@ -47,8 +48,8 @@ class _ModCDPAddCustomCommandRequired(TypedDict):
 
 class ModCDPAddCustomCommandParams(_ModCDPAddCustomCommandRequired, total=False):
     expression: str | None
-    params_schema: JsonValue
-    result_schema: JsonValue
+    params_schema: ModCDPPayloadSchemaSpec
+    result_schema: ModCDPPayloadSchemaSpec
 
 
 class _ModCDPAddCustomEventObjectRequired(TypedDict):
@@ -56,7 +57,7 @@ class _ModCDPAddCustomEventObjectRequired(TypedDict):
 
 
 class ModCDPAddCustomEventObjectParams(_ModCDPAddCustomEventObjectRequired, total=False):
-    event_schema: JsonValue
+    event_schema: ModCDPPayloadSchemaSpec
 
 
 ModCDPAddCustomEventParams: TypeAlias = str | ModCDPAddCustomEventObjectParams

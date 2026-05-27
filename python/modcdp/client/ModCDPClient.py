@@ -21,7 +21,7 @@ import threading
 import time
 from collections.abc import Mapping
 from queue import Queue, Empty
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 from ..router.AutoSessionRouter import AutoSessionRouter, RouterConfig
@@ -140,7 +140,7 @@ class _ModDomain:
     def addMiddleware(
         self,
         *,
-        phase: Literal["request", "response", "event"],
+        phase: str,
         expression: str,
         name: str | None = None,
     ) -> AwaitableDict | AwaitableValue:

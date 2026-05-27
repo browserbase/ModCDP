@@ -205,7 +205,7 @@ var defaultBuiltinCommands = []CustomCommand{
 			"required":             []any{"expression"},
 			"additionalProperties": false,
 		},
-		ResultSchema: map[string]any{},
+		ResultSchema: nil,
 		Expression: `
       async ({ expression, params = {}, cdpSessionId = null }) =>
         ModCDP.evaluateInServiceWorker({ expression, params, cdpSessionId })

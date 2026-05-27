@@ -8,7 +8,7 @@ import re
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, cast
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from pydantic_core import to_jsonable_python
@@ -23,6 +23,7 @@ from ..types.modcdp import (
     ModCDPAddCustomEventObjectParams,
     ModCDPAddCustomEventParams,
     ModCDPAddMiddlewareParams,
+    ModCDPPayloadSchemaSpec,
     ProtocolParams,
     ProtocolPayload,
     ProtocolResult,
@@ -30,6 +31,12 @@ from ..types.modcdp import (
 from ..types.toJSON import modCDPToJSON
 
 JsonSchema: TypeAlias = dict[str, JsonValue]
+CustomCommandConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
+CustomEventConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
+CustomMiddlewareConfig: TypeAlias = Mapping[str, object]
+CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | Mapping[str, CustomCommandConfig]
+CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | Mapping[str, CustomEventConfig]
+CustomMiddlewareRegistrations: TypeAlias = Sequence[ModCDPAddMiddlewareParams | CustomMiddlewareConfig]
 
 
 class _ModCDPAddCustomCommand(BaseModel):
@@ -319,9 +326,9 @@ def _model_or_json_object(value: object) -> ProtocolResult:
 class CDPTypes:
     def __init__(
         self,
-        custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None = None,
-        custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None = None,
-        custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
+        custom_commands: CustomCommandRegistrations | None = None,
+        custom_events: CustomEventRegistrations | None = None,
+        custom_middlewares: CustomMiddlewareRegistrations | None = None,
     ) -> None:
         self.custom_commands: dict[str, ModCDPAddCustomCommandParams] = {}
         self.custom_events: dict[str, ModCDPAddCustomEventObjectParams] = {}
@@ -345,9 +352,9 @@ class CDPTypes:
 
     def update(
         self,
-        custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None = None,
-        custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None = None,
-        custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
+        custom_commands: CustomCommandRegistrations | None = None,
+        custom_events: CustomEventRegistrations | None = None,
+        custom_middlewares: CustomMiddlewareRegistrations | None = None,
     ) -> "CDPTypes":
         commands = [*self.custom_commands.values(), *_custom_command_entries(custom_commands)]
         events = [*self.custom_events.values(), *_custom_event_entries(custom_events)]
@@ -494,7 +501,7 @@ class CDPTypes:
             jsonable = _json_value(to_jsonable_python(validated))
         return jsonable if isinstance(jsonable, dict) else {"value": jsonable}
 
-    def addCustomCommand(self, registration: ModCDPAddCustomCommandParams) -> str:
+    def addCustomCommand(self, registration: ModCDPAddCustomCommandParams | CustomCommandConfig) -> str:
         parsed = _ModCDPAddCustomCommand.model_validate(registration)
         name = normalizeModCDPName(parsed.name)
         if not re.match(r"^[^.]+\.[^.]+$", name):
@@ -543,7 +550,7 @@ class CDPTypes:
             registrations.append(wire)
         return registrations
 
-    def addCustomEvent(self, registration: ModCDPAddCustomEventObjectParams) -> str:
+    def addCustomEvent(self, registration: ModCDPAddCustomEventObjectParams | CustomEventConfig) -> str:
         parsed = _ModCDPAddCustomEvent.model_validate(registration)
         name = normalizeModCDPName(parsed.name)
         if not re.match(r"^[^.]+\.[^.]+$", name):
@@ -571,7 +578,7 @@ class CDPTypes:
     def customEventWireRegistrations(self) -> list[ProtocolParams]:
         return [self.customEventWireRegistration(name) for name in self.custom_events]
 
-    def addCustomMiddleware(self, registration: ModCDPAddMiddlewareParams) -> str:
+    def addCustomMiddleware(self, registration: ModCDPAddMiddlewareParams | CustomMiddlewareConfig) -> str:
         parsed = _ModCDPAddMiddleware.model_validate(registration)
         name = "*" if parsed.name is None or parsed.name == "*" else normalizeModCDPName(parsed.name)
         if name != "*" and "." not in name:
@@ -604,26 +611,39 @@ class CDPTypes:
 
 
 def _custom_command_entries(
-    custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None,
+    custom_commands: CustomCommandRegistrations | None,
 ) -> list[ModCDPAddCustomCommandParams]:
     if custom_commands is None:
         return []
     if isinstance(custom_commands, Mapping):
-        return [
-            cast(ModCDPAddCustomCommandParams, {**dict(command), "name": name})
-            for name, command in custom_commands.items()
-        ]
+        entries: list[ModCDPAddCustomCommandParams] = []
+        for name, command in custom_commands.items():
+            entry: ModCDPAddCustomCommandParams = {"name": name}
+            expression = command.get("expression")
+            if expression is not None:
+                if not isinstance(expression, str):
+                    raise TypeError("expression must be a string")
+                entry["expression"] = expression
+            if "params_schema" in command:
+                entry["params_schema"] = command["params_schema"]
+            if "result_schema" in command:
+                entry["result_schema"] = command["result_schema"]
+            entries.append(entry)
+        return entries
     return list(custom_commands)
 
 
 def _custom_event_entries(
-    custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None,
+    custom_events: CustomEventRegistrations | None,
 ) -> list[ModCDPAddCustomEventParams]:
     if custom_events is None:
         return []
     if isinstance(custom_events, Mapping):
-        return [
-            cast(ModCDPAddCustomEventObjectParams, {**dict(event), "name": name})
-            for name, event in custom_events.items()
-        ]
+        entries: list[ModCDPAddCustomEventParams] = []
+        for name, event in custom_events.items():
+            entry: ModCDPAddCustomEventObjectParams = {"name": name}
+            if "event_schema" in event:
+                entry["event_schema"] = event["event_schema"]
+            entries.append(entry)
+        return entries
     return list(custom_events)
