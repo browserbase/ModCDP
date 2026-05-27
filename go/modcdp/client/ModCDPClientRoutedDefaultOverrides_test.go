@@ -53,7 +53,7 @@ async (payload, next) => {
   const visit = async value => {
     if (!value || typeof value !== "object" || seen.has(value)) return;
     seen.add(value);
-    if (!Array.isArray(value) && typeof value.targetId === "string" && value.tabId == null) {
+    if (!Array.isArray(value) && typeof value.targetId === "string" && typeof value.type === "string" && value.tabId == null) {
       const { tabId } = await cdp.send("Custom.tabIdFromTargetId", { targetId: value.targetId });
       if (tabId != null) value.tabId = tabId;
     }
