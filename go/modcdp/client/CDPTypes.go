@@ -162,6 +162,79 @@ var modTopologyParamsSchema = map[string]any{
 	"additionalProperties": false,
 }
 
+var modTopologyFrameSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"targetId":           map[string]any{"type": "string"},
+		"url":                map[string]any{"type": "string"},
+		"parentFrameId":      map[string]any{"type": "string"},
+		"outerBackendNodeId": map[string]any{"type": "integer"},
+	},
+	"required":             []any{"targetId"},
+	"additionalProperties": false,
+}
+
+var modTopologyDomRootSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"kind":               map[string]any{"enum": []any{"document", "shadow"}},
+		"frameId":            map[string]any{"type": "string"},
+		"outerBackendNodeId": map[string]any{"type": "integer"},
+		"innerBackendNodeId": map[string]any{"type": "integer"},
+		"mode":               map[string]any{"enum": []any{"open", "closed", "user-agent"}},
+		"executionContextId": map[string]any{"type": "integer"},
+		"uniqueContextId":    map[string]any{"type": "string"},
+	},
+	"required":             []any{"kind", "frameId"},
+	"additionalProperties": false,
+}
+
+var modTopologyTargetSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"targetId":      map[string]any{"type": "string"},
+		"type":          map[string]any{"type": "string"},
+		"title":         map[string]any{"type": "string"},
+		"url":           map[string]any{"type": "string"},
+		"attached":      map[string]any{"type": "boolean"},
+		"parentId":      map[string]any{"type": "string"},
+		"parentFrameId": map[string]any{"type": "string"},
+		"sessionId":     map[string]any{"type": "string"},
+	},
+	"required": []any{"targetId", "type"},
+}
+
+var modTopologyExecutionContextSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"id":        map[string]any{"type": "integer"},
+		"origin":    map[string]any{"type": "string"},
+		"name":      map[string]any{"type": "string"},
+		"uniqueId":  map[string]any{"type": "string"},
+		"auxData":   map[string]any{"type": "object"},
+		"sessionId": map[string]any{"type": []any{"string", "null"}},
+		"targetId":  map[string]any{"type": "string"},
+		"frameId":   map[string]any{"type": "string"},
+		"world":     map[string]any{"type": "string"},
+	},
+	"required":             []any{"id", "sessionId", "targetId", "world"},
+	"additionalProperties": false,
+}
+
+var modTopologyResponseSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"objectGroup": map[string]any{"type": "string"},
+		"rootFrameId": map[string]any{"type": "string"},
+		"frames":      map[string]any{"type": "object", "additionalProperties": modTopologyFrameSchema},
+		"roots":       map[string]any{"type": "object", "additionalProperties": modTopologyDomRootSchema},
+		"targets":     map[string]any{"type": "object", "additionalProperties": modTopologyTargetSchema},
+		"contexts":    map[string]any{"type": "object", "additionalProperties": modTopologyExecutionContextSchema},
+	},
+	"required":             []any{"objectGroup", "rootFrameId", "frames", "roots", "targets", "contexts"},
+	"additionalProperties": false,
+}
+
 var defaultBuiltinCommands = []CustomCommand{
 	{
 		Name:         "Mod.ping",
@@ -214,7 +287,7 @@ var defaultBuiltinCommands = []CustomCommand{
 	{
 		Name:         "Mod.getTopology",
 		ParamsSchema: modTopologyParamsSchema,
-		ResultSchema: jsonSchemaObject,
+		ResultSchema: modTopologyResponseSchema,
 		Expression:   "async (params) => ModCDP.client.router.getTopology(params)",
 	},
 	{

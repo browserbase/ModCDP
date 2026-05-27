@@ -12,7 +12,7 @@ then validated with ``TypeAdapter`` at the client boundary.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal, TypeAlias, Union, cast
+from typing import Annotated, Any, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
 
@@ -70,7 +70,10 @@ def _iter_schema_objects(value: object) -> list[dict[str, Any]]:
 def _combine_union(types: list[Any]) -> Any:
     if not types:
         return Any
-    return cast(Any, Union).__getitem__(tuple(types))
+    combined = types[0]
+    for item in types[1:]:
+        combined = combined | item
+    return combined
 
 
 def _literal_type(values: Sequence[Any]) -> Any:

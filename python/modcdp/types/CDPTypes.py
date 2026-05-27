@@ -223,6 +223,74 @@ MOD_TOPOLOGY_PARAMS_SCHEMA: JsonSchema = {
     },
     "additionalProperties": False,
 }
+MOD_TOPOLOGY_FRAME_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "targetId": {"type": "string"},
+        "url": {"type": "string"},
+        "parentFrameId": {"type": "string"},
+        "outerBackendNodeId": {"type": "integer"},
+    },
+    "required": ["targetId"],
+    "additionalProperties": False,
+}
+MOD_TOPOLOGY_DOM_ROOT_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "kind": {"enum": ["document", "shadow"]},
+        "frameId": {"type": "string"},
+        "outerBackendNodeId": {"type": "integer"},
+        "innerBackendNodeId": {"type": "integer"},
+        "mode": {"enum": ["open", "closed", "user-agent"]},
+        "executionContextId": {"type": "integer"},
+        "uniqueContextId": {"type": "string"},
+    },
+    "required": ["kind", "frameId"],
+    "additionalProperties": False,
+}
+MOD_TOPOLOGY_TARGET_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "targetId": {"type": "string"},
+        "type": {"type": "string"},
+        "title": {"type": "string"},
+        "url": {"type": "string"},
+        "attached": {"type": "boolean"},
+        "parentId": {"type": "string"},
+        "parentFrameId": {"type": "string"},
+        "sessionId": {"type": "string"},
+    },
+    "required": ["targetId", "type"],
+}
+MOD_TOPOLOGY_EXECUTION_CONTEXT_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "origin": {"type": "string"},
+        "name": {"type": "string"},
+        "uniqueId": {"type": "string"},
+        "auxData": {"type": "object"},
+        "sessionId": {"type": ["string", "null"]},
+        "targetId": {"type": "string"},
+        "frameId": {"type": "string"},
+        "world": {"type": "string"},
+    },
+    "required": ["id", "sessionId", "targetId", "world"],
+    "additionalProperties": False,
+}
+MOD_TOPOLOGY_RESPONSE_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "objectGroup": {"type": "string"},
+        "rootFrameId": {"type": "string"},
+        "frames": {"type": "object", "additionalProperties": MOD_TOPOLOGY_FRAME_SCHEMA},
+        "roots": {"type": "object", "additionalProperties": MOD_TOPOLOGY_DOM_ROOT_SCHEMA},
+        "targets": {"type": "object", "additionalProperties": MOD_TOPOLOGY_TARGET_SCHEMA},
+        "contexts": {"type": "object", "additionalProperties": MOD_TOPOLOGY_EXECUTION_CONTEXT_SCHEMA},
+    },
+    "required": ["objectGroup", "rootFrameId", "frames", "roots", "targets", "contexts"],
+    "additionalProperties": False,
+}
 DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
     {
         "name": "Mod.ping",
@@ -275,7 +343,7 @@ DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
     {
         "name": "Mod.getTopology",
         "params_schema": MOD_TOPOLOGY_PARAMS_SCHEMA,
-        "result_schema": JSON_SCHEMA_OBJECT,
+        "result_schema": MOD_TOPOLOGY_RESPONSE_SCHEMA,
         "expression": "async (params) => ModCDP.client.router.getTopology(params)",
     },
     {
