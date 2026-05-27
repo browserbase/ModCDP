@@ -8,7 +8,7 @@ import {
   ModCDPClient,
   type ModCDPClientInstance,
 } from "../src/client/ModCDPClient.js";
-import { installModCDPServer } from "../src/server/ModCDPServer.js";
+import { ModCDPServer } from "../src/server/ModCDPServer.js";
 import type {
   ModCDPCustomCommandRegistration,
   ModCDPCustomEventRegistration,
@@ -294,24 +294,7 @@ test("assigned type registry updates runtime validation and aliases", () => {
 
 test("service worker server validates registered custom command and event schemas", async () => {
   const scope = {} as typeof globalThis;
-  const server = installModCDPServer(scope) as unknown as {
-    client: ModCDPClient | null;
-    configure(params?: unknown): Promise<ProtocolResult>;
-    addCustomCommand(
-      registration: ModCDPCustomCommandRegistration,
-    ): ProtocolResult;
-    addCustomEvent(registration: ModCDPCustomEventRegistration): ProtocolResult;
-    handleCommand(
-      method: string,
-      params?: ProtocolParams,
-      cdpSessionId?: string | null,
-    ): Promise<ProtocolResult>;
-    emit(
-      eventName: string,
-      payload?: ProtocolPayload,
-      cdpSessionId?: string | null,
-    ): Promise<ProtocolResult>;
-  };
+  const server = await new ModCDPServer({ global_scope: scope }).start();
 
   await server.configure({
     server: { router: { router_routes: { "*.*": "chrome_debugger" } } },

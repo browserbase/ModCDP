@@ -3,10 +3,11 @@
 import { ModCDPServer } from "../../js/src/server/ModCDPServer.js";
 
 const started_at = new Date().toISOString();
+const server = await new ModCDPServer().start();
 
 function startConfiguredTransports() {
-  void ModCDPServer.ensureOffscreenKeepAlive();
-  ModCDPServer.downstream.startDefault();
+  void server.ensureOffscreenKeepAlive();
+  server.downstream.startDefault();
 }
 
 startConfiguredTransports();
@@ -26,14 +27,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         started_at,
       },
       server: {
-        __ModCDPServerVersion: ModCDPServer.__ModCDPServerVersion,
-        router: ModCDPServer.router,
-        loopback_cdp_url: ModCDPServer.loopback_cdp_url,
-        browser_token: ModCDPServer.browser_token ? "set" : null,
-        cdp_send_timeout_ms: ModCDPServer.cdp_send_timeout_ms,
-        loopback_execution_context_timeout_ms: ModCDPServer.loopback_execution_context_timeout_ms,
-        ws_connect_error_settle_timeout_ms: ModCDPServer.ws_connect_error_settle_timeout_ms,
-        downstream_transports: ModCDPServer.downstream.status(),
+        __ModCDPServerVersion: server.__ModCDPServerVersion,
+        router: server.router,
+        loopback_cdp_url: server.loopback_cdp_url,
+        browser_token: server.browser_token ? "set" : null,
+        cdp_send_timeout_ms: server.cdp_send_timeout_ms,
+        loopback_execution_context_timeout_ms:
+          server.loopback_execution_context_timeout_ms,
+        ws_connect_error_settle_timeout_ms:
+          server.ws_connect_error_settle_timeout_ms,
+        downstream_transports: server.downstream.status(),
       },
     },
   });
