@@ -658,9 +658,7 @@ class ModCDPClient(CDPSurfaceMixin):
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream.config = UpstreamTransportConfig.model_validate({**self.upstream.config.model_dump(), "upstream_ws_cdp_url": transport.url})
         server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream.config.upstream_mode == "ws" and transport.url else {}
-        transport_server_config = transport.configForServer()
         server_config.update(launcher.configForServer(transport))
-        server_config.update(transport_server_config)
         server_upstream = cast(Mapping[str, Any], server_config.get("upstream") or {})
         server_upstream_ws_cdp_url = server_upstream.get("upstream_ws_cdp_url")
         if self.server_config is not None and server_upstream_ws_cdp_url:

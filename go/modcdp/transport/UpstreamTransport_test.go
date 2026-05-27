@@ -36,9 +36,6 @@ func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
 	if len(transport.ConfigForLauncher().LauncherLocalExtraArgs) != 0 {
 		t.Fatal("expected empty launcher config")
 	}
-	if len(transport.ConfigForServer()) != 0 {
-		t.Fatal("expected empty server config")
-	}
 
 	testTransport := &testUpstreamTransport{UpstreamTransport: NewUpstreamTransport(UpstreamTransportConfig{})}
 	parsed := []map[string]any{}

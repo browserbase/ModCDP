@@ -343,7 +343,6 @@ type upstreamTransportClient interface {
 	Close() error
 	Send(command string, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error)
 	ConfigForLauncher() LauncherConfig
-	ConfigForServer() map[string]any
 	OnRecv(func(map[string]any)) func()
 	OnClose(func(error)) func()
 	WaitForPeer() error
@@ -731,9 +730,6 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 
 	serverConfig := map[string]any{}
 	for key, value := range launcher.ConfigForServer(c.Config.Upstream) {
-		serverConfig[key] = value
-	}
-	for key, value := range transport.ConfigForServer() {
 		serverConfig[key] = value
 	}
 	if c.Config.ServerConfig != nil {

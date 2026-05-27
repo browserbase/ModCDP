@@ -241,10 +241,6 @@ func (e *UpstreamTransport) ConfigForLauncher() LauncherConfig {
 	return LauncherConfig{}
 }
 
-func (e *UpstreamTransport) ConfigForServer() map[string]any {
-	return map[string]any{}
-}
-
 func (e *UpstreamTransport) GetTargets() ([]map[string]any, error) {
 	result, err := e.Send("Target.getTargets", map[string]any{}, "")
 	if err != nil {

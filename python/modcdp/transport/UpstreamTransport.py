@@ -61,9 +61,6 @@ class UpstreamTransport:
     def configForLauncher(self) -> dict[str, Any]:
         return {}
 
-    def configForServer(self) -> dict[str, Any]:
-        return {}
-
     def close(self) -> None:
         return None
 

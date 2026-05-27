@@ -27,7 +27,6 @@ class UpstreamTransportTests(unittest.TestCase):
         self.assertEqual(parseHostPort("127.0.0.1:29292", "0.0.0.0", 80), {"host": "127.0.0.1", "port": 29292})
         self.assertIs(transport.update(), transport)
         self.assertEqual(transport.configForLauncher(), {})
-        self.assertEqual(transport.configForServer(), {})
         self.assertIsNone(transport.close())
 
         parsed = []
