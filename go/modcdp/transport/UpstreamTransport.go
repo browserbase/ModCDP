@@ -70,6 +70,7 @@ type UpstreamTransport struct {
 	Config         UpstreamTransportConfig
 	recvListeners  []recvListener
 	closeListeners []closeListener
+	eventListeners map[string][]upstreamEventListener
 	listenerMu     sync.Mutex
 	nextListenerID int64
 	nextID         int64
@@ -86,6 +87,11 @@ type recvListener struct {
 type closeListener struct {
 	id int64
 	fn func(error)
+}
+
+type upstreamEventListener struct {
+	id int64
+	fn func(map[string]any, string, string)
 }
 
 func NewUpstreamTransport(config UpstreamTransportConfig) UpstreamTransport {
@@ -120,8 +126,9 @@ func NewUpstreamTransport(config UpstreamTransportConfig) UpstreamTransport {
 		config.UpstreamCDPSendTimeoutMS = 10_000
 	}
 	return UpstreamTransport{
-		Config:  config,
-		pending: map[int64]chan map[string]any{},
+		Config:         config,
+		eventListeners: map[string][]upstreamEventListener{},
+		pending:        map[int64]chan map[string]any{},
 		writeCommand: func(map[string]any) error {
 			return fmt.Errorf("UpstreamTransport.send is not implemented")
 		},
@@ -327,6 +334,37 @@ func (e *UpstreamTransport) OnClose(listener func(error)) func() {
 	}
 }
 
+func (e *UpstreamTransport) On(event string, listener func(map[string]any, string, string)) func() {
+	e.listenerMu.Lock()
+	if e.eventListeners == nil {
+		e.eventListeners = map[string][]upstreamEventListener{}
+	}
+	e.nextListenerID++
+	id := e.nextListenerID
+	e.eventListeners[event] = append(e.eventListeners[event], upstreamEventListener{id: id, fn: listener})
+	e.listenerMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			e.listenerMu.Lock()
+			defer e.listenerMu.Unlock()
+			listeners := e.eventListeners[event]
+			for index, candidate := range listeners {
+				if candidate.id != id {
+					continue
+				}
+				listeners = append(listeners[:index], listeners[index+1:]...)
+				if len(listeners) == 0 {
+					delete(e.eventListeners, event)
+				} else {
+					e.eventListeners[event] = listeners
+				}
+				return
+			}
+		})
+	}
+}
+
 func (e *UpstreamTransport) emitRecv(message map[string]any) {
 	if id, ok := commandID(message["id"]); ok {
 		e.pendingMu.Lock()
@@ -335,6 +373,14 @@ func (e *UpstreamTransport) emitRecv(message map[string]any) {
 		e.pendingMu.Unlock()
 		if done != nil {
 			done <- message
+		}
+	}
+	if _, ok := commandID(message["id"]); !ok {
+		method, _ := message["method"].(string)
+		params, _ := message["params"].(map[string]any)
+		sessionID, _ := message["sessionId"].(string)
+		if method != "" && params != nil {
+			e.emitUpstreamEvent(method, params, "", sessionID)
 		}
 	}
 	e.listenerMu.Lock()
@@ -347,6 +393,15 @@ func (e *UpstreamTransport) emitRecv(message map[string]any) {
 
 func (e *UpstreamTransport) EmitRecv(message map[string]any) {
 	e.emitRecv(message)
+}
+
+func (e *UpstreamTransport) emitUpstreamEvent(method string, payload map[string]any, targetID string, sessionID string) {
+	e.listenerMu.Lock()
+	listeners := append([]upstreamEventListener(nil), e.eventListeners[method]...)
+	e.listenerMu.Unlock()
+	for _, listener := range listeners {
+		listener.fn(payload, targetID, sessionID)
+	}
 }
 
 func (e *UpstreamTransport) emitClose(err error) {
@@ -384,14 +439,18 @@ func (e *UpstreamTransport) ToJSON() map[string]any {
 	e.listenerMu.Lock()
 	recvListeners := len(e.recvListeners)
 	closeListeners := len(e.closeListeners)
+	eventListeners := len(e.eventListeners)
 	e.listenerMu.Unlock()
+	config := e.Config
+	config.UpstreamPipeRead = nil
+	config.UpstreamPipeWrite = nil
 	return types.ModCDPToJSON(e, types.ModCDPJSONConfig{
-		Config: e.Config,
+		Config: config,
 		State: map[string]any{
 			"pending":         pending,
 			"recv_listeners":  recvListeners,
 			"close_listeners": closeListeners,
-			"event_listeners": 0,
+			"event_listeners": eventListeners,
 		},
 	})
 }

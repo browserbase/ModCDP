@@ -48,6 +48,7 @@ class UpstreamTransport:
         self._lock = threading.Lock()
         self._recv_listeners: list[Callable[[dict[str, Any]], None]] = []
         self._close_listeners: list[Callable[[Exception], None]] = []
+        self._event_listeners: dict[str, list[Callable[[dict[str, Any], str | None, str | None], None]]] = {}
 
     def connect(self) -> None:
         raise NotImplementedError(f"{type(self).__name__}.connect is not implemented.")
@@ -138,6 +139,30 @@ class UpstreamTransport:
 
         return stop
 
+    def on(self, event: Any, listener: Callable[[dict[str, Any], str | None, str | None], None]) -> Callable[[], None]:
+        event_name = event if isinstance(event, str) else getattr(event, "cdp_event_name")
+        listeners = self._event_listeners.setdefault(event_name, [])
+        listeners.append(listener)
+
+        removed = False
+
+        def stop() -> None:
+            nonlocal removed
+            if removed:
+                return
+            removed = True
+            current_listeners = self._event_listeners.get(event_name)
+            if current_listeners is None:
+                return
+            try:
+                current_listeners.remove(listener)
+            except ValueError:
+                return
+            if not current_listeners:
+                self._event_listeners.pop(event_name, None)
+
+        return stop
+
     def getTargets(self) -> list[dict[str, Any]]:
         result = self.send("Target.getTargets", {})
         target_infos = result.get("targetInfos") if isinstance(result, dict) else None
@@ -166,14 +191,18 @@ class UpstreamTransport:
         return None
 
     def toJSON(self) -> dict[str, object]:
+        config = self.config.model_dump(mode="json")
+        config.pop("upstream_pipe_read", None)
+        config.pop("upstream_pipe_write", None)
         return modCDPToJSON(
             self,
             {
+                "config": config,
                 "state": {
                     "pending": len(self._pending),
                     "recv_listeners": len(self._recv_listeners),
                     "close_listeners": len(self._close_listeners),
-                    "event_listeners": 0,
+                    "event_listeners": len(self._event_listeners),
                 }
             },
         )
@@ -203,7 +232,22 @@ class UpstreamTransport:
                 entry[1].put(parsed)
             self._emit_recv(parsed)
             return
+        method = parsed.get("method")
+        params = parsed.get("params")
+        session_id = parsed.get("sessionId")
+        if isinstance(method, str) and isinstance(params, dict):
+            self._emit_upstream_event(method, params, None, session_id if isinstance(session_id, str) else None)
         self._emit_recv(parsed)
+
+    def _emit_upstream_event(
+        self,
+        method: str,
+        payload: dict[str, Any],
+        target_id: str | None,
+        session_id: str | None,
+    ) -> None:
+        for listener in list(self._event_listeners.get(method, [])):
+            listener(payload, target_id, session_id)
 
 
 def parseHostPort(value: str, defaultHost: str, defaultPort: int) -> dict[str, int | str]:
