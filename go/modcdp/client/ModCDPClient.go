@@ -86,6 +86,10 @@ type UpstreamTransportConfig = types.UpstreamTransportConfig
 type UpstreamTransport = transportpkg.UpstreamTransport
 type WSUpstreamTransport = transportpkg.WSUpstreamTransport
 type AutoSessionRouter = router.AutoSessionRouter
+type DownstreamConfig = types.ModCDPDownstreamConfig
+type CustomCommand = types.ModCDPAddCustomCommandParams
+type CustomEvent = types.ModCDPAddCustomEventObjectParams
+type CustomMiddleware = types.ModCDPAddMiddlewareParams
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
 var NewRemoteBrowserLauncher = launcher.NewRemoteBrowserLauncher
@@ -159,31 +163,6 @@ func freePort() (int, error) {
 	}
 	defer listener.Close()
 	return listener.Addr().(*net.TCPAddr).Port, nil
-}
-
-// --- public types --------------------------------------------------------
-
-type DownstreamConfig struct {
-	DownstreamClientTimeoutMS          int   `json:"downstream_client_timeout_ms,omitempty"`
-	DownstreamCloseBrowserOnDisconnect *bool `json:"downstream_close_browser_on_disconnect,omitempty"`
-}
-
-type CustomEvent struct {
-	Name        string         `json:"name"`
-	EventSchema map[string]any `json:"event_schema,omitempty"`
-}
-
-type CustomCommand struct {
-	Name         string         `json:"name"`
-	Expression   string         `json:"expression,omitempty"`
-	ParamsSchema map[string]any `json:"params_schema,omitempty"`
-	ResultSchema map[string]any `json:"result_schema,omitempty"`
-}
-
-type CustomMiddleware struct {
-	Name       string `json:"name,omitempty"`
-	Phase      string `json:"phase"`
-	Expression string `json:"expression"`
 }
 
 type CDPTypesConfig struct {
