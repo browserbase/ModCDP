@@ -535,7 +535,12 @@ class AutoSessionRouter:
         waiter_key: str | None,
         timeout_ms: int | None = None,
     ) -> dict[str, Any]:
-        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.config.get("loopback_execution_context_timeout_ms", self.defaultExecutionContextTimeoutMs())
+        effective_timeout_ms = timeout_ms
+        if effective_timeout_ms is None:
+            configured_timeout_ms = self.config["loopback_execution_context_timeout_ms"]
+            if not isinstance(configured_timeout_ms, int):
+                raise TypeError("loopback_execution_context_timeout_ms must be an int")
+            effective_timeout_ms = configured_timeout_ms
         with self._lock:
             for context in self.contexts.values():
                 if matches(context):

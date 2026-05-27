@@ -225,10 +225,13 @@ class CDPTypes:
         try:
             validated = adapter.validate_python(payload or {}, strict=True)
         except ValidationError as direct_error:
-            if not isinstance(payload, Mapping) or set(payload.keys()) != {"value"}:
+            if not isinstance(payload, Mapping):
+                raise ValueError(f"{event} event did not match event_schema: {direct_error}") from direct_error
+            payload_mapping = dict(payload)
+            if set(payload_mapping.keys()) != {"value"}:
                 raise ValueError(f"{event} event did not match event_schema: {direct_error}") from direct_error
             try:
-                validated = adapter.validate_python(payload["value"], strict=True)
+                validated = adapter.validate_python(payload_mapping["value"], strict=True)
             except ValidationError as value_error:
                 raise ValueError(f"{event} event did not match event_schema: {value_error}") from value_error
         if isinstance(validated, BaseModel):
