@@ -44,7 +44,7 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 		},
 		Injector: InjectorConfig{
 			InjectorMode:                        "discover",
-			InjectorCLIExtensionPath:            "/tmp/ext",
+			InjectorDiscoverExtensionPath:       "/tmp/ext",
 			InjectorServiceWorkerExtensionID:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			InjectorServiceWorkerURLIncludes:    []string{"modcdp"},
 			InjectorServiceWorkerURLSuffixes:    []string{"/custom/service_worker.js"},
@@ -56,17 +56,19 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 			InjectorServiceWorkerPollIntervalMS: 76,
 			InjectorTargetSessionPollIntervalMS: 87,
 		},
-		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "direct_cdp"}},
+		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "direct_cdp"}, LoopbackExecutionContextTimeoutMS: 4321},
 		ClientConfig: ClientConfig{
 			ClientHydrateAliases:       boolPtr(false),
 			ClientMirrorUpstreamEvents: boolPtr(false),
 			ClientCDPSendTimeoutMS:     1234,
 			ClientEventWaitTimeoutMS:   2345,
+			ClientHeartbeatIntervalMS:  3456,
 		},
 		ServerConfig: &ServerConfig{
-			Router:             RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}, LoopbackExecutionContextTimeoutMS: 8765},
+			Router:             RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
 			ClientConfig:       ClientConfig{ClientCDPSendTimeoutMS: 9876},
 			Upstream:           UpstreamTransportConfig{UpstreamWSConnectErrorSettleTimeoutMS: 7654},
+			Downstream:         DownstreamConfig{DownstreamClientTimeoutMS: 4567},
 			ServerBrowserToken: "token-1",
 		},
 	})
@@ -113,10 +115,14 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Config.ClientConfig.ClientEventWaitTimeoutMS != 2345 {
 		t.Fatalf("ClientConfig.ClientEventWaitTimeoutMS = %d", cdp.Config.ClientConfig.ClientEventWaitTimeoutMS)
 	}
+	if cdp.Config.ClientConfig.ClientHeartbeatIntervalMS != 3456 {
+		t.Fatalf("ClientConfig.ClientHeartbeatIntervalMS = %d", cdp.Config.ClientConfig.ClientHeartbeatIntervalMS)
+	}
 	params := cdp.serverConfigureParams(nil, nil, nil)
 	clientConfigConfig := params["client_config"].(map[string]any)
 	routerConfig := params["router"].(map[string]any)
 	upstreamConfig := params["upstream"].(map[string]any)
+	downstreamConfig := params["downstream"].(map[string]any)
 	routes := routerConfig["router_routes"].(map[string]string)
 	if routes["*.*"] != "loopback_cdp" {
 		t.Fatalf("configure router routes = %#v", routes)
@@ -127,11 +133,14 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if clientConfigConfig["client_cdp_send_timeout_ms"] != 9876 {
 		t.Fatalf("configure cdp_send_timeout_ms = %#v", clientConfigConfig["client_cdp_send_timeout_ms"])
 	}
-	if routerConfig["loopback_execution_context_timeout_ms"] != 8765 {
+	if routerConfig["loopback_execution_context_timeout_ms"] != 4321 {
 		t.Fatalf("configure loopback_execution_context_timeout_ms = %#v", routerConfig["loopback_execution_context_timeout_ms"])
 	}
 	if upstreamConfig["upstream_ws_connect_error_settle_timeout_ms"] != 7654 {
 		t.Fatalf("configure ws_connect_error_settle_timeout_ms = %#v", upstreamConfig["upstream_ws_connect_error_settle_timeout_ms"])
+	}
+	if downstreamConfig["downstream_client_timeout_ms"] != 4567 {
+		t.Fatalf("configure downstream_client_timeout_ms = %#v", downstreamConfig["downstream_client_timeout_ms"])
 	}
 }
 

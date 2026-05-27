@@ -42,7 +42,7 @@ class ModCDPClientTests(unittest.TestCase):
             },
             injector={
                 "injector_mode": "discover",
-                "injector_cli_extension_path": "/tmp/ext",
+                "injector_discover_extension_path": "/tmp/ext",
                 "injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "injector_service_worker_url_includes": ["modcdp"],
                 "injector_service_worker_url_suffixes": ["/custom/service_worker.js"],
@@ -54,18 +54,20 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_poll_interval_ms": 76,
                 "injector_target_session_poll_interval_ms": 87,
             },
-            router={"router_routes": {"*.*": "direct_cdp"}},
+            router={"router_routes": {"*.*": "direct_cdp"}, "loopback_execution_context_timeout_ms": 4321},
             client_config={
                 "client_hydrate_aliases": False,
                 "client_mirror_upstream_events": False,
                 "client_cdp_send_timeout_ms": 1234,
                 "client_event_wait_timeout_ms": 2345,
+                "client_heartbeat_interval_ms": 3456,
             },
             server_config={
-                "router": {"router_routes": {"*.*": "loopback_cdp"}, "loopback_execution_context_timeout_ms": 8765},
+                "router": {"router_routes": {"*.*": "loopback_cdp"}},
                 "server_browser_token": "token-1",
                 "client_config": {"client_cdp_send_timeout_ms": 9876},
                 "upstream": {"upstream_ws_connect_error_settle_timeout_ms": 7654},
+                "downstream": {"downstream_client_timeout_ms": 4567},
             },
         )
 
@@ -83,6 +85,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp.config.client_mirror_upstream_events, False)
         self.assertEqual(cdp.config.client_cdp_send_timeout_ms, 1234)
         self.assertEqual(cdp.config.client_event_wait_timeout_ms, 2345)
+        self.assertEqual(cdp.config.client_heartbeat_interval_ms, 3456)
         self.assertNotIn("Browser", cdp.__dict__)
         with self.assertRaises(AttributeError):
             _ = cdp.Browser
@@ -94,8 +97,9 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(params["router"]["router_routes"]["*.*"], "loopback_cdp")
         self.assertEqual(params["server_browser_token"], "token-1")
         self.assertEqual(params["client_config"]["client_cdp_send_timeout_ms"], 9876)
-        self.assertEqual(params["router"]["loopback_execution_context_timeout_ms"], 8765)
+        self.assertEqual(params["router"]["loopback_execution_context_timeout_ms"], 4321)
         self.assertEqual(params["upstream"]["upstream_ws_connect_error_settle_timeout_ms"], 7654)
+        self.assertEqual(params["downstream"]["downstream_client_timeout_ms"], 4567)
 
     def test_preserves_explicit_zero_timeout_config(self) -> None:
         cdp = ModCDPClient(

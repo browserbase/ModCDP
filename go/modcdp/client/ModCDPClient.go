@@ -752,7 +752,9 @@ func (c *ModCDPClient) ensureModCDPServerConfigured() error {
 
 func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	return map[string]any{
-		"upstream_ws_cdp_url": c.Config.Upstream.UpstreamWSCDPURL,
+		"upstream_ws_cdp_url":                         c.Config.Upstream.UpstreamWSCDPURL,
+		"upstream_ws_connect_error_settle_timeout_ms": c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
+		"upstream_cdp_send_timeout_ms":                c.Config.Upstream.UpstreamCDPSendTimeoutMS,
 	}
 }
 
@@ -1241,6 +1243,8 @@ func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 		InjectorServiceWorkerReadyTimeoutMS:  c.Config.Injector.InjectorServiceWorkerReadyTimeoutMS,
 		InjectorServiceWorkerPollIntervalMS:  c.Config.Injector.InjectorServiceWorkerPollIntervalMS,
 		InjectorTargetSessionPollIntervalMS:  c.Config.Injector.InjectorTargetSessionPollIntervalMS,
+		InjectorBBAPIKey:                     c.Config.Injector.InjectorBBAPIKey,
+		InjectorBBBaseURL:                    c.Config.Injector.InjectorBBBaseURL,
 	}
 }
 
