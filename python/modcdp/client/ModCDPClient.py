@@ -178,8 +178,7 @@ class _ModDomain:
         return self._client._send_command("Mod.getTopology", params)
 
 MODCDP_READY_EXPRESSION = (
-    "Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && "
-    "globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)"
+    "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)"
 )
 DEFAULT_SERVER = object()
 DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000

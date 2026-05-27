@@ -33,7 +33,7 @@ var extIDFromURL = regexp.MustCompile(`^chrome-extension://([a-z]+)/`)
 //go:embed extension.zip
 var bundledExtensionZip []byte
 
-const modcdpReadyExpression = `Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)`
+const modcdpReadyExpression = `Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)`
 
 type SendCDP = types.SendCDP
 type LaunchOptions = types.LaunchOptions

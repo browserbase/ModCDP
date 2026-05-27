@@ -21,7 +21,7 @@ EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
 DEFAULT_MODCDP_EXTENSION_ID = "mdedooklbnfejodmnhmkdpkaedafkehf"
 DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = ["/modcdp/service_worker.js"]
 MODCDP_READY_EXPRESSION = (
-    "Boolean(globalThis.ModCDP?.__ModCDPServerVersion >= 1 && globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)"
+    "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)"
 )
 DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000
 DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
