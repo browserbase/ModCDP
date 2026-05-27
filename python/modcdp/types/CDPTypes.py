@@ -398,7 +398,8 @@ def normalizeModCDPName(value: object) -> str:
     if isinstance(value, str):
         name = value.strip()
     else:
-        meta = value.meta() if callable(getattr(value, "meta", None)) else None
+        meta_fn = getattr(value, "meta", None)
+        meta = meta_fn() if callable(meta_fn) else None
         candidates = (
             getattr(value, "cdp_command_name", None),
             getattr(value, "cdp_event_name", None),
@@ -414,10 +415,27 @@ def normalizeModCDPName(value: object) -> str:
             getattr(value, "name", None),
         )
         name = next((candidate for candidate in candidates if isinstance(candidate, str) and candidate.strip()), "")
+        if not name:
+            name = _bound_cdp_method_name(value) or ""
         name = name.strip()
-    if not name or name.count(".") != 1:
+    if not name:
         raise ValueError("Expected a CDP name string or named CDP schema.")
     return name
+
+
+def _bound_cdp_method_name(value: object) -> str | None:
+    method = getattr(value, "__name__", None)
+    owner = getattr(value, "__self__", None)
+    owner_class = type(owner) if owner is not None else None
+    owner_name = getattr(owner_class, "__name__", None)
+    if not isinstance(method, str) or not method or not isinstance(owner_name, str):
+        return None
+    if not owner_name.endswith("Domain"):
+        return None
+    domain = owner_name.removesuffix("Domain").removeprefix("_")
+    if not domain:
+        return None
+    return f"{domain}.{method}"
 
 
 def _json_object(value: object) -> JsonObject:
@@ -445,8 +463,10 @@ def _model_or_json_object(value: object) -> ProtocolResult:
 
 
 class CDPTypes:
-    def __init__(self, config: CDPTypesConfig | Mapping[str, object] | None = None) -> None:
-        parsed_config = config if isinstance(config, CDPTypesConfig) else CDPTypesConfig.model_validate(config or {})
+    def __init__(self, config: CDPTypesConfig | Mapping[str, object] | None = None, **kwargs: object) -> None:
+        raw_config = config.model_dump() if isinstance(config, CDPTypesConfig) else dict(config or {})
+        raw_config.update(kwargs)
+        parsed_config = CDPTypesConfig.model_validate(raw_config)
         self.custom_commands: dict[str, CustomCommandRegistration] = {}
         self.custom_events: dict[str, CustomEventRegistration] = {}
         self.custom_middlewares: list[CustomMiddlewareRegistration] = []
@@ -477,8 +497,11 @@ class CDPTypes:
     def update(
         self,
         config: CDPTypesConfig | Mapping[str, object] | None = None,
+        **kwargs: object,
     ) -> "CDPTypes":
-        parsed_config = config if isinstance(config, CDPTypesConfig) else CDPTypesConfig.model_validate(config or {})
+        raw_config = config.model_dump() if isinstance(config, CDPTypesConfig) else dict(config or {})
+        raw_config.update(kwargs)
+        parsed_config = CDPTypesConfig.model_validate(raw_config)
         commands = [*self.custom_commands.values(), *_custom_command_entries(parsed_config.custom_commands)]
         events = [*self.custom_events.values(), *_custom_event_entries(parsed_config.custom_events)]
         middlewares = [*self.custom_middlewares, *(parsed_config.custom_middlewares or [])]
@@ -612,6 +635,28 @@ class CDPTypes:
         return CommandPreparation(params=command_params)
 
     def parseCommandParams(self, method: str, params: object = None) -> ProtocolParams:
+        if method == "Mod.addCustomCommand":
+            parsed = _ModCDPAddCustomCommand.model_validate(params or {})
+            command_params: dict[str, object] = {"name": normalizeModCDPName(parsed.name)}
+            if parsed.expression is not None:
+                command_params["expression"] = parsed.expression
+            if parsed.params_schema is not None:
+                command_params["params_schema"] = _json_value(parsed.params_schema)
+            if parsed.result_schema is not None:
+                command_params["result_schema"] = _json_value(parsed.result_schema)
+            return command_params
+        if method == "Mod.addCustomEvent":
+            parsed = _ModCDPAddCustomEvent.model_validate(params or {})
+            event_params: dict[str, object] = {"name": normalizeModCDPName(parsed.name)}
+            if parsed.event_schema is not None:
+                event_params["event_schema"] = _json_value(parsed.event_schema)
+            return event_params
+        if method == "Mod.addMiddleware":
+            parsed = _ModCDPAddMiddleware.model_validate(params or {})
+            middleware_params: dict[str, object] = {"phase": parsed.phase, "expression": parsed.expression}
+            if parsed.name is not None:
+                middleware_params["name"] = "*" if parsed.name == "*" else normalizeModCDPName(parsed.name)
+            return middleware_params
         adapter = self.commandParamsSchema(method)
         if adapter is None:
             return _json_object(params or {})

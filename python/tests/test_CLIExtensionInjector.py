@@ -84,7 +84,8 @@ class CLIExtensionInjectorTests(unittest.TestCase):
         try:
             injector.prepare()
             unpacked_extension_path = injector.unpacked_extension_path
-            self.assertIsInstance(unpacked_extension_path, str)
+            if not isinstance(unpacked_extension_path, str):
+                self.fail(f"unpacked_extension_path = {unpacked_extension_path!r}")
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])
@@ -97,7 +98,8 @@ class CLIExtensionInjectorTests(unittest.TestCase):
         try:
             injector.prepare()
             unpacked_extension_path = injector.unpacked_extension_path
-            self.assertIsInstance(unpacked_extension_path, str)
+            if not isinstance(unpacked_extension_path, str):
+                self.fail(f"unpacked_extension_path = {unpacked_extension_path!r}")
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertIn("modcdp-extension-", unpacked_extension_path)
             self.assertEqual(injector.extra_args, [f"--load-extension={unpacked_extension_path}"])

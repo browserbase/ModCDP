@@ -1,11 +1,18 @@
 // MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
 // Reason: only runs in browser.
-import type { z } from "zod";
+import { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { CdpCommandMessage, CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
+
+const ChromeDebuggerUpstreamTransportConfigSchema = z.object({
+  upstream_mode: z.literal("chromedebugger").default("chromedebugger"),
+  upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+});
+type ChromeDebuggerUpstreamTransportConfig = z.infer<typeof ChromeDebuggerUpstreamTransportConfigSchema>;
 
 const target_auto_attach_params = {
   autoAttach: true,
@@ -32,6 +39,7 @@ const target_auto_attach_params = {
  *    typed `on(event, listener)` subscriptions.
  */
 class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
+  declare config: ChromeDebuggerUpstreamTransportConfig;
   // JSON(debuggee) values attached in this service worker. Updated by
   // attachDebuggee/onDetach; read before attach to avoid duplicate native
   // chrome.debugger.attach calls.
@@ -62,8 +70,9 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   // Non-null means native detach events are clearing attached-debuggee state.
   private debugger_onDetach_listener: ((source: chrome.debugger.Debuggee, reason?: string) => void) | null = null;
 
-  constructor(config: UpstreamTransportConfig = {}) {
-    super({ ...config, upstream_mode: "chromedebugger" });
+  constructor(config: z.input<typeof ChromeDebuggerUpstreamTransportConfigSchema> = {}) {
+    super();
+    this.config = ChromeDebuggerUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "chromedebugger" });
   }
 
   /** Install chrome.debugger listeners for this service-worker lifetime. */
@@ -301,4 +310,5 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   }
 }
 
-export { ChromeDebuggerUpstreamTransport };
+export { ChromeDebuggerUpstreamTransport, ChromeDebuggerUpstreamTransportConfigSchema };
+export type { ChromeDebuggerUpstreamTransportConfig };

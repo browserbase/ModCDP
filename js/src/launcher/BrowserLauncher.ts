@@ -13,12 +13,9 @@ type LauncherMode = ReturnType<typeof ModCDPLauncherConfigSchema.parse>["launche
 type LaunchedBrowser = {
   proc?: unknown;
   cdp_listen_port?: number;
-  // Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
   cdp_url: string | null;
   // Extension-dialable loopback CDP endpoint when it differs from cdp_url (usually they are the same unless public-facing cdp url differs from intranet/localhost equivalent).
   loopback_cdp_url?: string | null;
-  pipe_read?: NodeJS.ReadableStream | null;
-  pipe_write?: NodeJS.WritableStream | null;
   profile_dir?: string | null;
   browserbase_session_id?: string | null;
   browserbase_session_url?: string | null;
@@ -84,8 +81,6 @@ class BrowserLauncher {
     const config: UpstreamTransportConfig = {};
     const upstream_ws_cdp_url = this.launched?.cdp_url ?? this.config.launcher_remote_cdp_url;
     if (upstream_ws_cdp_url) config.upstream_ws_cdp_url = upstream_ws_cdp_url;
-    if (this.launched?.pipe_read) config.upstream_pipe_read = this.launched.pipe_read;
-    if (this.launched?.pipe_write) config.upstream_pipe_write = this.launched.pipe_write;
     return config;
   }
 
@@ -94,9 +89,7 @@ class BrowserLauncher {
       this.launched?.loopback_cdp_url ??
       (upstream.config.upstream_mode === "ws" && upstream.config.upstream_ws_cdp_url
         ? upstream.config.upstream_ws_cdp_url
-        : upstream.config.upstream_mode !== "ws" && upstream.config.upstream_mode !== "pipe" && this.launched?.cdp_url
-          ? this.launched.cdp_url
-          : null);
+        : null);
     return launcher_local_loopback_cdp_url
       ? { upstream: { upstream_ws_cdp_url: launcher_local_loopback_cdp_url } }
       : {};

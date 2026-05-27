@@ -80,7 +80,7 @@ class ModCDPServer {
     this.client = new ModCDPClient({
       launcher: { launcher_mode: "none" },
       injector: { injector_mode: "none" },
-      upstream: config.upstream ?? { upstream_mode: "chromedebugger" },
+      upstream: config.upstream ?? ({ upstream_mode: "chromedebugger" } as Record<string, unknown>),
       router: {
         ...(config.router ?? {}),
         router_routes: {

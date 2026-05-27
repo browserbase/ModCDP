@@ -184,7 +184,7 @@ func (i *ExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 }
 
 func (i ExtensionInjector) readyExpression() string {
-	if i.Config.InjectorServiceWorkerReadyExpression == "" {
+	if i.Config.InjectorServiceWorkerReadyExpression == "" || i.Config.InjectorServiceWorkerReadyExpression == modcdpReadyExpression {
 		return modcdpReadyExpression
 	}
 	return fmt.Sprintf("(%s) && Boolean(%s)", modcdpReadyExpression, i.Config.InjectorServiceWorkerReadyExpression)

@@ -1,16 +1,28 @@
 // MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
 // Reason: not needed by Stagehand (exotic transport).
-import type { z } from "zod";
+import { z } from "zod";
+import type { LauncherConfig } from "../launcher/BrowserLauncher.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
+
+const PipeUpstreamTransportConfigSchema = z.object({
+  upstream_mode: z.literal("pipe").default("pipe"),
+  upstream_pipe_read: z.custom<NodeJS.ReadableStream>().optional(),
+  upstream_pipe_write: z.custom<NodeJS.WritableStream>().optional(),
+  upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+});
+type PipeUpstreamTransportConfig = z.infer<typeof PipeUpstreamTransportConfigSchema>;
 
 class PipeUpstreamTransport extends UpstreamTransport {
+  declare config: PipeUpstreamTransportConfig;
   private buffer = "";
   private pipe_cleanup: (() => void) | null = null;
 
-  constructor(config: UpstreamTransportConfig = {}) {
-    super({ ...config, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
+  constructor(config: z.input<typeof PipeUpstreamTransportConfigSchema> = {}) {
+    super();
+    this.config = PipeUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "pipe" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -55,13 +67,13 @@ class PipeUpstreamTransport extends UpstreamTransport {
     return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportConfig = {}) {
-    super.update({ ...config, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
+  override update(config: Record<string, unknown> = {}) {
+    this.config = PipeUpstreamTransportConfigSchema.parse({ ...this.config, ...config, upstream_mode: "pipe" });
     return this;
   }
 
-  configForLauncher() {
-    return { launcher_local_cdp_transport: "pipe" as const };
+  override configForLauncher(): LauncherConfig {
+    return { launcher_local_cdp_transport: "pipe" } as unknown as LauncherConfig;
   }
 
   async connect() {
@@ -124,4 +136,5 @@ class PipeUpstreamTransport extends UpstreamTransport {
   }
 }
 
-export { PipeUpstreamTransport };
+export { PipeUpstreamTransport, PipeUpstreamTransportConfigSchema };
+export type { PipeUpstreamTransportConfig };

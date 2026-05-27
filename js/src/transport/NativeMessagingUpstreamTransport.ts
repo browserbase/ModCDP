@@ -1,17 +1,28 @@
 // MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
 // Reason: not needed by Stagehand (exotic transport).
-import type { z } from "zod";
+import { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
+
+const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
+
+const NativeMessagingUpstreamTransportConfigSchema = z.object({
+  upstream_mode: z.literal("nativemessaging").default("nativemessaging"),
+  upstream_nativemessaging_host_name: z.string().default(DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME),
+  upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+});
+type NativeMessagingUpstreamTransportConfig = z.infer<typeof NativeMessagingUpstreamTransportConfigSchema>;
 
 class NativeMessagingUpstreamTransport extends UpstreamTransport {
+  declare config: NativeMessagingUpstreamTransportConfig;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
 
-  constructor(config: UpstreamTransportConfig = {}) {
-    super({ ...config, upstream_mode: "nativemessaging" });
+  constructor(config: z.input<typeof NativeMessagingUpstreamTransportConfigSchema> = {}) {
+    super();
+    this.config = NativeMessagingUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "nativemessaging" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -59,8 +70,12 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
     return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportConfig = {}) {
-    super.update(config);
+  override update(config: Record<string, unknown> = {}) {
+    this.config = NativeMessagingUpstreamTransportConfigSchema.parse({
+      ...this.config,
+      ...config,
+      upstream_mode: "nativemessaging",
+    });
     return this;
   }
 
@@ -119,4 +134,9 @@ function readLengthPrefixedJSON(buffer: Buffer<ArrayBufferLike>, onRecv: (messag
   return buffer;
 }
 
-export { DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME, NativeMessagingUpstreamTransport };
+export {
+  DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
+  NativeMessagingUpstreamTransport,
+  NativeMessagingUpstreamTransportConfigSchema,
+};
+export type { NativeMessagingUpstreamTransportConfig };

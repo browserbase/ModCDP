@@ -10,6 +10,8 @@ from collections.abc import Callable, Mapping
 from queue import Empty, Queue
 from typing import Any, Literal, TypeAlias, overload
 
+from pydantic import BaseModel
+
 from ..types.modcdp import ModCDPUpstreamConfig, ProtocolPayload, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
@@ -138,9 +140,13 @@ class UpstreamTransport:
         return stop
 
     def on(self, event: Any, listener: Callable[[dict[str, Any], str | None, str | None], None]) -> Callable[[], None]:
-        event_name = event if isinstance(event, str) else getattr(event, "cdp_event_name")
+        event_name = _cdp_event_name(event)
+
+        def typed_listener(payload: dict[str, Any], target_id: str | None, session_id: str | None) -> None:
+            listener(_parse_event_payload(event, payload), target_id, session_id)
+
         listeners = self._event_listeners.setdefault(event_name, [])
-        listeners.append(listener)
+        listeners.append(typed_listener)
 
         removed = False
 
@@ -153,7 +159,7 @@ class UpstreamTransport:
             if current_listeners is None:
                 return
             try:
-                current_listeners.remove(listener)
+                current_listeners.remove(typed_listener)
             except ValueError:
                 return
             if not current_listeners:
@@ -208,13 +214,16 @@ class UpstreamTransport:
             listener(message)
 
     def _emit_close(self, error: Exception) -> None:
+        self._settle_pending(error)
+        for listener in list(self._close_listeners):
+            listener(error)
+
+    def _settle_pending(self, error: Exception) -> None:
         with self._lock:
             pending = list(self._pending.values())
             self._pending.clear()
         for _, done in pending:
             done.put({"error": {"message": str(error)}})
-        for listener in list(self._close_listeners):
-            listener(error)
 
     def _parse_and_emit_recv(self, data: str | bytes) -> None:
         raw = data.decode() if isinstance(data, bytes) else data
@@ -254,7 +263,8 @@ def _upstream_transport_config(config: UpstreamTransportConfig | dict[str, Any] 
 def _cdp_name(command: object) -> str:
     if isinstance(command, str):
         return command
-    meta = command.meta() if callable(getattr(command, "meta", None)) else None
+    meta_fn = getattr(command, "meta", None)
+    meta = meta_fn() if callable(meta_fn) else None
     candidates = (
         getattr(command, "cdp_command_name", None),
         getattr(command, "id", None),
@@ -267,3 +277,30 @@ def _cdp_name(command: object) -> str:
     if name is None:
         raise TypeError("command must be a CDP method string or generated command object")
     return name
+
+
+def _cdp_event_name(event: object) -> str:
+    if isinstance(event, str):
+        return event
+    meta_fn = getattr(event, "meta", None)
+    meta = meta_fn() if callable(meta_fn) else None
+    candidates = (
+        getattr(event, "cdp_event_name", None),
+        getattr(meta, "cdp_event_name", None) if meta is not None else None,
+        meta.get("cdp_event_name") if isinstance(meta, Mapping) else None,
+        getattr(event, "id", None),
+        getattr(meta, "id", None) if meta is not None else None,
+        meta.get("id") if isinstance(meta, Mapping) else None,
+        getattr(event, "name", None),
+    )
+    name = next((candidate for candidate in candidates if isinstance(candidate, str) and candidate), None)
+    if name is None:
+        raise TypeError("event must be a CDP event name string or generated event object")
+    return name
+
+
+def _parse_event_payload(event: object, payload: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(event, type) and issubclass(event, BaseModel):
+        parsed = event.model_validate(payload)
+        return parsed.model_dump(mode="json", exclude_none=True, by_alias=True)
+    return payload

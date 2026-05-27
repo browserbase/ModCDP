@@ -5,6 +5,8 @@
 package router
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -176,23 +178,23 @@ func (r *AutoSessionRouter) Send(method string, params map[string]any, requested
 	return r.upstream.Send(method, routedParams, sessionID)
 }
 
-func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
+func (r *AutoSessionRouter) AttachToTarget(targetID string) (string, error) {
 	r.mu.Lock()
 	sessionID := r.SessionId_from_targetId[targetID]
 	r.mu.Unlock()
 	if sessionID != "" {
-		return sessionID
+		return sessionID, nil
 	}
 	attachedSessionID, err := r.upstream.AttachToTarget(targetID)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	if attachedSessionID != "" {
 		r.mu.Lock()
 		r.recordTargetSession(targetID, attachedSessionID, r.Targets[targetID])
 		r.mu.Unlock()
 	}
-	return attachedSessionID
+	return attachedSessionID, nil
 }
 
 func (r *AutoSessionRouter) EnsureSessionForTarget(targetID string) (string, error) {
@@ -233,7 +235,10 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 			return "", "", err
 		}
 	}
-	sessionID := r.AttachToTarget(resolvedTargetID)
+	sessionID, err := r.AttachToTarget(resolvedTargetID)
+	if err != nil {
+		return "", "", err
+	}
 	if sessionID == "" {
 		r.recordTargetSessionlessAttachment(resolvedTargetID)
 		return resolvedTargetID, "", nil
@@ -428,7 +433,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 	if params == nil {
 		params = map[string]any{}
 	}
-	objectGroup := fmt.Sprintf("modcdp-topology-%d", time.Now().UnixMilli())
+	objectGroup := fmt.Sprintf("modcdp-topology-%d-%s", time.Now().UnixMilli(), randomHexSuffix(8))
 	targetResult, err := r.upstream.Send("Target.getTargets", map[string]any{}, "")
 	if err != nil {
 		return nil, err
@@ -1077,6 +1082,14 @@ func cloneStringMap(input map[string]string) map[string]string {
 		output[key] = value
 	}
 	return output
+}
+
+func randomHexSuffix(bytesLen int) string {
+	buf := make([]byte, bytesLen)
+	if _, err := rand.Read(buf); err == nil {
+		return hex.EncodeToString(buf)
+	}
+	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
 func intFromAny(value any) (int, bool) {

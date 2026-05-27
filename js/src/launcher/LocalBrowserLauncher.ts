@@ -10,12 +10,7 @@ import net from "node:net";
 import type { AddressInfo } from "node:net";
 import { homedir, platform, tmpdir } from "node:os";
 import path from "node:path";
-import {
-  BrowserLauncher,
-  resolveCdpWebSocketUrl,
-  type LauncherConfig,
-  type LaunchedBrowser,
-} from "./BrowserLauncher.js";
+import { BrowserLauncher, type LauncherConfig, type LaunchedBrowser } from "./BrowserLauncher.js";
 
 function wildcardToRegExp(value: string) {
   return new RegExp(`^${value.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
@@ -181,67 +176,6 @@ async function removeProfileDir(profile_dir: string) {
   } catch {}
 }
 
-async function waitForPipeReady(
-  pipe_read: NodeJS.ReadableStream,
-  pipe_write: NodeJS.WritableStream,
-  timeoutMs: number,
-) {
-  let buffer = "";
-  const readyId = 1;
-  await new Promise<void>((resolve, reject) => {
-    const cleanup = () => {
-      clearTimeout(timeout);
-      pipe_read.off("data", onData);
-      pipe_read.off("error", onError);
-      pipe_write.off("error", onError);
-    };
-    const onError = (error: Error) => {
-      cleanup();
-      reject(error);
-    };
-    const onData = (chunk: Buffer | string) => {
-      buffer += chunk.toString();
-      while (buffer.includes("\0")) {
-        const [raw, ...rest] = buffer.split("\0");
-        buffer = rest.join("\0");
-        if (!raw) continue;
-        const message = JSON.parse(raw);
-        if (message.id !== readyId) continue;
-        cleanup();
-        if (message.error) reject(new Error(message.error.message ?? "Browser.getVersion failed over pipe"));
-        else resolve();
-      }
-    };
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error(`Chrome remote-debugging pipe did not respond within ${timeoutMs}ms`));
-    }, timeoutMs);
-    pipe_read.on("data", onData);
-    pipe_read.on("error", onError);
-    pipe_write.on("error", onError);
-    pipe_write.write(`${JSON.stringify({ id: readyId, method: "Browser.getVersion" })}\0`);
-  });
-}
-
-async function waitForCdpWebSocketUrl(cdp_url: string, timeout_ms: number, poll_interval_ms: number) {
-  const deadline = Date.now() + timeout_ms;
-  let lastError: unknown = null;
-  while (Date.now() < deadline) {
-    try {
-      return await resolveCdpWebSocketUrl(cdp_url);
-    } catch (error) {
-      lastError = error;
-      await delay(poll_interval_ms);
-    }
-  }
-  if (lastError instanceof Error) {
-    throw new Error(
-      `Chrome at ${cdp_url} did not expose a WebSocket CDP URL within ${timeout_ms}ms: ${lastError.message}`,
-    );
-  }
-  throw new Error(`Chrome at ${cdp_url} did not expose a WebSocket CDP URL within ${timeout_ms}ms`);
-}
-
 async function readDevToolsActivePort(profile_dir: string) {
   const activePortPath = path.join(profile_dir, "DevToolsActivePort");
   let body: string;
@@ -256,37 +190,6 @@ async function readDevToolsActivePort(profile_dir: string) {
   const port = Number(rawPort);
   if (!Number.isInteger(port) || port <= 0) throw new Error(`Invalid DevToolsActivePort port: ${rawPort}`);
   return { cdp_listen_port: port, cdp_url: `http://127.0.0.1:${port}`, websocketPath };
-}
-
-async function waitForBrowserSelectedCdpWebSocketUrl(
-  profile_dir: string,
-  timeout_ms: number,
-  poll_interval_ms: number,
-  assertChromeRunning: () => void,
-) {
-  const deadline = Date.now() + timeout_ms;
-  let lastError: unknown = null;
-  while (Date.now() < deadline) {
-    assertChromeRunning();
-    const activePort = await readDevToolsActivePort(profile_dir);
-    if (activePort) {
-      try {
-        return {
-          cdp_listen_port: activePort.cdp_listen_port,
-          cdp_url: await resolveCdpWebSocketUrl(activePort.cdp_url),
-        };
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    await delay(poll_interval_ms);
-  }
-  if (lastError instanceof Error) {
-    throw new Error(
-      `Chrome did not expose DevToolsActivePort from ${profile_dir} within ${timeout_ms}ms: ${lastError.message}`,
-    );
-  }
-  throw new Error(`Chrome did not expose DevToolsActivePort from ${profile_dir} within ${timeout_ms}ms`);
 }
 
 class LocalBrowserLauncher extends BrowserLauncher {
@@ -318,10 +221,7 @@ class LocalBrowserLauncher extends BrowserLauncher {
   async launch(config: LauncherConfig = {}): Promise<LaunchedBrowser> {
     const launch_config = { ...this.config, ...config };
     const exe = LocalBrowserLauncher.findChromeBinary(launch_config.launcher_local_executable_path);
-    const usePipe = launch_config.launcher_local_cdp_transport === "pipe";
-    const useLoopbackCdp =
-      !usePipe || launch_config.launcher_local_loopback_cdp || launch_config.launcher_local_cdp_listen_port != null;
-    const usePort = useLoopbackCdp ? (launch_config.launcher_local_cdp_listen_port ?? 0) : null;
+    const usePort = launch_config.launcher_local_cdp_listen_port ?? 0;
     const profile_dir = launch_config.launcher_local_user_data_dir || (await mkdtemp(path.join(tmpdir(), "modcdp.")));
     const default_headless = process.platform === "linux" && !process.env.DISPLAY;
     const headless = launch_config.launcher_local_headless ?? default_headless;
@@ -332,21 +232,15 @@ class LocalBrowserLauncher extends BrowserLauncher {
       "--disable-gpu",
       sandbox === false ? "--no-sandbox" : null,
       `--user-data-dir=${profile_dir}`,
-      useLoopbackCdp ? "--remote-debugging-address=127.0.0.1" : null,
-      useLoopbackCdp ? `--remote-debugging-port=${usePort}` : null,
-      usePipe ? "--remote-debugging-pipe" : null,
+      "--remote-debugging-address=127.0.0.1",
+      `--remote-debugging-port=${usePort}`,
       ...launch_config.launcher_local_args,
       ...launch_config.launcher_local_extra_args,
       "about:blank",
     ].filter(Boolean);
 
-    const useStdio = (usePipe ? ["ignore", "ignore", "ignore", "pipe", "pipe"] : "ignore") as
-      | "ignore"
-      | "inherit"
-      | "pipe"
-      | import("node:child_process").StdioOptions;
     const proc = spawn(exe, flags, {
-      stdio: useStdio,
+      stdio: "ignore",
       detached: process.platform !== "win32",
     });
     let spawnError: Error | null = null;
@@ -367,46 +261,6 @@ class LocalBrowserLauncher extends BrowserLauncher {
         throw new Error(`Chrome exited before CDP became ready (exit=${proc.exitCode}, signal=${proc.signalCode}).`);
       }
     };
-
-    if (usePipe) {
-      const pipe_write = proc.stdio[3] as NodeJS.WritableStream | null;
-      const pipe_read = proc.stdio[4] as NodeJS.ReadableStream | null;
-      if (!pipe_write || !pipe_read) {
-        await close();
-        throw new Error("Chrome remote-debugging pipe stdio handles were not created.");
-      }
-      assertChromeRunning();
-      await waitForPipeReady(pipe_read, pipe_write, launch_config.launcher_local_chrome_ready_timeout_ms);
-      const loopback =
-        usePort == null
-          ? null
-          : usePort === 0
-            ? await waitForBrowserSelectedCdpWebSocketUrl(
-                profile_dir,
-                launch_config.launcher_local_chrome_ready_timeout_ms,
-                launch_config.launcher_local_chrome_ready_poll_interval_ms,
-                assertChromeRunning,
-              )
-            : {
-                cdp_listen_port: usePort,
-                cdp_url: await waitForCdpWebSocketUrl(
-                  `http://127.0.0.1:${usePort}`,
-                  launch_config.launcher_local_chrome_ready_timeout_ms,
-                  launch_config.launcher_local_chrome_ready_poll_interval_ms,
-                ),
-              };
-      this.launched = {
-        proc,
-        ...(loopback == null ? {} : { cdp_listen_port: loopback.cdp_listen_port }),
-        cdp_url: null,
-        ...(loopback == null ? {} : { loopback_cdp_url: loopback.cdp_url }),
-        pipe_read,
-        pipe_write,
-        profile_dir,
-        close,
-      };
-      return this.launched;
-    }
 
     const deadline = Date.now() + launch_config.launcher_local_chrome_ready_timeout_ms;
     while (Date.now() < deadline) {

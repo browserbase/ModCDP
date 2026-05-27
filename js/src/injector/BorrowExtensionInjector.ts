@@ -11,7 +11,7 @@ import {
   type ExtensionInjectionResult,
   type TargetInfo,
 } from "./ExtensionInjector.js";
-import type { z } from "zod";
+import { z } from "zod";
 
 const EXT_ID_FROM_URL = /^chrome-extension:\/\/([a-z]+)\//;
 const MODCDP_READY_EXPRESSION = "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
@@ -24,13 +24,26 @@ const BORROW_BOOTSTRAP_STATUS_EXPRESSION = `
   }))()
 `;
 
+const BorrowInjectorConfigSchema = InjectorConfigSchema.extend({
+  injector_mode: z.literal("borrow").default("borrow"),
+  injector_borrow_extension_path: z.string().optional(),
+}).strict();
+type BorrowInjectorConfig = z.infer<typeof BorrowInjectorConfigSchema>;
+
 class BorrowExtensionInjector extends ExtensionInjector {
+  declare config: BorrowInjectorConfig;
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
   private bootstrap_modcdp_server_expression: string | null = null;
 
-  constructor(config: z.input<typeof InjectorConfigSchema> = {}) {
-    super({ ...config, injector_mode: "borrow" });
+  constructor(config: z.input<typeof BorrowInjectorConfigSchema> = {}) {
+    super();
+    this.config = BorrowInjectorConfigSchema.parse({ ...config, injector_mode: "borrow" });
+  }
+
+  override update(config: Record<string, unknown> = {}) {
+    this.config = BorrowInjectorConfigSchema.parse({ ...this.config, ...config, injector_mode: "borrow" });
+    return this;
   }
 
   async prepare() {
@@ -206,4 +219,5 @@ class BorrowExtensionInjector extends ExtensionInjector {
   }
 }
 
-export { BorrowExtensionInjector };
+export { BorrowExtensionInjector, BorrowInjectorConfigSchema };
+export type { BorrowInjectorConfig };

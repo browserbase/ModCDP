@@ -5,6 +5,7 @@
 package transport
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -126,7 +127,25 @@ func (e *UpstreamTransport) Close() error {
 	return nil
 }
 
-func (e *UpstreamTransport) Send(command string, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error) {
+func (e *UpstreamTransport) Send(command any, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error) {
+	method, ok := command.(string)
+	if !ok {
+		message, ok := command.(types.CdpCommandMessage)
+		if !ok {
+			return nil, fmt.Errorf("command must be a CDP method name or CdpCommandMessage")
+		}
+		payload := map[string]any{
+			"id":     message.ID,
+			"method": message.Method,
+		}
+		if message.Params != nil {
+			payload["params"] = message.Params
+		}
+		if message.SessionID != "" {
+			payload["sessionId"] = message.SessionID
+		}
+		return map[string]any{}, e.writeCommand(payload)
+	}
 	e.pendingMu.Lock()
 	e.nextID++
 	id := e.nextID
@@ -134,7 +153,7 @@ func (e *UpstreamTransport) Send(command string, params map[string]any, sessionI
 	e.pending[id] = done
 	e.pendingMu.Unlock()
 
-	message := map[string]any{"id": id, "method": command, "params": params}
+	message := map[string]any{"id": id, "method": method, "params": params}
 	if sessionID != "" {
 		message["sessionId"] = sessionID
 	}
@@ -151,7 +170,7 @@ func (e *UpstreamTransport) Send(command string, params map[string]any, sessionI
 	if effectiveTimeout <= 0 {
 		response := <-done
 		if errObj, ok := response["error"].(map[string]any); ok {
-			return nil, fmt.Errorf("%s failed: %v", command, errObj["message"])
+			return nil, fmt.Errorf("%s failed: %v", method, errObj["message"])
 		}
 		if result, ok := response["result"].(map[string]any); ok {
 			return result, nil
@@ -163,10 +182,10 @@ func (e *UpstreamTransport) Send(command string, params map[string]any, sessionI
 		e.pendingMu.Lock()
 		delete(e.pending, id)
 		e.pendingMu.Unlock()
-		return nil, fmt.Errorf("%s timed out after %s", command, effectiveTimeout)
+		return nil, fmt.Errorf("%s timed out after %s", method, effectiveTimeout)
 	case response := <-done:
 		if errObj, ok := response["error"].(map[string]any); ok {
-			return nil, fmt.Errorf("%s failed: %v", command, errObj["message"])
+			return nil, fmt.Errorf("%s failed: %v", method, errObj["message"])
 		}
 		if result, ok := response["result"].(map[string]any); ok {
 			return result, nil
@@ -330,6 +349,50 @@ func (e *UpstreamTransport) emitRecv(message map[string]any) {
 
 func (e *UpstreamTransport) EmitRecv(message map[string]any) {
 	e.emitRecv(message)
+}
+
+func (e *UpstreamTransport) parseAndEmitRecv(data []byte) error {
+	var message map[string]any
+	if err := json.Unmarshal(data, &message); err != nil {
+		return fmt.Errorf("invalid CDP message: %w", err)
+	}
+	if _, ok := commandID(message["id"]); ok {
+		if errObj, hasError := message["error"]; hasError && errObj != nil {
+			errorMap, ok := errObj.(map[string]any)
+			if !ok {
+				return fmt.Errorf("invalid CDP response error")
+			}
+			if message, ok := errorMap["message"].(string); !ok || message == "" {
+				return fmt.Errorf("invalid CDP response error message")
+			}
+		}
+		if sessionID, ok := message["sessionId"]; ok && sessionID != nil {
+			if _, ok := sessionID.(string); !ok {
+				return fmt.Errorf("invalid CDP response sessionId")
+			}
+		}
+		e.emitRecv(message)
+		return nil
+	}
+	if _, hasID := message["id"]; hasID {
+		return fmt.Errorf("invalid CDP response id")
+	}
+	method, _ := message["method"].(string)
+	if method == "" {
+		return fmt.Errorf("invalid CDP event method")
+	}
+	if params, ok := message["params"]; ok && params != nil {
+		if _, ok := params.(map[string]any); !ok {
+			return fmt.Errorf("invalid CDP event params")
+		}
+	}
+	if sessionID, ok := message["sessionId"]; ok && sessionID != nil {
+		if _, ok := sessionID.(string); !ok {
+			return fmt.Errorf("invalid CDP event sessionId")
+		}
+	}
+	e.emitRecv(message)
+	return nil
 }
 
 func (e *UpstreamTransport) emitUpstreamEvent(method string, payload map[string]any, targetID string, sessionID string) {

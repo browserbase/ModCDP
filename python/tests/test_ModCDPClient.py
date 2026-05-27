@@ -101,6 +101,8 @@ class ModCDPClientTests(unittest.TestCase):
                 "router": {"router_routes": {"*.*": "loopback_cdp"}},
                 "client_config": {"client_cdp_send_timeout_ms": 9876},
                 "upstream": {"upstream_ws_connect_error_settle_timeout_ms": 7654},
+                "downstream": {"downstream_client_timeout_ms": 4567},
+                "server_browser_token": "token-1",
             },
         )
 
@@ -133,19 +135,15 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertNotIn("service_worker_probe_timeout_ms", cdp.__dict__)
 
         params = cdp._server_configure_params()
-        router_config = params.get("router")
-        client_config = params.get("client_config")
-        upstream_config = params.get("upstream")
-        self.assertIsInstance(router_config, dict)
-        self.assertIsInstance(client_config, dict)
-        self.assertIsInstance(upstream_config, dict)
-        assert isinstance(router_config, dict)
-        assert isinstance(client_config, dict)
-        assert isinstance(upstream_config, dict)
-        self.assertEqual(router_config.get("router_routes", {}).get("*.*"), "loopback_cdp")
+        router_config = object_map(params.get("router"))
+        client_config = object_map(params.get("client_config"))
+        upstream_config = object_map(params.get("upstream"))
+        self.assertEqual(object_map(router_config.get("router_routes")).get("*.*"), "loopback_cdp")
+        self.assertEqual(params.get("server_browser_token"), "token-1")
         self.assertEqual(client_config.get("client_cdp_send_timeout_ms"), 9876)
         self.assertEqual(router_config.get("loopback_execution_context_timeout_ms"), 4321)
         self.assertEqual(upstream_config.get("upstream_ws_connect_error_settle_timeout_ms"), 7654)
+        self.assertEqual(object_map(params.get("downstream")).get("downstream_client_timeout_ms"), 4567)
 
     def test_modcdpclient_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "discover", "injector_service_worker_url_suffixes": []})
@@ -267,7 +265,7 @@ class ModCDPClientTests(unittest.TestCase):
                 cdp.Mod.ping(sent_at="bad")
             self.assertEqual(
                 cdp.Mod.addMiddleware(
-                    name="Mod.ping",
+                    name=cdp.Mod.ping,
                     phase="response",
                     expression="async (payload, next) => next(payload)",
                 ),
@@ -349,17 +347,17 @@ class ModCDPClientTests(unittest.TestCase):
                 "launcher_local_extra_args": [f"--load-extension={EXTENSION_PATH}"],
             }
         ).launch()
-        cdp_url = chrome["cdp_url"]
+        cdp_url = chrome.cdp_url
         if not isinstance(cdp_url, str):
             self.fail(f"cdp_url = {cdp_url!r}")
         transport = WSUpstreamTransport({"upstream_ws_cdp_url": cdp_url})
         transport.connect()
         cdp = ModCDPClient(
-            launcher={"launcher_mode": "remote", "launcher_remote_cdp_url": chrome["cdp_url"]},
-            upstream={"upstream_mode": "ws", "upstream_ws_cdp_url": chrome["cdp_url"]},
+            launcher={"launcher_mode": "remote", "launcher_remote_cdp_url": chrome.cdp_url},
+            upstream={"upstream_mode": "ws", "upstream_ws_cdp_url": chrome.cdp_url},
             injector={
-                "injector_mode": "cli",
-                "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_mode": "discover",
+                "injector_discover_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
                 "injector_service_worker_ready_timeout_ms": 30_000,
@@ -373,11 +371,14 @@ class ModCDPClientTests(unittest.TestCase):
             cdp.close()
             time.sleep(0.5)
             response = transport.send("Browser.getVersion")
-            self.assertRegex(response["product"], r"Chrome|Chromium")
+            product = response.get("product")
+            if not isinstance(product, str):
+                self.fail(f"Browser.getVersion product = {product!r}")
+            self.assertRegex(product, r"Chrome|Chromium")
         finally:
             transport.close()
             cdp.close()
-            chrome["close"]()
+            chrome.close()
 
     def test_modcdpclient_close_keeps_injector_files_until_after_launched_browser_shutdown(self) -> None:
         cdp = ModCDPClient(
@@ -408,7 +409,7 @@ class ModCDPClientTests(unittest.TestCase):
             launched = cdp.launcher.launched
             if launched is None:
                 self.fail("expected launched browser")
-            original_close = launched["close"]
+            original_close = launched.close
             browser_close_saw_extension = False
 
             def close_browser() -> None:
@@ -416,7 +417,7 @@ class ModCDPClientTests(unittest.TestCase):
                 browser_close_saw_extension = Path(unpacked_extension_path).exists()
                 original_close()
 
-            launched["close"] = close_browser
+            launched.close = close_browser
 
             cdp.close()
 
@@ -548,6 +549,12 @@ class ModCDPClientTests(unittest.TestCase):
         attach_only = ModCDPClient(upstream={"upstream_mode": "ws"})
         self.assertEqual(attach_only.launcher.config.launcher_mode, "none")
         self.assertIsNone(attach_only.injector)
+
+
+def object_map(value: object) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise AssertionError(f"expected object mapping, got {value!r}")
+    return {str(key): raw_value for key, raw_value in value.items()}
 
 
 if __name__ == "__main__":

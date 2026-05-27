@@ -6,6 +6,7 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
+from collections.abc import Mapping
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,20 +30,20 @@ class LocalBrowserLauncherTests(unittest.TestCase):
                     "launcher_local_chrome_ready_poll_interval_ms": 50,
                 }
             ).launch({"launcher_local_cdp_listen_port": port, "launcher_local_user_data_dir": user_data_dir})
-            cdp_url = chrome["cdp_url"]
+            cdp_url = chrome.cdp_url
             if cdp_url is None:
                 raise AssertionError("expected launcher to return cdp_url")
             transport = WSUpstreamTransport({"upstream_ws_cdp_url": cdp_url})
             transport.connect()
 
             try:
-                self.assertEqual(chrome.get("cdp_listen_port"), port)
+                self.assertEqual(chrome.cdp_listen_port, port)
                 self.assertRegex(cdp_url, rf"^ws://127\.0\.0\.1:{port}/")
-                self.assertEqual(chrome.get("profile_dir"), user_data_dir)
+                self.assertEqual(chrome.profile_dir, user_data_dir)
                 expect_cdp_browser_surface(transport)
             finally:
                 transport.close()
-                chrome["close"]()
+                chrome.close()
 
             self.assertTrue(Path(user_data_dir).exists())
 
@@ -56,9 +57,9 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         ).launch({"launcher_local_user_data_dir": user_data_dir, "launcher_local_cleanup_user_data_dir": True})
 
         try:
-            self.assertEqual(chrome.get("profile_dir"), user_data_dir)
+            self.assertEqual(chrome.profile_dir, user_data_dir)
         finally:
-            chrome["close"]()
+            chrome.close()
         self.assertFalse(Path(user_data_dir).exists())
 
 
@@ -82,8 +83,8 @@ def expect_cdp_browser_surface(transport: WSUpstreamTransport) -> None:
             {"expression": "(() => ({ ok: true, value: 42 }))()", "returnByValue": True},
             session_id,
         )
-        result = evaluated.get("result")
-        if not isinstance(result, dict) or result.get("type") != "object" or result.get("value") != {"ok": True, "value": 42}:
+        result = object_dict(evaluated.get("result"))
+        if result.get("type") != "object" or result.get("value") != {"ok": True, "value": 42}:
             raise AssertionError(f"Runtime.evaluate result = {evaluated!r}")
     finally:
         try:
@@ -92,12 +93,18 @@ def expect_cdp_browser_surface(transport: WSUpstreamTransport) -> None:
             pass
 
 
-def expect_version_result(version: dict) -> None:
+def expect_version_result(version: Mapping[str, object]) -> None:
     product = version.get("product")
     if not isinstance(product, str) or ("Chrome" not in product and "Chromium" not in product):
         raise AssertionError(f"Browser.getVersion product = {product!r}")
     if not isinstance(version.get("protocolVersion"), str):
         raise AssertionError(f"Browser.getVersion protocolVersion = {version.get('protocolVersion')!r}")
+
+
+def object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        raise AssertionError(f"expected object mapping, got {value!r}")
+    return {str(key): raw_value for key, raw_value in value.items()}
 
 
 if __name__ == "__main__":

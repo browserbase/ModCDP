@@ -2,15 +2,28 @@
 // Reason: not needed by Stagehand (exotic transport).
 import net from "node:net";
 import tls from "node:tls";
-import type { z } from "zod";
+import { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import {
-  DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX,
-  DEFAULT_UPSTREAM_NATS_URL,
-  DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS,
-} from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
+import { DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute } from "./UpstreamTransport.js";
+
+const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
+const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
+const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
+
+const NATSUpstreamTransportConfigSchema = z.object({
+  upstream_mode: z.literal("nats").default("nats"),
+  upstream_nats_url: z.string().default(DEFAULT_UPSTREAM_NATS_URL),
+  upstream_nats_subject_prefix: z
+    .string()
+    .refine((value) => value.trim().length > 0 && !/[\s*>]/.test(value), "Invalid NATS subject prefix")
+    .default(DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX),
+  upstream_nats_role: z.enum(["client", "browser"]).default("client"),
+  upstream_nats_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS),
+  upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+});
+type NATSUpstreamTransportConfig = z.infer<typeof NATSUpstreamTransportConfigSchema>;
 
 type NatsTcpSocket = {
   write(data: string): void;
@@ -23,6 +36,7 @@ type NatsTcpSocket = {
 type NatsSocket = WebSocket | NatsTcpSocket;
 
 class NATSUpstreamTransport extends UpstreamTransport {
+  declare config: NATSUpstreamTransportConfig;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
   private ws_buffer = "";
@@ -35,8 +49,9 @@ class NATSUpstreamTransport extends UpstreamTransport {
     timeout: ReturnType<typeof setTimeout>;
   }>();
 
-  constructor(config: UpstreamTransportConfig = {}) {
-    super({ ...config, upstream_mode: "nats" });
+  constructor(config: z.input<typeof NATSUpstreamTransportConfigSchema> = {}) {
+    super();
+    this.config = NATSUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "nats" });
     this.client_reply_subject = `${this.config.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
   }
 
@@ -86,9 +101,9 @@ class NATSUpstreamTransport extends UpstreamTransport {
     return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportConfig = {}) {
+  override update(config: Record<string, unknown> = {}) {
     const previous_subject_prefix = this.config.upstream_nats_subject_prefix;
-    super.update(config);
+    this.config = NATSUpstreamTransportConfigSchema.parse({ ...this.config, ...config, upstream_mode: "nats" });
     if (this.config.upstream_nats_subject_prefix !== previous_subject_prefix) {
       this.client_reply_subject = `${this.config.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
     }
@@ -325,4 +340,6 @@ export {
   DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX,
   DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS,
   NATSUpstreamTransport,
+  NATSUpstreamTransportConfigSchema,
 };
+export type { NATSUpstreamTransportConfig };

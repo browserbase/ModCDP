@@ -19,15 +19,14 @@ import type {
 import { CdpEventMessageSchema, CdpResponseMessageSchema, ModCDPUpstreamConfigSchema } from "../types/modcdp.js";
 import { modCDPToJSON } from "../types/toJSON.js";
 
-type UpstreamMode =
-  | "ws" // connect via CDP WebSocket over TCP (default, used by normal CDP, loopback CDP)
-  | "pipe" // connect via CDP over stdio pipe (used by local chrome with --remote-debugging-pipe CLI arg)
-  | "nativemessaging" // connect via Native Messaging Host IPC (chrome -> sdk via hardcoded IPC paths)
-  | "reversews" // connect via revers WebSocket (chrome -> sdk via hardcoded listening port)
-  | "nats" // connect via NATS messaging (chrome -> NATS -> sdk via hardcoded NATS localhost:port relay)
-  | "chromedebugger"; // connect via CDP over Extension API chrome.debugger to pages (Browser.* methods not supported, only page-scoped methods allowed, not recommended for production)
-type UpstreamNatsRole = "client" | "browser";
+type UpstreamMode = "ws";
 type UpstreamTransportConfig = z.input<typeof ModCDPUpstreamConfigSchema>;
+type UpstreamTransportBaseConfig = {
+  upstream_mode: string;
+  upstream_cdp_send_timeout_ms: number;
+  upstream_ws_cdp_url?: string;
+  upstream_ws_connect_error_settle_timeout_ms?: number;
+} & Record<string, unknown>;
 
 type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
@@ -42,7 +41,7 @@ type UpstreamEventListener = (
 ) => void;
 
 class UpstreamTransport {
-  config: ModCDPUpstreamConfig;
+  config: UpstreamTransportBaseConfig;
   private next_id = 1;
   private pending = new Map<
     number,
@@ -65,7 +64,7 @@ class UpstreamTransport {
     throw new Error(`${this.constructor.name}.connect is not implemented.`);
   }
 
-  update(config: UpstreamTransportConfig = {}) {
+  update(config: UpstreamTransportConfig | Record<string, unknown> = {}) {
     this.config = ModCDPUpstreamConfigSchema.parse({ ...this.config, ...config });
     return this;
   }
@@ -248,9 +247,8 @@ class UpstreamTransport {
   async waitForPeer(_config: UpstreamPeerWaitConfig = {}) {}
 
   toJSON() {
-    const { upstream_pipe_read, upstream_pipe_write, ...config } = this.config;
     return modCDPToJSON(this, {
-      config,
+      config: this.config,
       state: {
         pending: this.pending.size,
         recv_listeners: this.recv_listeners.size,
@@ -272,7 +270,7 @@ function parseHostPort(value: string, defaultHost: string, defaultPort: number) 
 export { UpstreamTransport, parseHostPort };
 export type {
   UpstreamMode,
-  UpstreamNatsRole,
+  UpstreamTransportBaseConfig,
   UpstreamTransportConfig,
   TargetRoute,
   UpstreamPeerWaitConfig,

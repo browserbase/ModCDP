@@ -146,7 +146,7 @@ class _ModDomain:
         *,
         phase: str | None = None,
         expression: str | None = None,
-        name: str | None = None,
+        name: object | None = None,
     ) -> AwaitableDict | AwaitableValue:
         payload: dict[str, Any] = dict(params or {})
         if phase is not None:
@@ -433,15 +433,7 @@ class ModCDPClient(CDPSurfaceMixin):
         event_name = cdp_event_name(event) if not isinstance(event, str) else event
         if event_name is None:
             raise TypeError("event must be a CDP event class or event name string")
-        wrapped_handler = handler
-        if not isinstance(event, str):
-            event_class = event
-
-            def typed_handler(payload: object, session_id: str | None = None) -> object:
-                typed_payload = event_class.model_validate(payload) if isinstance(payload, Mapping) else payload
-                return _call_handler(handler, typed_payload, session_id)
-
-            wrapped_handler = typed_handler
+        wrapped_handler: Handler = handler if isinstance(event, str) else _typed_event_handler(event, handler)
         self._handler_wrappers[(event_name, handler)] = wrapped_handler
         handlers = self._handlers.setdefault(event_name, [])
         if wrapped_handler not in handlers:
@@ -526,15 +518,29 @@ class ModCDPClient(CDPSurfaceMixin):
 
     def _server_configure_params(self) -> dict[str, object]:
         server_model = self.server_config or ModCDPServerConfig()
-        server_config = server_model.model_dump(exclude_none=True, exclude_unset=True)
-        has_upstream_config = "upstream" in server_model.model_fields_set
-        upstream = dict(server_config.pop("upstream", {}))
-        router = dict(server_config.pop("router", {}))
-        server_client_config = dict(server_config.pop("client_config", {}))
+        configured_server_config = server_model.model_dump(exclude_none=True, exclude_unset=True)
+        launcher_server_config = self.launcher.configForServer(self.upstream)
+        has_upstream_config = "upstream" in launcher_server_config or "upstream" in configured_server_config
+        upstream = {
+            **_mapping_dict(launcher_server_config.get("upstream")),
+            **_mapping_dict(configured_server_config.get("upstream")),
+        }
+        router = {
+            **_mapping_dict(launcher_server_config.get("router")),
+            **_mapping_dict(configured_server_config.get("router")),
+        }
+        server_client_config = {
+            **_mapping_dict(launcher_server_config.get("client_config")),
+            **_mapping_dict(configured_server_config.get("client_config")),
+        }
+        downstream = {
+            **_mapping_dict(launcher_server_config.get("downstream")),
+            **_mapping_dict(configured_server_config.get("downstream")),
+        }
         custom_events = self.types.customEventWireRegistrations()
         custom_commands = self.types.customCommandWireRegistrations(expression_required=True)
         custom_middlewares = self.types.customMiddlewareWireRegistrations()
-        return {
+        params: dict[str, object] = {
             **(
                 {
                     "upstream": {
@@ -555,11 +561,18 @@ class ModCDPClient(CDPSurfaceMixin):
                 "client_cdp_send_timeout_ms": self.config.client_cdp_send_timeout_ms,
                 **server_client_config,
             },
-            **server_config,
+            "downstream": {
+                "downstream_client_timeout_ms": max(self.config.client_heartbeat_interval_ms * 4, 1_000),
+                **downstream,
+            },
             "custom_events": custom_events,
             "custom_commands": custom_commands,
             "custom_middlewares": custom_middlewares,
         }
+        server_browser_token = configured_server_config.get("server_browser_token")
+        if server_browser_token is not None:
+            params["server_browser_token"] = server_browser_token
+        return params
 
     def close(self) -> None:
         if self._closed:
@@ -611,7 +624,6 @@ class ModCDPClient(CDPSurfaceMixin):
     def _connect_upstream_transport(self) -> None:
         launcher = self.launcher
         transport = self.upstream
-        initial_upstream_ws_cdp_url = self.upstream.config.upstream_ws_cdp_url
 
         if self.injector is not None:
             self.injector.update({"injector_cdp_send_timeout_ms": self.config.client_cdp_send_timeout_ms})
@@ -619,9 +631,14 @@ class ModCDPClient(CDPSurfaceMixin):
             launcher.update(self.injector.configForLauncher())
             transport.update(self.injector.configForUpstream())
         launcher.update(transport.configForLauncher())
+        server_upstream_ws_cdp_url = (
+            self.server_config.upstream.upstream_ws_cdp_url
+            if self.server_config is not None and self.server_config.upstream is not None
+            else None
+        )
         needs_loopback_cdp = (
             self.server_config is not None
-            and self.server_config.upstream is None
+            and not server_upstream_ws_cdp_url
             and (self.server_config.router.router_routes if self.server_config.router is not None else {}).get("*.*") == "loopback_cdp"
         )
         launcher.update({"launcher_local_loopback_cdp": needs_loopback_cdp})
@@ -639,18 +656,6 @@ class ModCDPClient(CDPSurfaceMixin):
         if transport.upstream_mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream.config = UpstreamTransportConfig.model_validate({**self.upstream.config.model_dump(), "upstream_ws_cdp_url": transport.url})
-        server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream.config.upstream_mode == "ws" and transport.url else {}
-        server_config.update(launcher.configForServer(transport))
-        raw_server_upstream = server_config.get("upstream") or {}
-        server_upstream = raw_server_upstream if isinstance(raw_server_upstream, Mapping) else {}
-        server_upstream_ws_cdp_url = server_upstream.get("upstream_ws_cdp_url")
-        if self.server_config is not None and server_upstream_ws_cdp_url:
-            configured_loopback = self.server_config.upstream.upstream_ws_cdp_url if self.server_config.upstream is not None else None
-            if "upstream" not in self.server_config.model_fields_set or configured_loopback in (
-                initial_upstream_ws_cdp_url,
-                launched_cdp_url,
-            ):
-                self.server_config = ModCDPServerConfig.model_validate({**self.server_config.model_dump(exclude_none=True), **server_config})
 
     def _inject_extension(self) -> ExtensionInfo:
         if self.injector is None:
@@ -705,7 +710,7 @@ class ModCDPClient(CDPSurfaceMixin):
             return
         method = msg.get("method")
         raw_params = msg.get("params")
-        params = raw_params if isinstance(raw_params, Mapping) else {}
+        params = _protocol_params(raw_params)
         extension_session_id = self.injector.session_id if self.injector is not None else None
         if isinstance(method, str) and extension_session_id is not None and msg.get("sessionId") == extension_session_id:
             session_id = msg.get("sessionId")
@@ -746,3 +751,23 @@ def _call_handler(handler: Handler, *args: object) -> object:
         if parameter.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
     ]
     return handler(*args[: len(positional_parameters)])
+
+
+def _typed_event_handler(event_class: type[CDPEvent], handler: Handler) -> Handler:
+    def typed_handler(payload: object, session_id: str | None = None) -> object:
+        typed_payload = event_class.model_validate(payload) if isinstance(payload, Mapping) else payload
+        return _call_handler(handler, typed_payload, session_id)
+
+    return typed_handler
+
+
+def _protocol_params(value: object) -> ProtocolParams:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): raw_value for key, raw_value in value.items()}
+
+
+def _mapping_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): raw_value for key, raw_value in value.items()}

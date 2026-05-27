@@ -11,13 +11,15 @@ then validated with ``TypeAdapter`` at the client boundary.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
 
 JsonSchema: TypeAlias = Mapping[str, Any]
 FieldDefinition: TypeAlias = Any | tuple[Any, Any]
+CreateModel: TypeAlias = Callable[..., type[BaseModel]]
+_create_model: CreateModel = create_model
 
 _TYPE_MAPPING: dict[str, Any] = {
     "string": str,
@@ -77,7 +79,8 @@ def _combine_union(types: list[Any]) -> Any:
 
 
 def _literal_type(values: Sequence[Any]) -> Any:
-    return Literal.__getitem__(tuple(values))
+    literal_getitem = getattr(Literal, "__getitem__")
+    return literal_getitem(tuple(values))
 
 
 def _create_dynamic_model(
@@ -85,11 +88,12 @@ def _create_dynamic_model(
     model_schema: Mapping[str, Any],
     fields: Mapping[str, FieldDefinition] | None = None,
 ) -> type[BaseModel]:
-    return create_model(
+    field_definitions: dict[str, Any | tuple[Any, Any]] = dict(fields or {})
+    return _create_model(
         model_name,
         __config__=ConfigDict(extra="forbid" if model_schema.get("additionalProperties") is False else "allow"),
         __doc__=str(model_schema.get("description", "")),
-        **dict(fields or {}),
+        **field_definitions,
     )
 
 

@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
+	"github.com/browserbase/modcdp/go/modcdp/types"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 )
@@ -79,6 +81,20 @@ func (t *WSUpstreamTransport) Connect() error {
 	return nil
 }
 
+func (t *WSUpstreamTransport) Send(command any, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error) {
+	if _, is_command_message := command.(types.CdpCommandMessage); !is_command_message {
+		t.writeMu.Lock()
+		connected := t.Conn != nil
+		t.writeMu.Unlock()
+		if !connected {
+			if err := t.Connect(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return t.UpstreamTransport.Send(command, params, sessionID, timeout...)
+}
+
 func (t *WSUpstreamTransport) Close() error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
@@ -109,15 +125,27 @@ func (t *WSUpstreamTransport) readLoop(conn net.Conn) {
 		if err != nil {
 			t.writeMu.Lock()
 			currentConn := t.Conn
+			if currentConn == conn {
+				t.Conn = nil
+			}
 			t.writeMu.Unlock()
 			if currentConn == conn {
 				t.emitClose(err)
 			}
 			return
 		}
-		var message map[string]any
-		if err := json.Unmarshal(data, &message); err == nil {
-			t.emitRecv(message)
+		if err := t.parseAndEmitRecv(data); err != nil {
+			t.writeMu.Lock()
+			currentConn := t.Conn
+			if currentConn == conn {
+				t.Conn = nil
+			}
+			t.writeMu.Unlock()
+			if currentConn == conn {
+				_ = conn.Close()
+				t.emitClose(err)
+			}
+			return
 		}
 	}
 }

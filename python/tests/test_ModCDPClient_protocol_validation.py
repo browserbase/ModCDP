@@ -84,7 +84,7 @@ class ModCDPClientProtocolValidationTests(unittest.TestCase):
         ping_result = {"ok": True}
         pong_event = {"sent_at": 123, "received_at": 124, "from": "extension-service-worker"}
         middleware_params = {
-            "name": "Target.getTargets",
+            "name": client.Target.getTargets,
             "phase": "response",
             "expression": "async (payload, next) => next(payload)",
         }
@@ -93,7 +93,14 @@ class ModCDPClientProtocolValidationTests(unittest.TestCase):
         self.assertEqual(types.parseCommandParams("Mod.ping", ping_params), ping_params)
         self.assertEqual(types.parseCommandResult("Mod.ping", ping_result), ping_result)
         self.assertEqual(types.parseEventPayload("Mod.pong", pong_event), pong_event)
-        self.assertEqual(types.parseCommandParams("Mod.addMiddleware", middleware_params), middleware_params)
+        self.assertEqual(
+            types.parseCommandParams("Mod.addMiddleware", middleware_params),
+            {
+                "name": "Target.getTargets",
+                "phase": "response",
+                "expression": "async (payload, next) => next(payload)",
+            },
+        )
         self.assertEqual(types.parseCommandResult("Mod.addMiddleware", middleware_result), middleware_result)
         with self.assertRaises(ValueError):
             types.parseCommandParams("Mod.ping", {"sent_at": "123"})

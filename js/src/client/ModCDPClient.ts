@@ -7,7 +7,7 @@
 // Constructor config groups mirror the owning runtime components:
 //   launcher          browser/session creation and cleanup
 //   upstream          message transport to either raw CDP or a ModCDP server
-//   injector          raw-CDP extension discovery/injection/borrowing
+//   injector          raw-CDP extension discovery/injection
 //   client            client-side routing, alias hydration, event mirroring, send/event timeouts
 //   server_config    ModCDPServer.configure params
 //
@@ -35,7 +35,6 @@ import {
   type CDPEventPayload,
   type CDPTypesConfig,
 } from "../types/CDPTypes.js";
-import { ChromeDebuggerUpstreamTransport } from "../transport/ChromeDebuggerUpstreamTransport.js";
 import { WSUpstreamTransport } from "../transport/WSUpstreamTransport.js";
 import { AutoSessionRouter, DEFAULT_CLIENT_ROUTER_ROUTES } from "../router/AutoSessionRouter.js";
 import { BrowserLauncher, type LauncherConfig } from "../launcher/BrowserLauncher.js";
@@ -78,22 +77,15 @@ type ModCDPClientConfig<TCommands extends CDPCommandMap = {}, TEvents extends CD
   server_config?: z.input<typeof ModCDPServerConfigSchema> | null;
   types?: CDPTypesConfig<TCommands, TEvents> | CDPTypes<TCommands, TEvents>;
 };
-const upstream_transport_constructors = new Map<
-  NonNullable<UpstreamTransportConfig["upstream_mode"]>,
-  typeof UpstreamTransport
->([
-  ["ws", WSUpstreamTransport],
-  ["chromedebugger", ChromeDebuggerUpstreamTransport],
-]);
+type UpstreamTransportConstructor = new (config?: Record<string, unknown>) => UpstreamTransport;
+type ExtensionInjectorConstructor = new (config?: Record<string, unknown>) => ExtensionInjector;
+const upstream_transport_constructors = new Map<string, UpstreamTransportConstructor>([["ws", WSUpstreamTransport]]);
 
 const browser_launcher_constructors = new Map<NonNullable<LauncherConfig["launcher_mode"]>, typeof BrowserLauncher>([
   ["none", NoneBrowserLauncher],
 ]);
 
-const extension_injector_constructors = new Map<
-  NonNullable<InjectorConfig["injector_mode"]>,
-  typeof ExtensionInjector
->();
+const extension_injector_constructors = new Map<string, ExtensionInjectorConstructor>();
 
 class ModCDPEventEmitter {
   private listeners = new Map<string | symbol, Set<(...args: unknown[]) => void>>();
@@ -164,9 +156,24 @@ export class ModCDPClient<
     types = {},
   }: ModCDPClientConfig<TCommands, TEvents> = {}) {
     super();
-    const upstream_config = ModCDPUpstreamConfigSchema.parse(upstream);
+    const raw_upstream = upstream as Record<string, unknown>;
+    const upstream_mode_input = typeof raw_upstream.upstream_mode === "string" ? raw_upstream.upstream_mode : "ws";
+    if (upstream_mode_input !== "ws" && !upstream_transport_constructors.has(upstream_mode_input)) {
+      throw new Error(`unknown upstream_mode=${upstream_mode_input}`);
+    }
+    const upstream_config =
+      upstream_mode_input === "ws" || !upstream_transport_constructors.has(upstream_mode_input)
+        ? ModCDPUpstreamConfigSchema.parse(upstream)
+        : raw_upstream;
     const launcher_config = ModCDPLauncherConfigSchema.parse(launcher);
-    const injector_config = InjectorConfigSchema.parse(injector);
+    const raw_injector = injector as Record<string, unknown>;
+    const injector_mode_input = typeof raw_injector.injector_mode === "string" ? raw_injector.injector_mode : "none";
+    const injector_config =
+      injector_mode_input === "none" ||
+      ["cli", "cdp", "bb", "discover"].includes(injector_mode_input) ||
+      !extension_injector_constructors.has(injector_mode_input)
+        ? InjectorConfigSchema.parse(injector)
+        : raw_injector;
     const router_config = ModCDPRouterConfigSchema.parse({
       ...router,
       router_routes: {
@@ -176,9 +183,9 @@ export class ModCDPClient<
     });
     const parsed_client_config = ModCDPClientConfigSchema.parse(client_config);
     const parsed_server_config = server_config === null ? null : ModCDPServerConfigSchema.parse(server_config ?? {});
-    const upstream_mode = upstream_config.upstream_mode;
+    const upstream_mode = upstream_config.upstream_mode as string;
     const launcher_mode = launcher_config.launcher_mode;
-    const injector_mode = injector_config.injector_mode;
+    const injector_mode = injector_config.injector_mode as string;
     const Upstream = upstream_transport_constructors.get(upstream_mode);
     if (!Upstream) throw new Error(`unknown upstream_mode=${upstream_mode}`);
     this.upstream = new Upstream(upstream_config);
@@ -197,23 +204,7 @@ export class ModCDPClient<
     this.upstream.update({
       upstream_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
     });
-    this.server_config =
-      parsed_server_config === null
-        ? null
-        : ModCDPServerConfigSchema.parse({
-            ...parsed_server_config,
-            router: {
-              ...(parsed_server_config.router ?? {}),
-              router_routes: {
-                ...(this.upstream.config.upstream_mode === "nativemessaging" ||
-                this.upstream.config.upstream_mode === "reversews" ||
-                this.upstream.config.upstream_mode === "nats"
-                  ? { "*.*": "chromedebugger" }
-                  : {}),
-                ...(parsed_server_config.router?.router_routes ?? {}),
-              },
-            },
-          });
+    this.server_config = parsed_server_config === null ? null : parsed_server_config;
     this.types = types instanceof CDPTypes ? types : new CDPTypes(types);
 
     this.latency = null;
@@ -260,100 +251,28 @@ export class ModCDPClient<
     client_config,
     server_config,
   }: Pick<ModCDPClientConfig<TCommands, TEvents>, "upstream" | "router" | "client_config" | "server_config"> = {}) {
-    const has_upstream_config = upstream !== undefined;
-    const has_router_config = router !== undefined;
-    const upstream_config = upstream === undefined ? null : upstream;
-    const configured_router =
-      router === undefined
-        ? this.router.config
-        : ModCDPRouterConfigSchema.parse({
-            ...this.router.config,
-            ...router,
-            router_routes: {
-              ...this.router.config.router_routes,
-              ...(router.router_routes ?? {}),
-            },
-          });
-    const configured_loopback_cdp_url =
-      upstream?.upstream_ws_cdp_url !== undefined
-        ? upstream.upstream_ws_cdp_url
-        : this.upstream.config.upstream_mode === "ws"
-          ? this.upstream.config.upstream_ws_cdp_url
-          : undefined;
-    const configured_upstream = {
-      ...this.upstream.config,
-      ...(upstream_config ?? {}),
-    };
-    const route_upstream = configured_router.router_routes["*.*"];
-    const has_loopback_cdp_url =
-      typeof configured_loopback_cdp_url === "string" && configured_loopback_cdp_url.length > 0;
-    const upstream_mode = has_loopback_cdp_url
-      ? "ws"
-      : configured_upstream.upstream_mode === "chromedebugger" ||
-          route_upstream === "loopback_cdp" ||
-          route_upstream === "chromedebugger" ||
-          (configured_upstream.upstream_mode === "ws" && !configured_upstream.upstream_ws_cdp_url)
-        ? "chromedebugger"
-        : configured_upstream.upstream_mode;
-    const selected_upstream =
-      upstream_mode === "ws"
-        ? {
-            ...configured_upstream,
-            upstream_mode: "ws" as const,
-            upstream_ws_cdp_url: configured_loopback_cdp_url,
-          }
-        : {
-            ...configured_upstream,
-            upstream_mode: "chromedebugger" as const,
-            upstream_ws_cdp_url: undefined,
-          };
     if (client_config !== undefined) {
       this.config = ModCDPClientConfigSchema.parse({ ...this.config, ...client_config });
     }
     this.upstream.update({
       upstream_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
     });
+    if (upstream !== undefined) {
+      this.upstream.update(upstream);
+    }
+    if (router !== undefined) {
+      this.router.config = ModCDPRouterConfigSchema.parse({
+        ...this.router.config,
+        ...router,
+        router_routes: {
+          ...this.router.config.router_routes,
+          ...(router.router_routes ?? {}),
+        },
+      });
+    }
     if (server_config !== undefined) {
       const parsed_server_config = server_config === null ? null : ModCDPServerConfigSchema.parse(server_config);
-      this.server_config =
-        parsed_server_config === null
-          ? null
-          : ModCDPServerConfigSchema.parse({
-              ...parsed_server_config,
-              router: {
-                ...(parsed_server_config.router ?? {}),
-                router_routes: {
-                  ...(this.upstream.config.upstream_mode === "nativemessaging" ||
-                  this.upstream.config.upstream_mode === "reversews" ||
-                  this.upstream.config.upstream_mode === "nats"
-                    ? { "*.*": "chromedebugger" }
-                    : {}),
-                  ...(parsed_server_config.router?.router_routes ?? {}),
-                },
-              },
-            });
-    }
-
-    const should_rebuild_upstream =
-      has_upstream_config ||
-      has_router_config ||
-      selected_upstream.upstream_mode !== this.upstream.config.upstream_mode ||
-      (selected_upstream.upstream_mode === "ws" &&
-        (this.upstream.config.upstream_mode !== "ws" ||
-          selected_upstream.upstream_ws_cdp_url !== this.upstream.config.upstream_ws_cdp_url));
-    if (should_rebuild_upstream) {
-      const Upstream = upstream_transport_constructors.get(selected_upstream.upstream_mode);
-      if (!Upstream) throw new Error(`unknown upstream_mode=${selected_upstream.upstream_mode}`);
-      this.router.stop();
-      this.upstream = new Upstream(selected_upstream);
-      this.upstream.update({
-        upstream_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
-      });
-      this.router = new AutoSessionRouter({
-        ...configured_router,
-        upstream: this.upstream,
-        types: this.types,
-      });
+      this.server_config = parsed_server_config;
     }
     if (this.config.client_hydrate_aliases)
       this.types.installAliases(this, (method, params) => this.send(method, params));
@@ -369,34 +288,7 @@ export class ModCDPClient<
     this.upstream.onRecv(this.on_upstream_recv);
     this.upstream.onClose(this.on_upstream_close);
 
-    if (
-      this.upstream.config.upstream_mode === "nativemessaging" ||
-      this.upstream.config.upstream_mode === "reversews" ||
-      this.upstream.config.upstream_mode === "nats"
-    ) {
-      await this.upstream.waitForPeer();
-      if (this.server_config !== null) {
-        await this.send("Mod.configure", this._serverConfigureParams());
-      }
-      this._startHeartbeat();
-      void this._measurePingLatency().catch(() => {});
-      const connected_at = Date.now();
-      this.connect_timing = {
-        started_at: connect_started_at,
-        upstream_mode: this.upstream.config.upstream_mode,
-        transport_started_at,
-        transport_connected_at,
-        transport_duration_ms: transport_connected_at - transport_started_at,
-        connected_at,
-        duration_ms: connected_at - connect_started_at,
-      };
-      return this;
-    }
-
-    if (
-      this.upstream.config.upstream_mode === "chromedebugger" ||
-      (this.injector == null && this.server_config === null)
-    ) {
+    if (this.injector == null && this.server_config === null) {
       const connected_at = Date.now();
       this.connect_timing = {
         started_at: connect_started_at,
@@ -463,16 +355,8 @@ export class ModCDPClient<
       method,
       params,
       method === "Mod.addCustomCommand" ||
-        (method === "Mod.addCustomEvent" &&
-          !this.injector?.session_id &&
-          this.upstream.config.upstream_mode !== "nativemessaging" &&
-          this.upstream.config.upstream_mode !== "reversews" &&
-          this.upstream.config.upstream_mode !== "nats") ||
-        (method === "Mod.addMiddleware" &&
-          !this.injector?.session_id &&
-          this.upstream.config.upstream_mode !== "nativemessaging" &&
-          this.upstream.config.upstream_mode !== "reversews" &&
-          this.upstream.config.upstream_mode !== "nats"),
+        (method === "Mod.addCustomEvent" && !this.injector?.session_id) ||
+        (method === "Mod.addMiddleware" && !this.injector?.session_id),
     );
     const command_params = prepared.params;
     if (prepared.custom_command_name) {
@@ -490,29 +374,7 @@ export class ModCDPClient<
       };
       return this.types.parseCommandResult(method, prepared.local_result);
     }
-    if (
-      this.upstream.config.upstream_mode === "nativemessaging" ||
-      this.upstream.config.upstream_mode === "reversews" ||
-      this.upstream.config.upstream_mode === "nats"
-    ) {
-      await this.upstream.waitForPeer();
-      const result = await this.upstream.send(method, command_params as ProtocolParams, null, {
-        timeout_ms: this.config.client_cdp_send_timeout_ms,
-      });
-      const completed_at = Date.now();
-      this.last_command_timing = {
-        method,
-        target: "modcdp_server",
-        started_at,
-        completed_at,
-        duration_ms: completed_at - started_at,
-      };
-      return this.types.parseCommandResult(method, result);
-    }
-    if (
-      this.upstream.config.upstream_mode === "chromedebugger" ||
-      (this.injector == null && this.server_config === null)
-    ) {
+    if (this.injector == null && this.server_config === null) {
       const result = await this.router.send(method, command_params as ProtocolParams, session_id);
       const completed_at = Date.now();
       this.last_command_timing = {
@@ -620,7 +482,6 @@ export class ModCDPClient<
   async _connectUpstreamTransport() {
     const launcher = this.launcher;
     const transport = this.upstream;
-    let browser_launch_started_at: number | null = null;
     if (this.injector) {
       this.injector.update({
         injector_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
@@ -638,24 +499,12 @@ export class ModCDPClient<
     });
     transport.update(launcher.configForUpstream());
 
-    if (
-      this.upstream.config.upstream_mode === "nativemessaging" ||
-      this.upstream.config.upstream_mode === "reversews" ||
-      this.upstream.config.upstream_mode === "nats" ||
-      this.upstream.config.upstream_mode === "chromedebugger"
-    )
-      await transport.connect();
     if (launcher.config.launcher_mode !== "none") {
-      browser_launch_started_at = Date.now();
       await launcher.launch();
       transport.update(launcher.configForUpstream());
       if (this.injector) transport.update(this.injector.configForUpstream());
     }
-    if (this.upstream.config.upstream_mode === "reversews" && browser_launch_started_at != null) {
-      await transport.waitForPeer({ connected_after_ms: browser_launch_started_at });
-    }
-    if (this.upstream.config.upstream_mode === "ws" || this.upstream.config.upstream_mode === "pipe")
-      await transport.connect();
+    await transport.connect();
 
     if (this.upstream.config.upstream_mode === "ws" && transport.config.upstream_ws_cdp_url)
       this.upstream.update({ upstream_ws_cdp_url: transport.config.upstream_ws_cdp_url });

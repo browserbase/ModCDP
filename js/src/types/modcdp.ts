@@ -40,12 +40,6 @@ const DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250;
 const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
 const DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
 const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
-const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
-const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
-const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
-const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
-const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
-const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
 const DEFAULT_LAUNCHER_BB_BASE_URL = "https://api.browserbase.com";
 const DEFAULT_LAUNCHER_BB_VIEWPORT = { width: 1288, height: 711 };
 
@@ -195,7 +189,6 @@ const ModCDPLauncherConfigSchema = z
     launcher_local_sandbox: z.boolean().optional(),
     launcher_local_args: z.array(z.string()).default([]),
     launcher_local_extra_args: z.array(z.string()).default([]),
-    launcher_local_cdp_transport: z.enum(["port", "pipe"]).default("port"),
     launcher_local_loopback_cdp: z.boolean().default(false),
     launcher_local_cleanup_user_data_dir: z.boolean().default(false),
     launcher_local_chrome_ready_timeout_ms: z.number().positive().default(DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS),
@@ -220,20 +213,8 @@ type ModCDPLauncherConfig = z.infer<typeof ModCDPLauncherConfigSchema>;
 
 const ModCDPUpstreamConfigSchema = z
   .object({
-    upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]).default("ws"),
+    upstream_mode: z.enum(["ws"]).default("ws"),
     upstream_ws_cdp_url: z.string().optional(),
-    upstream_pipe_read: z.custom<NodeJS.ReadableStream>().optional(),
-    upstream_pipe_write: z.custom<NodeJS.WritableStream>().optional(),
-    upstream_nats_url: z.string().default(DEFAULT_UPSTREAM_NATS_URL),
-    upstream_nats_subject_prefix: z
-      .string()
-      .refine((value) => value.trim().length > 0 && !/[\s*>]/.test(value), "Invalid NATS subject prefix")
-      .default(DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX),
-    upstream_nats_role: z.enum(["client", "browser"]).default("client"),
-    upstream_nats_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS),
-    upstream_reversews_bind: z.string().default(DEFAULT_UPSTREAM_REVERSEWS_BIND),
-    upstream_reversews_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS),
-    upstream_nativemessaging_host_name: z.string().default(DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME),
     upstream_ws_connect_error_settle_timeout_ms: z
       .number()
       .positive()
@@ -568,12 +549,6 @@ export {
   DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
   DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS,
   DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
-  DEFAULT_UPSTREAM_NATS_URL,
-  DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX,
-  DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS,
-  DEFAULT_UPSTREAM_REVERSEWS_BIND,
-  DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
-  DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
   CdpCommandParamsSchema,
   CdpCommandResultSchema,
   CdpEventParamsSchema,

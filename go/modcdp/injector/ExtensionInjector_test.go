@@ -48,3 +48,20 @@ func TestExtensionInjectorBaseInjectReportsTheSubclassName(t *testing.T) {
 		t.Fatalf("Inject error = %v", err)
 	}
 }
+
+func TestExtensionInjectorDoesNotWrapTheDefaultReadyExpressionTwice(t *testing.T) {
+	injector := NewExtensionInjector(InjectorConfig{
+		InjectorServiceWorkerReadyExpression: modcdpReadyExpression,
+	})
+
+	if injector.readyExpression() != modcdpReadyExpression {
+		t.Fatalf("readyExpression = %q", injector.readyExpression())
+	}
+
+	injector.Update(InjectorConfig{
+		InjectorServiceWorkerReadyExpression: "globalThis.ready === true",
+	})
+	if got := injector.readyExpression(); got != "("+modcdpReadyExpression+") && Boolean(globalThis.ready === true)" {
+		t.Fatalf("custom readyExpression = %q", got)
+	}
+}

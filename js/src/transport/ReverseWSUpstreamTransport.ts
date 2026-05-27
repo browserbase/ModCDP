@@ -1,17 +1,23 @@
 // MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
 // Reason: not needed by Stagehand (exotic transport).
 import type { WebSocket as WsSocket, WebSocketServer as WsServer } from "ws";
-import type { z } from "zod";
+import { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { DEFAULT_UPSTREAM_REVERSEWS_BIND, DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS } from "../types/modcdp.js";
-import {
-  parseHostPort,
-  UpstreamTransport,
-  type UpstreamPeerWaitConfig,
-  type UpstreamTransportConfig,
-} from "./UpstreamTransport.js";
+import { DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS } from "../types/modcdp.js";
+import { parseHostPort, UpstreamTransport, type UpstreamPeerWaitConfig } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
+
+const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
+const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
+
+const ReverseWSUpstreamTransportConfigSchema = z.object({
+  upstream_mode: z.literal("reversews").default("reversews"),
+  upstream_reversews_bind: z.string().default(DEFAULT_UPSTREAM_REVERSEWS_BIND),
+  upstream_reversews_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS),
+  upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+});
+type ReverseWSUpstreamTransportConfig = z.infer<typeof ReverseWSUpstreamTransportConfigSchema>;
 
 type ReverseHello = {
   type: "modcdp.reverse.hello";
@@ -21,6 +27,7 @@ type ReverseHello = {
 };
 
 class ReverseWSUpstreamTransport extends UpstreamTransport {
+  declare config: ReverseWSUpstreamTransportConfig;
   endpoint_url: string;
   private reversews_listener: WsServer | null = null;
   private socket: WsSocket | null = null;
@@ -33,8 +40,9 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
   }>();
   peer_info: ReverseHello | null = null;
 
-  constructor(config: UpstreamTransportConfig = {}) {
-    super({ ...config, upstream_mode: "reversews" });
+  constructor(config: z.input<typeof ReverseWSUpstreamTransportConfigSchema> = {}) {
+    super();
+    this.config = ReverseWSUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "reversews" });
     this.endpoint_url = endpointFromBind(this.config.upstream_reversews_bind);
   }
 
@@ -82,8 +90,12 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     return super.send(command, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportConfig = {}) {
-    super.update({ ...config, upstream_mode: "reversews" });
+  override update(config: Record<string, unknown> = {}) {
+    this.config = ReverseWSUpstreamTransportConfigSchema.parse({
+      ...this.config,
+      ...config,
+      upstream_mode: "reversews",
+    });
     this.endpoint_url = endpointFromBind(this.config.upstream_reversews_bind);
     return this;
   }
@@ -211,4 +223,10 @@ function endpointFromBind(bind: string) {
   return `ws://${host}:${port}`;
 }
 
-export { DEFAULT_UPSTREAM_REVERSEWS_BIND, DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS, ReverseWSUpstreamTransport };
+export {
+  DEFAULT_UPSTREAM_REVERSEWS_BIND,
+  DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
+  ReverseWSUpstreamTransport,
+  ReverseWSUpstreamTransportConfigSchema,
+};
+export type { ReverseWSUpstreamTransportConfig };

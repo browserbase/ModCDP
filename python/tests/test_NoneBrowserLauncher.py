@@ -17,9 +17,9 @@ class NoneBrowserLauncherTests(unittest.TestCase):
 
         launched = launcher.launch()
 
-        self.assertIsNone(launched["cdp_url"])
+        self.assertIsNone(launched.cdp_url)
         self.assertIs(launcher.launched, launched)
-        launched["close"]()
+        launched.close()
 
 
 if __name__ == "__main__":

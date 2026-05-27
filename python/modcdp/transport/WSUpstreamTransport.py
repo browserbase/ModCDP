@@ -92,9 +92,12 @@ class WSUpstreamTransport(UpstreamTransport):
 
     def close(self) -> None:
         self._generation += 1
+        had_connection = self.ws is not None
         if self.ws is not None:
             self.ws.close()
         self.ws = None
+        if had_connection:
+            self._settle_pending(RuntimeError("CDP websocket closed"))
         if self._reader_thread is not None and self._reader_thread.is_alive():
             self._reader_thread.join(timeout=1)
         self._reader_thread = None

@@ -9,6 +9,7 @@ from __future__ import annotations
 import unittest
 
 from modcdp.transport.UpstreamTransport import UpstreamTransport
+from modcdp.types.generated.cdp import RuntimeDomain, TargetDomain
 
 
 class TestTransport(UpstreamTransport):
@@ -42,6 +43,16 @@ class UpstreamTransportTests(unittest.TestCase):
                 {"method": "Runtime.executionContextCreated", "params": {}},
             ],
         )
+
+        typed_events = []
+        test_transport.on(TargetDomain.targetCreated, lambda event, _target_id, _session_id: typed_events.append(event))
+        test_transport.emit(
+            '{"method":"Target.targetCreated","params":{"targetInfo":{"targetId":"target-1","type":"page","title":"Example","url":"https://example.com","attached":false,"canAccessOpener":false}}}'
+        )
+        self.assertEqual(typed_events[0]["targetInfo"]["targetId"], "target-1")
+        with self.assertRaises(ValueError):
+            test_transport.on(RuntimeDomain.executionContextDestroyed, lambda _event, _target_id, _session_id: None)
+            test_transport.emit('{"method":"Runtime.executionContextDestroyed","params":{"executionContextId":1}}')
 
         stop()
         self.assertEqual(received, [])

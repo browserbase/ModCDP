@@ -9,11 +9,14 @@ import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
 import { ModCDPClient } from "../src/index.js";
+import { extension_injector_constructors } from "../src/client/ModCDPClient.js";
+import { BorrowExtensionInjector } from "../src/injector/BorrowExtensionInjector.js";
 import { loadExtensionTestBrowserPath } from "./browserPaths.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 const LOAD_EXTENSION_TEST_BROWSER_PATH = loadExtensionTestBrowserPath();
+extension_injector_constructors.set("borrow", BorrowExtensionInjector);
 
 test("BorrowExtensionInjector bootstraps ModCDP inside a live extension service worker", async () => {
   const owner = new ModCDPClient({
@@ -41,7 +44,7 @@ test("BorrowExtensionInjector bootstraps ModCDP inside a live extension service 
         injector_mode: "borrow",
         injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
         injector_trust_service_worker_target: true,
-      },
+      } as any,
     });
     await cdp.connect();
     assert.equal(cdp.connect_timing?.injector_source, "borrow");

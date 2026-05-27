@@ -38,7 +38,7 @@ interface SendCDP {
 }
 type TargetInfo = { targetId: string; type?: string; url?: string };
 
-const InjectorModeSchema = z.enum(["cli", "cdp", "bb", "discover", "borrow", "none"]);
+const InjectorModeSchema = z.enum(["cli", "cdp", "bb", "discover", "none"]);
 type InjectorMode = z.infer<typeof InjectorModeSchema>;
 
 const DefaultSendCDP: SendCDP = async () => {
@@ -56,7 +56,6 @@ const InjectorConfigSchema = z
     injector_bb_extension_path: z.string().optional(),
     injector_bb_extension_id: z.string().optional(),
     injector_discover_extension_path: z.string().optional(),
-    injector_borrow_extension_path: z.string().optional(),
     injector_service_worker_extension_id: z.string().nullable().optional(),
     injector_service_worker_url_includes: z.array(z.string()).default([]),
     injector_service_worker_url_suffixes: z.array(z.string()).default(DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES),
@@ -74,6 +73,7 @@ const InjectorConfigSchema = z
   })
   .strict();
 type InjectorConfig = z.infer<typeof InjectorConfigSchema>;
+type InjectorBaseConfig = Omit<InjectorConfig, "injector_mode"> & { injector_mode: string };
 
 type ExtensionInjectionResult = {
   source: string;
@@ -88,7 +88,7 @@ function delay(ms: number) {
 }
 
 class ExtensionInjector {
-  config: InjectorConfig;
+  config: InjectorBaseConfig;
   source: string | null;
   extension_id: string | null;
   service_worker_extension_id: string | null;
@@ -109,7 +109,7 @@ class ExtensionInjector {
     this.extra_args = [];
   }
 
-  update(config: z.input<typeof InjectorConfigSchema> = {}) {
+  update(config: z.input<typeof InjectorConfigSchema> | Record<string, unknown> = {}) {
     this.config = InjectorConfigSchema.parse({ ...this.config, ...config });
     return this;
   }
@@ -272,4 +272,4 @@ export {
   ExtensionInjector,
 };
 export { InjectorModeSchema, InjectorConfigSchema };
-export type { SendCDP, TargetInfo, InjectorMode, InjectorConfig, ExtensionInjectionResult };
+export type { SendCDP, TargetInfo, InjectorMode, InjectorBaseConfig, InjectorConfig, ExtensionInjectionResult };

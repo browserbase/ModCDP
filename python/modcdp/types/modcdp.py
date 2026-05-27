@@ -246,9 +246,9 @@ class ModCDPLauncherConfig(ModCDPModel):
     launcher_bb_region: str | None = None
     launcher_bb_timeout: int | None = Field(default=None, gt=0)
     launcher_bb_extension_id: str | None = None
-    launcher_bb_browser_settings: dict[str, object] = Field(default_factory=lambda: {"viewport": {"width": 1288, "height": 711}})
+    launcher_bb_browser_settings: dict[str, object] = {"viewport": {"width": 1288, "height": 711}}
     launcher_bb_user_metadata: dict[str, object] = Field(default_factory=dict)
-    launcher_bb_session_create_params: dict[str, object] = Field(default_factory=lambda: {"userMetadata": {}})
+    launcher_bb_session_create_params: dict[str, object] = {"userMetadata": {}}
 
 
 class ModCDPServerConfig(ModCDPModel):

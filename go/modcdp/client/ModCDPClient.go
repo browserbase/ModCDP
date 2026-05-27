@@ -331,7 +331,7 @@ type upstreamTransportClient interface {
 	Update(map[string]any)
 	Connect() error
 	Close() error
-	Send(command string, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error)
+	Send(command any, params map[string]any, sessionID string, timeout ...time.Duration) (map[string]any, error)
 	ConfigForLauncher() LauncherConfig
 	OnRecv(func(map[string]any)) func()
 	OnClose(func(error)) func()
@@ -479,7 +479,10 @@ func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
 	if c.Upstream != nil {
 		c.Upstream.Update(map[string]any{"upstream_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS})
 	}
-	if config.Upstream.UpstreamWSCDPURL != "" || config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 || config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
+	if config.Upstream.UpstreamMode != "" || config.Upstream.UpstreamWSCDPURL != "" || config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 || config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
+		if config.Upstream.UpstreamMode != "" {
+			c.Config.Upstream.UpstreamMode = config.Upstream.UpstreamMode
+		}
 		if config.Upstream.UpstreamWSCDPURL != "" {
 			c.Config.Upstream.UpstreamWSCDPURL = config.Upstream.UpstreamWSCDPURL
 		}
@@ -738,7 +741,8 @@ func (c *ModCDPClient) ensureModCDPServerConfigured() error {
 
 func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	return map[string]any{
-		"upstream_ws_cdp_url":                         c.Config.Upstream.UpstreamWSCDPURL,
+		"upstream_mode":       c.Config.Upstream.UpstreamMode,
+		"upstream_ws_cdp_url": c.Config.Upstream.UpstreamWSCDPURL,
 		"upstream_ws_connect_error_settle_timeout_ms": c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
 		"upstream_cdp_send_timeout_ms":                c.Config.Upstream.UpstreamCDPSendTimeoutMS,
 	}

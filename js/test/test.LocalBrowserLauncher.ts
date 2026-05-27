@@ -10,7 +10,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
-import { PipeUpstreamTransport } from "../src/transport/PipeUpstreamTransport.js";
 import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
 
 const LIVE_BROWSER_TIMEOUT_MS = 60_000;
@@ -56,68 +55,6 @@ describe("LocalBrowserLauncher", () => {
   );
 
   it(
-    "launches a real browser over remote-debugging-pipe and speaks CDP over the returned pipes",
-    { timeout: LIVE_BROWSER_TIMEOUT_MS },
-    async () => {
-      const chrome = await new LocalBrowserLauncher().launch({
-        launcher_local_headless: true,
-        launcher_local_cdp_transport: "pipe",
-        launcher_local_chrome_ready_timeout_ms: 45_000,
-      });
-      const cdp = new PipeUpstreamTransport({
-        upstream_pipe_read: chrome.pipe_read,
-        upstream_pipe_write: chrome.pipe_write,
-      });
-      const profile_dir = chrome.profile_dir;
-
-      try {
-        expect(chrome.cdp_listen_port).toBeUndefined();
-        expect(chrome.cdp_url).toBeNull();
-        expect(chrome.loopback_cdp_url).toBeUndefined();
-        expect(chrome.pipe_read).toBeTruthy();
-        expect(chrome.pipe_write).toBeTruthy();
-        await cdp.connect();
-        await expectCdpBrowserSurface(cdp);
-      } finally {
-        await cdp.close();
-        await chrome.close();
-        await chrome.close();
-      }
-
-      if (profile_dir) {
-        await expect(stat(profile_dir)).rejects.toMatchObject({
-          code: "ENOENT",
-        });
-      }
-    },
-  );
-
-  it(
-    "launches a pipe browser with an auxiliary loopback CDP endpoint only when requested",
-    { timeout: LIVE_BROWSER_TIMEOUT_MS },
-    async () => {
-      const chrome = await new LocalBrowserLauncher().launch({
-        launcher_local_headless: true,
-        launcher_local_cdp_transport: "pipe",
-        launcher_local_loopback_cdp: true,
-        launcher_local_chrome_ready_timeout_ms: 45_000,
-      });
-      const cdp = new WSUpstreamTransport({ upstream_ws_cdp_url: chrome.loopback_cdp_url });
-
-      try {
-        expect(chrome.cdp_url).toBeNull();
-        expect(chrome.cdp_listen_port).toEqual(expect.any(Number));
-        expect(chrome.loopback_cdp_url).toEqual(expect.stringMatching(/^ws:\/\/127\.0\.0\.1:\d+\//));
-        await cdp.connect();
-        await expectCdpBrowserSurface(cdp);
-      } finally {
-        await cdp.close();
-        await chrome.close();
-      }
-    },
-  );
-
-  it(
     "removes an explicit user data dir when cleanup_user_data_dir is set",
     { timeout: LIVE_BROWSER_TIMEOUT_MS },
     async () => {
@@ -144,7 +81,7 @@ describe("LocalBrowserLauncher", () => {
 
 // MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
 // Keep the setup semantics above 1:1 with translated tests; helpers here only use real ModCDP transports against real browser endpoints.
-async function expectCdpBrowserSurface(cdp: WSUpstreamTransport | PipeUpstreamTransport) {
+async function expectCdpBrowserSurface(cdp: WSUpstreamTransport) {
   const version = await cdp.send("Browser.getVersion");
   expect(version.product).toEqual(expect.stringMatching(/Chrome|Chromium/));
   expect(version.protocolVersion).toEqual(expect.any(String));

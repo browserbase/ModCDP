@@ -19,7 +19,7 @@ import type { cdp as cdp_types } from "../src/types/generated/cdp.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
-const REVERSEWS_TEST_BROWSER_PATH = reversewsTestBrowserPath();
+const LOAD_EXTENSION_TEST_BROWSER_PATH = loadExtensionTestBrowserPath();
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -197,7 +197,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       launcher_mode: "local",
       launcher_local_headless: true,
       launcher_local_chrome_ready_timeout_ms: 60_000,
-      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
@@ -235,7 +235,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
     assert.equal(cdp.launcher.config.launcher_mode, "local");
     assert.equal(cdp.upstream.config.upstream_mode, "ws");
     assert.equal(cdp.injector?.config.injector_mode, "cli");
-    assert.equal(["discover", "cli", "cdp", "borrow"].includes(String(cdp.connect_timing?.injector_source)), true);
+    assert.equal(["discover", "cli", "cdp"].includes(String(cdp.connect_timing?.injector_source)), true);
     assert.equal(cdp.router.config.router_routes["*.*"], "direct_cdp");
     assert.match(cdp.upstream.config.upstream_ws_cdp_url ?? "", /^ws:\/\//);
     const service_worker_url = await cdp.Mod.evaluate({
@@ -345,7 +345,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
 test("ModCDPClient preserves explicit empty service worker suffix config", async () => {
   const cdp = new ModCDPClient({
     injector: {
-      injector_mode: "borrow",
+      injector_mode: "discover",
       injector_service_worker_url_suffixes: [],
     },
   });
@@ -353,7 +353,7 @@ test("ModCDPClient preserves explicit empty service worker suffix config", async
   assert.deepEqual(cdp.injector.config.injector_service_worker_url_suffixes, []);
 }, 60_000);
 
-function reversewsTestBrowserPath() {
+function loadExtensionTestBrowserPath() {
   const explicit_candidates = [process.env.CHROME_PATH, platform() === "linux" ? "/usr/bin/chromium" : null].filter(
     (candidate): candidate is string => Boolean(candidate),
   );
@@ -389,7 +389,7 @@ function reversewsTestBrowserPath() {
           ];
   const candidates = newestFirst(patterns.flatMap(expandGlob));
   if (candidates[0]) return candidates[0];
-  throw new Error("Reversews tests require CHROME_PATH, /usr/bin/chromium, or Chrome for Testing.");
+  throw new Error("Extension loading tests require CHROME_PATH, /usr/bin/chromium, or Chrome for Testing.");
 }
 
 function expandGlob(pattern: string) {
@@ -452,18 +452,16 @@ test("ModCDPClient preserves explicit null server config", () => {
 });
 
 test("ModCDPClient uses no injector unless injector_mode is explicit", () => {
-  for (const mode of ["nativemessaging", "reversews", "nats"] as const) {
-    const launched = new ModCDPClient({
-      launcher: { launcher_mode: "local" },
-      upstream: { upstream_mode: mode },
-    });
-    assert.equal(launched.launcher.config.launcher_mode, "local");
-    assert.equal(launched.injector, null);
+  const launched = new ModCDPClient({
+    launcher: { launcher_mode: "local" },
+    upstream: { upstream_mode: "ws" },
+  });
+  assert.equal(launched.launcher.config.launcher_mode, "local");
+  assert.equal(launched.injector, null);
 
-    const attach_only = new ModCDPClient({ upstream: { upstream_mode: mode } });
-    assert.equal(attach_only.launcher.config.launcher_mode, "none");
-    assert.equal(attach_only.injector, null);
-  }
+  const attach_only = new ModCDPClient({ upstream: { upstream_mode: "ws" } });
+  assert.equal(attach_only.launcher.config.launcher_mode, "none");
+  assert.equal(attach_only.injector, null);
 });
 
 test("ModCDPClient selects exactly one injector from explicit injector_mode", async () => {
@@ -494,13 +492,6 @@ test("ModCDPClient selects exactly one injector from explicit injector_mode", as
     }).injector?.constructor.name,
     "DiscoverExtensionInjector",
   );
-  assert.equal(
-    new ModCDPClient({
-      launcher: { launcher_mode: "remote" },
-      injector: { injector_mode: "borrow" },
-    }).injector?.constructor.name,
-    "BorrowExtensionInjector",
-  );
 });
 
 test("ModCDPClient rejects unknown component modes at their owning factory boundary", async () => {
@@ -509,7 +500,7 @@ test("ModCDPClient rejects unknown component modes at their owning factory bound
       new ModCDPClient({
         upstream: { upstream_mode: "bogus" as any },
       }),
-    /Invalid option/,
+    /unknown upstream_mode=bogus/,
   );
   assert.throws(
     () =>
@@ -533,7 +524,7 @@ test("ModCDPClient.close does not close a remote browser it did not launch", asy
     launcher_local_chrome_ready_timeout_ms: 60_000,
     // This test manually supplies --load-extension, so it intentionally uses
     // the launch-flag browser path instead of relying on the client fallback.
-    launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
+    launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     launcher_local_extra_args: [`--load-extension=${EXTENSION_PATH}`],
   }).launch();
   const raw_cdp = new WSUpstreamTransport({ upstream_ws_cdp_url: chrome.cdp_url });
@@ -573,7 +564,7 @@ test("ModCDPClient.close keeps injector files until after launched browser shutd
       // After explicit CHROME_PATH and CI /usr/bin/chromium, this test uses
       // Chrome for Testing because Canary rejects --load-extension in this
       // local launch injector path.
-      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: {
       upstream_mode: "ws",
@@ -620,7 +611,7 @@ test("ModCDPClient.close clears top-level connection state", async () => {
     launcher: {
       launcher_mode: "local",
       launcher_local_headless: true,
-      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
+      launcher_local_executable_path: LOAD_EXTENSION_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {

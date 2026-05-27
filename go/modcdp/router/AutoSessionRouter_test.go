@@ -101,6 +101,25 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContextsFromLiveCD
 	if !foundContext {
 		t.Fatalf("context id %d for session %s was not recorded", contextID, sessionID)
 	}
+	topologyOne, err := cdp.Router.GetTopology(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objectGroupOne, _ := topologyOne["objectGroup"].(string)
+	if !regexp.MustCompile(`^modcdp-topology-\d+-[0-9a-f]+$`).MatchString(objectGroupOne) {
+		t.Fatalf("topology objectGroup = %q", objectGroupOne)
+	}
+	topologyTwo, err := cdp.Router.GetTopology(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objectGroupTwo, _ := topologyTwo["objectGroup"].(string)
+	if objectGroupOne == objectGroupTwo {
+		t.Fatalf("topology objectGroup was reused: %q", objectGroupOne)
+	}
+	if _, _, err := cdp.Router.EnsureRouteForTarget("missing-target-id"); err == nil {
+		t.Fatal("EnsureRouteForTarget should return the attach error for an unknown target")
+	}
 
 	detachTarget(t, cdp, sessionID)
 	expectEventually(t, func() error {

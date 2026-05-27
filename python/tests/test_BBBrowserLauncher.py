@@ -39,12 +39,12 @@ class BBBrowserLauncherTests(unittest.TestCase):
         browser = launcher.launch()
         resumed = None
         transport = None
-        session_id = browser.get("browserbase_session_id")
+        session_id = browser.browserbase_session_id
         try:
             if not isinstance(session_id, str):
                 self.fail(f"browserbase_session_id = {session_id!r}")
-            self.assertIn(session_id, browser.get("browserbase_session_url") or "")
-            cdp_url = browser.get("cdp_url")
+            self.assertIn(session_id, browser.browserbase_session_url or "")
+            cdp_url = browser.cdp_url
             if not isinstance(cdp_url, str):
                 self.fail(f"cdp_url = {cdp_url!r}")
             self.assertRegex(cdp_url, r"^wss://")
@@ -62,16 +62,16 @@ class BBBrowserLauncherTests(unittest.TestCase):
                     "launcher_bb_close_session_on_close": False,
                 }
             ).launch()
-            self.assertEqual(resumed.get("browserbase_session_id"), session_id)
-            self.assertRegex(resumed.get("cdp_url") or "", r"^wss://")
+            self.assertEqual(resumed.browserbase_session_id, session_id)
+            self.assertRegex(resumed.cdp_url or "", r"^wss://")
             expect_cdp_browser_surface(transport)
         finally:
             if transport is not None:
                 transport.close()
             if resumed is not None:
-                resumed["close"]()
-            browser["close"]()
-            browser["close"]()
+                resumed.close()
+            browser.close()
+            browser.close()
 
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -83,7 +83,7 @@ class BBBrowserLauncherTests(unittest.TestCase):
 
 # MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
 # Keep the setup semantics above 1:1 with translated tests; helpers here only call real Browserbase APIs and real CDP endpoints.
-def retrieve_browserbase_session(session_id: str) -> dict:
+def retrieve_browserbase_session(session_id: str) -> dict[str, object]:
     request = urllib.request.Request(
         browserbase_api_url(f"/v1/sessions/{session_id}"),
         headers={"x-bb-api-key": os.environ["BROWSERBASE_API_KEY"]},
@@ -91,7 +91,10 @@ def retrieve_browserbase_session(session_id: str) -> dict:
     with urllib.request.urlopen(request, timeout=60) as response:
         if response.status < 200 or response.status >= 300:
             raise AssertionError(f"Browserbase session fetch returned {response.status}")
-        return json.loads(response.read())
+        parsed: object = json.loads(response.read())
+        if not isinstance(parsed, dict):
+            raise AssertionError(f"Browserbase session fetch returned {parsed!r}")
+        return {str(key): value for key, value in parsed.items()}
 
 
 def browserbase_api_url(pathname: str) -> str:

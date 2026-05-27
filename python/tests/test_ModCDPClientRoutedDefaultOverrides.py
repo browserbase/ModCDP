@@ -159,6 +159,8 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
             self.assertEqual(cdp.cdp_url, owner.cdp_url)
             self.assertIsNotNone(cdp.server_config)
             server_config = cdp.server_config
+            if server_config is None or server_config.upstream is None:
+                self.fail(f"server_config = {server_config!r}")
             self.assertEqual(server_config.upstream.upstream_ws_cdp_url, owner.cdp_url)
 
             raw_targets = cdp.send("Target.getTargets")

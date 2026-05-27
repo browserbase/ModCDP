@@ -26,31 +26,31 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
         transport = None
         try:
             from_http = RemoteBrowserLauncher({"launcher_remote_cdp_url": f"http://127.0.0.1:{port}"}).launch()
-            self.assertEqual(from_http["cdp_url"], local["cdp_url"])
-            from_http_cdp_url = from_http.get("cdp_url")
+            self.assertEqual(from_http.cdp_url, local.cdp_url)
+            from_http_cdp_url = from_http.cdp_url
             if not isinstance(from_http_cdp_url, str):
                 self.fail(f"cdp_url = {from_http_cdp_url!r}")
             transport = WSUpstreamTransport({"upstream_ws_cdp_url": from_http_cdp_url})
             transport.connect()
             expect_cdp_browser_surface(transport)
-            from_http["close"]()
+            from_http.close()
 
             from_host_port = RemoteBrowserLauncher({"launcher_remote_cdp_url": f"127.0.0.1:{port}"}).launch()
-            self.assertEqual(from_host_port["cdp_url"], local["cdp_url"])
-            from_host_port["close"]()
+            self.assertEqual(from_host_port.cdp_url, local.cdp_url)
+            from_host_port.close()
 
-            from_config = RemoteBrowserLauncher({"launcher_remote_cdp_url": local["cdp_url"]}).launch()
-            self.assertEqual(from_config["cdp_url"], local["cdp_url"])
-            from_config["close"]()
+            from_config = RemoteBrowserLauncher({"launcher_remote_cdp_url": local.cdp_url}).launch()
+            self.assertEqual(from_config.cdp_url, local.cdp_url)
+            from_config.close()
 
-            from_ws = RemoteBrowserLauncher().launch({"launcher_remote_cdp_url": local["cdp_url"]})
-            self.assertEqual(from_ws["cdp_url"], local["cdp_url"])
+            from_ws = RemoteBrowserLauncher().launch({"launcher_remote_cdp_url": local.cdp_url})
+            self.assertEqual(from_ws.cdp_url, local.cdp_url)
             expect_cdp_browser_surface(transport)
-            from_ws["close"]()
+            from_ws.close()
         finally:
             if transport is not None:
                 transport.close()
-            local["close"]()
+            local.close()
 
     def test_lets_launch_config_override_constructor_cdp_url(self) -> None:
         first = LocalBrowserLauncher().launch(
@@ -61,17 +61,17 @@ class RemoteBrowserLauncherTests(unittest.TestCase):
         )
 
         try:
-            second_cdp_listen_port = second.get("cdp_listen_port")
+            second_cdp_listen_port = second.cdp_listen_port
             if not isinstance(second_cdp_listen_port, int):
                 raise AssertionError(f"second cdp_listen_port = {second_cdp_listen_port!r}")
-            launched = RemoteBrowserLauncher({"launcher_remote_cdp_url": first["cdp_url"]}).launch(
+            launched = RemoteBrowserLauncher({"launcher_remote_cdp_url": first.cdp_url}).launch(
                 {"launcher_remote_cdp_url": f"127.0.0.1:{second_cdp_listen_port}"}
             )
-            self.assertEqual(launched["cdp_url"], second["cdp_url"])
-            launched["close"]()
+            self.assertEqual(launched.cdp_url, second.cdp_url)
+            launched.close()
         finally:
-            first["close"]()
-            second["close"]()
+            first.close()
+            second.close()
 
 
 # MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.

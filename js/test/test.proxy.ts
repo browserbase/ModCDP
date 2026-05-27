@@ -145,7 +145,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
       ...LOCAL_TEST_LAUNCH_OPTIONS,
       launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
     },
-    upstream: { upstream_mode: "pipe" },
+    upstream: { upstream_mode: "pipe" } as any,
     injector: {
       injector_mode: "cli",
       injector_cli_extension_path: EXTENSION_PATH,
@@ -345,7 +345,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
     upstream: {
       upstream_mode: "reversews",
       upstream_reversews_wait_timeout_ms: 10_000,
-    },
+    } as any,
     injector: {
       injector_mode: "cli",
       injector_cli_extension_path: EXTENSION_PATH,

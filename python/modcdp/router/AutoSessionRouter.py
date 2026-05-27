@@ -150,7 +150,7 @@ class AutoSessionRouter:
     def send(self, method: str, params: ProtocolParams | None = None, requested_session_id: str | None = None) -> ProtocolResult:
         if self.types.nativeCommandSchema(method) is None:
             raise RuntimeError(f"AutoSessionRouter cannot route unknown CDP command {method}.")
-        command_params = dict(params or {})
+        command_params = self.types.parseCommandParams(method, params or {})
         domain = method.split(".", 1)[0]
         if requested_session_id is not None:
             target_id = self.targetId_from_sessionId.get(requested_session_id)
@@ -161,9 +161,9 @@ class AutoSessionRouter:
                 if method == "Runtime.callFunctionOn"
                 else command_params
             )
-            return self.upstream.send(method, routed_params, requested_session_id)
+            return _protocol_result(self.types.parseCommandResult(method, self.upstream.send(method, routed_params, requested_session_id)))
         if domain in browserLevelDomains:
-            return self.upstream.send(method, command_params, None)
+            return _protocol_result(self.types.parseCommandResult(method, self.upstream.send(method, command_params, None)))
         target_id = self._resolveTargetId(command_params)
         target_id, session_id = self.ensureRouteForTarget(target_id)
         routed_params = (
@@ -171,7 +171,7 @@ class AutoSessionRouter:
             if method == "Runtime.callFunctionOn"
             else command_params
         )
-        return self.upstream.send(method, routed_params, session_id)
+        return _protocol_result(self.types.parseCommandResult(method, self.upstream.send(method, routed_params, session_id)))
 
     def attachToTarget(self, target_id: str) -> str | None:
         with self._lock:
@@ -688,3 +688,9 @@ class AutoSessionRouter:
 
     def _contextKey(self, target_id: str, session_id: str | None, context_id: int, unique_id: object) -> str:
         return unique_id if isinstance(unique_id, str) else f"{session_id or target_id}:{context_id}"
+
+
+def _protocol_result(value: object) -> ProtocolResult:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): raw_value for key, raw_value in value.items()}
