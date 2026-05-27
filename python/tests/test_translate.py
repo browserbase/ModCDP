@@ -6,6 +6,7 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import unittest
 
@@ -43,10 +44,10 @@ class TranslateTests(unittest.TestCase):
         wrapped_arguments = wrapped_step_params["arguments"]
         self.assertIsInstance(wrapped_arguments, list)
         assert isinstance(wrapped_arguments, list)
-        self.assertIsInstance(wrapped_arguments[1], dict)
-        self.assertIsInstance(wrapped_arguments[2], dict)
-        assert isinstance(wrapped_arguments[1], dict)
-        assert isinstance(wrapped_arguments[2], dict)
+        self.assertIsInstance(wrapped_arguments[1], Mapping)
+        self.assertIsInstance(wrapped_arguments[2], Mapping)
+        assert isinstance(wrapped_arguments[1], Mapping)
+        assert isinstance(wrapped_arguments[2], Mapping)
         self.assertEqual(json.loads(str(wrapped_arguments[1].get("value"))), {"expression": "({ ok: true })", "params": {"value": 1}})
         self.assertEqual(wrapped_arguments[2].get("value"), "session-1")
         self.assertEqual(wrapped["steps"][0].get("unwrap"), "runtime_json")
@@ -65,8 +66,8 @@ class TranslateTests(unittest.TestCase):
         ping_arguments = ping_step_params["arguments"]
         self.assertIsInstance(ping_arguments, list)
         assert isinstance(ping_arguments, list)
-        self.assertIsInstance(ping_arguments[1], dict)
-        assert isinstance(ping_arguments[1], dict)
+        self.assertIsInstance(ping_arguments[1], Mapping)
+        assert isinstance(ping_arguments[1], Mapping)
         self.assertEqual(json.loads(str(ping_arguments[1].get("value"))), {})
 
         custom = wrap_command_if_needed(
@@ -82,12 +83,12 @@ class TranslateTests(unittest.TestCase):
         custom_arguments = custom_step_params["arguments"]
         self.assertIsInstance(custom_arguments, list)
         assert isinstance(custom_arguments, list)
-        self.assertIsInstance(custom_arguments[0], dict)
-        self.assertIsInstance(custom_arguments[1], dict)
-        self.assertIsInstance(custom_arguments[2], dict)
-        assert isinstance(custom_arguments[0], dict)
-        assert isinstance(custom_arguments[1], dict)
-        assert isinstance(custom_arguments[2], dict)
+        self.assertIsInstance(custom_arguments[0], Mapping)
+        self.assertIsInstance(custom_arguments[1], Mapping)
+        self.assertIsInstance(custom_arguments[2], Mapping)
+        assert isinstance(custom_arguments[0], Mapping)
+        assert isinstance(custom_arguments[1], Mapping)
+        assert isinstance(custom_arguments[2], Mapping)
         self.assertEqual(custom_arguments[0].get("value"), "Custom.echo")
         self.assertEqual(json.loads(str(custom_arguments[1].get("value"))), {"secret": "x" * 100, "nested": {"ok": True}})
         self.assertEqual(custom_arguments[2].get("value"), "session-1")
@@ -103,8 +104,8 @@ class TranslateTests(unittest.TestCase):
         custom_with_session_arguments = custom_with_session_params["arguments"]
         self.assertIsInstance(custom_with_session_arguments, list)
         assert isinstance(custom_with_session_arguments, list)
-        self.assertIsInstance(custom_with_session_arguments[2], dict)
-        assert isinstance(custom_with_session_arguments[2], dict)
+        self.assertIsInstance(custom_with_session_arguments[2], Mapping)
+        assert isinstance(custom_with_session_arguments[2], Mapping)
         self.assertEqual(custom_with_session_arguments[2].get("value"), "target-session-1")
 
         self.assertEqual(unwrap_response_if_needed({"result": {"type": "object", "value": {"ok": True}}}, "runtime"), {"ok": True})
