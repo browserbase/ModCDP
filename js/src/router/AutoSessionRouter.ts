@@ -183,15 +183,24 @@ export class AutoSessionRouter {
         throw new Error(
           `No target is recorded for sessionId=${requestedSessionId}.`,
         );
-      return await this.upstream.send(command, params, {
+      const route = {
         targetId,
         sessionId: requestedSessionId,
-      });
+      };
+      const routed_params =
+        command.id === Runtime.CallFunctionOnCommand.id
+          ? await this.callFunctionOnParamsForRoute(params, route)
+          : params;
+      return await this.upstream.send(command, routed_params, route);
     }
     const route = await this.ensureRouteForTarget(
       await this.resolveTargetId(CdpDebuggeeCommandParamsSchema.parse(params)),
     );
-    return await this.upstream.send(command, params, route);
+    const routed_params =
+      command.id === Runtime.CallFunctionOnCommand.id
+        ? await this.callFunctionOnParamsForRoute(params, route)
+        : params;
+    return await this.upstream.send(command, routed_params, route);
   }
 
   /** Ensure a target has a real native flattened CDP session id. */
@@ -308,6 +317,33 @@ export class AutoSessionRouter {
       sessionId,
       timeout_ms,
     ).then((context) => context.id);
+  }
+
+  private async callFunctionOnParamsForRoute(
+    params: ProtocolParams,
+    route: TargetRoute,
+  ): Promise<ProtocolParams> {
+    const call_params = Runtime.CallFunctionOnCommand.params.parse(params);
+    // objectId and uniqueContextId already pin the call to a browser-owned
+    // context. Only inject executionContextId for global calls that need the
+    // route's current Runtime context.
+    if (
+      call_params.executionContextId != null ||
+      call_params.uniqueContextId != null ||
+      call_params.objectId != null
+    )
+      return call_params;
+    const context = await this.waitForExecutionContextMatching(
+      (current_context) =>
+        current_context.targetId === route.targetId &&
+        (route.sessionId == null ||
+          current_context.sessionId === route.sessionId),
+      route.sessionId ?? route.targetId,
+    );
+    return {
+      ...call_params,
+      executionContextId: context.id,
+    };
   }
 
   /** Ensure the requested execution context exists for a frame. */

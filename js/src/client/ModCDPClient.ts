@@ -397,29 +397,18 @@ export class ModCDPClientBase<
         `${injector.constructor.name} did not record a ModCDP extension target.`,
       );
     }
-    const ext_context = this.router.waitForExecutionContext(
-      injector.session_id,
-      {
-        timeout_ms: injector.injector_execution_context_timeout_ms,
-      },
-    );
-    await this.upstream.send(
-      Runtime.EnableCommand,
-      {},
-      { targetId: injector.target_id, sessionId: injector.session_id },
-    );
-    injector.execution_context_id = await ext_context;
+    await this.router.send(Runtime.EnableCommand.id, {}, injector.session_id);
     await Promise.all([
-      this.upstream.send(
-        Runtime.AddBindingCommand,
+      this.router.send(
+        Runtime.AddBindingCommand.id,
         { name: CUSTOM_EVENT_BINDING_NAME },
-        { targetId: injector.target_id, sessionId: injector.session_id },
+        injector.session_id,
       ),
       this.client.client_mirror_upstream_events
-        ? this.upstream.send(
-            Runtime.AddBindingCommand,
+        ? this.router.send(
+            Runtime.AddBindingCommand.id,
             { name: UPSTREAM_EVENT_BINDING_NAME },
-            { targetId: injector.target_id, sessionId: injector.session_id },
+            injector.session_id,
           )
         : Promise.resolve(),
     ]);
@@ -563,44 +552,11 @@ export class ModCDPClientBase<
         );
       }
       for (const step of command.steps) {
-        const step_params = step.params ?? {};
-        if (step.method === Runtime.CallFunctionOnCommand.id) {
-          const existing_execution_context_id =
-            step_params &&
-            typeof step_params === "object" &&
-            "executionContextId" in step_params &&
-            typeof step_params.executionContextId === "number"
-              ? step_params.executionContextId
-              : null;
-          const executionContextId =
-            existing_execution_context_id ??
-            injector.execution_context_id ??
-            (await this.router.waitForExecutionContext(injector.session_id, {
-              timeout_ms:
-                this.injector?.injector_execution_context_timeout_ms ??
-                DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
-            }));
-          result = await this.upstream.send(
-            Runtime.CallFunctionOnCommand.id,
-            this.types.parseCommandParams(Runtime.CallFunctionOnCommand.id, {
-              ...step_params,
-              executionContextId,
-            }),
-            injector.session_id,
-            {
-              timeout_ms: this.client.client_cdp_send_timeout_ms,
-            },
-          );
-        } else {
-          result = await this.upstream.send(
-            step.method,
-            step_params,
-            injector.session_id,
-            {
-              timeout_ms: this.client.client_cdp_send_timeout_ms,
-            },
-          );
-        }
+        result = await this.router.send(
+          step.method,
+          step.params ?? {},
+          injector.session_id,
+        );
         unwrap = step.unwrap ?? null;
       }
       result = unwrapResponseIfNeeded(result, unwrap);

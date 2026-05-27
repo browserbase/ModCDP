@@ -730,7 +730,9 @@ async function handleConnection(
     pending: new Map(), // upstream_id -> { kind, client_id?, client_session_id?, ... }
     ext_session_id: cdp.injector?.session_id ?? null,
     ext_target_id: cdp.injector?.target_id ?? null,
-    ext_execution_context_id: cdp.injector?.execution_context_id ?? null,
+    ext_execution_context_id: cdp.injector?.session_id
+      ? (cdp.router.execution_contexts.get(cdp.injector.session_id) ?? null)
+      : null,
     hidden_session_ids: new Set(), // sessions we attached for ourselves
     hidden_target_ids: new Set(), // SW target the client must never see
     target_session_ids: cdp.router.sessionId_from_targetId,

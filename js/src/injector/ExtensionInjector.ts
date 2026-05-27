@@ -227,7 +227,6 @@ export class ExtensionInjector {
   target_id: string | null;
   url: string | null;
   session_id: string | null;
-  execution_context_id: number | null;
   extra_args: string[];
   protected unusable_target_ids = new Set<string>();
   last_error: Error | null = null;
@@ -291,7 +290,6 @@ export class ExtensionInjector {
     this.target_id = null;
     this.url = null;
     this.session_id = null;
-    this.execution_context_id = null;
     this.extra_args = [];
   }
 
