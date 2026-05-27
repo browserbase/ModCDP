@@ -6,6 +6,7 @@ package router
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -312,6 +313,348 @@ func (r *AutoSessionRouter) EnsureExecutionContext(frame map[string]string, sele
 	return r.waitForExecutionContextMatching(func(context map[string]any) bool {
 		return context["targetId"] == routeTargetID && context["sessionId"] == sessionID && context["frameId"] == frameID && context["world"] == selector["world"]
 	}, firstNonEmptyString(sessionID, routeTargetID), 0)
+}
+
+func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, error) {
+	if params == nil {
+		params = map[string]any{}
+	}
+	objectGroup := fmt.Sprintf("modcdp-topology-%d", time.Now().UnixMilli())
+	targetResult, err := r.sendRaw("Target.getTargets", map[string]any{}, "")
+	if err != nil {
+		return nil, err
+	}
+	rawTargetInfos, _ := targetResult["targetInfos"].([]any)
+	targetInfos := []map[string]any{}
+	for _, rawTargetInfo := range rawTargetInfos {
+		targetInfo, _ := rawTargetInfo.(map[string]any)
+		if targetInfo == nil {
+			continue
+		}
+		targetInfos = append(targetInfos, targetInfo)
+		r.recordTarget(targetInfo)
+	}
+	rootTarget := r.resolveRootTarget(params, targetInfos)
+	if rootTarget == nil {
+		return nil, fmt.Errorf("Mod.getTopology could not resolve a page target.")
+	}
+	frames := map[string]map[string]any{}
+	rootTargetID, _ := rootTarget["targetId"].(string)
+	_, rootSessionID, err := r.enableTarget(rootTargetID)
+	if err != nil {
+		return nil, err
+	}
+	rootTreeResult, err := r.sendRaw("Page.getFrameTree", map[string]any{}, rootSessionID)
+	if err != nil {
+		return nil, err
+	}
+	rootTree, _ := rootTreeResult["frameTree"].(map[string]any)
+	if rootTree == nil {
+		return nil, fmt.Errorf("Page.getFrameTree returned no frameTree.")
+	}
+	rootFrameID, err := r.recordFrameTree(rootTree, rootTargetID, "", frames)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, target := range targetInfos {
+		parentFrameID, _ := target["parentFrameId"].(string)
+		targetID, _ := target["targetId"].(string)
+		if target["type"] != "iframe" || parentFrameID == "" || frames[targetID] != nil {
+			continue
+		}
+		_, sessionID, err := r.enableTarget(targetID)
+		if err != nil {
+			return nil, err
+		}
+		frameTreeResult, err := r.sendRaw("Page.getFrameTree", map[string]any{}, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		frameTree, _ := frameTreeResult["frameTree"].(map[string]any)
+		if frameTree != nil {
+			if _, err := r.recordFrameTree(frameTree, targetID, parentFrameID, frames); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	for frameID, frame := range frames {
+		parentFrameID, _ := frame["parentFrameId"].(string)
+		if parentFrameID == "" {
+			continue
+		}
+		parent := frames[parentFrameID]
+		if parent == nil {
+			continue
+		}
+		parentTargetID, _ := parent["targetId"].(string)
+		_, parentSessionID, err := r.EnsureRouteForTarget(parentTargetID)
+		if err != nil {
+			return nil, err
+		}
+		owner, err := r.sendRaw("DOM.getFrameOwner", map[string]any{"frameId": frameID}, parentSessionID)
+		if err != nil {
+			return nil, err
+		}
+		if backendNodeID, ok := intFromAny(owner["backendNodeId"]); ok {
+			frame["outerBackendNodeId"] = backendNodeID
+		}
+	}
+
+	contexts := map[string]map[string]any{}
+	roots := map[string]map[string]any{}
+	for frameID, frame := range frames {
+		frameTargetID, _ := frame["targetId"].(string)
+		context, err := r.EnsureExecutionContext(map[string]string{"frameId": frameID, "targetId": frameTargetID}, map[string]string{"world": "piercer"})
+		if err != nil {
+			return nil, err
+		}
+		contextTargetID, _ := context["targetId"].(string)
+		contextSessionID, _ := context["sessionId"].(string)
+		contextID, _ := intFromAny(context["id"])
+		contextUniqueID, _ := context["uniqueId"].(string)
+		contexts[contextKey(contextTargetID, contextSessionID, contextID, contextUniqueID)] = context
+		evaluateParams := map[string]any{"expression": "document.documentElement", "objectGroup": objectGroup}
+		if contextUniqueID != "" {
+			evaluateParams["uniqueContextId"] = contextUniqueID
+		} else {
+			evaluateParams["contextId"] = contextID
+		}
+		rootObject, err := r.sendRaw("Runtime.evaluate", evaluateParams, contextSessionID)
+		if err != nil {
+			return nil, err
+		}
+		result, _ := rootObject["result"].(map[string]any)
+		objectID, _ := result["objectId"].(string)
+		if objectID == "" {
+			return nil, fmt.Errorf("Mod.getTopology could not resolve document root for frameId=%s.", frameID)
+		}
+		described, err := r.sendRaw("DOM.describeNode", map[string]any{"objectId": objectID}, contextSessionID)
+		if err != nil {
+			return nil, err
+		}
+		node, _ := described["node"].(map[string]any)
+		root := map[string]any{
+			"kind":               "document",
+			"frameId":            frameID,
+			"outerBackendNodeId": frame["outerBackendNodeId"],
+			"innerBackendNodeId": nil,
+			"executionContextId": contextID,
+		}
+		if node != nil {
+			if backendNodeID, ok := intFromAny(node["backendNodeId"]); ok {
+				root["innerBackendNodeId"] = backendNodeID
+			}
+		}
+		if contextUniqueID != "" {
+			root["uniqueContextId"] = contextUniqueID
+		}
+		roots[objectID] = root
+	}
+
+	targetIDs := map[string]bool{}
+	for _, frame := range frames {
+		targetID, _ := frame["targetId"].(string)
+		if targetID != "" {
+			targetIDs[targetID] = true
+		}
+	}
+	for targetID := range targetIDs {
+		_, sessionID, err := r.EnsureRouteForTarget(targetID)
+		if err != nil {
+			return nil, err
+		}
+		document, err := r.sendRaw("DOM.getDocument", map[string]any{"depth": -1, "pierce": true}, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		root, _ := document["root"].(map[string]any)
+		if root != nil {
+			if err := r.recordShadowRoots(root, frames, roots, objectGroup, "", nil); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	for _, context := range r.contexts {
+		contextTargetID, _ := context["targetId"].(string)
+		if !targetIDs[contextTargetID] {
+			continue
+		}
+		contextSessionID, _ := context["sessionId"].(string)
+		contextID, _ := intFromAny(context["id"])
+		contextUniqueID, _ := context["uniqueId"].(string)
+		contexts[contextKey(contextTargetID, contextSessionID, contextID, contextUniqueID)] = context
+	}
+	targets := map[string]map[string]any{}
+	for targetID, target := range r.targets {
+		for _, targetInfo := range targetInfos {
+			if targetInfo["targetId"] == targetID {
+				targets[targetID] = target
+				break
+			}
+		}
+	}
+	return map[string]any{
+		"objectGroup": objectGroup,
+		"rootFrameId": rootFrameID,
+		"frames":      frames,
+		"roots":       roots,
+		"targets":     targets,
+		"contexts":    contexts,
+	}, nil
+}
+
+func (r *AutoSessionRouter) resolveRootTarget(params map[string]any, targetInfos []map[string]any) map[string]any {
+	requestedTargetID, _ := params["rootTargetId"].(string)
+	if requestedTargetID == "" {
+		requestedTargetID, _ = params["targetId"].(string)
+	}
+	if requestedTargetID != "" {
+		for _, target := range targetInfos {
+			if target["targetId"] == requestedTargetID {
+				return target
+			}
+		}
+		return nil
+	}
+	for _, target := range targetInfos {
+		targetURL, _ := target["url"].(string)
+		if target["type"] == "page" && !strings.HasPrefix(targetURL, "devtools://") {
+			return target
+		}
+	}
+	return nil
+}
+
+func (r *AutoSessionRouter) enableTarget(targetID string) (string, string, error) {
+	routeTargetID, sessionID, err := r.EnsureRouteForTarget(targetID)
+	if err != nil {
+		return "", "", err
+	}
+	for _, command := range []struct {
+		method string
+		params map[string]any
+	}{
+		{method: "Page.enable", params: map[string]any{}},
+		{method: "DOM.enable", params: map[string]any{}},
+		{method: "Runtime.enable", params: map[string]any{}},
+		{method: "Target.setAutoAttach", params: targetAutoAttachParams},
+	} {
+		if _, err := r.sendRaw(command.method, command.params, sessionID); err != nil && command.method != "Target.setAutoAttach" {
+			return "", "", err
+		}
+	}
+	return routeTargetID, sessionID, nil
+}
+
+func (r *AutoSessionRouter) recordFrameTree(tree map[string]any, targetID string, parentFrameID string, frames map[string]map[string]any) (string, error) {
+	frame, _ := tree["frame"].(map[string]any)
+	if frame == nil {
+		return "", fmt.Errorf("frame tree entry is missing frame.")
+	}
+	frameID, _ := frame["id"].(string)
+	if frameID == "" {
+		return "", fmt.Errorf("frame tree entry is missing frame.id.")
+	}
+	childParentFrameID := parentFrameID
+	if currentParentFrameID, _ := frame["parentId"].(string); currentParentFrameID != "" {
+		childParentFrameID = currentParentFrameID
+	}
+	frames[frameID] = map[string]any{
+		"targetId":      targetID,
+		"url":           frame["url"],
+		"parentFrameId": childParentFrameID,
+	}
+	childFrames, _ := tree["childFrames"].([]any)
+	for _, rawChild := range childFrames {
+		child, _ := rawChild.(map[string]any)
+		if child == nil {
+			continue
+		}
+		if _, err := r.recordFrameTree(child, targetID, frameID, frames); err != nil {
+			return "", err
+		}
+	}
+	return frameID, nil
+}
+
+func (r *AutoSessionRouter) recordShadowRoots(node map[string]any, frames map[string]map[string]any, roots map[string]map[string]any, objectGroup string, frameID string, outerBackendNodeID any) error {
+	currentFrameID := frameID
+	if nodeFrameID, _ := node["frameId"].(string); nodeFrameID != "" {
+		currentFrameID = nodeFrameID
+	}
+	shadowRoots, _ := node["shadowRoots"].([]any)
+	for _, rawShadowRoot := range shadowRoots {
+		shadowRoot, _ := rawShadowRoot.(map[string]any)
+		if shadowRoot == nil {
+			continue
+		}
+		if currentFrameID != "" {
+			frame := frames[currentFrameID]
+			if frame != nil {
+				frameTargetID, _ := frame["targetId"].(string)
+				context := r.findExecutionContext(frameTargetID, "", currentFrameID, map[string]string{"world": "piercer"})
+				backendNodeID, backendNodeIDOK := intFromAny(shadowRoot["backendNodeId"])
+				if context != nil && backendNodeIDOK {
+					contextSessionID, _ := context["sessionId"].(string)
+					contextID, _ := intFromAny(context["id"])
+					resolved, err := r.sendRaw(
+						"DOM.resolveNode",
+						map[string]any{"backendNodeId": backendNodeID, "executionContextId": contextID, "objectGroup": objectGroup},
+						contextSessionID,
+					)
+					if err != nil {
+						return err
+					}
+					remoteObject, _ := resolved["object"].(map[string]any)
+					objectID, _ := remoteObject["objectId"].(string)
+					if objectID != "" {
+						contextUniqueID, _ := context["uniqueId"].(string)
+						rootOuterBackendNodeID := outerBackendNodeID
+						if rootOuterBackendNodeID == nil {
+							rootOuterBackendNodeID = node["backendNodeId"]
+						}
+						root := map[string]any{
+							"kind":               "shadow",
+							"frameId":            currentFrameID,
+							"outerBackendNodeId": rootOuterBackendNodeID,
+							"innerBackendNodeId": backendNodeID,
+							"mode":               shadowRoot["shadowRootType"],
+							"executionContextId": contextID,
+						}
+						if contextUniqueID != "" {
+							root["uniqueContextId"] = contextUniqueID
+						}
+						roots[objectID] = root
+					}
+				}
+			}
+		}
+		if err := r.recordShadowRoots(shadowRoot, frames, roots, objectGroup, currentFrameID, node["backendNodeId"]); err != nil {
+			return err
+		}
+	}
+	children, _ := node["children"].([]any)
+	for _, rawChild := range children {
+		child, _ := rawChild.(map[string]any)
+		if child == nil {
+			continue
+		}
+		if err := r.recordShadowRoots(child, frames, roots, objectGroup, currentFrameID, outerBackendNodeID); err != nil {
+			return err
+		}
+	}
+	contentDocument, _ := node["contentDocument"].(map[string]any)
+	if contentDocument != nil {
+		contentFrameID := currentFrameID
+		if documentFrameID, _ := contentDocument["frameId"].(string); documentFrameID != "" {
+			contentFrameID = documentFrameID
+		}
+		return r.recordShadowRoots(contentDocument, frames, roots, objectGroup, contentFrameID, outerBackendNodeID)
+	}
+	return nil
 }
 
 func (r *AutoSessionRouter) recordTarget(targetInfo map[string]any) {

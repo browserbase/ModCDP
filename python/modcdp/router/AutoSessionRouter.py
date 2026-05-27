@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -196,6 +197,95 @@ class AutoSessionRouter:
             session_id or route_target_id,
         )
 
+    def getTopology(self, params: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        object_group = f"modcdp-topology-{int(time.time() * 1000)}"
+        raw_target_infos = self._send("Target.getTargets", {}, None).get("targetInfos")
+        target_infos = [dict(target) for target in raw_target_infos if isinstance(target, Mapping)] if isinstance(raw_target_infos, list) else []
+        for target_info in target_infos:
+            self._recordTarget(target_info)
+        root_target = self._resolveRootTarget(dict(params or {}), target_infos)
+        if root_target is None:
+            raise RuntimeError("Mod.getTopology could not resolve a page target.")
+        frames: dict[str, dict[str, Any]] = {}
+        root_target_id = str(root_target["targetId"])
+        _root_route_target_id, root_session_id = self._enableTarget(root_target_id)
+        root_tree = self._send("Page.getFrameTree", {}, root_session_id).get("frameTree")
+        if not isinstance(root_tree, Mapping):
+            raise RuntimeError("Page.getFrameTree returned no frameTree.")
+        root_frame_id = self._recordFrameTree(root_tree, root_target_id, None, frames)
+
+        oopif_targets = [
+            target
+            for target in target_infos
+            if target.get("type") == "iframe" and isinstance(target.get("parentFrameId"), str) and target.get("targetId") not in frames
+        ]
+        for target in oopif_targets:
+            target_id = str(target["targetId"])
+            _route_target_id, session_id = self._enableTarget(target_id)
+            frame_tree = self._send("Page.getFrameTree", {}, session_id).get("frameTree")
+            if isinstance(frame_tree, Mapping):
+                self._recordFrameTree(frame_tree, target_id, str(target.get("parentFrameId")), frames)
+
+        for frame_id, frame in list(frames.items()):
+            parent_frame_id = frame.get("parentFrameId")
+            if not isinstance(parent_frame_id, str):
+                continue
+            parent = frames.get(parent_frame_id)
+            if parent is None:
+                continue
+            _parent_target_id, parent_session_id = self.ensureRouteForTarget(str(parent["targetId"]))
+            owner = self._send("DOM.getFrameOwner", {"frameId": frame_id}, parent_session_id)
+            backend_node_id = owner.get("backendNodeId")
+            if isinstance(backend_node_id, int):
+                frame["outerBackendNodeId"] = backend_node_id
+
+        contexts: dict[str, dict[str, Any]] = {}
+        roots: dict[str, dict[str, Any]] = {}
+        for frame_id, frame in list(frames.items()):
+            context = self.ensureExecutionContext({"frameId": frame_id, "targetId": str(frame["targetId"])}, {"world": "piercer"})
+            contexts[self._contextKey(str(context["targetId"]), context.get("sessionId") if isinstance(context.get("sessionId"), str) else None, int(context["id"]), context.get("uniqueId"))] = context
+            evaluate_params: dict[str, Any] = {"expression": "document.documentElement", "objectGroup": object_group}
+            if isinstance(context.get("uniqueId"), str):
+                evaluate_params["uniqueContextId"] = context["uniqueId"]
+            else:
+                evaluate_params["contextId"] = context["id"]
+            root_object = self._send("Runtime.evaluate", evaluate_params, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
+            result = root_object.get("result") if isinstance(root_object.get("result"), Mapping) else {}
+            object_id = result.get("objectId")
+            if not isinstance(object_id, str) or not object_id:
+                raise RuntimeError(f"Mod.getTopology could not resolve document root for frameId={frame_id}.")
+            described = self._send("DOM.describeNode", {"objectId": object_id}, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
+            node = described.get("node") if isinstance(described.get("node"), Mapping) else {}
+            roots[object_id] = {
+                "kind": "document",
+                "frameId": frame_id,
+                "outerBackendNodeId": frame.get("outerBackendNodeId"),
+                "innerBackendNodeId": node.get("backendNodeId"),
+                "executionContextId": context["id"],
+                **({"uniqueContextId": context["uniqueId"]} if isinstance(context.get("uniqueId"), str) else {}),
+            }
+
+        for target_id in {str(frame["targetId"]) for frame in frames.values()}:
+            _route_target_id, session_id = self.ensureRouteForTarget(target_id)
+            document = self._send("DOM.getDocument", {"depth": -1, "pierce": True}, session_id)
+            root = document.get("root")
+            if isinstance(root, Mapping):
+                self._recordShadowRoots(root, frames, roots, object_group)
+
+        frame_target_ids = {frame.get("targetId") for frame in frames.values()}
+        for context in self.contexts.values():
+            if context.get("targetId") in frame_target_ids:
+                contexts[self._contextKey(str(context["targetId"]), context.get("sessionId") if isinstance(context.get("sessionId"), str) else None, int(context["id"]), context.get("uniqueId"))] = context
+
+        return {
+            "objectGroup": object_group,
+            "rootFrameId": root_frame_id,
+            "frames": frames,
+            "roots": roots,
+            "targets": {target_id: target for target_id, target in self.targets.items() if any(info.get("targetId") == target_id for info in target_infos)},
+            "contexts": contexts,
+        }
+
     def _recordTarget(self, target_info: Mapping[str, Any]) -> None:
         target_id = target_info.get("targetId")
         if not isinstance(target_id, str):
@@ -301,6 +391,106 @@ class AutoSessionRouter:
                     self.contexts.pop(context_key, None)
                 elif target_id is not None and context.get("targetId") == target_id:
                     self.contexts.pop(context_key, None)
+
+    def _resolveRootTarget(self, params: Mapping[str, Any], target_infos: list[dict[str, Any]]) -> dict[str, Any] | None:
+        requested_target_id = params.get("rootTargetId") or params.get("targetId")
+        if isinstance(requested_target_id, str) and requested_target_id:
+            return next((target for target in target_infos if target.get("targetId") == requested_target_id), None)
+        return next(
+            (
+                target
+                for target in target_infos
+                if target.get("type") == "page" and not (isinstance(target.get("url"), str) and str(target["url"]).startswith("devtools://"))
+            ),
+            None,
+        )
+
+    def _enableTarget(self, target_id: str) -> tuple[str, str | None]:
+        route_target_id, session_id = self.ensureRouteForTarget(target_id)
+        for method, params in (
+            ("Page.enable", {}),
+            ("DOM.enable", {}),
+            ("Runtime.enable", {}),
+            ("Target.setAutoAttach", targetAutoAttachParams),
+        ):
+            try:
+                self._send(method, params, session_id)
+            except Exception:
+                if method != "Target.setAutoAttach":
+                    raise
+        return route_target_id, session_id
+
+    def _recordFrameTree(self, tree: Mapping[str, Any], target_id: str, parent_frame_id: str | None, frames: dict[str, dict[str, Any]]) -> str:
+        frame = tree.get("frame")
+        if not isinstance(frame, Mapping):
+            raise RuntimeError("frame tree entry is missing frame.")
+        frame_id = frame.get("id")
+        if not isinstance(frame_id, str):
+            raise RuntimeError("frame tree entry is missing frame.id.")
+        frames[frame_id] = {
+            "targetId": target_id,
+            "url": frame.get("url"),
+            "parentFrameId": frame.get("parentId") if isinstance(frame.get("parentId"), str) else parent_frame_id,
+        }
+        child_frames = tree.get("childFrames")
+        if isinstance(child_frames, list):
+            for child in child_frames:
+                if isinstance(child, Mapping):
+                    self._recordFrameTree(child, target_id, frame_id, frames)
+        return frame_id
+
+    def _recordShadowRoots(
+        self,
+        node: Mapping[str, Any],
+        frames: dict[str, dict[str, Any]],
+        roots: dict[str, dict[str, Any]],
+        object_group: str,
+        frame_id: str | None = None,
+        outer_backend_node_id: int | None = None,
+    ) -> None:
+        current_frame_id = node.get("frameId") if isinstance(node.get("frameId"), str) else frame_id
+        shadow_roots = node.get("shadowRoots")
+        if isinstance(shadow_roots, list):
+            for shadow_root in shadow_roots:
+                if not isinstance(shadow_root, Mapping):
+                    continue
+                if current_frame_id:
+                    frame = frames.get(current_frame_id)
+                    context = self._findExecutionContext(str(frame["targetId"]), None, current_frame_id, {"world": "piercer"}) if frame else None
+                    if frame and context and isinstance(shadow_root.get("backendNodeId"), int):
+                        resolved = self._send(
+                            "DOM.resolveNode",
+                            {"backendNodeId": shadow_root["backendNodeId"], "executionContextId": context["id"], "objectGroup": object_group},
+                            context.get("sessionId") if isinstance(context.get("sessionId"), str) else None,
+                        )
+                        remote_object = resolved.get("object") if isinstance(resolved.get("object"), Mapping) else {}
+                        object_id = remote_object.get("objectId")
+                        if isinstance(object_id, str):
+                            roots[object_id] = {
+                                "kind": "shadow",
+                                "frameId": current_frame_id,
+                                "outerBackendNodeId": outer_backend_node_id if outer_backend_node_id is not None else node.get("backendNodeId"),
+                                "innerBackendNodeId": shadow_root.get("backendNodeId"),
+                                "mode": shadow_root.get("shadowRootType"),
+                                "executionContextId": context["id"],
+                                **({"uniqueContextId": context["uniqueId"]} if isinstance(context.get("uniqueId"), str) else {}),
+                            }
+                self._recordShadowRoots(shadow_root, frames, roots, object_group, current_frame_id, node.get("backendNodeId") if isinstance(node.get("backendNodeId"), int) else None)
+        children = node.get("children")
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, Mapping):
+                    self._recordShadowRoots(child, frames, roots, object_group, current_frame_id, outer_backend_node_id)
+        content_document = node.get("contentDocument")
+        if isinstance(content_document, Mapping):
+            self._recordShadowRoots(
+                content_document,
+                frames,
+                roots,
+                object_group,
+                content_document.get("frameId") if isinstance(content_document.get("frameId"), str) else current_frame_id,
+                outer_backend_node_id,
+            )
 
     def _callFunctionOnParamsForRoute(self, params: Mapping[str, Any], target_id: str, session_id: str | None) -> dict[str, Any]:
         call_params = dict(params)
