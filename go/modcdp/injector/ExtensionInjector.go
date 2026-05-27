@@ -52,6 +52,7 @@ type ExtensionInjector struct {
 	Config            InjectorConfig
 	UnusableTargetIDs map[string]bool
 	LastError         error
+	ExtraArgs         []string
 }
 
 func NewExtensionInjector(config InjectorConfig) ExtensionInjector {
@@ -150,7 +151,10 @@ func (i *ExtensionInjector) Update(config InjectorConfig) *ExtensionInjector {
 }
 
 func (i ExtensionInjector) ConfigForLauncher() LauncherConfig {
-	return LauncherConfig{}
+	return LauncherConfig{
+		LauncherLocalExtraArgs: i.ExtraArgs,
+		LauncherBBExtensionID:  i.Config.InjectorBBExtensionID,
+	}
 }
 
 func (i ExtensionInjector) ConfigForUpstream() map[string]any {

@@ -50,13 +50,6 @@ def route_for(method: str, routes: ModCDPRoutes) -> str:
     return "direct_cdp"
 
 
-def _required_string(params: ProtocolParams, name: str) -> str:
-    value = params.get(name)
-    if not isinstance(value, str) or not value:
-        raise TypeError(f"{name} must be a non-empty string")
-    return value
-
-
 def _optional_string(params: ProtocolParams, name: str) -> str | None:
     value = params.get(name)
     if value is None:
@@ -78,81 +71,6 @@ def _call_function_params(function_declaration: str) -> RuntimeCallFunctionOnPar
     }
 
 
-def _wrap_modcdp_evaluate(
-    params: ProtocolParams,
-    cdp_session_id: str | None = None,
-) -> RuntimeCallFunctionOnParams:
-    expression = _required_string(params, "expression")
-    user_params = params.get("params", {})
-    resolved_cdp_session_id = _optional_string(params, "cdpSessionId") or cdp_session_id
-    return _call_function_params(
-        "async function() {\n"
-        f"  const params = {json.dumps(user_params)};\n"
-        f"  const cdp = globalThis.ModCDP.attachToSession({json.dumps(resolved_cdp_session_id)});\n"
-        "  const ModCDP = globalThis.ModCDP;\n"
-        "  const chrome = globalThis.chrome;\n"
-        f"  const value = ({expression});\n"
-        "  return typeof value === 'function' ? await value(params) : value;\n"
-        "}"
-    )
-
-
-def _wrap_modcdp_add_custom_command(params: ProtocolParams) -> RuntimeCallFunctionOnParams:
-    name = _required_string(params, "name")
-    expression = _required_string(params, "expression")
-    return _call_function_params(
-        "function() {\n"
-        "  return globalThis.ModCDP.addCustomCommand({\n"
-        f"    name: {json.dumps(name)},\n"
-        "    params_schema: null,\n"
-        "    result_schema: null,\n"
-        f"    expression: {json.dumps(expression)},\n"
-        "    handler: async (params, cdpSessionId, method) => {\n"
-        "      const cdp = globalThis.ModCDP.attachToSession(cdpSessionId);\n"
-        "      const ModCDP = globalThis.ModCDP;\n"
-        "      const chrome = globalThis.chrome;\n"
-        f"      const handler = ({expression});\n"
-        "      return await handler(params || {}, method);\n"
-        "    },\n"
-        "  });\n"
-        "}"
-    )
-
-
-def _wrap_modcdp_add_custom_event(params: ProtocolParams) -> RuntimeCallFunctionOnParams:
-    name = _required_string(params, "name")
-    return _call_function_params(
-        "function() {\n"
-        "  return globalThis.ModCDP.addCustomEvent({\n"
-        f"  name: {json.dumps(name)},\n"
-        "  event_schema: null,\n"
-        "  });\n"
-        "}"
-    )
-
-
-def _wrap_modcdp_add_middleware(params: ProtocolParams) -> RuntimeCallFunctionOnParams:
-    phase = _required_string(params, "phase")
-    expression = _required_string(params, "expression")
-    name = _optional_string(params, "name") or "*"
-    return _call_function_params(
-        "function() {\n"
-        "  return globalThis.ModCDP.addMiddleware({\n"
-        f"    name: {json.dumps(name)},\n"
-        f"    phase: {json.dumps(phase)},\n"
-        f"    expression: {json.dumps(expression)},\n"
-        "    handler: async (payload, next, context = {}) => {\n"
-        "      const cdp = globalThis.ModCDP.attachToSession(context.cdpSessionId ?? null);\n"
-        "      const ModCDP = globalThis.ModCDP;\n"
-        "      const chrome = globalThis.chrome;\n"
-        f"      const middleware = ({expression});\n"
-        "      return await middleware(payload, next, context);\n"
-        "    },\n"
-        "  });\n"
-        "}"
-    )
-
-
 def _wrap_custom_command(method: str, params: ProtocolParams, session_id: str | None) -> RuntimeCallFunctionOnParams:
     runtime_params = _call_function_params(
         "async function(method, paramsJson, cdpSessionId) { "
@@ -168,25 +86,13 @@ def _wrap_service_worker_command(
     params: ProtocolParams,
     cdp_session_id: str | None = None,
 ) -> list[TranslatedStep]:
-    if method == "Mod.addCustomEvent":
-        return [
-            {
-                "method": "Runtime.callFunctionOn",
-                "params": _wrap_modcdp_add_custom_event(params),
-                "unwrap": "runtime",
-            },
-        ]
-    unwrap = "runtime"
-    if method == "Mod.evaluate":
-        runtime_params = _wrap_modcdp_evaluate(params, cdp_session_id)
-    elif method == "Mod.addCustomCommand":
-        runtime_params = _wrap_modcdp_add_custom_command(params)
-    elif method == "Mod.addMiddleware":
-        runtime_params = _wrap_modcdp_add_middleware(params)
-    else:
-        runtime_params = _wrap_custom_command(method, params, _optional_string(params, "cdpSessionId") or cdp_session_id)
-        unwrap = "runtime_json"
-    return [{"method": "Runtime.callFunctionOn", "params": runtime_params, "unwrap": unwrap}]
+    return [
+        {
+            "method": "Runtime.callFunctionOn",
+            "params": _wrap_custom_command(method, params, _optional_string(params, "cdpSessionId") or cdp_session_id),
+            "unwrap": "runtime_json",
+        }
+    ]
 
 
 def wrap_command_if_needed(

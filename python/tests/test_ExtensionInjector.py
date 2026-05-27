@@ -20,8 +20,9 @@ class ExtensionInjectorTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(injector.configForUpstream(), {"injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
-        self.assertEqual(injector.configForLauncher(), {})
+        self.assertEqual(injector.config.injector_service_worker_extension_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        self.assertEqual(injector.configForUpstream(), {})
+        self.assertEqual(injector.extra_args, [])
         self.assertTrue(
             injector._serviceWorkerTargetMatches(
                 {

@@ -23,8 +23,8 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker
 		Launcher: modcdp.LauncherConfig{LauncherMode: "local", LauncherLocalHeadless: &headless},
 		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorConfig{
-			InjectorMode:                     "cli",
-			InjectorCLIExtensionPath:         extensionPath,
+			InjectorMode:                     "cdp",
+			InjectorCDPExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},

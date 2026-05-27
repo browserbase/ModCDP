@@ -22,8 +22,8 @@ class BorrowExtensionInjectorTests(unittest.TestCase):
             launcher={"launcher_mode": "local", "launcher_local_headless": True},
             upstream={"upstream_mode": "ws"},
             injector={
-                "injector_mode": "cli",
-                "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_mode": "cdp",
+                "injector_cdp_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },

@@ -138,6 +138,7 @@ class ExtensionInjector:
         self.target_id: str | None = None
         self.url: str | None = None
         self.session_id: str | None = None
+        self.extra_args: list[str] = []
 
     def update(self, config: InjectorConfig | dict[str, Any] | None = None) -> "ExtensionInjector":
         incoming = _injector_config(config)
@@ -145,7 +146,10 @@ class ExtensionInjector:
         return self
 
     def configForLauncher(self) -> LauncherConfig | dict[str, Any]:
-        return {}
+        return {
+            "launcher_local_extra_args": self.extra_args,
+            "launcher_bb_extension_id": self.config.injector_bb_extension_id,
+        }
 
     def configForUpstream(self) -> dict[str, Any]:
         return {}

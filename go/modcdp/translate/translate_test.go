@@ -43,10 +43,21 @@ func TestTranslateRoutesWrapsAndUnwrapsModCDPProtocolMessagesDeterministically(t
 	if wrapped.Steps[0].Method != "Runtime.callFunctionOn" {
 		t.Fatalf("wrapped step = %#v", wrapped.Steps[0])
 	}
-	if !strings.Contains(stringValue(wrapped.Steps[0].Params["functionDeclaration"]), `attachToSession("session-1")`) {
+	if !strings.Contains(stringValue(wrapped.Steps[0].Params["functionDeclaration"]), "globalThis.ModCDP.handleCommand") {
 		t.Fatalf("functionDeclaration = %s", wrapped.Steps[0].Params["functionDeclaration"])
 	}
-	if wrapped.Steps[0].Unwrap != "runtime" {
+	wrappedArguments := wrapped.Steps[0].Params["arguments"].([]map[string]any)
+	var wrappedPayload map[string]any
+	if err := json.Unmarshal([]byte(wrappedArguments[1]["value"].(string)), &wrappedPayload); err != nil {
+		t.Fatal(err)
+	}
+	if wrappedPayload["expression"] != "({ ok: true })" || wrappedPayload["params"].(map[string]any)["value"].(float64) != 1 {
+		t.Fatalf("wrapped payload = %#v", wrappedPayload)
+	}
+	if wrappedArguments[2]["value"] != "session-1" {
+		t.Fatalf("session argument = %#v", wrappedArguments[2])
+	}
+	if wrapped.Steps[0].Unwrap != "runtime_json" {
 		t.Fatalf("unwrap = %q", wrapped.Steps[0].Unwrap)
 	}
 

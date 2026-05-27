@@ -19,12 +19,14 @@ func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
 		InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 	})
 
-	transportConfig := injector.ConfigForUpstream()
-	if transportConfig["injector_extension_id"] != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
-		t.Fatalf("injector_extension_id = %v", transportConfig["injector_extension_id"])
+	if injector.Config.InjectorServiceWorkerExtensionID != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("InjectorServiceWorkerExtensionID = %v", injector.Config.InjectorServiceWorkerExtensionID)
 	}
-	if len(injector.ConfigForLauncher().LauncherLocalExtraArgs) != 0 {
-		t.Fatalf("expected empty launcher config")
+	if len(injector.ConfigForUpstream()) != 0 {
+		t.Fatalf("expected empty upstream config")
+	}
+	if len(injector.ExtraArgs) != 0 {
+		t.Fatalf("expected empty extra args")
 	}
 	if !injector.ServiceWorkerTargetMatches(map[string]any{
 		"targetId": "target-1",

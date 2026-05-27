@@ -35,8 +35,12 @@ class TranslateTests(unittest.TestCase):
         )
         self.assertEqual(wrapped["target"], "service_worker")
         self.assertEqual(wrapped["steps"][0]["method"], "Runtime.callFunctionOn")
-        self.assertIn('attachToSession("session-1")', str(wrapped["steps"][0].get("params", {}).get("functionDeclaration")))
-        self.assertEqual(wrapped["steps"][0].get("unwrap"), "runtime")
+        wrapped_step_params = wrapped["steps"][0].get("params", {})
+        self.assertIn("globalThis.ModCDP.handleCommand", str(wrapped_step_params.get("functionDeclaration")))
+        wrapped_arguments = cast("list[dict[str, object]]", wrapped_step_params.get("arguments", []))
+        self.assertEqual(json.loads(str(wrapped_arguments[1].get("value"))), {"expression": "({ ok: true })", "params": {"value": 1}})
+        self.assertEqual(wrapped_arguments[2].get("value"), "session-1")
+        self.assertEqual(wrapped["steps"][0].get("unwrap"), "runtime_json")
 
         configured = wrap_command_if_needed(
             "Mod.configure",
