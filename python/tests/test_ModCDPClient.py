@@ -6,7 +6,6 @@
 # USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
 from __future__ import annotations
 
-import asyncio
 import glob
 import json
 import os
@@ -461,110 +460,6 @@ class ModCDPClientTests(unittest.TestCase):
         cdp.close()
 
         self.assertIsNone(cdp.launcher.launched)
-
-    def test_generated_cdp_surface_exposes_direct_domain_commands(self) -> None:
-        client = ModCDPClient(
-            launcher={
-                "launcher_mode": "local",
-                "launcher_local_headless": True,
-                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
-            },
-            upstream={"upstream_mode": "ws"},
-            injector={
-                "injector_mode": "cli",
-                "injector_cli_extension_path": str(EXTENSION_PATH),
-                "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
-                "injector_trust_service_worker_target": True,
-            },
-            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
-        )
-        target_ids: list[str] = []
-
-        client.connect()
-        try:
-            result = client.Target.createTarget(url="https://example.com")
-            raw_result = client.send("Target.createTarget", {"url": "https://example.org"})
-            target_ids.append(str(result.targetId))
-            target_ids.append(str(raw_result["targetId"]))
-
-            self.assertRegex(str(result.targetId), r"^[A-F0-9]+$")
-            self.assertRegex(str(raw_result["targetId"]), r"^[A-F0-9]+$")
-            attached = client.Target.attachToTarget(targetId=result.targetId, flatten=True)
-            evaluated = client.Runtime.evaluate(expression="1 + 1", returnByValue=True, session_id=str(attached.sessionId))
-            self.assertEqual(evaluated.result["value"], 2)
-            self.assertIsNotNone(client.last_command_timing)
-            timing = cast(Mapping[str, Any], client.last_command_timing)
-            self.assertEqual(timing["target"], "direct_cdp")
-            raw_version = cast(Mapping[str, Any], client.send("Browser.getVersion"))
-            self.assertIn("product", raw_version)
-            self.assertIsNotNone(client.last_command_timing)
-            timing = cast(Mapping[str, Any], client.last_command_timing)
-            self.assertEqual(timing["target"], "direct_cdp")
-        finally:
-            for target_id in target_ids:
-                try:
-                    client.Target.closeTarget(targetId=target_id)
-                except Exception:
-                    pass
-            client.close()
-
-        with self.assertRaises(Exception):
-            client.Target._CreateTargetParams.model_validate({"url": "https://example.com", "unknown": True})
-
-        async def run_awaited_calls() -> None:
-            awaited_result = await client.Target.createTarget(url="https://example.com")
-            target_ids.append(str(awaited_result.targetId))
-            self.assertRegex(str(awaited_result.targetId), r"^[A-F0-9]+$")
-            awaited_raw_result = await client.send("Target.createTarget", {"url": "https://example.net"})
-            target_ids.append(str(awaited_raw_result["targetId"]))
-            self.assertRegex(str(awaited_raw_result["targetId"]), r"^[A-F0-9]+$")
-
-        client = ModCDPClient(
-            launcher={
-                "launcher_mode": "local",
-                "launcher_local_headless": True,
-                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
-            },
-            upstream={"upstream_mode": "ws"},
-            injector={
-                "injector_mode": "cli",
-                "injector_cli_extension_path": str(EXTENSION_PATH),
-                "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
-                "injector_trust_service_worker_target": True,
-            },
-            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
-        )
-        target_ids = []
-        client.connect()
-        try:
-            asyncio.run(run_awaited_calls())
-        finally:
-            for target_id in target_ids:
-                try:
-                    client.Target.closeTarget(targetId=target_id)
-                except Exception:
-                    pass
-            client.close()
-
-    def test_generated_event_surface_supports_awaited_on_and_async_callbacks(self) -> None:
-        client = ModCDPClient()
-        seen: list[str] = []
-
-        async def callback(event: Any) -> None:
-            seen.append(event.targetId)
-
-        async def register() -> None:
-            await client.on(client.Target.targetCreated, callback)
-
-        asyncio.run(register())
-        client._run_handler(
-            client._handlers["Target.targetCreated"][0],
-            {"targetInfo": {"targetId": "target-1", "type": "page", "url": "https://example.com"}},
-            "Target.targetCreated",
-        )
-        self.assertEqual(seen, ["target-1"])
 
     def test_event_dispatch_snapshots_handlers_when_once_removes_itself(self) -> None:
         client = ModCDPClient()

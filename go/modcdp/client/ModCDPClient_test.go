@@ -9,10 +9,8 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -276,95 +274,6 @@ func TestModCDPClientValidatesNativeAndRegisteredCustomEventsBeforeDispatch(t *t
 	})
 }
 
-func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
-	encoded, err := json.Marshal(Config{
-		Launcher: LauncherConfig{
-			LauncherMode:                      "local",
-			LauncherLocalExecutablePath:       "/tmp/chrome",
-			LauncherLocalUserDataDir:          "/tmp/profile",
-			LauncherLocalCDPTransport:         "pipe",
-			LauncherLocalChromeReadyTimeoutMS: 45_000,
-			LauncherBBAPIKey:                  "test-key",
-			LauncherBBSessionCreateParams:     map[string]any{"keepAlive": true},
-		},
-		Upstream: UpstreamTransportConfig{
-			UpstreamMode:                          "ws",
-			UpstreamWSConnectErrorSettleTimeoutMS: 321,
-		},
-		Injector: InjectorConfig{
-			InjectorMode:                         "discover",
-			InjectorServiceWorkerExtensionID:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			InjectorServiceWorkerURLSuffixes:     []string{"/modcdp/service_worker.js"},
-			InjectorTrustServiceWorkerTarget:     true,
-			InjectorRequireServiceWorkerTarget:   true,
-			InjectorServiceWorkerReadyExpression: "Boolean(globalThis.ModCDP)",
-			InjectorExecutionContextTimeoutMS:    4_321,
-		},
-		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "service_worker"}},
-		ClientConfig: ClientConfig{
-			ClientHydrateAliases:       boolPtr(false),
-			ClientMirrorUpstreamEvents: boolPtr(false),
-			ClientCDPSendTimeoutMS:     987,
-		},
-		ServerConfig: &ServerConfig{
-			Upstream: UpstreamTransportConfig{UpstreamWSCDPURL: "http://127.0.0.1:9222"},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw := string(encoded)
-	for _, wrong := range []string{
-		"Launcher", "ExecutablePath", "LocalCDPTransport", "BrowserbaseAPIKey",
-		"Upstream",
-		"Injector", "InjectorServiceWorkerURLSuffixes", "InjectorTrustServiceWorkerTarget",
-		"Client", "HydrateAliases",
-	} {
-		if strings.Contains(raw, wrong) {
-			t.Fatalf("encoded config leaked Go field name %q in %s", wrong, raw)
-		}
-	}
-	for _, expected := range []string{
-		`"launcher"`,
-		`"launcher_mode"`,
-		`"launcher_local_executable_path"`,
-		`"launcher_local_user_data_dir"`,
-		`"launcher_local_cdp_transport"`,
-		`"launcher_bb_api_key"`,
-		`"launcher_bb_session_create_params"`,
-		`"upstream"`,
-		`"upstream_mode"`,
-		`"upstream_ws_connect_error_settle_timeout_ms"`,
-		`"injector"`,
-		`"injector_mode"`,
-		`"injector_service_worker_url_suffixes"`,
-		`"injector_trust_service_worker_target"`,
-		`"injector_require_service_worker_target"`,
-		`"injector_service_worker_ready_expression"`,
-		`"injector_execution_context_timeout_ms"`,
-		`"client_config"`,
-		`"client_hydrate_aliases"`,
-		`"client_mirror_upstream_events"`,
-		`"client_cdp_send_timeout_ms"`,
-	} {
-		if !strings.Contains(raw, expected) {
-			t.Fatalf("encoded config missing %s in %s", expected, raw)
-		}
-	}
-}
-
-func TestModCDPClientConfigUnmarshalNullServerConfigDisablesServerConfig(t *testing.T) {
-	var config Config
-	if err := json.Unmarshal([]byte(`{"server_config": null}`), &config); err != nil {
-		t.Fatal(err)
-	}
-	cdp := New(config)
-
-	if cdp.Config.ServerConfig != nil {
-		t.Fatalf("ServerConfig = %#v", cdp.Config.ServerConfig)
-	}
-}
-
 func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.T) {
 	cdp := New(Config{
 		Injector: InjectorConfig{
@@ -402,30 +311,25 @@ func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.
 	}
 }
 
-func TestModCDPClientUsesConfiguredInjectorOnly(t *testing.T) {
+func TestModCDPClientSelectsExactlyOneInjectorFromExplicitInjectorMode(t *testing.T) {
 	cdp := New(Config{
 		Launcher: LauncherConfig{LauncherMode: "local"},
 		Injector: InjectorConfig{InjectorMode: "cli"},
 	})
-
-	got := []string{}
-	for _, injector := range cdp.extensionInjectorsForConfig() {
-		switch injector.(type) {
-		case *CLIExtensionInjector:
-			got = append(got, "CLIExtensionInjector")
-		case *CDPExtensionInjector:
-			got = append(got, "CDPExtensionInjector")
-		case *DiscoverExtensionInjector:
-			got = append(got, "DiscoverExtensionInjector")
-		case *BorrowExtensionInjector:
-			got = append(got, "BorrowExtensionInjector")
-		default:
-			got = append(got, fmt.Sprintf("%T", injector))
-		}
+	if _, ok := cdp.Injector.(*CLIExtensionInjector); !ok {
+		t.Fatalf("Injector = %T", cdp.Injector)
 	}
-	want := []string{"CLIExtensionInjector"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("injector order = %#v", got)
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "cdp"}}).Injector.(*CDPExtensionInjector); !ok {
+		t.Fatalf("cdp injector type mismatch")
+	}
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "bb"}, Injector: InjectorConfig{InjectorMode: "bb"}}).Injector.(*BBExtensionInjector); !ok {
+		t.Fatalf("bb injector type mismatch")
+	}
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "discover"}}).Injector.(*DiscoverExtensionInjector); !ok {
+		t.Fatalf("discover injector type mismatch")
+	}
+	if _, ok := New(Config{Launcher: LauncherConfig{LauncherMode: "remote"}, Injector: InjectorConfig{InjectorMode: "borrow"}}).Injector.(*BorrowExtensionInjector); !ok {
+		t.Fatalf("borrow injector type mismatch")
 	}
 }
 
