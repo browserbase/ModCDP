@@ -317,7 +317,7 @@ class ExtensionInfo(ExtensionProbe):
 
 class UnwrappedModCDPEvent(TypedDict):
     event: str
-    data: ProtocolPayload
+    data: ProtocolPayload | JsonValue
     sessionId: str | None
 
 

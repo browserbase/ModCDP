@@ -176,8 +176,7 @@ def unwrap_event_if_needed(
     resolved_event = payload_event
     if resolved_event == UPSTREAM_EVENT_BINDING_NAME or resolved_event == CUSTOM_EVENT_BINDING_NAME:
         return None
-    data_value = payload["data"] if "data" in payload else payload
-    data: ProtocolPayload = data_value if isinstance(data_value, dict) else {"value": data_value}
+    data = payload["data"] if "data" in payload else payload
     raw_source_session_id = payload.get("cdpSessionId")
     source_session_id = raw_source_session_id if isinstance(raw_source_session_id, str) else session_id
     unwrapped: UnwrappedModCDPEvent = {"event": resolved_event, "data": data, "sessionId": source_session_id}
