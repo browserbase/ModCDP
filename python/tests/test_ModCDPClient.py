@@ -65,7 +65,7 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class ModCDPClientTests(unittest.TestCase):
-    def test_constructor_normalizes_nested_config_owners(self) -> None:
+    def test_uses_flat_owner_prefixed_config(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -210,9 +210,14 @@ class ModCDPClientTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, r"Input should be"):
             ModCDPClient(injector={"injector_mode": "bogus"})
 
-    def test_connects_with_cli_injector_chain(self) -> None:
+    def test_connects_with_nested_launch_upstream_extension_client_server_config(self) -> None:
         cdp = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_local_headless": True, "launcher_local_chrome_ready_timeout_ms": 60_000},
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_chrome_ready_timeout_ms": 60_000,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
             upstream={"upstream_mode": "ws"},
             injector={
                 "injector_mode": "cli",
@@ -221,9 +226,20 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_trust_service_worker_target": True,
                 "injector_service_worker_probe_timeout_ms": 30_000,
             },
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
             client_config={
+                "client_hydrate_aliases": True,
+                "client_mirror_upstream_events": True,
                 "client_cdp_send_timeout_ms": 30_000,
                 "client_event_wait_timeout_ms": 30_000,
+            },
+            server_config={
+                "client_config": {"client_cdp_send_timeout_ms": 30_000},
+                "router": {
+                    "router_routes": {"*.*": "loopback_cdp"},
+                    "loopback_execution_context_timeout_ms": 30_000,
+                },
+                "upstream": {"upstream_ws_connect_error_settle_timeout_ms": 250},
             },
         )
 
@@ -233,6 +249,13 @@ class ModCDPClientTests(unittest.TestCase):
                 cdp.connect_timing.get("injector_source") if cdp.connect_timing else None,
                 ("discover", "cli", "cdp", "borrow"),
             )
+            self.assertEqual(cdp.launcher.config.launcher_mode, "local")
+            self.assertEqual(cdp.upstream.config.upstream_mode, "ws")
+            self.assertIsNotNone(cdp.injector)
+            assert cdp.injector is not None
+            self.assertEqual(cdp.injector.config.injector_mode, "cli")
+            self.assertEqual(cdp.router.config.router_routes["*.*"], "direct_cdp")
+            self.assertRegex(cdp.upstream.config.upstream_ws_cdp_url or "", r"^ws://")
             self.assertEqual(cdp.extension_id, "mdedooklbnfejodmnhmkdpkaedafkehf")
             self.assertEqual(
                 cdp.Mod.evaluate(expression="chrome.runtime.getURL('modcdp/service_worker.js')"),
@@ -247,6 +270,56 @@ class ModCDPClientTests(unittest.TestCase):
                 ),
                 True,
             )
+            version = cdp.Browser.getVersion()
+            self.assertRegex(version.product, r"Chrome|Chromium")
+            self.assertIsInstance(version.protocolVersion, str)
+            runtime_evaluation = cdp.Runtime.evaluate(expression="1 + 1", returnByValue=True)
+            self.assertEqual(runtime_evaluation.result["type"], "number")
+            self.assertEqual(runtime_evaluation.result["value"], 2)
+            with self.assertRaisesRegex(Exception, "expression"):
+                cdp.Runtime.evaluate(returnByValue=True)
+            with self.assertRaisesRegex(Exception, "number"):
+                cdp.Mod.ping(sent_at="bad")
+            self.assertEqual(
+                cdp.Mod.addMiddleware(
+                    name="Mod.ping",
+                    phase="response",
+                    expression="async (payload, next) => next(payload)",
+                ),
+                {"name": "Mod.ping", "phase": "response", "registered": True},
+            )
+            with self.assertRaisesRegex(Exception, "Invalid option|after"):
+                cdp.Mod.addMiddleware(
+                    name="Mod.ping",
+                    phase="after",
+                    expression="async (payload, next) => next(payload)",
+                )
+            created_target_id: Queue[str] = Queue()
+
+            def on_target_created(payload: Mapping[str, Any]) -> None:
+                target_info = payload["targetInfo"]
+                if isinstance(target_info, Mapping) and target_info.get("url") == "about:blank#public-api-target-created":
+                    created_target_id.put(str(target_info["targetId"]))
+
+            cdp.on("Target.targetCreated", on_target_created)
+            created_via_alias = cdp.Target.createTarget(url="about:blank#public-api-target-created")
+            try:
+                self.assertEqual(created_target_id.get(timeout=10), created_via_alias.targetId)
+            finally:
+                cdp.off("Target.targetCreated", on_target_created)
+                cdp.Target.closeTarget(targetId=created_via_alias.targetId)
+            direct_target = cdp.send("Target.createTarget", {"url": "about:blank#direct-session-routing"})
+            direct_session_target_id = str(direct_target["targetId"])
+            try:
+                direct_session = cdp.send("Target.attachToTarget", {"targetId": direct_session_target_id, "flatten": True})
+                direct_eval = cdp.send(
+                    "Runtime.evaluate",
+                    {"expression": "1 + 1", "returnByValue": True},
+                    str(direct_session["sessionId"]),
+                )
+                self.assertEqual(direct_eval["result"]["value"], 2)
+            finally:
+                cdp.send("Target.closeTarget", {"targetId": direct_session_target_id})
             sent_at = int(time.time() * 1000)
             pong: Queue[Mapping[str, Any]] = Queue()
 
@@ -369,10 +442,15 @@ class ModCDPClientTests(unittest.TestCase):
 
     def test_close_clears_top_level_connection_state(self) -> None:
         cdp = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_local_headless": True},
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
             upstream={"upstream_mode": "ws"},
             injector={
                 "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
@@ -386,7 +464,11 @@ class ModCDPClientTests(unittest.TestCase):
 
     def test_generated_cdp_surface_exposes_direct_domain_commands(self) -> None:
         client = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_local_headless": True},
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
             upstream={"upstream_mode": "ws"},
             injector={
                 "injector_mode": "cli",
@@ -439,7 +521,11 @@ class ModCDPClientTests(unittest.TestCase):
             self.assertRegex(str(awaited_raw_result["targetId"]), r"^[A-F0-9]+$")
 
         client = ModCDPClient(
-            launcher={"launcher_mode": "local", "launcher_local_headless": True},
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
             upstream={"upstream_mode": "ws"},
             injector={
                 "injector_mode": "cli",

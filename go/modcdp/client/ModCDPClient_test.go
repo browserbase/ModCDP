@@ -29,7 +29,7 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
-func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
+func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 	cdp := New(Config{
 		Launcher: LauncherConfig{
 			LauncherMode:                "local",
@@ -382,7 +382,7 @@ func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.
 	}
 }
 
-func TestModCDPClientPreservesExplicitNoneServerConfigConfig(t *testing.T) {
+func TestModCDPClientPreservesExplicitNoneServerConfig(t *testing.T) {
 	cdp := New(Config{ServerConfig: ServerConfigNone})
 
 	if cdp.Config.ServerConfig != nil {
@@ -486,7 +486,7 @@ func TestModCDPClientRejectsUnknownComponentModesAtTheirOwningFactoryBoundary(t 
 	}
 }
 
-func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
+func TestModCDPClientConnectsWithNestedLaunchUpstreamExtensionClientServerConfig(t *testing.T) {
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
 	extensionPath, err := filepath.Abs("../../../dist/extension")
 	if err != nil {
@@ -497,6 +497,7 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 			LauncherMode:                      "local",
 			LauncherLocalHeadless:             boolPtr(headless),
 			LauncherLocalChromeReadyTimeoutMS: 60_000,
+			LauncherLocalExecutablePath:       reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: InjectorConfig{
@@ -508,11 +509,18 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 		},
 		Router: RouterConfig{RouterRoutes: map[string]string{"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
 		ClientConfig: ClientConfig{
-			ClientCDPSendTimeoutMS:   30_000,
-			ClientEventWaitTimeoutMS: 30_000,
+			ClientHydrateAliases:       boolPtr(true),
+			ClientMirrorUpstreamEvents: boolPtr(true),
+			ClientCDPSendTimeoutMS:     30_000,
+			ClientEventWaitTimeoutMS:   30_000,
 		},
 		ServerConfig: &ServerConfig{
-			Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
+			ClientConfig: ClientConfig{ClientCDPSendTimeoutMS: 30_000},
+			Router: RouterConfig{
+				RouterRoutes:                      map[string]string{"*.*": "loopback_cdp"},
+				LoopbackExecutionContextTimeoutMS: 30_000,
+			},
+			Upstream: UpstreamTransportConfig{UpstreamWSConnectErrorSettleTimeoutMS: 250},
 		},
 	})
 	defer cdp.Close()
@@ -527,6 +535,21 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 	}
 	if cdp.ExtensionID != DefaultModCDPExtensionID {
 		t.Fatalf("ExtensionID = %q", cdp.ExtensionID)
+	}
+	if cdp.Config.Launcher.LauncherMode != "local" {
+		t.Fatalf("launcher mode = %q", cdp.Config.Launcher.LauncherMode)
+	}
+	if cdp.Config.Upstream.UpstreamMode != "ws" {
+		t.Fatalf("upstream mode = %q", cdp.Config.Upstream.UpstreamMode)
+	}
+	if cdp.Config.Injector.InjectorMode != "cli" {
+		t.Fatalf("injector mode = %q", cdp.Config.Injector.InjectorMode)
+	}
+	if cdp.Config.Router.RouterRoutes["*.*"] != "direct_cdp" {
+		t.Fatalf("router route *.* = %q", cdp.Config.Router.RouterRoutes["*.*"])
+	}
+	if !strings.HasPrefix(cdp.Config.Upstream.UpstreamWSCDPURL, "ws://") {
+		t.Fatalf("upstream ws url = %q", cdp.Config.Upstream.UpstreamWSCDPURL)
 	}
 	result, err := cdp.Mod.Evaluate(map[string]any{
 		"expression": "chrome.runtime.getURL('modcdp/service_worker.js')",
@@ -775,14 +798,20 @@ func TestModCDPClientCloseKeepsInjectorFilesUntilAfterLaunchedBrowserShutdown(t 
 }
 
 func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
+	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	cdp := New(Config{
 		Launcher: LauncherConfig{
-			LauncherMode:          "local",
-			LauncherLocalHeadless: boolPtr(true),
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: InjectorConfig{
 			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
