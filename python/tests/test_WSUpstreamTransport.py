@@ -27,7 +27,7 @@ class WSUpstreamTransportTests(unittest.TestCase):
         state = transport.toJSON()["state"]
         if not isinstance(state, dict):
             raise AssertionError(f"state = {state!r}")
-        self.assertIs(state["connected"], False)
+        self.assertIs(state.get("connected"), False)
 
     def test_launches_real_browser_and_speaks_raw_cdp(self) -> None:
         chrome = LocalBrowserLauncher({"launcher_local_headless": True}).launch()
@@ -72,13 +72,13 @@ class WSUpstreamTransportTests(unittest.TestCase):
             state = transport.toJSON()["state"]
             if not isinstance(state, dict):
                 raise AssertionError(f"state = {state!r}")
-            self.assertIs(state["connected"], True)
+            self.assertIs(state.get("connected"), True)
             transport.close()
             self.assertIsNone(transport.ws)
             state = transport.toJSON()["state"]
             if not isinstance(state, dict):
                 raise AssertionError(f"state = {state!r}")
-            self.assertIs(state["connected"], False)
+            self.assertIs(state.get("connected"), False)
             with self.assertRaisesRegex(RuntimeError, "CDP websocket is not connected"):
                 transport.send({"id": 1, "method": "Browser.getVersion"})
         finally:
