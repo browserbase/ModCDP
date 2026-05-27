@@ -163,7 +163,7 @@ def _launcher_config(config: LauncherConfig | dict[str, Any] | None = None) -> L
     return LauncherConfig.model_validate(config or {})
 
 
-def resolveCdpWebSocketUrl(endpoint: str, name: str = "launcher_remote_cdp_url") -> str:
+def resolveCdpWebSocketUrl(endpoint: str, name: str = "cdp_url") -> str:
     if endpoint.startswith(("ws://", "wss://")):
         return endpoint
     http_endpoint = endpoint if CDP_URL_SCHEME_RE.match(endpoint) else f"http://{endpoint}"

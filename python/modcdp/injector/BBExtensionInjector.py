@@ -44,7 +44,10 @@ class BBExtensionInjector(ExtensionInjector):
             raise
 
     def configForLauncher(self) -> LauncherConfig | dict:
-        return {"launcher_bb_extension_id": self.extension_id or self.config.injector_bb_extension_id}
+        return {
+            **dict(super().configForLauncher()),
+            "launcher_bb_extension_id": self.extension_id or self.config.injector_bb_extension_id,
+        }
 
     def inject(self) -> ExtensionInjectionResult | None:
         extension_id = self.config.injector_service_worker_extension_id

@@ -63,10 +63,11 @@ func (i *BBExtensionInjector) Prepare() error {
 }
 
 func (i *BBExtensionInjector) ConfigForLauncher() LauncherConfig {
-	if i.ExtensionID == "" {
-		return LauncherConfig{}
+	config := i.ExtensionInjector.ConfigForLauncher()
+	if i.ExtensionID != "" {
+		config.LauncherBBExtensionID = i.ExtensionID
 	}
-	return LauncherConfig{LauncherBBExtensionID: i.ExtensionID}
+	return config
 }
 
 func (i *BBExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
