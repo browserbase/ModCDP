@@ -323,13 +323,14 @@ class LocalBrowserLauncher extends BrowserLauncher {
       !usePipe || config.launcher_local_loopback_cdp || config.launcher_local_cdp_listen_port != null;
     const usePort = useLoopbackCdp ? (config.launcher_local_cdp_listen_port ?? 0) : null;
     const profile_dir = config.launcher_local_user_data_dir || (await mkdtemp(path.join(tmpdir(), "modcdp.")));
+    const default_headless = process.platform === "linux" && !process.env.DISPLAY;
+    const headless = config.launcher_local_headless ?? default_headless;
+    const sandbox = config.launcher_local_sandbox ?? !default_headless;
     const flags = [
       ...DEFAULT_FLAGS,
-      (config.launcher_local_headless ?? (process.platform === "linux" && !process.env.DISPLAY))
-        ? "--headless=new"
-        : null,
+      headless ? "--headless=new" : null,
       "--disable-gpu",
-      config.launcher_local_sandbox === false ? "--no-sandbox" : null,
+      sandbox === false ? "--no-sandbox" : null,
       `--user-data-dir=${profile_dir}`,
       useLoopbackCdp ? "--remote-debugging-address=127.0.0.1" : null,
       useLoopbackCdp ? `--remote-debugging-port=${usePort}` : null,
