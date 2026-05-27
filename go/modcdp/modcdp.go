@@ -95,6 +95,7 @@ var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
 var NewRemoteBrowserLauncher = launcher.NewRemoteBrowserLauncher
 var NewBBBrowserLauncher = launcher.NewBBBrowserLauncher
 var NewNoneBrowserLauncher = launcher.NewNoneBrowserLauncher
+var ResolveCdpWebSocketUrl = launcher.WebsocketURLFor
 var NewExtensionInjector = injector.NewExtensionInjector
 var NewDiscoverExtensionInjector = injector.NewDiscoverExtensionInjector
 var NewBBExtensionInjector = injector.NewBBExtensionInjector

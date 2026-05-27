@@ -6,9 +6,9 @@ from .router.AutoSessionRouter import AutoSessionRouter
 from .injector.BBExtensionInjector import BBExtensionInjector
 from .injector.BorrowExtensionInjector import BorrowExtensionInjector
 from .launcher.BBBrowserLauncher import BBBrowserLauncher
-from .launcher.BrowserLauncher import BrowserLauncher
+from .launcher.BrowserLauncher import BrowserLauncher, resolveCdpWebSocketUrl
 from .injector.DiscoverExtensionInjector import DiscoverExtensionInjector
-from .injector.ExtensionInjector import ExtensionInjector
+from .injector.ExtensionInjector import ExtensionInjector, DEFAULT_MODCDP_EXTENSION_ID, DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES
 from .injector.NodeExtensionFiles import PreparedExtension, defaultModCDPExtensionPath, extensionIdFromManifestKey, prepareUnpackedExtension
 from .injector.CDPExtensionInjector import CDPExtensionInjector
 from .injector.CLIExtensionInjector import CLIExtensionInjector
@@ -28,8 +28,11 @@ __all__ = [
     "BorrowExtensionInjector",
     "BBBrowserLauncher",
     "BrowserLauncher",
+    "resolveCdpWebSocketUrl",
     "DiscoverExtensionInjector",
     "ExtensionInjector",
+    "DEFAULT_MODCDP_EXTENSION_ID",
+    "DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES",
     "PreparedExtension",
     "defaultModCDPExtensionPath",
     "extensionIdFromManifestKey",
