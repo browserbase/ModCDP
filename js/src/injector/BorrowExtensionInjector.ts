@@ -1,7 +1,5 @@
-// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
-// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
-// - ./python/modcdp/injector/BorrowExtensionInjector.py
-// - ./go/modcdp/injector/BorrowExtensionInjector.go
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand.
 import fs from "node:fs";
 import path from "node:path";
 import * as Runtime from "../types/generated/zod/Runtime.js";

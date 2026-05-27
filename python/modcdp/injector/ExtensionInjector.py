@@ -35,7 +35,7 @@ SendCDP = Callable[[str, ProtocolParams | None, str | None], ProtocolResult]
 class InjectorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    injector_mode: Literal["cli", "cdp", "bb", "borrow", "discover", "none"] = "none"
+    injector_mode: Literal["cli", "cdp", "bb", "discover", "none"] = "none"
     send: Any | None = None
     injector_cli_extension_path: str | None = None
     injector_cli_extension_id: str | None = None
@@ -43,7 +43,6 @@ class InjectorConfig(BaseModel):
     injector_cdp_extension_id: str | None = None
     injector_bb_extension_path: str | None = None
     injector_bb_extension_id: str | None = None
-    injector_borrow_extension_path: str | None = None
     injector_discover_extension_path: str | None = None
     injector_service_worker_extension_id: str | None = None
     injector_service_worker_url_includes: list[str] = Field(default_factory=list)

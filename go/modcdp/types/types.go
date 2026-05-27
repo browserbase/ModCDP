@@ -68,7 +68,6 @@ type InjectorConfig struct {
 	InjectorCDPExtensionID               string   `json:"injector_cdp_extension_id,omitempty"`
 	InjectorBBExtensionPath              string   `json:"injector_bb_extension_path,omitempty"`
 	InjectorBBExtensionID                string   `json:"injector_bb_extension_id,omitempty"`
-	InjectorBorrowExtensionPath          string   `json:"injector_borrow_extension_path,omitempty"`
 	InjectorDiscoverExtensionPath        string   `json:"injector_discover_extension_path,omitempty"`
 	InjectorServiceWorkerExtensionID     string   `json:"injector_service_worker_extension_id,omitempty"`
 	InjectorServiceWorkerURLIncludes     []string `json:"injector_service_worker_url_includes,omitempty"`

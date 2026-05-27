@@ -28,7 +28,6 @@ from ..types.generated.cdp import AwaitableDict, CDPEvent, CDPModel, CDPParams, 
 from ..types.CDPTypes import CDPTypes
 from ..launcher.BBBrowserLauncher import BBBrowserLauncher
 from ..injector.BBExtensionInjector import BBExtensionInjector
-from ..injector.BorrowExtensionInjector import BorrowExtensionInjector
 from ..injector.DiscoverExtensionInjector import DiscoverExtensionInjector
 from ..injector.ExtensionInjector import ExtensionInjector, InjectorConfig
 from ..injector.CDPExtensionInjector import CDPExtensionInjector
@@ -243,8 +242,6 @@ class ModCDPClient(CDPSurfaceMixin):
             self.injector = CDPExtensionInjector(injector_config)
         elif injector_config.injector_mode == "bb":
             self.injector = BBExtensionInjector(injector_config)
-        elif injector_config.injector_mode == "borrow":
-            self.injector = BorrowExtensionInjector(injector_config)
         elif injector_config.injector_mode == "discover":
             self.injector = DiscoverExtensionInjector(injector_config)
         else:

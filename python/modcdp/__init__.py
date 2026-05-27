@@ -4,7 +4,6 @@
 # - ./go/modcdp/modcdp.go
 from .router.AutoSessionRouter import AutoSessionRouter
 from .injector.BBExtensionInjector import BBExtensionInjector
-from .injector.BorrowExtensionInjector import BorrowExtensionInjector
 from .launcher.BBBrowserLauncher import BBBrowserLauncher
 from .launcher.BrowserLauncher import BrowserLauncher, resolveCdpWebSocketUrl
 from .injector.DiscoverExtensionInjector import DiscoverExtensionInjector
@@ -25,7 +24,6 @@ from .types.generated.cdp import CDPEvent, CDPModel, CDPParams
 __all__ = [
     "AutoSessionRouter",
     "BBExtensionInjector",
-    "BorrowExtensionInjector",
     "BBBrowserLauncher",
     "BrowserLauncher",
     "resolveCdpWebSocketUrl",

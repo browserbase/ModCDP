@@ -78,7 +78,6 @@ type RouterConfig = types.ModCDPRouterConfig
 type ExtensionInjector = injector.ExtensionInjector
 type DiscoverExtensionInjector = injector.DiscoverExtensionInjector
 type BBExtensionInjector = injector.BBExtensionInjector
-type BorrowExtensionInjector = injector.BorrowExtensionInjector
 type CLIExtensionInjector = injector.CLIExtensionInjector
 type CDPExtensionInjector = injector.CDPExtensionInjector
 type UpstreamMode = transportpkg.UpstreamMode
@@ -96,7 +95,6 @@ var NewBBBrowserLauncher = launcher.NewBBBrowserLauncher
 var NewNoneBrowserLauncher = launcher.NewNoneBrowserLauncher
 var NewDiscoverExtensionInjector = injector.NewDiscoverExtensionInjector
 var NewBBExtensionInjector = injector.NewBBExtensionInjector
-var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewCLIExtensionInjector = injector.NewCLIExtensionInjector
 var NewCDPExtensionInjector = injector.NewCDPExtensionInjector
 var NewWSUpstreamTransport = transportpkg.NewWSUpstreamTransport
@@ -1132,10 +1130,6 @@ func (c *ModCDPClient) extensionInjectorsForConfig() ([]extensionInjector, *Exte
 		injector := NewBBExtensionInjector(InjectorConfig{})
 		return []extensionInjector{&injector}, &injector.ExtensionInjector
 	}
-	if c.Config.Injector.InjectorMode == "borrow" {
-		injector := NewBorrowExtensionInjector(InjectorConfig{})
-		return []extensionInjector{&injector}, &injector.ExtensionInjector
-	}
 	if c.Config.Injector.InjectorMode == "discover" {
 		injector := NewDiscoverExtensionInjector(InjectorConfig{})
 		return []extensionInjector{&injector}, &injector.ExtensionInjector
@@ -1152,7 +1146,7 @@ func isKnownUpstreamMode(mode string) bool {
 }
 
 func isKnownExtensionMode(mode string) bool {
-	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "borrow" || mode == "discover" || mode == "none"
+	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "discover" || mode == "none"
 }
 
 func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
@@ -1165,7 +1159,6 @@ func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 		InjectorCDPExtensionID:               c.Config.Injector.InjectorCDPExtensionID,
 		InjectorBBExtensionPath:              c.Config.Injector.InjectorBBExtensionPath,
 		InjectorBBExtensionID:                c.Config.Injector.InjectorBBExtensionID,
-		InjectorBorrowExtensionPath:          c.Config.Injector.InjectorBorrowExtensionPath,
 		InjectorDiscoverExtensionPath:        c.Config.Injector.InjectorDiscoverExtensionPath,
 		InjectorServiceWorkerExtensionID:     c.Config.Injector.InjectorServiceWorkerExtensionID,
 		InjectorServiceWorkerURLIncludes:     c.Config.Injector.InjectorServiceWorkerURLIncludes,
