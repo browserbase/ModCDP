@@ -266,7 +266,7 @@ func (types *CDPTypes) CustomEventWireRegistrations() []map[string]any {
 
 func (types *CDPTypes) AddCustomMiddleware(middleware CustomMiddleware) (string, error) {
 	name := middleware.Name
-	if name == "" {
+	if name == "" || name == "*" {
 		name = "*"
 	} else {
 		normalized, err := normalizeModCDPName(name)
