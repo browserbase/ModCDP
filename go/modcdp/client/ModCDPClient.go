@@ -594,6 +594,19 @@ func (c *ModCDPClient) Connect() error {
 		c.Close()
 		return err
 	}
+	if c.Config.Injector.InjectorMode == "none" && c.Config.ServerConfig == nil {
+		connectedAt := time.Now().UnixMilli()
+		c.ConnectTiming = map[string]any{
+			"started_at":             connectStartedAt,
+			"upstream_mode":          c.Config.Upstream.UpstreamMode,
+			"transport_started_at":   transportStartedAt,
+			"transport_connected_at": transportConnectedAt,
+			"transport_duration_ms":  transportConnectedAt - transportStartedAt,
+			"connected_at":           connectedAt,
+			"duration_ms":            connectedAt - connectStartedAt,
+		}
+		return nil
+	}
 	extensionStartedAt := time.Now().UnixMilli()
 	ext, err := c.injectExtension(c.extensionInjectors)
 	if err != nil {
@@ -1013,9 +1026,38 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 			"completed_at": completedAt,
 			"duration_ms":  completedAt - startedAt,
 		}
+		if validateSchema {
+			parsed, parseErr := c.Types.ParseCommandResult(method, preparation.LocalResult)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+			return parsed, nil
+		}
 		return preparation.LocalResult, nil
 	}
 	params = preparation.Params
+	if c.Config.Injector.InjectorMode == "none" && c.Config.ServerConfig == nil {
+		result, err := c.Router.Send(method, params, cdpSessionID)
+		completedAt := time.Now().UnixMilli()
+		c.LastCommandTiming = map[string]any{
+			"method":       method,
+			"target":       "browser_targets",
+			"started_at":   startedAt,
+			"completed_at": completedAt,
+			"duration_ms":  completedAt - startedAt,
+		}
+		if err != nil {
+			return nil, err
+		}
+		if validateSchema {
+			parsed, parseErr := c.Types.ParseCommandResult(method, result)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+			return parsed, nil
+		}
+		return result, nil
+	}
 	if c.Config.Upstream.UpstreamMode != "ws" {
 		if method != "Mod.configure" {
 			if err := c.ensureModCDPServerConfigured(); err != nil {

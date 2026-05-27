@@ -311,6 +311,18 @@ class ModCDPClient(CDPSurfaceMixin):
         self._initialize_raw_cdp_transport()
 
         injector_started_at = int(time.time() * 1000)
+        if self.injector is None and self.server_config is None:
+            connected_at = int(time.time() * 1000)
+            self.connect_timing = cast(ModCDPConnectTiming, {
+                "started_at": connect_started_at,
+                "upstream_mode": self.upstream.config.upstream_mode,
+                "transport_started_at": transport_started_at,
+                "transport_connected_at": transport_connected_at,
+                "transport_duration_ms": transport_connected_at - transport_started_at,
+                "connected_at": connected_at,
+                "duration_ms": connected_at - connect_started_at,
+            })
+            return self
         if self.injector is None:
             raise RuntimeError("injector.injector_mode='none' cannot be used with a raw_cdp upstream.")
         ext = self._inject_extension()
@@ -373,6 +385,18 @@ class ModCDPClient(CDPSurfaceMixin):
             result = self.types.parseCommandResult(method, preparation.local_result) if validate_custom_schema else preparation.local_result
             return AwaitableDict(dict(result)) if isinstance(result, Mapping) else AwaitableValue(result)
         command_params = preparation.params
+        if self.injector is None and self.server_config is None:
+            result = self.router.send(method, command_params, session_id)
+            result = self.types.parseCommandResult(method, result) if validate_custom_schema else result
+            completed_at = int(time.time() * 1000)
+            self.last_command_timing = {
+                "method": method,
+                "target": "browser_targets",
+                "started_at": started_at,
+                "completed_at": completed_at,
+                "duration_ms": completed_at - started_at,
+            }
+            return AwaitableDict(dict(result)) if isinstance(result, Mapping) else AwaitableValue(result)
 
         command = wrap_command_if_needed(
             method,
