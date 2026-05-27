@@ -24,6 +24,9 @@ func TestBrowserLauncherMergesLaunchConfigAndExposesUpstreamConfig(t *testing.T)
 	if transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/updated" {
 		t.Fatalf("cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
+	if launcher.Config.LauncherLocalUserDataDir != "/tmp/modcdp-browser-launcher" {
+		t.Fatalf("LauncherLocalUserDataDir = %q", launcher.Config.LauncherLocalUserDataDir)
+	}
 	if _, err := launcher.Launch(LauncherConfig{}); err == nil || !strings.Contains(err.Error(), "BrowserLauncher.Launch is not implemented") {
 		t.Fatalf("Launch error = %v", err)
 	}

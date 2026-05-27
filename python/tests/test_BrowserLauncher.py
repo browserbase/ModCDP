@@ -33,6 +33,7 @@ class BrowserLauncherTests(unittest.TestCase):
                 "upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
             },
         )
+        self.assertEqual(launcher.config.launcher_local_user_data_dir, "/tmp/modcdp-browser-launcher")
         with self.assertRaisesRegex(NotImplementedError, "BrowserLauncher.launch is not implemented"):
             launcher.launch()
 

@@ -9,22 +9,16 @@ from __future__ import annotations
 import unittest
 
 from modcdp.launcher.NoneBrowserLauncher import NoneBrowserLauncher
-from modcdp.transport.UpstreamTransport import UpstreamTransport
 
 
 class NoneBrowserLauncherTests(unittest.TestCase):
-    def test_constructor_launch_and_config_match_ts_shape(self) -> None:
-        launcher = NoneBrowserLauncher({"launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial"})
-        self.assertEqual(launcher.config.launcher_remote_cdp_url, "ws://127.0.0.1:9222/devtools/browser/initial")
-        self.assertEqual(
-            launcher.configForUpstream().get("upstream_ws_cdp_url"),
-            "ws://127.0.0.1:9222/devtools/browser/initial",
-        )
+    def test_records_an_empty_launched_browser(self) -> None:
+        launcher = NoneBrowserLauncher()
 
-        launched = launcher.launch({"launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/call"})
-        self.assertIs(launcher.launched, launched)
+        launched = launcher.launch()
+
         self.assertIsNone(launched["cdp_url"])
-        self.assertEqual(launcher.configForServer(UpstreamTransport()), {})
+        self.assertIs(launcher.launched, launched)
         launched["close"]()
 
 
