@@ -14,11 +14,31 @@ JsonPrimitive: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 
+CdpCommandParams: TypeAlias = dict[str, JsonValue]
+CdpCommandResult: TypeAlias = dict[str, JsonValue]
+CdpEventParams: TypeAlias = dict[str, JsonValue]
+
 ProtocolParams: TypeAlias = Mapping[str, JsonValue]
 ProtocolResult: TypeAlias = dict[str, JsonValue]
 ProtocolPayload: TypeAlias = dict[str, JsonValue]
 MessageParams: TypeAlias = Mapping[str, object]
 ModCDPRoutes: TypeAlias = dict[str, str]
+
+
+class RuntimeBindingCalledEvent(TypedDict, total=False):
+    name: str
+    payload: str
+    executionContextId: int | None
+
+
+class _TargetAttachedToTargetRequired(TypedDict):
+    sessionId: str
+    targetInfo: dict[str, str]
+    waitingForDebugger: bool
+
+
+class TargetAttachedToTargetEvent(_TargetAttachedToTargetRequired):
+    pass
 
 
 class _ModCDPAddCustomCommandRequired(TypedDict):
@@ -49,6 +69,22 @@ class _ModCDPAddMiddlewareRequired(TypedDict):
 
 class ModCDPAddMiddlewareParams(_ModCDPAddMiddlewareRequired, total=False):
     name: str
+
+
+class _ModCDPEvaluateParamsRequired(TypedDict):
+    expression: str
+
+
+class ModCDPEvaluateParams(_ModCDPEvaluateParamsRequired, total=False):
+    params: dict[str, JsonValue] | None
+    cdpSessionId: str | None
+
+
+class ModCDPPingParams(TypedDict, total=False):
+    sent_at: int
+
+
+ModCDPPongEvent = TypedDict("ModCDPPongEvent", {"sent_at": int, "received_at": int, "from": str})
 
 
 class ModCDPPingLatency(TypedDict):
@@ -173,7 +209,62 @@ class ModCDPServerConfig(TypedDict, total=False):
     custom_middlewares: list[ModCDPAddMiddlewareParams]
 
 
+ModCDPConfigureParams: TypeAlias = ModCDPServerConfig
+ModCDPCommandParams: TypeAlias = (
+    ModCDPEvaluateParams
+    | ModCDPGetTopologyParams
+    | ModCDPAddCustomCommandParams
+    | ModCDPAddCustomEventParams
+    | ModCDPAddMiddlewareParams
+    | ModCDPConfigureParams
+    | ModCDPPingParams
+    | dict[str, JsonValue]
+)
+
+
+class ModCDPOkResponse(TypedDict):
+    ok: bool
+
+
+ModCDPCommandResult: TypeAlias = ModCDPOkResponse | dict[str, JsonValue]
+ModCDPEvaluateResponse: TypeAlias = JsonValue
+ModCDPGetTopologyResponse: TypeAlias = ModCDPTopology
+
+
+class ModCDPAddCustomCommandResponse(TypedDict):
+    name: str
+    registered: bool
+
+
+class ModCDPAddCustomEventResponse(TypedDict):
+    name: str
+    registered: bool
+
+
+class ModCDPAddMiddlewareResponse(TypedDict):
+    name: str
+    phase: Literal["request", "response", "event"]
+    registered: bool
+
+
+ModCDPConfigureResponse: TypeAlias = dict[str, JsonValue]
+ModCDPPingResponse: TypeAlias = ModCDPOkResponse
+
+
+class ModCDPBindingPayload(TypedDict, total=False):
+    event: str
+    data: JsonValue
+    cdpSessionId: str | None
+
+
 RuntimeCallFunctionOnParams: TypeAlias = dict[str, JsonValue]
+
+
+class CdpDebuggeeCommandParams(TypedDict, total=False):
+    debuggee: dict[str, JsonValue] | None
+    tabId: int | None
+    targetId: str | None
+    extensionId: str | None
 
 
 class _TranslatedStepRequired(TypedDict):
@@ -193,7 +284,9 @@ class TranslatedCommand(TypedDict):
 
 
 class CdpError(TypedDict, total=False):
+    code: int | None
     message: str
+    data: JsonValue
 
 
 class CdpMessage(TypedDict, total=False):

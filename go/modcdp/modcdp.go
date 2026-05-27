@@ -9,6 +9,7 @@ import (
 	"github.com/browserbase/modcdp/go/modcdp/injector"
 	"github.com/browserbase/modcdp/go/modcdp/launcher"
 	"github.com/browserbase/modcdp/go/modcdp/transport"
+	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
 type ModCDPClient = client.ModCDPClient
@@ -42,6 +43,47 @@ type UpstreamTransportConfig = transport.UpstreamTransportConfig
 type UpstreamTransport = transport.UpstreamTransport
 type WSUpstreamTransport = transport.WSUpstreamTransport
 type AutoSessionRouter = client.AutoSessionRouter
+type CdpCommandParams = types.CdpCommandParams
+type CdpCommandResult = types.CdpCommandResult
+type CdpEventParams = types.CdpEventParams
+type RuntimeBindingCalledEvent = types.RuntimeBindingCalledEvent
+type TargetAttachedToTargetEvent = types.TargetAttachedToTargetEvent
+type ModCDPRoutes = types.ModCDPRoutes
+type ModCDPEvaluateParams = types.ModCDPEvaluateParams
+type ModCDPAddCustomCommandParams = types.ModCDPAddCustomCommandParams
+type ModCDPAddCustomEventObjectParams = types.ModCDPAddCustomEventObjectParams
+type ModCDPAddMiddlewareParams = types.ModCDPAddMiddlewareParams
+type ModCDPPingParams = types.ModCDPPingParams
+type ModCDPPongEvent = types.ModCDPPongEvent
+type ModCDPPingLatency = types.ModCDPPingLatency
+type ModCDPGetTopologyParams = types.ModCDPGetTopologyParams
+type ModCDPTopologyFrame = types.ModCDPTopologyFrame
+type ModCDPTopologyDomRoot = types.ModCDPTopologyDomRoot
+type ModCDPTopologyTarget = types.ModCDPTopologyTarget
+type ModCDPTopologyExecutionContext = types.ModCDPTopologyExecutionContext
+type ModCDPTopology = types.ModCDPTopology
+type ModCDPGetTopologyResponse = types.ModCDPGetTopologyResponse
+type ModCDPConfigureParams = types.ModCDPConfigureParams
+type ModCDPCommandParams = types.ModCDPCommandParams
+type ModCDPCommandResult = types.ModCDPCommandResult
+type ModCDPEvaluateResponse = types.ModCDPEvaluateResponse
+type ModCDPConfigureResponse = types.ModCDPConfigureResponse
+type ModCDPAddCustomCommandResponse = types.ModCDPAddCustomCommandResponse
+type ModCDPAddCustomEventResponse = types.ModCDPAddCustomEventResponse
+type ModCDPAddMiddlewareResponse = types.ModCDPAddMiddlewareResponse
+type ModCDPPingResponse = types.ModCDPPingResponse
+type ModCDPBindingPayload = types.ModCDPBindingPayload
+type CdpDebuggeeCommandParams = types.CdpDebuggeeCommandParams
+type ProtocolParams = types.ProtocolParams
+type ProtocolResult = types.ProtocolResult
+type ProtocolPayload = types.ProtocolPayload
+type CdpError = types.CdpError
+type CdpCommandMessage = types.CdpCommandMessage
+type CdpResponseMessage = types.CdpResponseMessage
+type CdpEventMessage = types.CdpEventMessage
+type TranslatedStep = types.TranslatedStep
+type TranslatedCommand = types.TranslatedCommand
+type UnwrappedModCDPEvent = types.UnwrappedModCDPEvent
 
 var New = client.New
 var NewCDPTypes = client.NewCDPTypes
