@@ -48,10 +48,10 @@ class TranslateTests(unittest.TestCase):
         self.assertIsInstance(wrapped_arguments[2], Mapping)
         assert isinstance(wrapped_arguments[1], Mapping)
         assert isinstance(wrapped_arguments[2], Mapping)
-        wrapped_payload_argument: Mapping[object, object] = wrapped_arguments[1]
-        wrapped_session_argument: Mapping[object, object] = wrapped_arguments[2]
-        self.assertEqual(json.loads(str(wrapped_payload_argument.get("value"))), {"expression": "({ ok: true })", "params": {"value": 1}})
-        self.assertEqual(wrapped_session_argument.get("value"), "session-1")
+        self.assertEqual(len(wrapped_arguments[1]), 1)
+        self.assertEqual(len(wrapped_arguments[2]), 1)
+        self.assertEqual(json.loads(str(next(iter(wrapped_arguments[1].values())))), {"expression": "({ ok: true })", "params": {"value": 1}})
+        self.assertEqual(next(iter(wrapped_arguments[2].values())), "session-1")
         self.assertEqual(wrapped["steps"][0].get("unwrap"), "runtime_json")
 
         configured = wrap_command_if_needed(
@@ -70,8 +70,8 @@ class TranslateTests(unittest.TestCase):
         assert isinstance(ping_arguments, list)
         self.assertIsInstance(ping_arguments[1], Mapping)
         assert isinstance(ping_arguments[1], Mapping)
-        ping_payload_argument: Mapping[object, object] = ping_arguments[1]
-        self.assertEqual(json.loads(str(ping_payload_argument.get("value"))), {})
+        self.assertEqual(len(ping_arguments[1]), 1)
+        self.assertEqual(json.loads(str(next(iter(ping_arguments[1].values())))), {})
 
         custom = wrap_command_if_needed(
             "Custom.echo",
@@ -92,12 +92,12 @@ class TranslateTests(unittest.TestCase):
         assert isinstance(custom_arguments[0], Mapping)
         assert isinstance(custom_arguments[1], Mapping)
         assert isinstance(custom_arguments[2], Mapping)
-        custom_method_argument: Mapping[object, object] = custom_arguments[0]
-        custom_payload_argument: Mapping[object, object] = custom_arguments[1]
-        custom_session_argument: Mapping[object, object] = custom_arguments[2]
-        self.assertEqual(custom_method_argument.get("value"), "Custom.echo")
-        self.assertEqual(json.loads(str(custom_payload_argument.get("value"))), {"secret": "x" * 100, "nested": {"ok": True}})
-        self.assertEqual(custom_session_argument.get("value"), "session-1")
+        self.assertEqual(len(custom_arguments[0]), 1)
+        self.assertEqual(len(custom_arguments[1]), 1)
+        self.assertEqual(len(custom_arguments[2]), 1)
+        self.assertEqual(next(iter(custom_arguments[0].values())), "Custom.echo")
+        self.assertEqual(json.loads(str(next(iter(custom_arguments[1].values())))), {"secret": "x" * 100, "nested": {"ok": True}})
+        self.assertEqual(next(iter(custom_arguments[2].values())), "session-1")
 
         custom_with_session = wrap_command_if_needed(
             "Custom.echo",
@@ -112,8 +112,8 @@ class TranslateTests(unittest.TestCase):
         assert isinstance(custom_with_session_arguments, list)
         self.assertIsInstance(custom_with_session_arguments[2], Mapping)
         assert isinstance(custom_with_session_arguments[2], Mapping)
-        custom_with_session_argument: Mapping[object, object] = custom_with_session_arguments[2]
-        self.assertEqual(custom_with_session_argument.get("value"), "target-session-1")
+        self.assertEqual(len(custom_with_session_arguments[2]), 1)
+        self.assertEqual(next(iter(custom_with_session_arguments[2].values())), "target-session-1")
 
         self.assertEqual(unwrap_response_if_needed({"result": {"type": "object", "value": {"ok": True}}}, "runtime"), {"ok": True})
         self.assertEqual(unwrap_response_if_needed({"product": "Chrome/1"}, None), {"product": "Chrome/1"})
