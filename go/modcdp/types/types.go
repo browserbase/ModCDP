@@ -55,6 +55,15 @@ type LauncherConfig struct {
 type UpstreamTransportConfig struct {
 	UpstreamMode                          string `json:"upstream_mode,omitempty"`
 	UpstreamWSCDPURL                      string `json:"upstream_ws_cdp_url,omitempty"`
+	UpstreamPipeRead                      any    `json:"upstream_pipe_read,omitempty"`
+	UpstreamPipeWrite                     any    `json:"upstream_pipe_write,omitempty"`
+	UpstreamNatsURL                       string `json:"upstream_nats_url,omitempty"`
+	UpstreamNatsSubjectPrefix             string `json:"upstream_nats_subject_prefix,omitempty"`
+	UpstreamNatsRole                      string `json:"upstream_nats_role,omitempty"`
+	UpstreamNatsWaitTimeoutMS             int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
+	UpstreamReverseWSBind                 string `json:"upstream_reversews_bind,omitempty"`
+	UpstreamReverseWSWaitTimeoutMS        int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
+	UpstreamNativeMessagingHostName       string `json:"upstream_nativemessaging_host_name,omitempty"`
 	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
 	UpstreamCDPSendTimeoutMS              int    `json:"upstream_cdp_send_timeout_ms,omitempty"`
 }

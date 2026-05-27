@@ -16,7 +16,7 @@ from ..types.modcdp import ProtocolPayload, ProtocolResult
 from ..types.toJSON import modCDPToJSON
 
 
-UpstreamMode = Literal["ws"]
+UpstreamMode = Literal["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]
 
 
 class UpstreamTransportConfig(BaseModel):
@@ -24,6 +24,15 @@ class UpstreamTransportConfig(BaseModel):
 
     upstream_mode: UpstreamMode = "ws"
     upstream_ws_cdp_url: str | None = None
+    upstream_pipe_read: Any | None = None
+    upstream_pipe_write: Any | None = None
+    upstream_nats_url: str = "ws://127.0.0.1:4223"
+    upstream_nats_subject_prefix: str = "modcdp.default"
+    upstream_nats_role: Literal["client", "browser"] = "client"
+    upstream_nats_wait_timeout_ms: int = 10_000
+    upstream_reversews_bind: str = "127.0.0.1:29292"
+    upstream_reversews_wait_timeout_ms: int = 10_000
+    upstream_nativemessaging_host_name: str = "com.modcdp.bridge"
     upstream_ws_connect_error_settle_timeout_ms: int = 250
     upstream_cdp_send_timeout_ms: int = 10_000
 
