@@ -384,13 +384,7 @@ func New(opts Config) *ModCDPClient {
 		opts.Upstream.UpstreamMode = "ws"
 	}
 	if opts.Launcher.LauncherMode == "" {
-		if opts.Upstream.UpstreamMode == "ws" && opts.Upstream.UpstreamWSCDPURL != "" {
-			opts.Launcher.LauncherMode = "remote"
-		} else if opts.Upstream.UpstreamMode == "ws" {
-			opts.Launcher.LauncherMode = "local"
-		} else {
-			opts.Launcher.LauncherMode = "none"
-		}
+		opts.Launcher.LauncherMode = "none"
 	}
 	if opts.Injector.InjectorMode == "" {
 		opts.Injector.InjectorMode = "none"

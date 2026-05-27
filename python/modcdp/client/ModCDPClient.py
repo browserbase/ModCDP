@@ -218,10 +218,7 @@ class ModCDPClient(CDPSurfaceMixin):
             raise RuntimeError(f"unknown upstream.upstream_mode={upstream_mode_input}")
         upstream_mode: UpstreamMode = upstream_mode_input
         upstream_config = UpstreamTransportConfig.model_validate({**upstream_input, "upstream_mode": upstream_mode})
-        launcher_mode = launcher_input.get("launcher_mode") or (
-            "remote" if upstream_config.upstream_ws_cdp_url
-            else "local"
-        )
+        launcher_mode = launcher_input.get("launcher_mode") or "none"
         launcher_config = LauncherConfig.model_validate({**launcher_input, "launcher_mode": launcher_mode})
         injector_config = InjectorConfig.model_validate(injector_input)
         parsed_router_config = RouterConfig.model_validate(
