@@ -27,6 +27,7 @@ type LocalBrowserLauncher struct {
 }
 
 func NewLocalBrowserLauncher(config LauncherConfig) *LocalBrowserLauncher {
+	config.LauncherMode = "local"
 	return &LocalBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 

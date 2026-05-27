@@ -8,6 +8,10 @@ from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, Launched
 
 
 class NoneBrowserLauncher(BrowserLauncher):
+    def __init__(self, config: LauncherConfig | dict | None = None) -> None:
+        raw_config = config.model_dump() if isinstance(config, LauncherConfig) else dict(config or {})
+        super().__init__({**raw_config, "launcher_mode": "none"})
+
     def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         self.launched = {"cdp_url": None, "close": lambda: None}
         return self.launched

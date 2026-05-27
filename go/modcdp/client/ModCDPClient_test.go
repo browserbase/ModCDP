@@ -245,6 +245,37 @@ func TestModCDPClientEventDispatchSnapshotsHandlersWhenOnceRemovesItself(t *test
 	}
 }
 
+func TestModCDPClientValidatesNativeCommandParamsBeforeSending(t *testing.T) {
+	cdp := New(Config{})
+
+	if _, err := cdp.Send("Runtime.evaluate", map[string]any{}); err == nil || !strings.Contains(err.Error(), "expression") {
+		t.Fatalf("Runtime.evaluate validation error = %v", err)
+	}
+}
+
+func TestModCDPClientValidatesNativeAndRegisteredCustomEventsBeforeDispatch(t *testing.T) {
+	cdp := New(Config{})
+
+	expectPanic(t, func() {
+		cdp.handleEventMessage(map[string]any{"method": "Target.targetCreated", "params": map[string]any{}})
+	})
+
+	if _, err := cdp.Mod.AddCustomEvent(CustomEvent{
+		Name: "Custom.ready",
+		EventSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+			"required":             []any{"ok"},
+			"additionalProperties": false,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	expectPanic(t, func() {
+		cdp.handleEventMessage(map[string]any{"method": "Custom.ready", "params": map[string]any{"ok": "yes"}})
+	})
+}
+
 func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 	encoded, err := json.Marshal(Config{
 		Launcher: LauncherConfig{
@@ -278,7 +309,6 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 		ServerConfig: &ServerConfig{
 			Upstream: UpstreamTransportConfig{UpstreamWSCDPURL: "http://127.0.0.1:9222"},
 		},
-		CustomCommands: []CustomCommand{{Name: "Custom.echo", Expression: "async () => null"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +318,7 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 		"Launcher", "ExecutablePath", "LocalCDPTransport", "BrowserbaseAPIKey",
 		"Upstream",
 		"Injector", "InjectorServiceWorkerURLSuffixes", "InjectorTrustServiceWorkerTarget",
-		"Client", "HydrateAliases", "CustomCommands",
+		"Client", "HydrateAliases",
 	} {
 		if strings.Contains(raw, wrong) {
 			t.Fatalf("encoded config leaked Go field name %q in %s", wrong, raw)
@@ -316,7 +346,6 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 		`"client_hydrate_aliases"`,
 		`"client_mirror_upstream_events"`,
 		`"client_cdp_send_timeout_ms"`,
-		`"custom_commands"`,
 	} {
 		if !strings.Contains(raw, expected) {
 			t.Fatalf("encoded config missing %s in %s", expected, raw)
@@ -397,6 +426,27 @@ func TestModCDPClientUsesConfiguredInjectorOnly(t *testing.T) {
 	want := []string{"CLIExtensionInjector"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("injector order = %#v", got)
+	}
+}
+
+func TestModCDPClientUsesNoInjectorUnlessInjectorModeIsExplicit(t *testing.T) {
+	launched := New(Config{
+		Launcher: LauncherConfig{LauncherMode: "local"},
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+	})
+	if launched.Config.Launcher.LauncherMode != "local" {
+		t.Fatalf("launcher mode = %q", launched.Config.Launcher.LauncherMode)
+	}
+	if launched.Config.Injector.InjectorMode != "none" {
+		t.Fatalf("injector mode = %q", launched.Config.Injector.InjectorMode)
+	}
+
+	attachOnly := New(Config{Upstream: UpstreamTransportConfig{UpstreamMode: "ws"}})
+	if attachOnly.Config.Launcher.LauncherMode != "none" {
+		t.Fatalf("launcher mode = %q", attachOnly.Config.Launcher.LauncherMode)
+	}
+	if attachOnly.Config.Injector.InjectorMode != "none" {
+		t.Fatalf("injector mode = %q", attachOnly.Config.Injector.InjectorMode)
 	}
 }
 
@@ -862,82 +912,4 @@ func maxPathNumber(value string) int {
 		}
 	}
 	return maxValue
-}
-
-func TestCustomCommandSchemasValidateParamsAndResults(t *testing.T) {
-	cdp := New(Config{
-		CustomCommands: []CustomCommand{
-			{
-				Name: "Custom.echo",
-				ParamsSchema: map[string]any{
-					"type":                 "object",
-					"required":             []any{"value"},
-					"properties":           map[string]any{"value": map[string]any{"type": "string"}},
-					"additionalProperties": false,
-				},
-				ResultSchema: map[string]any{
-					"type":                 "object",
-					"required":             []any{"value"},
-					"properties":           map[string]any{"value": map[string]any{"type": "string"}},
-					"additionalProperties": false,
-				},
-			},
-		},
-	})
-
-	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"value": "ok"}); err != nil {
-		t.Fatalf("expected valid params, got %v", err)
-	}
-	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "params_schema") {
-		t.Fatalf("expected params schema error, got %v", err)
-	}
-	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"value": "ok"}); err != nil {
-		t.Fatalf("expected valid result, got %v", err)
-	}
-	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"value": 42}); err == nil || !strings.Contains(err.Error(), "result_schema") {
-		t.Fatalf("expected result schema error, got %v", err)
-	}
-}
-
-func TestCustomEventSchemasValidatePayloads(t *testing.T) {
-	cdp := New(Config{
-		CustomEvents: []CustomEvent{
-			{
-				Name: "Custom.changed",
-				EventSchema: map[string]any{
-					"type":                 "object",
-					"required":             []any{"targetId"},
-					"properties":           map[string]any{"targetId": map[string]any{"type": "string"}},
-					"additionalProperties": false,
-				},
-			},
-		},
-	})
-
-	if _, ok := cdp.Types.ParseEventPayload("Custom.changed", map[string]any{"targetId": "target-1"}); !ok {
-		t.Fatal("expected valid event payload")
-	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.changed", map[string]any{"targetId": 1}) })
-}
-
-func TestTypedCDPSurfaceInitializesAndEncodesParams(t *testing.T) {
-	cdp := New(Config{})
-	if cdp.Target.client != cdp {
-		t.Fatal("expected Target domain to be initialized with the client")
-	}
-
-	params := TargetCreateTargetParams{
-		URL:        "https://example.com",
-		Background: Bool(true),
-	}
-	raw, err := cdpParamsMap(params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if raw["url"] != "https://example.com" || raw["background"] != true {
-		t.Fatalf("unexpected encoded Target.createTarget params: %#v", raw)
-	}
-	if _, ok := raw["sessionId"]; ok {
-		t.Fatalf("SessionID must stay transport-only, got %#v", raw)
-	}
 }

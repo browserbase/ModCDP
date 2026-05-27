@@ -19,7 +19,7 @@ import asyncio
 import inspect
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from queue import Queue, Empty
 from typing import Any, Literal, cast
 
@@ -49,10 +49,6 @@ from ..translate.translate import (
 )
 from ..launcher.BrowserLauncher import LauncherConfig
 from ..types.modcdp import (
-    ModCDPAddCustomCommandParams,
-    ModCDPAddCustomEventObjectParams,
-    ModCDPAddCustomEventParams,
-    ModCDPAddMiddlewareParams,
     ModCDPCommandTiming,
     ModCDPConnectTiming,
     ModCDPPingLatency,
@@ -206,9 +202,6 @@ class ModCDPClient(CDPSurfaceMixin):
         client_config: Mapping[str, Any] | None = None,
         server_config: Mapping[str, JsonValue] | None | object = DEFAULT_SERVER,
         types: CDPTypes | Mapping[str, Any] | None = None,
-        custom_commands: Sequence[ModCDPAddCustomCommandParams] | None = None,
-        custom_events: Sequence[ModCDPAddCustomEventParams] | None = None,
-        custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
     ) -> None:
         launcher_input = dict(launcher or {})
         upstream_input = dict(upstream or {})
@@ -278,7 +271,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 cast(Any, types.get("custom_middlewares")),
             )
         else:
-            self.types = CDPTypes(custom_commands, custom_events, custom_middlewares)
+            self.types = CDPTypes()
 
         self.extension_id: str | None = None
         self.ext_target_id: str | None = None

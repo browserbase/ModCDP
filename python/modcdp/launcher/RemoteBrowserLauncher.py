@@ -10,11 +10,15 @@ from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, Launched
 
 
 class RemoteBrowserLauncher(BrowserLauncher):
+    def __init__(self, config: LauncherConfig | dict | None = None) -> None:
+        raw_config = config.model_dump() if isinstance(config, LauncherConfig) else dict(config or {})
+        super().__init__({**raw_config, "launcher_mode": "remote"})
+
     def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         merged = self.config if config is None else _launcher_config({**self.config.model_dump(), **_launcher_config(config).model_dump(exclude_unset=True)})
         cdp_url = merged.launcher_remote_cdp_url
         if not cdp_url:
-            raise RuntimeError("launcher.launcher_mode=remote requires launcher_remote_cdp_url.")
+            raise RuntimeError("launcher_mode=remote requires launcher_remote_cdp_url.")
         # cdp_url is resolved here so downstream transports can dial it directly.
         cdp_url = resolveCdpWebSocketUrl(cast(str, cdp_url), "launcher_remote_cdp_url")
         self.launched = {"cdp_url": cdp_url, "close": lambda: None}

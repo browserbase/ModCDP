@@ -19,8 +19,6 @@ from websocket import create_connection
 
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
-from modcdp.types import JsonValue
-
 
 HERE = Path(__file__).resolve().parent
 EXTENSION_PATH = HERE.parents[1] / "dist" / "extension"
@@ -493,6 +491,30 @@ class ModCDPClientTests(unittest.TestCase):
         with self.assertRaises(Empty):
             seen.get(timeout=0.1)
 
+    def test_validates_native_command_params_before_sending(self) -> None:
+        client = ModCDPClient()
+
+        with self.assertRaisesRegex(Exception, "expression"):
+            client.send("Runtime.evaluate", {})
+
+    def test_validates_native_and_registered_custom_events_before_dispatch(self) -> None:
+        client = ModCDPClient()
+
+        with self.assertRaisesRegex(Exception, "targetInfo"):
+            client._on_recv({"method": "Target.targetCreated", "params": {}})
+
+        client.Mod.addCustomEvent(
+            "Custom.ready",
+            event_schema={
+                "type": "object",
+                "properties": {"ok": {"type": "boolean"}},
+                "required": ["ok"],
+                "additionalProperties": False,
+            },
+        )
+        with self.assertRaisesRegex(Exception, "boolean"):
+            client._on_recv({"method": "Custom.ready", "params": {"ok": "yes"}})
+
     def test_root_events_dispatch_before_extension_session_is_attached(self) -> None:
         client = ModCDPClient()
         seen: Queue[str] = Queue()
@@ -515,105 +537,14 @@ class ModCDPClientTests(unittest.TestCase):
         )
         self.assertEqual(seen.get(timeout=1), "target-1")
 
-    def test_schema_only_custom_command_registers_without_websocket(self) -> None:
-        client = ModCDPClient()
+    def test_uses_no_injector_unless_injector_mode_is_explicit(self) -> None:
+        launched = ModCDPClient(launcher={"launcher_mode": "local"}, upstream={"upstream_mode": "ws"})
+        self.assertEqual(launched.launcher.config.launcher_mode, "local")
+        self.assertIsNone(launched.injector)
 
-        result = client.send(
-            "Mod.addCustomCommand",
-            {
-                "name": "Custom.echo",
-                "params_schema": {
-                    "type": "object",
-                    "properties": {"text": {"type": "string", "minLength": 1}},
-                    "required": ["text"],
-                    "additionalProperties": False,
-                },
-                "result_schema": {
-                    "type": "object",
-                    "properties": {"text": {"type": "string"}},
-                    "required": ["text"],
-                    "additionalProperties": False,
-                },
-            },
-        )
-
-        self.assertEqual(result, {"name": "Custom.echo", "registered": True})
-        self.assertEqual(client.types.parseCommandParams("Custom.echo", {"text": "ok"}), {"text": "ok"})
-        with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Custom.echo", {"text": ""})
-        with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Custom.echo", {"text": "ok", "extra": True})
-        self.assertEqual(client.types.parseCommandResult("Custom.echo", {"text": "ok"}), {"text": "ok"})
-        with self.assertRaises(ValueError):
-            client.types.parseCommandResult("Custom.echo", {"text": 123})
-
-    def test_constructor_custom_command_schemas_validate_nested_json(self) -> None:
-        client = ModCDPClient(
-            custom_commands=[
-                {
-                    "name": "Custom.collect",
-                    "params_schema": {
-                        "type": "object",
-                        "properties": {
-                            "items": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "id": {"type": "string"},
-                                        "count": {"type": "integer", "minimum": 1},
-                                    },
-                                    "required": ["id", "count"],
-                                    "additionalProperties": False,
-                                },
-                            }
-                        },
-                        "required": ["items"],
-                        "additionalProperties": False,
-                    },
-                }
-            ]
-        )
-
-        valid: dict[str, JsonValue] = {"items": [{"id": "a", "count": 1}]}
-        self.assertEqual(client.types.parseCommandParams("Custom.collect", valid), valid)
-        with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Custom.collect", {"items": [{"id": "a", "count": 0}]})
-        with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Custom.collect", {"items": []})
-
-    def test_custom_event_schema_validates_payload_before_handlers(self) -> None:
-        client = ModCDPClient(
-            custom_events=[
-                {
-                    "name": "Custom.ready",
-                    "event_schema": {
-                        "type": "object",
-                        "properties": {
-                            "url": {"type": "string", "pattern": "^https://"},
-                            "ready": {"type": "boolean"},
-                        },
-                        "required": ["url", "ready"],
-                        "additionalProperties": False,
-                    },
-                }
-            ]
-        )
-
-        payload: dict[str, JsonValue] = {"url": "https://example.com", "ready": True}
-        self.assertEqual(client.types.parseEventPayload("Custom.ready", payload), payload)
-        with self.assertRaises(ValueError):
-            client.types.parseEventPayload("Custom.ready", {"url": "http://example.com", "ready": True})
-        with self.assertRaises(ValueError):
-            client.types.parseEventPayload("Custom.ready", {"url": "https://example.com", "ready": True, "x": 1})
-
-    def test_scalar_event_schema_validates_value_payloads(self) -> None:
-        client = ModCDPClient(custom_events=[{"name": "Custom.count", "event_schema": {"type": "integer", "minimum": 1}}])
-
-        self.assertEqual(client.types.parseEventPayload("Custom.count", {"value": 3}), {"value": 3})
-        with self.assertRaises(ValueError):
-            client.types.parseEventPayload("Custom.count", {"value": 0})
+        attach_only = ModCDPClient(upstream={"upstream_mode": "ws"})
+        self.assertEqual(attach_only.launcher.config.launcher_mode, "none")
+        self.assertIsNone(attach_only.injector)
 
 
 if __name__ == "__main__":

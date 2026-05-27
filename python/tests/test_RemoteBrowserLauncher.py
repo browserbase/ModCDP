@@ -16,8 +16,8 @@ from modcdp.launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
 
 
 class RemoteBrowserLauncherTests(unittest.TestCase):
-    def test_requires_upstream_ws_cdp_url(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "launcher.launcher_mode=remote requires launcher_remote_cdp_url"):
+    def test_requires_launcher_remote_cdp_url(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "launcher_mode=remote requires launcher_remote_cdp_url"):
             RemoteBrowserLauncher().launch()
 
     def test_connects_to_real_browser_from_http_and_websocket_cdp_endpoints(self) -> None:

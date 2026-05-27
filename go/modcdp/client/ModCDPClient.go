@@ -226,9 +226,6 @@ type Config struct {
 	ClientConfig           ClientConfig            `json:"client_config,omitempty"`
 	ServerConfig           *ServerConfig           `json:"server_config,omitempty"`
 	Types                  *CDPTypesConfig         `json:"types,omitempty"`
-	CustomCommands         []CustomCommand         `json:"custom_commands,omitempty"`
-	CustomEvents           []CustomEvent           `json:"custom_events,omitempty"`
-	CustomMiddlewares      []CustomMiddleware      `json:"custom_middlewares,omitempty"`
 	serverConfigConfigured bool
 }
 
@@ -446,11 +443,7 @@ func New(config Config) *ModCDPClient {
 	if config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
 		config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = DefaultWSConnectErrorSettleTimeoutMS
 	}
-	typesConfig := CDPTypesConfig{
-		CustomCommands:    config.CustomCommands,
-		CustomEvents:      config.CustomEvents,
-		CustomMiddlewares: config.CustomMiddlewares,
-	}
+	typesConfig := CDPTypesConfig{}
 	if config.Types != nil {
 		typesConfig = *config.Types
 	}

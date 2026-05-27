@@ -11,13 +11,14 @@ type RemoteBrowserLauncher struct {
 }
 
 func NewRemoteBrowserLauncher(config LauncherConfig) *RemoteBrowserLauncher {
+	config.LauncherMode = "remote"
 	return &RemoteBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 
 func (l *RemoteBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error) {
 	cdpURL := firstString(config.LauncherRemoteCDPURL, l.Config.LauncherRemoteCDPURL)
 	if cdpURL == "" {
-		return nil, fmt.Errorf("launcher.launcher_mode=remote requires launcher_remote_cdp_url")
+		return nil, fmt.Errorf("launcher_mode=remote requires launcher_remote_cdp_url.")
 	}
 	resolvedCDPURL, err := websocketURLFor(cdpURL)
 	if err != nil {

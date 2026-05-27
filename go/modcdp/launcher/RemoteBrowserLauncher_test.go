@@ -13,7 +13,7 @@ import (
 
 func TestRemoteBrowserLauncherRequiresLauncherRemoteCDPURL(t *testing.T) {
 	_, err := NewRemoteBrowserLauncher(LauncherConfig{}).Launch(LauncherConfig{})
-	if err == nil || err.Error() != "launcher.launcher_mode=remote requires launcher_remote_cdp_url" {
+	if err == nil || err.Error() != "launcher_mode=remote requires launcher_remote_cdp_url." {
 		t.Fatalf("Launch error = %v", err)
 	}
 }

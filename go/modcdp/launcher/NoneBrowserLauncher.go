@@ -9,6 +9,7 @@ type NoneBrowserLauncher struct {
 }
 
 func NewNoneBrowserLauncher(config LauncherConfig) *NoneBrowserLauncher {
+	config.LauncherMode = "none"
 	return &NoneBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 

@@ -30,6 +30,10 @@ from ..launcher.BrowserLauncher import (
 
 
 class LocalBrowserLauncher(BrowserLauncher):
+    def __init__(self, config: LauncherConfig | dict | None = None) -> None:
+        raw_config = config.model_dump() if isinstance(config, LauncherConfig) else dict(config or {})
+        super().__init__({**raw_config, "launcher_mode": "local"})
+
     @staticmethod
     def findChromeBinary(explicit: str | None = None) -> str:
         candidates = [explicit, os.environ.get("CHROME_PATH"), *_candidate_paths()]

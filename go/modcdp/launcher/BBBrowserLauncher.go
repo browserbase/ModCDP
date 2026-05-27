@@ -36,6 +36,7 @@ type browserbaseSession struct {
 }
 
 func NewBBBrowserLauncher(config LauncherConfig) *BBBrowserLauncher {
+	config.LauncherMode = "bb"
 	return &BBBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 
@@ -43,7 +44,7 @@ func (l *BBBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, err
 	merged := mergeLaunchConfig(l.Config, config)
 	browserbaseAPIKey := firstString(merged.LauncherBBAPIKey, os.Getenv("BROWSERBASE_API_KEY"))
 	if browserbaseAPIKey == "" {
-		return nil, fmt.Errorf("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key")
+		return nil, fmt.Errorf("launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")
 	}
 
 	baseURL := firstString(merged.LauncherBBBaseURL, os.Getenv("BROWSERBASE_BASE_URL"), DefaultBrowserbaseLauncherBaseURL)
