@@ -258,7 +258,28 @@ export class ModCDPClient<
       upstream_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
     });
     if (upstream !== undefined) {
-      this.upstream.update(upstream);
+      const upstream_mode =
+        typeof (upstream as { upstream_mode?: unknown }).upstream_mode === "string"
+          ? (upstream as { upstream_mode: string }).upstream_mode
+          : this.upstream.config.upstream_mode;
+      if (upstream_mode !== this.upstream.config.upstream_mode) {
+        const Upstream = upstream_transport_constructors.get(upstream_mode);
+        if (!Upstream) throw new Error(`unknown upstream_mode=${upstream_mode}`);
+        const previous_upstream = this.upstream;
+        this.upstream = new Upstream(upstream);
+        this.upstream.update({
+          upstream_cdp_send_timeout_ms: this.config.client_cdp_send_timeout_ms,
+        });
+        this.router.stop();
+        this.router = new AutoSessionRouter({
+          ...this.router.config,
+          upstream: this.upstream,
+          types: this.types,
+        });
+        void previous_upstream.close();
+      } else {
+        this.upstream.update(upstream);
+      }
     }
     if (router !== undefined) {
       this.router.config = ModCDPRouterConfigSchema.parse({

@@ -8,9 +8,10 @@
 import * as Browser from "../types/generated/zod/Browser.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import type { z } from "zod";
-import { ModCDPClient } from "../client/ModCDPClient.js";
+import { ModCDPClient, upstream_transport_constructors } from "../client/ModCDPClient.js";
 import { ModCDPConfigureParamsSchema, ModCDPServerConfigSchema } from "../types/modcdp.js";
 import { routeFor } from "../translate/translate.js";
+import { ChromeDebuggerUpstreamTransport } from "../transport/ChromeDebuggerUpstreamTransport.js";
 import { DownstreamTransportSet } from "../transport/DownstreamTransportSet.js";
 import { NativeMessagingDownstreamTransport } from "../transport/NativeMessagingDownstreamTransport.js";
 import { NATSDownstreamTransport } from "../transport/NATSDownstreamTransport.js";
@@ -44,6 +45,8 @@ const DEFAULT_ROUTES = {
 
 const OFFSCREEN_KEEP_ALIVE_PORT_NAME = "ModCDPOffscreenKeepAlive";
 const OFFSCREEN_KEEP_ALIVE_PATH = "offscreen/keepalive.html";
+
+upstream_transport_constructors.set("chromedebugger", ChromeDebuggerUpstreamTransport);
 
 /**
  * Extension-side ModCDP server.

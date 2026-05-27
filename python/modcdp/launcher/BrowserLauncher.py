@@ -53,7 +53,7 @@ class BrowserLauncher:
         launcher_local_loopback_cdp_url = self.launched.loopback_cdp_url if self.launched is not None else None
         if not launcher_local_loopback_cdp_url and upstream.config.upstream_mode == "ws" and upstream.config.upstream_ws_cdp_url:
             launcher_local_loopback_cdp_url = upstream.config.upstream_ws_cdp_url
-        return {"upstream": {"upstream_ws_cdp_url": launcher_local_loopback_cdp_url}} if launcher_local_loopback_cdp_url else {}
+        return {"upstream": {"upstream_mode": "ws", "upstream_ws_cdp_url": launcher_local_loopback_cdp_url}} if launcher_local_loopback_cdp_url else {}
 
     def launch(self, config: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")

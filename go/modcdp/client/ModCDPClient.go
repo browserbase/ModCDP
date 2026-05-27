@@ -707,6 +707,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 				(c.Config.ServerConfig.Upstream.UpstreamWSCDPURL == "" ||
 					c.Config.ServerConfig.Upstream.UpstreamWSCDPURL == initialCDPURL ||
 					c.Config.ServerConfig.Upstream.UpstreamWSCDPURL == launchedCDPURL) {
+				c.Config.ServerConfig.Upstream.UpstreamMode = "ws"
 				c.Config.ServerConfig.Upstream.UpstreamWSCDPURL = loopbackCDPURL
 			}
 		}

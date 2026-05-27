@@ -107,7 +107,7 @@ func (l BrowserLauncher) ConfigForServer(upstreamConfig UpstreamTransportConfig)
 		launcherLocalLoopbackCDPURL = upstreamConfig.UpstreamWSCDPURL
 	}
 	if launcherLocalLoopbackCDPURL != "" {
-		return map[string]any{"upstream": map[string]any{"upstream_ws_cdp_url": launcherLocalLoopbackCDPURL}}
+		return map[string]any{"upstream": map[string]any{"upstream_mode": "ws", "upstream_ws_cdp_url": launcherLocalLoopbackCDPURL}}
 	}
 	return map[string]any{}
 }

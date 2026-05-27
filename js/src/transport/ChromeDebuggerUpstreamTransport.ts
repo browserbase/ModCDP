@@ -75,6 +75,15 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
     this.config = ChromeDebuggerUpstreamTransportConfigSchema.parse({ ...config, upstream_mode: "chromedebugger" });
   }
 
+  override update(config: z.input<typeof ChromeDebuggerUpstreamTransportConfigSchema> = {}) {
+    this.config = ChromeDebuggerUpstreamTransportConfigSchema.parse({
+      ...this.config,
+      ...config,
+      upstream_mode: "chromedebugger",
+    });
+    return this;
+  }
+
   /** Install chrome.debugger listeners for this service-worker lifetime. */
   override async connect() {
     this.installEventListener();
