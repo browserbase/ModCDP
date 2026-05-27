@@ -321,7 +321,7 @@ class ModCDPClient(CDPSurfaceMixin):
             })
             return self
 
-        self._initialize_raw_cdp_transport()
+        self.router.start()
 
         injector_started_at = int(time.time() * 1000)
         if self.injector is None:
@@ -587,6 +587,7 @@ class ModCDPClient(CDPSurfaceMixin):
             return
         self._closed = True
         self._stop_heartbeat()
+        self.router.stop()
         self.launcher.close()
         try:
             self.upstream.close()
@@ -668,14 +669,6 @@ class ModCDPClient(CDPSurfaceMixin):
                 launched_cdp_url,
             ):
                 self.server_config = {**self.server_config, **server_config}
-
-    def _initialize_raw_cdp_transport(self) -> None:
-        self.upstream.send("Target.setAutoAttach", {
-            "autoAttach": True,
-            "waitForDebuggerOnStart": False,
-            "flatten": True,
-        })
-        self.upstream.send("Target.setDiscoverTargets", {"discover": True})
 
     def _inject_extension(self) -> ExtensionInfo:
         if self.injector is None:

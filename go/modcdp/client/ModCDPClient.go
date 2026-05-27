@@ -581,7 +581,7 @@ func (c *ModCDPClient) Connect() error {
 		}
 		return nil
 	}
-	if err := c.initializeRawCDPTransport(); err != nil {
+	if err := c.Router.Start(); err != nil {
 		c.Close()
 		return err
 	}
@@ -778,20 +778,6 @@ func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 		"upstream_ws_connect_error_settle_timeout_ms": c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
 		"upstream_cdp_send_timeout_ms":                c.Config.Upstream.UpstreamCDPSendTimeoutMS,
 	}
-}
-
-func (c *ModCDPClient) initializeRawCDPTransport() error {
-	if _, err := c.transport.Send("Target.setAutoAttach", map[string]any{
-		"autoAttach":             true,
-		"waitForDebuggerOnStart": false,
-		"flatten":                true,
-	}, ""); err != nil {
-		return err
-	}
-	if _, err := c.transport.Send("Target.setDiscoverTargets", map[string]any{"discover": true}, ""); err != nil {
-		return err
-	}
-	return nil
 }
 
 func transportURL(transport upstreamTransportClient) string {
@@ -1178,6 +1164,7 @@ func handlerPointer(handler Handler) uintptr {
 
 func (c *ModCDPClient) Close() {
 	c.stopHeartbeat()
+	c.Router.Stop()
 	if c.launchedBrowser != nil {
 		c.launchedBrowser.Close()
 		c.launchedBrowser = nil
