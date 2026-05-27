@@ -102,31 +102,40 @@ class ModCDPPingLatency(TypedDict):
 
 
 class ModCDPGetTopologyParams(TypedDict, total=False):
-    rootTargetId: str
-    targetId: str
-    active: bool
+    rootTargetId: str | None
+    targetId: str | None
+    active: bool | None
 
 
-class ModCDPTopologyFrame(TypedDict, total=False):
+class _ModCDPTopologyFrameRequired(TypedDict):
     targetId: str
+
+
+class ModCDPTopologyFrame(_ModCDPTopologyFrameRequired, total=False):
     url: str | None
     parentFrameId: str | None
     outerBackendNodeId: int | None
 
 
-class ModCDPTopologyDomRoot(TypedDict, total=False):
+class _ModCDPTopologyDomRootRequired(TypedDict):
     kind: Literal["document", "shadow"]
     frameId: str
+
+
+class ModCDPTopologyDomRoot(_ModCDPTopologyDomRootRequired, total=False):
     outerBackendNodeId: int | None
     innerBackendNodeId: int | None
-    mode: Literal["open", "closed", "user-agent"]
-    executionContextId: int
-    uniqueContextId: str
+    mode: Literal["open", "closed", "user-agent"] | None
+    executionContextId: int | None
+    uniqueContextId: str | None
 
 
-class ModCDPTopologyTarget(TypedDict, total=False):
+class _ModCDPTopologyTargetRequired(TypedDict):
     targetId: str
     type: str
+
+
+class ModCDPTopologyTarget(_ModCDPTopologyTargetRequired, total=False):
     title: str
     url: str
     attached: bool
@@ -135,16 +144,19 @@ class ModCDPTopologyTarget(TypedDict, total=False):
     sessionId: str | None
 
 
-class ModCDPTopologyExecutionContext(TypedDict, total=False):
+class _ModCDPTopologyExecutionContextRequired(TypedDict):
     id: int
+    sessionId: str | None
+    targetId: str
+    world: str
+
+
+class ModCDPTopologyExecutionContext(_ModCDPTopologyExecutionContextRequired, total=False):
     origin: str
     name: str
     uniqueId: str
     auxData: dict[str, object]
-    sessionId: str | None
-    targetId: str
     frameId: str | None
-    world: str
 
 
 class ModCDPTopology(TypedDict):
