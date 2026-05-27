@@ -26,8 +26,8 @@ func TestNoneBrowserLauncherConstructorLaunchAndConfigMatchTSShape(t *testing.T)
 	if launched.CDPURL != "" {
 		t.Fatalf("launched.CDPURL = %q", launched.CDPURL)
 	}
-	if len(launcher.ConfigForServer()) != 0 {
-		t.Fatalf("server config after launch = %#v", launcher.ConfigForServer())
+	if len(launcher.ConfigForServer(UpstreamTransportConfig{})) != 0 {
+		t.Fatalf("server config after launch = %#v", launcher.ConfigForServer(UpstreamTransportConfig{}))
 	}
 	launched.Close()
 }

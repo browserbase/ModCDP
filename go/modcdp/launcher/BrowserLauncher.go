@@ -20,6 +20,7 @@ import (
 
 type LauncherConfig = types.LauncherConfig
 type InjectorConfig = types.InjectorConfig
+type UpstreamTransportConfig = types.UpstreamTransportConfig
 
 const DefaultChromeReadyTimeoutMS = 45_000
 const DefaultChromeReadyPollIntervalMS = 100
@@ -131,9 +132,17 @@ func (l BrowserLauncher) ConfigForUpstream() map[string]any {
 	return config
 }
 
-func (l BrowserLauncher) ConfigForServer() map[string]any {
+func (l BrowserLauncher) ConfigForServer(upstreamConfig UpstreamTransportConfig) map[string]any {
+	launcherLocalLoopbackCDPURL := ""
 	if l.Launched != nil && l.Launched.LoopbackCDPURL != "" {
-		return map[string]any{"upstream": map[string]any{"upstream_ws_cdp_url": l.Launched.LoopbackCDPURL}}
+		launcherLocalLoopbackCDPURL = l.Launched.LoopbackCDPURL
+	} else if upstreamConfig.UpstreamMode == "ws" && upstreamConfig.UpstreamWSCDPURL != "" {
+		launcherLocalLoopbackCDPURL = upstreamConfig.UpstreamWSCDPURL
+	} else if upstreamConfig.UpstreamMode != "ws" && upstreamConfig.UpstreamMode != "pipe" && l.Launched != nil && l.Launched.CDPURL != "" {
+		launcherLocalLoopbackCDPURL = l.Launched.CDPURL
+	}
+	if launcherLocalLoopbackCDPURL != "" {
+		return map[string]any{"upstream": map[string]any{"upstream_ws_cdp_url": launcherLocalLoopbackCDPURL}}
 	}
 	return map[string]any{}
 }

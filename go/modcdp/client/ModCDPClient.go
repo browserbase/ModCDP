@@ -333,7 +333,7 @@ type extensionInjector interface {
 type browserLauncherClient interface {
 	Update(LauncherConfig) *BrowserLauncher
 	ConfigForUpstream() map[string]any
-	ConfigForServer() map[string]any
+	ConfigForServer(UpstreamTransportConfig) map[string]any
 	Launch(LauncherConfig) (*LaunchedBrowser, error)
 }
 
@@ -730,7 +730,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	}
 
 	serverConfig := map[string]any{}
-	for key, value := range launcher.ConfigForServer() {
+	for key, value := range launcher.ConfigForServer(c.Config.Upstream) {
 		serverConfig[key] = value
 	}
 	for key, value := range transport.ConfigForServer() {

@@ -9,6 +9,7 @@ from __future__ import annotations
 import unittest
 
 from modcdp.launcher.NoneBrowserLauncher import NoneBrowserLauncher
+from modcdp.transport.UpstreamTransport import UpstreamTransport
 
 
 class NoneBrowserLauncherTests(unittest.TestCase):
@@ -23,7 +24,7 @@ class NoneBrowserLauncherTests(unittest.TestCase):
         launched = launcher.launch({"launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/call"})
         self.assertIs(launcher.launched, launched)
         self.assertIsNone(launched["cdp_url"])
-        self.assertEqual(launcher.configForServer(), {})
+        self.assertEqual(launcher.configForServer(UpstreamTransport()), {})
         launched["close"]()
 
 

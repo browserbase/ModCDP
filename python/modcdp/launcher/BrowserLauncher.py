@@ -8,11 +8,14 @@ import json
 import re
 import urllib.request
 from collections.abc import Callable
-from typing import Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired
 from ..types.toJSON import modCDPToJSON
+
+if TYPE_CHECKING:
+    from ..transport.UpstreamTransport import UpstreamTransport
 
 
 class LauncherConfig(BaseModel):
@@ -96,9 +99,14 @@ class BrowserLauncher:
             config["upstream_pipe_write"] = pipe_write
         return config
 
-    def configForServer(self) -> dict[str, Any]:
-        loopback_cdp_url = (self.launched or {}).get("loopback_cdp_url")
-        return {"upstream": {"upstream_ws_cdp_url": loopback_cdp_url}} if loopback_cdp_url else {}
+    def configForServer(self, upstream: UpstreamTransport) -> dict[str, Any]:
+        launched = self.launched or {}
+        launcher_local_loopback_cdp_url = launched.get("loopback_cdp_url")
+        if not launcher_local_loopback_cdp_url and upstream.config.upstream_mode == "ws" and upstream.config.upstream_ws_cdp_url:
+            launcher_local_loopback_cdp_url = upstream.config.upstream_ws_cdp_url
+        if not launcher_local_loopback_cdp_url and upstream.config.upstream_mode not in ("ws", "pipe") and launched.get("cdp_url"):
+            launcher_local_loopback_cdp_url = launched.get("cdp_url")
+        return {"upstream": {"upstream_ws_cdp_url": launcher_local_loopback_cdp_url}} if launcher_local_loopback_cdp_url else {}
 
     def launch(self, config: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")
