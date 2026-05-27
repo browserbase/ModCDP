@@ -60,9 +60,10 @@ LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
-    def test_pydantic_custom_command_installs_flat_dynamic_method_through_real_service_worker(self) -> None:
+    def test_custom_commands_install_flat_namespace_methods_through_a_real_service_worker(self) -> None:
         class ParamsSchema(BaseModel):
             id: str
+            suffix: str = ""
 
         class ResultSchema(BaseModel):
             success: bool
@@ -82,30 +83,51 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
             },
             router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
             server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+            types={
+                "custom_commands": {
+                    "Custom.doSomething": {
+                        "params_schema": ParamsSchema,
+                        "result_schema": ResultSchema,
+                        "expression": "async ({ id, suffix = '' }) => ({ success: `${id}${suffix}` === 'abcmiddleware' })",
+                    },
+                    "Custom.badResult": {
+                        "params_schema": {
+                            "type": "object",
+                            "properties": {"id": {"type": "string"}},
+                            "required": ["id"],
+                            "additionalProperties": False,
+                        },
+                        "result_schema": ResultSchema,
+                        "expression": "async () => ({ success: 'yes' })",
+                    },
+                },
+                "custom_middlewares": [
+                    {
+                        "name": "Custom.doSomething",
+                        "phase": "request",
+                        "expression": "async (payload, next) => next({ ...payload, suffix: 'middleware' })",
+                    }
+                ],
+            },
         )
 
         async def run() -> None:
             client.connect()
-            registered = await client.Mod.addCustomCommand(
-                "Custom.doSomething",
-                params_schema=ParamsSchema,
-                result_schema=ResultSchema,
-                expression="async ({ id }) => ({ success: id === 'abc' })",
-            )
-            self.assertEqual(registered, {"name": "Custom.doSomething", "registered": True})
             success = await client.Custom.doSomething(id="abc")
             raw_success = await client.send("Custom.doSomething", {"id": "abc"})
             self.assertEqual(success, {"success": True})
             self.assertEqual(raw_success, {"success": True})
+            with self.assertRaises(ValueError):
+                await client.Custom.doSomething(id=123)
+            with self.assertRaisesRegex(Exception, "boolean"):
+                await client.Custom.badResult(id="abc")
 
         try:
             asyncio.run(run())
-            with self.assertRaises(ValueError):
-                client.Custom.doSomething(id=123)
         finally:
             client.close()
 
-    def test_pydantic_custom_event_schema_coerces_raw_string_handlers_through_real_service_worker(self) -> None:
+    def test_custom_events_validate_raw_string_handlers_through_a_real_service_worker(self) -> None:
         class EventSchema(BaseModel):
             data: str
 

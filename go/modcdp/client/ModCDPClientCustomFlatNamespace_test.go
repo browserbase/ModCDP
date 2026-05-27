@@ -16,10 +16,14 @@ import (
 
 func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T) {
 	type ParamsSchema struct {
-		ID string `json:"id"`
+		ID     string `json:"id"`
+		Suffix string `json:"suffix,omitempty"`
 	}
 	type ResultSchema struct {
 		Success bool `json:"success"`
+	}
+	type BadResultParamsSchema struct {
+		ID string `json:"id"`
 	}
 
 	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
@@ -45,24 +49,34 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 			"*.*":      "direct_cdp",
 		}},
 		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+		Types: &CDPTypesConfig{
+			CustomCommands: []CustomCommand{
+				{
+					Name:         "Custom.doSomething",
+					ParamsSchema: abxjsonschema.SchemaFor[ParamsSchema](),
+					ResultSchema: abxjsonschema.SchemaFor[ResultSchema](),
+					Expression:   "async ({ id, suffix = '' }) => ({ success: `${id}${suffix}` === 'abcmiddleware' })",
+				},
+				{
+					Name:         "Custom.badResult",
+					ParamsSchema: abxjsonschema.SchemaFor[BadResultParamsSchema](),
+					ResultSchema: abxjsonschema.SchemaFor[ResultSchema](),
+					Expression:   "async () => ({ success: 'yes' })",
+				},
+			},
+			CustomMiddlewares: []CustomMiddleware{
+				{
+					Name:       "Custom.doSomething",
+					Phase:      "request",
+					Expression: "async (payload, next) => next({ ...payload, suffix: 'middleware' })",
+				},
+			},
+		},
 	})
 	defer cdp.Close()
 
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)
-	}
-	registered, err := cdp.Mod.AddCustomCommand(CustomCommand{
-		Name:         "Custom.doSomething",
-		ParamsSchema: abxjsonschema.SchemaFor[ParamsSchema](),
-		ResultSchema: abxjsonschema.SchemaFor[ResultSchema](),
-		Expression:   "async ({ id }) => ({ success: id === 'abc' })",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	registration, ok := registered.(map[string]any)
-	if !ok || registration["name"] != "Custom.doSomething" || registration["registered"] != true {
-		t.Fatalf("unexpected custom command registration: %#v", registered)
 	}
 	result, err := cdp.Send("Custom.doSomething", map[string]any{"id": "abc"})
 	if err != nil {
@@ -74,6 +88,9 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 	}
 	if _, err := cdp.Send("Custom.doSomething", map[string]any{"id": 123}); err == nil {
 		t.Fatal("expected custom command params schema to reject non-string id")
+	}
+	if _, err := cdp.Send("Custom.badResult", map[string]any{"id": "abc"}); err == nil {
+		t.Fatal("expected Custom.badResult result validation error")
 	}
 }
 
@@ -507,7 +524,7 @@ func TestServiceWorkerServerValidatesRegisteredCustomCommandAndEventSchemas(t *t
 	}
 }
 
-func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
+func TestSchemaOnlyCustomCommandsRegisterWithoutAWebsocket(t *testing.T) {
 	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
 		Name: "Custom.echo",
