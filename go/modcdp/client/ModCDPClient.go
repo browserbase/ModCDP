@@ -300,7 +300,7 @@ type ModCDPClient struct {
 	CDPURL                   string
 	Launcher                 browserLauncherClient
 	Injector                 extensionInjector
-	transport                upstreamTransportClient
+	Upstream                 upstreamTransportClient
 	handlers                 map[string][]handlerEntry
 	handlersMu               sync.Mutex
 	Router                   *AutoSessionRouter
@@ -310,7 +310,6 @@ type ModCDPClient struct {
 	Latency                  map[string]any
 	ConnectTiming            map[string]any
 	LastCommandTiming        map[string]any
-	launchedBrowser          *LaunchedBrowser
 	extensionInjectors       []extensionInjector
 	configuredPeerGeneration int64
 	heartbeatStop            chan struct{}
@@ -412,10 +411,10 @@ func New(config Config) *ModCDPClient {
 	}
 	upstream := NewWSUpstreamTransport(config.Upstream)
 	client := &ModCDPClient{
-		Config:    config,
-		Types:     NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
-		transport: upstream,
-		handlers:  map[string][]handlerEntry{},
+		Config:   config,
+		Types:    NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
+		Upstream: upstream,
+		handlers: map[string][]handlerEntry{},
 	}
 	client.Mod = ModDomain{client: client}
 	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, client.Types, config.Router)
@@ -436,7 +435,7 @@ func (c *ModCDPClient) ToJSON() map[string]any {
 	if child, ok := c.Launcher.(types.ModCDPJSONChild); ok {
 		children["launcher"] = child
 	}
-	if child, ok := c.transport.(types.ModCDPJSONChild); ok {
+	if child, ok := c.Upstream.(types.ModCDPJSONChild); ok {
 		children["upstream"] = child
 	}
 	if child, ok := c.Injector.(types.ModCDPJSONChild); ok {
@@ -483,8 +482,8 @@ func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
 	if config.ClientConfig.ClientHeartbeatIntervalMS != 0 {
 		c.Config.ClientConfig.ClientHeartbeatIntervalMS = config.ClientConfig.ClientHeartbeatIntervalMS
 	}
-	if c.transport != nil {
-		c.transport.Update(map[string]any{"upstream_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS})
+	if c.Upstream != nil {
+		c.Upstream.Update(map[string]any{"upstream_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS})
 	}
 	if config.Upstream.UpstreamWSCDPURL != "" || config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 || config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
 		if config.Upstream.UpstreamWSCDPURL != "" {
@@ -496,8 +495,8 @@ func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
 		if config.Upstream.UpstreamCDPSendTimeoutMS != 0 {
 			c.Config.Upstream.UpstreamCDPSendTimeoutMS = config.Upstream.UpstreamCDPSendTimeoutMS
 		}
-		if c.transport != nil {
-			c.transport.Update(c.upstreamTransportConfig())
+		if c.Upstream != nil {
+			c.Upstream.Update(c.upstreamTransportConfig())
 		}
 	}
 	if config.Router.RouterRoutes != nil {
@@ -538,24 +537,24 @@ func (c *ModCDPClient) Connect() error {
 		return err
 	}
 	transportConnectedAt := time.Now().UnixMilli()
-	if c.transport == nil {
+	if c.Upstream == nil {
 		return fmt.Errorf("upstream transport did not connect")
 	}
-	c.transport.OnRecv(func(message map[string]any) { c.handleMessage(message) })
-	c.transport.OnClose(func(err error) {
+	c.Upstream.OnRecv(func(message map[string]any) { c.handleMessage(message) })
+	c.Upstream.OnClose(func(err error) {
 		c.stopHeartbeat()
 	})
 	if c.Config.Upstream.UpstreamMode != "ws" {
-		if err := c.transport.WaitForPeer(); err != nil {
+		if err := c.Upstream.WaitForPeer(); err != nil {
 			c.Close()
 			return err
 		}
 		if c.Config.ServerConfig != nil {
-			if _, err := c.transport.Send("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
+			if _, err := c.Upstream.Send("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
 				c.Close()
 				return err
 			}
-			c.configuredPeerGeneration = c.transport.PeerGeneration()
+			c.configuredPeerGeneration = c.Upstream.PeerGeneration()
 		}
 		c.startHeartbeat()
 		c.startPingLatencyMeasurement()
@@ -652,7 +651,7 @@ func (c *ModCDPClient) Connect() error {
 }
 
 func (c *ModCDPClient) connectUpstreamTransport() error {
-	if wsTransport, ok := c.transport.(*WSUpstreamTransport); ok && wsTransport.Conn != nil {
+	if wsTransport, ok := c.Upstream.(*WSUpstreamTransport); ok && wsTransport.Conn != nil {
 		return nil
 	}
 	if !isKnownLaunchMode(c.Config.Launcher.LauncherMode) {
@@ -669,7 +668,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		launcher = c.browserLauncher()
 		c.Launcher = launcher
 	}
-	transport := c.transport
+	transport := c.Upstream
 	if transport == nil {
 		transport = c.upstreamTransport()
 	}
@@ -708,21 +707,18 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 			return err
 		}
 	}
+	launchedCDPURL := ""
 	if c.Config.Launcher.LauncherMode != "none" {
 		launched, err := launcher.Launch(LauncherConfig{})
 		if err != nil {
 			_ = transport.Close()
 			return err
 		}
-		c.launchedBrowser = launched
 		transport.Update(launcher.ConfigForUpstream())
 		for _, injector := range injectors {
 			transport.Update(injector.ConfigForUpstream())
 		}
-	}
-	launchedCDPURL := ""
-	if c.launchedBrowser != nil {
-		launchedCDPURL = c.launchedBrowser.CDPURL
+		launchedCDPURL = launched.CDPURL
 	}
 	if c.Config.Upstream.UpstreamMode == "ws" {
 		if err := transport.Connect(); err != nil {
@@ -730,7 +726,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		}
 	}
 
-	c.transport = transport
+	c.Upstream = transport
 	transportURL := transportURL(transport)
 	if c.Config.Upstream.UpstreamMode == "ws" {
 		c.CDPURL = firstNonEmptyString(transportURL, launchedCDPURL)
@@ -769,17 +765,17 @@ func (c *ModCDPClient) serverNeedsLoopbackCDP() bool {
 }
 
 func (c *ModCDPClient) ensureModCDPServerConfigured() error {
-	if c.Config.ServerConfig == nil || c.transport == nil {
+	if c.Config.ServerConfig == nil || c.Upstream == nil {
 		return nil
 	}
-	if err := c.transport.WaitForPeer(); err != nil {
+	if err := c.Upstream.WaitForPeer(); err != nil {
 		return err
 	}
-	peerGeneration := c.transport.PeerGeneration()
+	peerGeneration := c.Upstream.PeerGeneration()
 	if peerGeneration == c.configuredPeerGeneration {
 		return nil
 	}
-	if _, err := c.transport.Send("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
+	if _, err := c.Upstream.Send("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
 		return err
 	}
 	c.configuredPeerGeneration = peerGeneration
@@ -794,8 +790,8 @@ func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	}
 }
 
-func transportURL(transport upstreamTransportClient) string {
-	switch typed := transport.(type) {
+func transportURL(upstream upstreamTransportClient) string {
+	switch typed := upstream.(type) {
 	case *WSUpstreamTransport:
 		return typed.URL
 	default:
@@ -1045,7 +1041,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 				return nil, err
 			}
 		}
-		rawResult, err := c.transport.Send(method, params, "")
+		rawResult, err := c.Upstream.Send(method, params, "")
 		var result any = rawResult
 		completedAt := time.Now().UnixMilli()
 		c.LastCommandTiming = map[string]any{
@@ -1058,8 +1054,8 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		if err != nil {
 			return nil, err
 		}
-		if method == "Mod.configure" && c.transport != nil {
-			c.configuredPeerGeneration = c.transport.PeerGeneration()
+		if method == "Mod.configure" && c.Upstream != nil {
+			c.configuredPeerGeneration = c.Upstream.PeerGeneration()
 		}
 		if validateSchema {
 			var err error
@@ -1077,7 +1073,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 	var result any
 	if command.Target == "direct_cdp" {
 		step := command.Steps[0]
-		result, err = c.transport.Send(step.Method, step.Params, step.SessionID)
+		result, err = c.Upstream.Send(step.Method, step.Params, step.SessionID)
 	} else if command.Target == "service_worker" {
 		if c.ExtSessionID == "" {
 			return nil, fmt.Errorf("service_worker commands require an injected ModCDP extension target")
@@ -1169,9 +1165,8 @@ func (c *ModCDPClient) Close() {
 	if c.Launcher != nil {
 		c.Launcher.Close()
 	}
-	c.launchedBrowser = nil
-	if c.transport != nil {
-		_ = c.transport.Close()
+	if c.Upstream != nil {
+		_ = c.Upstream.Close()
 	}
 	for _, injector := range c.extensionInjectors {
 		_ = injector.Close()
@@ -1276,10 +1271,10 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 		return nil, fmt.Errorf("injector.injector_mode=none cannot be used with an extension-routed browser upstream")
 	}
 	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-		if c.transport == nil {
+		if c.Upstream == nil {
 			return nil, fmt.Errorf("ModCDP upstream is not connected")
 		}
-		return c.transport.Send(method, params, sessionID, time.Duration(c.Config.ClientConfig.ClientCDPSendTimeoutMS)*time.Millisecond)
+		return c.Upstream.Send(method, params, sessionID, time.Duration(c.Config.ClientConfig.ClientCDPSendTimeoutMS)*time.Millisecond)
 	}
 	var errors []string
 	for _, injector := range injectors {
