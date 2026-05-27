@@ -20,15 +20,19 @@ type CommandPreparation struct {
 	CustomCommandName string
 }
 
+type CDPCommandSchema struct {
+	Params map[string]any
+	Result map[string]any
+}
+
 type CDPTypes struct {
-	CustomCommands       map[string]CustomCommand
-	CustomEvents         map[string]CustomEvent
-	CustomMiddlewares    []CustomMiddleware
-	commandParamsSchemas map[string]map[string]any
-	commandResultSchemas map[string]map[string]any
-	nativeCommandSchemas map[string]map[string]any
-	eventSchemas         map[string]map[string]any
-	mu                   sync.RWMutex
+	CustomCommands    map[string]CustomCommand
+	CustomEvents      map[string]CustomEvent
+	CustomMiddlewares []CustomMiddleware
+	commandSchemas    map[string]CDPCommandSchema
+	nativeCommands    map[string]bool
+	eventSchemas      map[string]map[string]any
+	mu                sync.RWMutex
 }
 
 var jsonSchemaObject = map[string]any{"type": "object"}
@@ -330,18 +334,17 @@ var defaultBuiltinEvents = []CustomEvent{
 
 func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, customMiddlewares []CustomMiddleware) *CDPTypes {
 	types := &CDPTypes{
-		CustomCommands:       map[string]CustomCommand{},
-		CustomEvents:         map[string]CustomEvent{},
-		CustomMiddlewares:    []CustomMiddleware{},
-		commandParamsSchemas: map[string]map[string]any{},
-		commandResultSchemas: map[string]map[string]any{},
-		nativeCommandSchemas: map[string]map[string]any{},
-		eventSchemas:         map[string]map[string]any{},
+		CustomCommands:    map[string]CustomCommand{},
+		CustomEvents:      map[string]CustomEvent{},
+		CustomMiddlewares: []CustomMiddleware{},
+		commandSchemas:    map[string]CDPCommandSchema{},
+		nativeCommands:    map[string]bool{},
+		eventSchemas:      map[string]map[string]any{},
 	}
 	types.hydrateNativeProtocolSchemas()
 	types.mu.Lock()
-	for method, schema := range types.commandParamsSchemas {
-		types.nativeCommandSchemas[method] = schema
+	for method := range types.commandSchemas {
+		types.nativeCommands[method] = true
 	}
 	types.mu.Unlock()
 	for _, command := range defaultBuiltinCommands {
@@ -406,12 +409,11 @@ func (types *CDPTypes) ToJSON() map[string]any {
 	}
 	types.mu.RLock()
 	state := map[string]any{
-		"custom_commands":        len(types.CustomCommands),
-		"custom_events":          len(types.CustomEvents),
-		"custom_middlewares":     len(types.CustomMiddlewares),
-		"command_params_schemas": len(types.commandParamsSchemas),
-		"command_result_schemas": len(types.commandResultSchemas),
-		"event_schemas":          len(types.eventSchemas),
+		"custom_commands":    len(types.CustomCommands),
+		"custom_events":      len(types.CustomEvents),
+		"custom_middlewares": len(types.CustomMiddlewares),
+		"command_schemas":    len(types.commandSchemas),
+		"event_schemas":      len(types.eventSchemas),
 	}
 	types.mu.RUnlock()
 	return modtypes.ModCDPToJSON(types, modtypes.ModCDPJSONConfig{
@@ -478,10 +480,8 @@ func (types *CDPTypes) PrepareCommand(method string, params map[string]any, canR
 }
 
 func (types *CDPTypes) ParseCommandParams(method string, params map[string]any) (map[string]any, error) {
-	types.mu.RLock()
-	schema := types.commandParamsSchemas[method]
-	types.mu.RUnlock()
-	if schema == nil {
+	schema, ok := types.CommandParamsSchema(method)
+	if !ok {
 		return params, nil
 	}
 	if err := abxjsonschema.Validate(schema, params); err != nil {
@@ -493,14 +493,49 @@ func (types *CDPTypes) ParseCommandParams(method string, params map[string]any) 
 func (types *CDPTypes) NativeCommandSchema(method string) map[string]any {
 	types.mu.RLock()
 	defer types.mu.RUnlock()
-	return types.nativeCommandSchemas[method]
+	if !types.nativeCommands[method] {
+		return nil
+	}
+	schema, ok := types.commandSchemas[method]
+	if !ok {
+		return nil
+	}
+	return map[string]any{"params": schema.Params, "result": schema.Result}
+}
+
+func (types *CDPTypes) CommandParamsSchema(method string) (map[string]any, bool) {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
+	schema, ok := types.commandSchemas[method]
+	if !ok || schema.Params == nil {
+		return nil, false
+	}
+	return schema.Params, true
+}
+
+func (types *CDPTypes) CommandResultSchema(method string) (map[string]any, bool) {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
+	schema, ok := types.commandSchemas[method]
+	if !ok || schema.Result == nil {
+		return nil, false
+	}
+	return schema.Result, true
+}
+
+func (types *CDPTypes) EventPayloadSchema(event string) (map[string]any, bool) {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
+	schema, ok := types.eventSchemas[event]
+	if !ok || schema == nil {
+		return nil, false
+	}
+	return schema, true
 }
 
 func (types *CDPTypes) ParseCommandResult(method string, result any) (any, error) {
-	types.mu.RLock()
-	schema := types.commandResultSchemas[method]
-	types.mu.RUnlock()
-	if schema == nil {
+	schema, ok := types.CommandResultSchema(method)
+	if !ok {
 		return result, nil
 	}
 	if err := abxjsonschema.Validate(schema, result); err != nil {
@@ -510,10 +545,8 @@ func (types *CDPTypes) ParseCommandResult(method string, result any) (any, error
 }
 
 func (types *CDPTypes) ParseEventPayload(event string, payload any) (any, bool) {
-	types.mu.RLock()
-	schema := types.eventSchemas[event]
-	types.mu.RUnlock()
-	if schema == nil {
+	schema, ok := types.EventPayloadSchema(event)
+	if !ok {
 		return payload, true
 	}
 	if err := abxjsonschema.Validate(schema, payload); err != nil {
@@ -536,16 +569,18 @@ func (types *CDPTypes) AddCustomCommand(command CustomCommand) (string, bool, er
 	}
 	types.mu.Lock()
 	defer types.mu.Unlock()
+	existing := types.commandSchemas[name]
 	if command.ParamsSchema != nil {
 		if schema := cloneSchema(command.ParamsSchema); schema != nil {
-			types.commandParamsSchemas[name] = schema
+			existing.Params = schema
 		}
 	}
 	if command.ResultSchema != nil {
 		if schema := cloneSchema(command.ResultSchema); schema != nil {
-			types.commandResultSchemas[name] = schema
+			existing.Result = schema
 		}
 	}
+	types.commandSchemas[name] = existing
 	command.Name = name
 	if command.ParamsSchema != nil {
 		command.ParamsSchema = cloneSchema(command.ParamsSchema)

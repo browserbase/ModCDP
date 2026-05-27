@@ -94,6 +94,12 @@ class _AdapterRegistration:
 
 
 @dataclass(frozen=True)
+class CommandSchema:
+    params: TypeAdapter[object] | None = None
+    result: TypeAdapter[object] | None = None
+
+
+@dataclass(frozen=True)
 class CommandPreparation:
     params: Mapping[str, object]
     local_result: ProtocolResult | None = None
@@ -425,10 +431,9 @@ class CDPTypes:
         self.custom_commands: dict[str, ModCDPAddCustomCommandParams] = {}
         self.custom_events: dict[str, ModCDPAddCustomEventObjectParams] = {}
         self.custom_middlewares: list[ModCDPAddMiddlewareParams] = []
+        self.command_schemas: dict[str, CommandSchema] = {}
         self.event_schemas: dict[str, TypeAdapter[object]] = {}
-        self.command_params_schemas: dict[str, TypeAdapter[object]] = {}
-        self.command_result_schemas: dict[str, TypeAdapter[object]] = {}
-        self.native_command_schemas: dict[str, TypeAdapter[object]] = {}
+        self.native_command_names: set[str] = set()
         self.event_classes: dict[str, type[CDPEvent]] = {}
         self.service_worker_expression_builders: dict[str, Callable[[ProtocolParams, str | None], str]] = {}
         self._lock = threading.RLock()
@@ -484,8 +489,7 @@ class CDPTypes:
                     "custom_commands": len(self.custom_commands),
                     "custom_events": len(self.custom_events),
                     "custom_middlewares": len(self.custom_middlewares),
-                    "command_params_schemas": len(self.command_params_schemas),
-                    "command_result_schemas": len(self.command_result_schemas),
+                    "command_schemas": len(self.command_schemas),
                     "event_schemas": len(self.event_schemas),
                 },
             },
@@ -516,15 +520,35 @@ class CDPTypes:
                     if result_class is None:
                         continue
                     method = f"{domain}.{command_base[:1].lower()}{command_base[1:]}"
+                    params_adapter: TypeAdapter[object] | None = None
                     if issubclass(params_class, CDPParams):
-                        adapter: TypeAdapter[object] = TypeAdapter(params_class)
-                        self.command_params_schemas[method] = adapter
-                        self.native_command_schemas[method] = adapter
-                    self.command_result_schemas[method] = TypeAdapter(result_class)
+                        params_adapter = TypeAdapter(params_class)
+                    self.command_schemas[method] = CommandSchema(params=params_adapter, result=TypeAdapter(result_class))
+                    self.native_command_names.add(method)
 
-    def nativeCommandSchema(self, method: str) -> TypeAdapter[object] | None:
+    def nativeCommandSchema(self, method: str) -> CommandSchema | None:
         with self._lock:
-            return self.native_command_schemas.get(method)
+            if method not in self.native_command_names:
+                return None
+            return self.command_schemas.get(method)
+
+    def commandParamsSchema(self, method: str) -> TypeAdapter[object] | None:
+        with self._lock:
+            schema = self.command_schemas.get(method)
+            if schema is None:
+                return None
+            return schema.params
+
+    def commandResultSchema(self, method: str) -> TypeAdapter[object] | None:
+        with self._lock:
+            schema = self.command_schemas.get(method)
+            if schema is None:
+                return None
+            return schema.result
+
+    def eventPayloadSchema(self, event: str) -> TypeAdapter[object] | None:
+        with self._lock:
+            return self.event_schemas.get(event)
 
     def prepareCommand(self, method: str, params: object = None, can_register_locally: bool = False) -> CommandPreparation:
         if method == "Mod.addCustomCommand":
@@ -561,8 +585,7 @@ class CDPTypes:
         return CommandPreparation(params=command_params)
 
     def parseCommandParams(self, method: str, params: object = None) -> ProtocolParams:
-        with self._lock:
-            adapter = self.command_params_schemas.get(method)
+        adapter = self.commandParamsSchema(method)
         if adapter is None:
             return _json_object(params or {})
         try:
@@ -572,8 +595,7 @@ class CDPTypes:
         return _model_or_json_object(validated)
 
     def parseCommandResult(self, method: str, result: object) -> object:
-        with self._lock:
-            adapter = self.command_result_schemas.get(method)
+        adapter = self.commandResultSchema(method)
         if adapter is None:
             return result
         try:
@@ -585,8 +607,7 @@ class CDPTypes:
         return to_jsonable_python(validated)
 
     def parseEventPayload(self, event: str, payload: object = None) -> ProtocolPayload:
-        with self._lock:
-            adapter = self.event_schemas.get(event)
+        adapter = self.eventPayloadSchema(event)
         if adapter is None:
             return _json_object(payload or {})
         try:
@@ -615,10 +636,12 @@ class CDPTypes:
         params_schema = self._adapterFromOptionalSchema(parsed.params_schema, "params_schema")
         result_schema = self._adapterFromOptionalSchema(parsed.result_schema, "result_schema")
         with self._lock:
+            existing = self.command_schemas.get(name, CommandSchema())
             if params_schema.adapter is not None:
-                self.command_params_schemas[name] = params_schema.adapter
+                existing = CommandSchema(params=params_schema.adapter, result=existing.result)
             if result_schema.adapter is not None:
-                self.command_result_schemas[name] = result_schema.adapter
+                existing = CommandSchema(params=existing.params, result=result_schema.adapter)
+            self.command_schemas[name] = existing
             command: ModCDPAddCustomCommandParams = {"name": name}
             if parsed.expression:
                 command["expression"] = parsed.expression

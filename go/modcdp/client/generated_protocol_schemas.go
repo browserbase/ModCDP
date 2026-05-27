@@ -6,1336 +6,2666 @@ import abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
 func (types *CDPTypes) hydrateNativeProtocolSchemas() {
 	types.mu.Lock()
 	defer types.mu.Unlock()
-	types.commandParamsSchemas["Accessibility.disable"] = abxjsonschema.SchemaFor[AccessibilityDisableParams]()
-	types.commandResultSchemas["Accessibility.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityDisableResult]())
-	types.commandParamsSchemas["Accessibility.enable"] = abxjsonschema.SchemaFor[AccessibilityEnableParams]()
-	types.commandResultSchemas["Accessibility.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityEnableResult]())
-	types.commandParamsSchemas["Accessibility.getPartialAXTree"] = abxjsonschema.SchemaFor[AccessibilityGetPartialAXTreeParams]()
-	types.commandResultSchemas["Accessibility.getPartialAXTree"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetPartialAXTreeResult]())
-	types.commandParamsSchemas["Accessibility.getFullAXTree"] = abxjsonschema.SchemaFor[AccessibilityGetFullAXTreeParams]()
-	types.commandResultSchemas["Accessibility.getFullAXTree"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetFullAXTreeResult]())
-	types.commandParamsSchemas["Accessibility.getRootAXNode"] = abxjsonschema.SchemaFor[AccessibilityGetRootAXNodeParams]()
-	types.commandResultSchemas["Accessibility.getRootAXNode"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetRootAXNodeResult]())
-	types.commandParamsSchemas["Accessibility.getAXNodeAndAncestors"] = abxjsonschema.SchemaFor[AccessibilityGetAXNodeAndAncestorsParams]()
-	types.commandResultSchemas["Accessibility.getAXNodeAndAncestors"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetAXNodeAndAncestorsResult]())
-	types.commandParamsSchemas["Accessibility.getChildAXNodes"] = abxjsonschema.SchemaFor[AccessibilityGetChildAXNodesParams]()
-	types.commandResultSchemas["Accessibility.getChildAXNodes"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetChildAXNodesResult]())
-	types.commandParamsSchemas["Accessibility.queryAXTree"] = abxjsonschema.SchemaFor[AccessibilityQueryAXTreeParams]()
-	types.commandResultSchemas["Accessibility.queryAXTree"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityQueryAXTreeResult]())
-	types.commandParamsSchemas["Animation.disable"] = abxjsonschema.SchemaFor[AnimationDisableParams]()
-	types.commandResultSchemas["Animation.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationDisableResult]())
-	types.commandParamsSchemas["Animation.enable"] = abxjsonschema.SchemaFor[AnimationEnableParams]()
-	types.commandResultSchemas["Animation.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationEnableResult]())
-	types.commandParamsSchemas["Animation.getCurrentTime"] = abxjsonschema.SchemaFor[AnimationGetCurrentTimeParams]()
-	types.commandResultSchemas["Animation.getCurrentTime"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationGetCurrentTimeResult]())
-	types.commandParamsSchemas["Animation.getPlaybackRate"] = abxjsonschema.SchemaFor[AnimationGetPlaybackRateParams]()
-	types.commandResultSchemas["Animation.getPlaybackRate"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationGetPlaybackRateResult]())
-	types.commandParamsSchemas["Animation.releaseAnimations"] = abxjsonschema.SchemaFor[AnimationReleaseAnimationsParams]()
-	types.commandResultSchemas["Animation.releaseAnimations"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationReleaseAnimationsResult]())
-	types.commandParamsSchemas["Animation.resolveAnimation"] = abxjsonschema.SchemaFor[AnimationResolveAnimationParams]()
-	types.commandResultSchemas["Animation.resolveAnimation"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationResolveAnimationResult]())
-	types.commandParamsSchemas["Animation.seekAnimations"] = abxjsonschema.SchemaFor[AnimationSeekAnimationsParams]()
-	types.commandResultSchemas["Animation.seekAnimations"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationSeekAnimationsResult]())
-	types.commandParamsSchemas["Animation.setPaused"] = abxjsonschema.SchemaFor[AnimationSetPausedParams]()
-	types.commandResultSchemas["Animation.setPaused"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetPausedResult]())
-	types.commandParamsSchemas["Animation.setPlaybackRate"] = abxjsonschema.SchemaFor[AnimationSetPlaybackRateParams]()
-	types.commandResultSchemas["Animation.setPlaybackRate"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetPlaybackRateResult]())
-	types.commandParamsSchemas["Animation.setTiming"] = abxjsonschema.SchemaFor[AnimationSetTimingParams]()
-	types.commandResultSchemas["Animation.setTiming"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetTimingResult]())
-	types.commandParamsSchemas["Audits.getEncodedResponse"] = abxjsonschema.SchemaFor[AuditsGetEncodedResponseParams]()
-	types.commandResultSchemas["Audits.getEncodedResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[AuditsGetEncodedResponseResult]())
-	types.commandParamsSchemas["Audits.disable"] = abxjsonschema.SchemaFor[AuditsDisableParams]()
-	types.commandResultSchemas["Audits.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[AuditsDisableResult]())
-	types.commandParamsSchemas["Audits.enable"] = abxjsonschema.SchemaFor[AuditsEnableParams]()
-	types.commandResultSchemas["Audits.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[AuditsEnableResult]())
-	types.commandParamsSchemas["Audits.checkFormsIssues"] = abxjsonschema.SchemaFor[AuditsCheckFormsIssuesParams]()
-	types.commandResultSchemas["Audits.checkFormsIssues"] = nativeResultSchema(abxjsonschema.SchemaFor[AuditsCheckFormsIssuesResult]())
-	types.commandParamsSchemas["Autofill.trigger"] = abxjsonschema.SchemaFor[AutofillTriggerParams]()
-	types.commandResultSchemas["Autofill.trigger"] = nativeResultSchema(abxjsonschema.SchemaFor[AutofillTriggerResult]())
-	types.commandParamsSchemas["Autofill.setAddresses"] = abxjsonschema.SchemaFor[AutofillSetAddressesParams]()
-	types.commandResultSchemas["Autofill.setAddresses"] = nativeResultSchema(abxjsonschema.SchemaFor[AutofillSetAddressesResult]())
-	types.commandParamsSchemas["Autofill.disable"] = abxjsonschema.SchemaFor[AutofillDisableParams]()
-	types.commandResultSchemas["Autofill.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[AutofillDisableResult]())
-	types.commandParamsSchemas["Autofill.enable"] = abxjsonschema.SchemaFor[AutofillEnableParams]()
-	types.commandResultSchemas["Autofill.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[AutofillEnableResult]())
-	types.commandParamsSchemas["BackgroundService.startObserving"] = abxjsonschema.SchemaFor[BackgroundServiceStartObservingParams]()
-	types.commandResultSchemas["BackgroundService.startObserving"] = nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceStartObservingResult]())
-	types.commandParamsSchemas["BackgroundService.stopObserving"] = abxjsonschema.SchemaFor[BackgroundServiceStopObservingParams]()
-	types.commandResultSchemas["BackgroundService.stopObserving"] = nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceStopObservingResult]())
-	types.commandParamsSchemas["BackgroundService.setRecording"] = abxjsonschema.SchemaFor[BackgroundServiceSetRecordingParams]()
-	types.commandResultSchemas["BackgroundService.setRecording"] = nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceSetRecordingResult]())
-	types.commandParamsSchemas["BackgroundService.clearEvents"] = abxjsonschema.SchemaFor[BackgroundServiceClearEventsParams]()
-	types.commandResultSchemas["BackgroundService.clearEvents"] = nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceClearEventsResult]())
-	types.commandParamsSchemas["BluetoothEmulation.enable"] = abxjsonschema.SchemaFor[BluetoothEmulationEnableParams]()
-	types.commandResultSchemas["BluetoothEmulation.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationEnableResult]())
-	types.commandParamsSchemas["BluetoothEmulation.setSimulatedCentralState"] = abxjsonschema.SchemaFor[BluetoothEmulationSetSimulatedCentralStateParams]()
-	types.commandResultSchemas["BluetoothEmulation.setSimulatedCentralState"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSetSimulatedCentralStateResult]())
-	types.commandParamsSchemas["BluetoothEmulation.disable"] = abxjsonschema.SchemaFor[BluetoothEmulationDisableParams]()
-	types.commandResultSchemas["BluetoothEmulation.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationDisableResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulatePreconnectedPeripheral"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulatePreconnectedPeripheralParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulatePreconnectedPeripheral"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulatePreconnectedPeripheralResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulateAdvertisement"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulateAdvertisementParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulateAdvertisement"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateAdvertisementResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulateGATTOperationResponse"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTOperationResponseParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulateGATTOperationResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTOperationResponseResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulateCharacteristicOperationResponse"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulateCharacteristicOperationResponseParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulateCharacteristicOperationResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateCharacteristicOperationResponseResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulateDescriptorOperationResponse"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulateDescriptorOperationResponseParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulateDescriptorOperationResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateDescriptorOperationResponseResult]())
-	types.commandParamsSchemas["BluetoothEmulation.addService"] = abxjsonschema.SchemaFor[BluetoothEmulationAddServiceParams]()
-	types.commandResultSchemas["BluetoothEmulation.addService"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddServiceResult]())
-	types.commandParamsSchemas["BluetoothEmulation.removeService"] = abxjsonschema.SchemaFor[BluetoothEmulationRemoveServiceParams]()
-	types.commandResultSchemas["BluetoothEmulation.removeService"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveServiceResult]())
-	types.commandParamsSchemas["BluetoothEmulation.addCharacteristic"] = abxjsonschema.SchemaFor[BluetoothEmulationAddCharacteristicParams]()
-	types.commandResultSchemas["BluetoothEmulation.addCharacteristic"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddCharacteristicResult]())
-	types.commandParamsSchemas["BluetoothEmulation.removeCharacteristic"] = abxjsonschema.SchemaFor[BluetoothEmulationRemoveCharacteristicParams]()
-	types.commandResultSchemas["BluetoothEmulation.removeCharacteristic"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveCharacteristicResult]())
-	types.commandParamsSchemas["BluetoothEmulation.addDescriptor"] = abxjsonschema.SchemaFor[BluetoothEmulationAddDescriptorParams]()
-	types.commandResultSchemas["BluetoothEmulation.addDescriptor"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddDescriptorResult]())
-	types.commandParamsSchemas["BluetoothEmulation.removeDescriptor"] = abxjsonschema.SchemaFor[BluetoothEmulationRemoveDescriptorParams]()
-	types.commandResultSchemas["BluetoothEmulation.removeDescriptor"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveDescriptorResult]())
-	types.commandParamsSchemas["BluetoothEmulation.simulateGATTDisconnection"] = abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTDisconnectionParams]()
-	types.commandResultSchemas["BluetoothEmulation.simulateGATTDisconnection"] = nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTDisconnectionResult]())
-	types.commandParamsSchemas["Browser.setPermission"] = abxjsonschema.SchemaFor[BrowserSetPermissionParams]()
-	types.commandResultSchemas["Browser.setPermission"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetPermissionResult]())
-	types.commandParamsSchemas["Browser.grantPermissions"] = abxjsonschema.SchemaFor[BrowserGrantPermissionsParams]()
-	types.commandResultSchemas["Browser.grantPermissions"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGrantPermissionsResult]())
-	types.commandParamsSchemas["Browser.resetPermissions"] = abxjsonschema.SchemaFor[BrowserResetPermissionsParams]()
-	types.commandResultSchemas["Browser.resetPermissions"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserResetPermissionsResult]())
-	types.commandParamsSchemas["Browser.setDownloadBehavior"] = abxjsonschema.SchemaFor[BrowserSetDownloadBehaviorParams]()
-	types.commandResultSchemas["Browser.setDownloadBehavior"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetDownloadBehaviorResult]())
-	types.commandParamsSchemas["Browser.cancelDownload"] = abxjsonschema.SchemaFor[BrowserCancelDownloadParams]()
-	types.commandResultSchemas["Browser.cancelDownload"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserCancelDownloadResult]())
-	types.commandParamsSchemas["Browser.close"] = abxjsonschema.SchemaFor[BrowserCloseParams]()
-	types.commandResultSchemas["Browser.close"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserCloseResult]())
-	types.commandParamsSchemas["Browser.crash"] = abxjsonschema.SchemaFor[BrowserCrashParams]()
-	types.commandResultSchemas["Browser.crash"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserCrashResult]())
-	types.commandParamsSchemas["Browser.crashGpuProcess"] = abxjsonschema.SchemaFor[BrowserCrashGPUProcessParams]()
-	types.commandResultSchemas["Browser.crashGpuProcess"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserCrashGPUProcessResult]())
-	types.commandParamsSchemas["Browser.getVersion"] = abxjsonschema.SchemaFor[BrowserGetVersionParams]()
-	types.commandResultSchemas["Browser.getVersion"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetVersionResult]())
-	types.commandParamsSchemas["Browser.getBrowserCommandLine"] = abxjsonschema.SchemaFor[BrowserGetBrowserCommandLineParams]()
-	types.commandResultSchemas["Browser.getBrowserCommandLine"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetBrowserCommandLineResult]())
-	types.commandParamsSchemas["Browser.getHistograms"] = abxjsonschema.SchemaFor[BrowserGetHistogramsParams]()
-	types.commandResultSchemas["Browser.getHistograms"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetHistogramsResult]())
-	types.commandParamsSchemas["Browser.getHistogram"] = abxjsonschema.SchemaFor[BrowserGetHistogramParams]()
-	types.commandResultSchemas["Browser.getHistogram"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetHistogramResult]())
-	types.commandParamsSchemas["Browser.getWindowBounds"] = abxjsonschema.SchemaFor[BrowserGetWindowBoundsParams]()
-	types.commandResultSchemas["Browser.getWindowBounds"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetWindowBoundsResult]())
-	types.commandParamsSchemas["Browser.getWindowForTarget"] = abxjsonschema.SchemaFor[BrowserGetWindowForTargetParams]()
-	types.commandResultSchemas["Browser.getWindowForTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetWindowForTargetResult]())
-	types.commandParamsSchemas["Browser.setWindowBounds"] = abxjsonschema.SchemaFor[BrowserSetWindowBoundsParams]()
-	types.commandResultSchemas["Browser.setWindowBounds"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetWindowBoundsResult]())
-	types.commandParamsSchemas["Browser.setContentsSize"] = abxjsonschema.SchemaFor[BrowserSetContentsSizeParams]()
-	types.commandResultSchemas["Browser.setContentsSize"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetContentsSizeResult]())
-	types.commandParamsSchemas["Browser.setDockTile"] = abxjsonschema.SchemaFor[BrowserSetDockTileParams]()
-	types.commandResultSchemas["Browser.setDockTile"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetDockTileResult]())
-	types.commandParamsSchemas["Browser.executeBrowserCommand"] = abxjsonschema.SchemaFor[BrowserExecuteBrowserCommandParams]()
-	types.commandResultSchemas["Browser.executeBrowserCommand"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserExecuteBrowserCommandResult]())
-	types.commandParamsSchemas["Browser.addPrivacySandboxEnrollmentOverride"] = abxjsonschema.SchemaFor[BrowserAddPrivacySandboxEnrollmentOverrideParams]()
-	types.commandResultSchemas["Browser.addPrivacySandboxEnrollmentOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserAddPrivacySandboxEnrollmentOverrideResult]())
-	types.commandParamsSchemas["Browser.addPrivacySandboxCoordinatorKeyConfig"] = abxjsonschema.SchemaFor[BrowserAddPrivacySandboxCoordinatorKeyConfigParams]()
-	types.commandResultSchemas["Browser.addPrivacySandboxCoordinatorKeyConfig"] = nativeResultSchema(abxjsonschema.SchemaFor[BrowserAddPrivacySandboxCoordinatorKeyConfigResult]())
-	types.commandParamsSchemas["CSS.addRule"] = abxjsonschema.SchemaFor[CSSAddRuleParams]()
-	types.commandResultSchemas["CSS.addRule"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSAddRuleResult]())
-	types.commandParamsSchemas["CSS.collectClassNames"] = abxjsonschema.SchemaFor[CSSCollectClassNamesParams]()
-	types.commandResultSchemas["CSS.collectClassNames"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSCollectClassNamesResult]())
-	types.commandParamsSchemas["CSS.createStyleSheet"] = abxjsonschema.SchemaFor[CSSCreateStyleSheetParams]()
-	types.commandResultSchemas["CSS.createStyleSheet"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSCreateStyleSheetResult]())
-	types.commandParamsSchemas["CSS.disable"] = abxjsonschema.SchemaFor[CSSDisableParams]()
-	types.commandResultSchemas["CSS.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSDisableResult]())
-	types.commandParamsSchemas["CSS.enable"] = abxjsonschema.SchemaFor[CSSEnableParams]()
-	types.commandResultSchemas["CSS.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSEnableResult]())
-	types.commandParamsSchemas["CSS.forcePseudoState"] = abxjsonschema.SchemaFor[CSSForcePseudoStateParams]()
-	types.commandResultSchemas["CSS.forcePseudoState"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSForcePseudoStateResult]())
-	types.commandParamsSchemas["CSS.forceStartingStyle"] = abxjsonschema.SchemaFor[CSSForceStartingStyleParams]()
-	types.commandResultSchemas["CSS.forceStartingStyle"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSForceStartingStyleResult]())
-	types.commandParamsSchemas["CSS.getBackgroundColors"] = abxjsonschema.SchemaFor[CSSGetBackgroundColorsParams]()
-	types.commandResultSchemas["CSS.getBackgroundColors"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetBackgroundColorsResult]())
-	types.commandParamsSchemas["CSS.getComputedStyleForNode"] = abxjsonschema.SchemaFor[CSSGetComputedStyleForNodeParams]()
-	types.commandResultSchemas["CSS.getComputedStyleForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetComputedStyleForNodeResult]())
-	types.commandParamsSchemas["CSS.resolveValues"] = abxjsonschema.SchemaFor[CSSResolveValuesParams]()
-	types.commandResultSchemas["CSS.resolveValues"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSResolveValuesResult]())
-	types.commandParamsSchemas["CSS.getLonghandProperties"] = abxjsonschema.SchemaFor[CSSGetLonghandPropertiesParams]()
-	types.commandResultSchemas["CSS.getLonghandProperties"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLonghandPropertiesResult]())
-	types.commandParamsSchemas["CSS.getInlineStylesForNode"] = abxjsonschema.SchemaFor[CSSGetInlineStylesForNodeParams]()
-	types.commandResultSchemas["CSS.getInlineStylesForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetInlineStylesForNodeResult]())
-	types.commandParamsSchemas["CSS.getAnimatedStylesForNode"] = abxjsonschema.SchemaFor[CSSGetAnimatedStylesForNodeParams]()
-	types.commandResultSchemas["CSS.getAnimatedStylesForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetAnimatedStylesForNodeResult]())
-	types.commandParamsSchemas["CSS.getMatchedStylesForNode"] = abxjsonschema.SchemaFor[CSSGetMatchedStylesForNodeParams]()
-	types.commandResultSchemas["CSS.getMatchedStylesForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetMatchedStylesForNodeResult]())
-	types.commandParamsSchemas["CSS.getEnvironmentVariables"] = abxjsonschema.SchemaFor[CSSGetEnvironmentVariablesParams]()
-	types.commandResultSchemas["CSS.getEnvironmentVariables"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetEnvironmentVariablesResult]())
-	types.commandParamsSchemas["CSS.getMediaQueries"] = abxjsonschema.SchemaFor[CSSGetMediaQueriesParams]()
-	types.commandResultSchemas["CSS.getMediaQueries"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetMediaQueriesResult]())
-	types.commandParamsSchemas["CSS.getPlatformFontsForNode"] = abxjsonschema.SchemaFor[CSSGetPlatformFontsForNodeParams]()
-	types.commandResultSchemas["CSS.getPlatformFontsForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetPlatformFontsForNodeResult]())
-	types.commandParamsSchemas["CSS.getStyleSheetText"] = abxjsonschema.SchemaFor[CSSGetStyleSheetTextParams]()
-	types.commandResultSchemas["CSS.getStyleSheetText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetStyleSheetTextResult]())
-	types.commandParamsSchemas["CSS.getLayersForNode"] = abxjsonschema.SchemaFor[CSSGetLayersForNodeParams]()
-	types.commandResultSchemas["CSS.getLayersForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLayersForNodeResult]())
-	types.commandParamsSchemas["CSS.getLocationForSelector"] = abxjsonschema.SchemaFor[CSSGetLocationForSelectorParams]()
-	types.commandResultSchemas["CSS.getLocationForSelector"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLocationForSelectorResult]())
-	types.commandParamsSchemas["CSS.trackComputedStyleUpdatesForNode"] = abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesForNodeParams]()
-	types.commandResultSchemas["CSS.trackComputedStyleUpdatesForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesForNodeResult]())
-	types.commandParamsSchemas["CSS.trackComputedStyleUpdates"] = abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesParams]()
-	types.commandResultSchemas["CSS.trackComputedStyleUpdates"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesResult]())
-	types.commandParamsSchemas["CSS.takeComputedStyleUpdates"] = abxjsonschema.SchemaFor[CSSTakeComputedStyleUpdatesParams]()
-	types.commandResultSchemas["CSS.takeComputedStyleUpdates"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSTakeComputedStyleUpdatesResult]())
-	types.commandParamsSchemas["CSS.setEffectivePropertyValueForNode"] = abxjsonschema.SchemaFor[CSSSetEffectivePropertyValueForNodeParams]()
-	types.commandResultSchemas["CSS.setEffectivePropertyValueForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetEffectivePropertyValueForNodeResult]())
-	types.commandParamsSchemas["CSS.setPropertyRulePropertyName"] = abxjsonschema.SchemaFor[CSSSetPropertyRulePropertyNameParams]()
-	types.commandResultSchemas["CSS.setPropertyRulePropertyName"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetPropertyRulePropertyNameResult]())
-	types.commandParamsSchemas["CSS.setKeyframeKey"] = abxjsonschema.SchemaFor[CSSSetKeyframeKeyParams]()
-	types.commandResultSchemas["CSS.setKeyframeKey"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetKeyframeKeyResult]())
-	types.commandParamsSchemas["CSS.setMediaText"] = abxjsonschema.SchemaFor[CSSSetMediaTextParams]()
-	types.commandResultSchemas["CSS.setMediaText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetMediaTextResult]())
-	types.commandParamsSchemas["CSS.setContainerQueryText"] = abxjsonschema.SchemaFor[CSSSetContainerQueryTextParams]()
-	types.commandResultSchemas["CSS.setContainerQueryText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetContainerQueryTextResult]())
-	types.commandParamsSchemas["CSS.setSupportsText"] = abxjsonschema.SchemaFor[CSSSetSupportsTextParams]()
-	types.commandResultSchemas["CSS.setSupportsText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetSupportsTextResult]())
-	types.commandParamsSchemas["CSS.setNavigationText"] = abxjsonschema.SchemaFor[CSSSetNavigationTextParams]()
-	types.commandResultSchemas["CSS.setNavigationText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetNavigationTextResult]())
-	types.commandParamsSchemas["CSS.setScopeText"] = abxjsonschema.SchemaFor[CSSSetScopeTextParams]()
-	types.commandResultSchemas["CSS.setScopeText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetScopeTextResult]())
-	types.commandParamsSchemas["CSS.setRuleSelector"] = abxjsonschema.SchemaFor[CSSSetRuleSelectorParams]()
-	types.commandResultSchemas["CSS.setRuleSelector"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetRuleSelectorResult]())
-	types.commandParamsSchemas["CSS.setStyleSheetText"] = abxjsonschema.SchemaFor[CSSSetStyleSheetTextParams]()
-	types.commandResultSchemas["CSS.setStyleSheetText"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetStyleSheetTextResult]())
-	types.commandParamsSchemas["CSS.setStyleTexts"] = abxjsonschema.SchemaFor[CSSSetStyleTextsParams]()
-	types.commandResultSchemas["CSS.setStyleTexts"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetStyleTextsResult]())
-	types.commandParamsSchemas["CSS.startRuleUsageTracking"] = abxjsonschema.SchemaFor[CSSStartRuleUsageTrackingParams]()
-	types.commandResultSchemas["CSS.startRuleUsageTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSStartRuleUsageTrackingResult]())
-	types.commandParamsSchemas["CSS.stopRuleUsageTracking"] = abxjsonschema.SchemaFor[CSSStopRuleUsageTrackingParams]()
-	types.commandResultSchemas["CSS.stopRuleUsageTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSStopRuleUsageTrackingResult]())
-	types.commandParamsSchemas["CSS.takeCoverageDelta"] = abxjsonschema.SchemaFor[CSSTakeCoverageDeltaParams]()
-	types.commandResultSchemas["CSS.takeCoverageDelta"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSTakeCoverageDeltaResult]())
-	types.commandParamsSchemas["CSS.setLocalFontsEnabled"] = abxjsonschema.SchemaFor[CSSSetLocalFontsEnabledParams]()
-	types.commandResultSchemas["CSS.setLocalFontsEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[CSSSetLocalFontsEnabledResult]())
-	types.commandParamsSchemas["CacheStorage.deleteCache"] = abxjsonschema.SchemaFor[CacheStorageDeleteCacheParams]()
-	types.commandResultSchemas["CacheStorage.deleteCache"] = nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageDeleteCacheResult]())
-	types.commandParamsSchemas["CacheStorage.deleteEntry"] = abxjsonschema.SchemaFor[CacheStorageDeleteEntryParams]()
-	types.commandResultSchemas["CacheStorage.deleteEntry"] = nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageDeleteEntryResult]())
-	types.commandParamsSchemas["CacheStorage.requestCacheNames"] = abxjsonschema.SchemaFor[CacheStorageRequestCacheNamesParams]()
-	types.commandResultSchemas["CacheStorage.requestCacheNames"] = nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestCacheNamesResult]())
-	types.commandParamsSchemas["CacheStorage.requestCachedResponse"] = abxjsonschema.SchemaFor[CacheStorageRequestCachedResponseParams]()
-	types.commandResultSchemas["CacheStorage.requestCachedResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestCachedResponseResult]())
-	types.commandParamsSchemas["CacheStorage.requestEntries"] = abxjsonschema.SchemaFor[CacheStorageRequestEntriesParams]()
-	types.commandResultSchemas["CacheStorage.requestEntries"] = nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestEntriesResult]())
-	types.commandParamsSchemas["Cast.enable"] = abxjsonschema.SchemaFor[CastEnableParams]()
-	types.commandResultSchemas["Cast.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[CastEnableResult]())
-	types.commandParamsSchemas["Cast.disable"] = abxjsonschema.SchemaFor[CastDisableParams]()
-	types.commandResultSchemas["Cast.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[CastDisableResult]())
-	types.commandParamsSchemas["Cast.setSinkToUse"] = abxjsonschema.SchemaFor[CastSetSinkToUseParams]()
-	types.commandResultSchemas["Cast.setSinkToUse"] = nativeResultSchema(abxjsonschema.SchemaFor[CastSetSinkToUseResult]())
-	types.commandParamsSchemas["Cast.startDesktopMirroring"] = abxjsonschema.SchemaFor[CastStartDesktopMirroringParams]()
-	types.commandResultSchemas["Cast.startDesktopMirroring"] = nativeResultSchema(abxjsonschema.SchemaFor[CastStartDesktopMirroringResult]())
-	types.commandParamsSchemas["Cast.startTabMirroring"] = abxjsonschema.SchemaFor[CastStartTabMirroringParams]()
-	types.commandResultSchemas["Cast.startTabMirroring"] = nativeResultSchema(abxjsonschema.SchemaFor[CastStartTabMirroringResult]())
-	types.commandParamsSchemas["Cast.stopCasting"] = abxjsonschema.SchemaFor[CastStopCastingParams]()
-	types.commandResultSchemas["Cast.stopCasting"] = nativeResultSchema(abxjsonschema.SchemaFor[CastStopCastingResult]())
-	types.commandParamsSchemas["Console.clearMessages"] = abxjsonschema.SchemaFor[ConsoleClearMessagesParams]()
-	types.commandResultSchemas["Console.clearMessages"] = nativeResultSchema(abxjsonschema.SchemaFor[ConsoleClearMessagesResult]())
-	types.commandParamsSchemas["Console.disable"] = abxjsonschema.SchemaFor[ConsoleDisableParams]()
-	types.commandResultSchemas["Console.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[ConsoleDisableResult]())
-	types.commandParamsSchemas["Console.enable"] = abxjsonschema.SchemaFor[ConsoleEnableParams]()
-	types.commandResultSchemas["Console.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[ConsoleEnableResult]())
-	types.commandParamsSchemas["DOM.collectClassNamesFromSubtree"] = abxjsonschema.SchemaFor[DOMCollectClassNamesFromSubtreeParams]()
-	types.commandResultSchemas["DOM.collectClassNamesFromSubtree"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMCollectClassNamesFromSubtreeResult]())
-	types.commandParamsSchemas["DOM.copyTo"] = abxjsonschema.SchemaFor[DOMCopyToParams]()
-	types.commandResultSchemas["DOM.copyTo"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMCopyToResult]())
-	types.commandParamsSchemas["DOM.describeNode"] = abxjsonschema.SchemaFor[DOMDescribeNodeParams]()
-	types.commandResultSchemas["DOM.describeNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDescribeNodeResult]())
-	types.commandParamsSchemas["DOM.scrollIntoViewIfNeeded"] = abxjsonschema.SchemaFor[DOMScrollIntoViewIfNeededParams]()
-	types.commandResultSchemas["DOM.scrollIntoViewIfNeeded"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMScrollIntoViewIfNeededResult]())
-	types.commandParamsSchemas["DOM.disable"] = abxjsonschema.SchemaFor[DOMDisableParams]()
-	types.commandResultSchemas["DOM.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDisableResult]())
-	types.commandParamsSchemas["DOM.discardSearchResults"] = abxjsonschema.SchemaFor[DOMDiscardSearchResultsParams]()
-	types.commandResultSchemas["DOM.discardSearchResults"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDiscardSearchResultsResult]())
-	types.commandParamsSchemas["DOM.enable"] = abxjsonschema.SchemaFor[DOMEnableParams]()
-	types.commandResultSchemas["DOM.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMEnableResult]())
-	types.commandParamsSchemas["DOM.focus"] = abxjsonschema.SchemaFor[DOMFocusParams]()
-	types.commandResultSchemas["DOM.focus"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMFocusResult]())
-	types.commandParamsSchemas["DOM.getAttributes"] = abxjsonschema.SchemaFor[DOMGetAttributesParams]()
-	types.commandResultSchemas["DOM.getAttributes"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetAttributesResult]())
-	types.commandParamsSchemas["DOM.getBoxModel"] = abxjsonschema.SchemaFor[DOMGetBoxModelParams]()
-	types.commandResultSchemas["DOM.getBoxModel"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetBoxModelResult]())
-	types.commandParamsSchemas["DOM.getContentQuads"] = abxjsonschema.SchemaFor[DOMGetContentQuadsParams]()
-	types.commandResultSchemas["DOM.getContentQuads"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetContentQuadsResult]())
-	types.commandParamsSchemas["DOM.getDocument"] = abxjsonschema.SchemaFor[DOMGetDocumentParams]()
-	types.commandResultSchemas["DOM.getDocument"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetDocumentResult]())
-	types.commandParamsSchemas["DOM.getFlattenedDocument"] = abxjsonschema.SchemaFor[DOMGetFlattenedDocumentParams]()
-	types.commandResultSchemas["DOM.getFlattenedDocument"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFlattenedDocumentResult]())
-	types.commandParamsSchemas["DOM.getNodesForSubtreeByStyle"] = abxjsonschema.SchemaFor[DOMGetNodesForSubtreeByStyleParams]()
-	types.commandResultSchemas["DOM.getNodesForSubtreeByStyle"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodesForSubtreeByStyleResult]())
-	types.commandParamsSchemas["DOM.getNodeForLocation"] = abxjsonschema.SchemaFor[DOMGetNodeForLocationParams]()
-	types.commandResultSchemas["DOM.getNodeForLocation"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodeForLocationResult]())
-	types.commandParamsSchemas["DOM.getOuterHTML"] = abxjsonschema.SchemaFor[DOMGetOuterHTMLParams]()
-	types.commandResultSchemas["DOM.getOuterHTML"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetOuterHTMLResult]())
-	types.commandParamsSchemas["DOM.getRelayoutBoundary"] = abxjsonschema.SchemaFor[DOMGetRelayoutBoundaryParams]()
-	types.commandResultSchemas["DOM.getRelayoutBoundary"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetRelayoutBoundaryResult]())
-	types.commandParamsSchemas["DOM.getSearchResults"] = abxjsonschema.SchemaFor[DOMGetSearchResultsParams]()
-	types.commandResultSchemas["DOM.getSearchResults"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetSearchResultsResult]())
-	types.commandParamsSchemas["DOM.hideHighlight"] = abxjsonschema.SchemaFor[DOMHideHighlightParams]()
-	types.commandResultSchemas["DOM.hideHighlight"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMHideHighlightResult]())
-	types.commandParamsSchemas["DOM.highlightNode"] = abxjsonschema.SchemaFor[DOMHighlightNodeParams]()
-	types.commandResultSchemas["DOM.highlightNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMHighlightNodeResult]())
-	types.commandParamsSchemas["DOM.highlightRect"] = abxjsonschema.SchemaFor[DOMHighlightRectParams]()
-	types.commandResultSchemas["DOM.highlightRect"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMHighlightRectResult]())
-	types.commandParamsSchemas["DOM.markUndoableState"] = abxjsonschema.SchemaFor[DOMMarkUndoableStateParams]()
-	types.commandResultSchemas["DOM.markUndoableState"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMMarkUndoableStateResult]())
-	types.commandParamsSchemas["DOM.moveTo"] = abxjsonschema.SchemaFor[DOMMoveToParams]()
-	types.commandResultSchemas["DOM.moveTo"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMMoveToResult]())
-	types.commandParamsSchemas["DOM.performSearch"] = abxjsonschema.SchemaFor[DOMPerformSearchParams]()
-	types.commandResultSchemas["DOM.performSearch"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMPerformSearchResult]())
-	types.commandParamsSchemas["DOM.pushNodeByPathToFrontend"] = abxjsonschema.SchemaFor[DOMPushNodeByPathToFrontendParams]()
-	types.commandResultSchemas["DOM.pushNodeByPathToFrontend"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMPushNodeByPathToFrontendResult]())
-	types.commandParamsSchemas["DOM.pushNodesByBackendIdsToFrontend"] = abxjsonschema.SchemaFor[DOMPushNodesByBackendIdsToFrontendParams]()
-	types.commandResultSchemas["DOM.pushNodesByBackendIdsToFrontend"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMPushNodesByBackendIdsToFrontendResult]())
-	types.commandParamsSchemas["DOM.querySelector"] = abxjsonschema.SchemaFor[DOMQuerySelectorParams]()
-	types.commandResultSchemas["DOM.querySelector"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMQuerySelectorResult]())
-	types.commandParamsSchemas["DOM.querySelectorAll"] = abxjsonschema.SchemaFor[DOMQuerySelectorAllParams]()
-	types.commandResultSchemas["DOM.querySelectorAll"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMQuerySelectorAllResult]())
-	types.commandParamsSchemas["DOM.getTopLayerElements"] = abxjsonschema.SchemaFor[DOMGetTopLayerElementsParams]()
-	types.commandResultSchemas["DOM.getTopLayerElements"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetTopLayerElementsResult]())
-	types.commandParamsSchemas["DOM.getElementByRelation"] = abxjsonschema.SchemaFor[DOMGetElementByRelationParams]()
-	types.commandResultSchemas["DOM.getElementByRelation"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetElementByRelationResult]())
-	types.commandParamsSchemas["DOM.redo"] = abxjsonschema.SchemaFor[DOMRedoParams]()
-	types.commandResultSchemas["DOM.redo"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMRedoResult]())
-	types.commandParamsSchemas["DOM.removeAttribute"] = abxjsonschema.SchemaFor[DOMRemoveAttributeParams]()
-	types.commandResultSchemas["DOM.removeAttribute"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMRemoveAttributeResult]())
-	types.commandParamsSchemas["DOM.removeNode"] = abxjsonschema.SchemaFor[DOMRemoveNodeParams]()
-	types.commandResultSchemas["DOM.removeNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMRemoveNodeResult]())
-	types.commandParamsSchemas["DOM.requestChildNodes"] = abxjsonschema.SchemaFor[DOMRequestChildNodesParams]()
-	types.commandResultSchemas["DOM.requestChildNodes"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMRequestChildNodesResult]())
-	types.commandParamsSchemas["DOM.requestNode"] = abxjsonschema.SchemaFor[DOMRequestNodeParams]()
-	types.commandResultSchemas["DOM.requestNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMRequestNodeResult]())
-	types.commandParamsSchemas["DOM.resolveNode"] = abxjsonschema.SchemaFor[DOMResolveNodeParams]()
-	types.commandResultSchemas["DOM.resolveNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMResolveNodeResult]())
-	types.commandParamsSchemas["DOM.setAttributeValue"] = abxjsonschema.SchemaFor[DOMSetAttributeValueParams]()
-	types.commandResultSchemas["DOM.setAttributeValue"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetAttributeValueResult]())
-	types.commandParamsSchemas["DOM.setAttributesAsText"] = abxjsonschema.SchemaFor[DOMSetAttributesAsTextParams]()
-	types.commandResultSchemas["DOM.setAttributesAsText"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetAttributesAsTextResult]())
-	types.commandParamsSchemas["DOM.setFileInputFiles"] = abxjsonschema.SchemaFor[DOMSetFileInputFilesParams]()
-	types.commandResultSchemas["DOM.setFileInputFiles"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetFileInputFilesResult]())
-	types.commandParamsSchemas["DOM.setNodeStackTracesEnabled"] = abxjsonschema.SchemaFor[DOMSetNodeStackTracesEnabledParams]()
-	types.commandResultSchemas["DOM.setNodeStackTracesEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeStackTracesEnabledResult]())
-	types.commandParamsSchemas["DOM.getNodeStackTraces"] = abxjsonschema.SchemaFor[DOMGetNodeStackTracesParams]()
-	types.commandResultSchemas["DOM.getNodeStackTraces"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodeStackTracesResult]())
-	types.commandParamsSchemas["DOM.getFileInfo"] = abxjsonschema.SchemaFor[DOMGetFileInfoParams]()
-	types.commandResultSchemas["DOM.getFileInfo"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFileInfoResult]())
-	types.commandParamsSchemas["DOM.getDetachedDomNodes"] = abxjsonschema.SchemaFor[DOMGetDetachedDOMNodesParams]()
-	types.commandResultSchemas["DOM.getDetachedDomNodes"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetDetachedDOMNodesResult]())
-	types.commandParamsSchemas["DOM.setInspectedNode"] = abxjsonschema.SchemaFor[DOMSetInspectedNodeParams]()
-	types.commandResultSchemas["DOM.setInspectedNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetInspectedNodeResult]())
-	types.commandParamsSchemas["DOM.setNodeName"] = abxjsonschema.SchemaFor[DOMSetNodeNameParams]()
-	types.commandResultSchemas["DOM.setNodeName"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeNameResult]())
-	types.commandParamsSchemas["DOM.setNodeValue"] = abxjsonschema.SchemaFor[DOMSetNodeValueParams]()
-	types.commandResultSchemas["DOM.setNodeValue"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeValueResult]())
-	types.commandParamsSchemas["DOM.setOuterHTML"] = abxjsonschema.SchemaFor[DOMSetOuterHTMLParams]()
-	types.commandResultSchemas["DOM.setOuterHTML"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSetOuterHTMLResult]())
-	types.commandParamsSchemas["DOM.undo"] = abxjsonschema.SchemaFor[DOMUndoParams]()
-	types.commandResultSchemas["DOM.undo"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMUndoResult]())
-	types.commandParamsSchemas["DOM.getFrameOwner"] = abxjsonschema.SchemaFor[DOMGetFrameOwnerParams]()
-	types.commandResultSchemas["DOM.getFrameOwner"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFrameOwnerResult]())
-	types.commandParamsSchemas["DOM.getContainerForNode"] = abxjsonschema.SchemaFor[DOMGetContainerForNodeParams]()
-	types.commandResultSchemas["DOM.getContainerForNode"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetContainerForNodeResult]())
-	types.commandParamsSchemas["DOM.getQueryingDescendantsForContainer"] = abxjsonschema.SchemaFor[DOMGetQueryingDescendantsForContainerParams]()
-	types.commandResultSchemas["DOM.getQueryingDescendantsForContainer"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetQueryingDescendantsForContainerResult]())
-	types.commandParamsSchemas["DOM.getAnchorElement"] = abxjsonschema.SchemaFor[DOMGetAnchorElementParams]()
-	types.commandResultSchemas["DOM.getAnchorElement"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMGetAnchorElementResult]())
-	types.commandParamsSchemas["DOM.forceShowPopover"] = abxjsonschema.SchemaFor[DOMForceShowPopoverParams]()
-	types.commandResultSchemas["DOM.forceShowPopover"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMForceShowPopoverResult]())
-	types.commandParamsSchemas["DOMDebugger.getEventListeners"] = abxjsonschema.SchemaFor[DOMDebuggerGetEventListenersParams]()
-	types.commandResultSchemas["DOMDebugger.getEventListeners"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerGetEventListenersResult]())
-	types.commandParamsSchemas["DOMDebugger.removeDOMBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerRemoveDOMBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.removeDOMBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveDOMBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.removeEventListenerBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerRemoveEventListenerBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.removeEventListenerBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveEventListenerBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.removeInstrumentationBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerRemoveInstrumentationBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.removeInstrumentationBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveInstrumentationBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.removeXHRBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerRemoveXHRBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.removeXHRBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveXHRBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.setBreakOnCSPViolation"] = abxjsonschema.SchemaFor[DOMDebuggerSetBreakOnCSPViolationParams]()
-	types.commandResultSchemas["DOMDebugger.setBreakOnCSPViolation"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetBreakOnCSPViolationResult]())
-	types.commandParamsSchemas["DOMDebugger.setDOMBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerSetDOMBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.setDOMBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetDOMBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.setEventListenerBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerSetEventListenerBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.setEventListenerBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetEventListenerBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.setInstrumentationBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerSetInstrumentationBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.setInstrumentationBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetInstrumentationBreakpointResult]())
-	types.commandParamsSchemas["DOMDebugger.setXHRBreakpoint"] = abxjsonschema.SchemaFor[DOMDebuggerSetXHRBreakpointParams]()
-	types.commandResultSchemas["DOMDebugger.setXHRBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetXHRBreakpointResult]())
-	types.commandParamsSchemas["DOMSnapshot.disable"] = abxjsonschema.SchemaFor[DOMSnapshotDisableParams]()
-	types.commandResultSchemas["DOMSnapshot.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotDisableResult]())
-	types.commandParamsSchemas["DOMSnapshot.enable"] = abxjsonschema.SchemaFor[DOMSnapshotEnableParams]()
-	types.commandResultSchemas["DOMSnapshot.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotEnableResult]())
-	types.commandParamsSchemas["DOMSnapshot.getSnapshot"] = abxjsonschema.SchemaFor[DOMSnapshotGetSnapshotParams]()
-	types.commandResultSchemas["DOMSnapshot.getSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotGetSnapshotResult]())
-	types.commandParamsSchemas["DOMSnapshot.captureSnapshot"] = abxjsonschema.SchemaFor[DOMSnapshotCaptureSnapshotParams]()
-	types.commandResultSchemas["DOMSnapshot.captureSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotCaptureSnapshotResult]())
-	types.commandParamsSchemas["DOMStorage.clear"] = abxjsonschema.SchemaFor[DOMStorageClearParams]()
-	types.commandResultSchemas["DOMStorage.clear"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageClearResult]())
-	types.commandParamsSchemas["DOMStorage.disable"] = abxjsonschema.SchemaFor[DOMStorageDisableParams]()
-	types.commandResultSchemas["DOMStorage.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageDisableResult]())
-	types.commandParamsSchemas["DOMStorage.enable"] = abxjsonschema.SchemaFor[DOMStorageEnableParams]()
-	types.commandResultSchemas["DOMStorage.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageEnableResult]())
-	types.commandParamsSchemas["DOMStorage.getDOMStorageItems"] = abxjsonschema.SchemaFor[DOMStorageGetDOMStorageItemsParams]()
-	types.commandResultSchemas["DOMStorage.getDOMStorageItems"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageGetDOMStorageItemsResult]())
-	types.commandParamsSchemas["DOMStorage.removeDOMStorageItem"] = abxjsonschema.SchemaFor[DOMStorageRemoveDOMStorageItemParams]()
-	types.commandResultSchemas["DOMStorage.removeDOMStorageItem"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageRemoveDOMStorageItemResult]())
-	types.commandParamsSchemas["DOMStorage.setDOMStorageItem"] = abxjsonschema.SchemaFor[DOMStorageSetDOMStorageItemParams]()
-	types.commandResultSchemas["DOMStorage.setDOMStorageItem"] = nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageSetDOMStorageItemResult]())
-	types.commandParamsSchemas["Debugger.continueToLocation"] = abxjsonschema.SchemaFor[DebuggerContinueToLocationParams]()
-	types.commandResultSchemas["Debugger.continueToLocation"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerContinueToLocationResult]())
-	types.commandParamsSchemas["Debugger.disable"] = abxjsonschema.SchemaFor[DebuggerDisableParams]()
-	types.commandResultSchemas["Debugger.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerDisableResult]())
-	types.commandParamsSchemas["Debugger.enable"] = abxjsonschema.SchemaFor[DebuggerEnableParams]()
-	types.commandResultSchemas["Debugger.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerEnableResult]())
-	types.commandParamsSchemas["Debugger.evaluateOnCallFrame"] = abxjsonschema.SchemaFor[DebuggerEvaluateOnCallFrameParams]()
-	types.commandResultSchemas["Debugger.evaluateOnCallFrame"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerEvaluateOnCallFrameResult]())
-	types.commandParamsSchemas["Debugger.getPossibleBreakpoints"] = abxjsonschema.SchemaFor[DebuggerGetPossibleBreakpointsParams]()
-	types.commandResultSchemas["Debugger.getPossibleBreakpoints"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetPossibleBreakpointsResult]())
-	types.commandParamsSchemas["Debugger.getScriptSource"] = abxjsonschema.SchemaFor[DebuggerGetScriptSourceParams]()
-	types.commandResultSchemas["Debugger.getScriptSource"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetScriptSourceResult]())
-	types.commandParamsSchemas["Debugger.disassembleWasmModule"] = abxjsonschema.SchemaFor[DebuggerDisassembleWasmModuleParams]()
-	types.commandResultSchemas["Debugger.disassembleWasmModule"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerDisassembleWasmModuleResult]())
-	types.commandParamsSchemas["Debugger.nextWasmDisassemblyChunk"] = abxjsonschema.SchemaFor[DebuggerNextWasmDisassemblyChunkParams]()
-	types.commandResultSchemas["Debugger.nextWasmDisassemblyChunk"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerNextWasmDisassemblyChunkResult]())
-	types.commandParamsSchemas["Debugger.getWasmBytecode"] = abxjsonschema.SchemaFor[DebuggerGetWasmBytecodeParams]()
-	types.commandResultSchemas["Debugger.getWasmBytecode"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetWasmBytecodeResult]())
-	types.commandParamsSchemas["Debugger.getStackTrace"] = abxjsonschema.SchemaFor[DebuggerGetStackTraceParams]()
-	types.commandResultSchemas["Debugger.getStackTrace"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetStackTraceResult]())
-	types.commandParamsSchemas["Debugger.pause"] = abxjsonschema.SchemaFor[DebuggerPauseParams]()
-	types.commandResultSchemas["Debugger.pause"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerPauseResult]())
-	types.commandParamsSchemas["Debugger.pauseOnAsyncCall"] = abxjsonschema.SchemaFor[DebuggerPauseOnAsyncCallParams]()
-	types.commandResultSchemas["Debugger.pauseOnAsyncCall"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerPauseOnAsyncCallResult]())
-	types.commandParamsSchemas["Debugger.removeBreakpoint"] = abxjsonschema.SchemaFor[DebuggerRemoveBreakpointParams]()
-	types.commandResultSchemas["Debugger.removeBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerRemoveBreakpointResult]())
-	types.commandParamsSchemas["Debugger.restartFrame"] = abxjsonschema.SchemaFor[DebuggerRestartFrameParams]()
-	types.commandResultSchemas["Debugger.restartFrame"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerRestartFrameResult]())
-	types.commandParamsSchemas["Debugger.resume"] = abxjsonschema.SchemaFor[DebuggerResumeParams]()
-	types.commandResultSchemas["Debugger.resume"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerResumeResult]())
-	types.commandParamsSchemas["Debugger.searchInContent"] = abxjsonschema.SchemaFor[DebuggerSearchInContentParams]()
-	types.commandResultSchemas["Debugger.searchInContent"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSearchInContentResult]())
-	types.commandParamsSchemas["Debugger.setAsyncCallStackDepth"] = abxjsonschema.SchemaFor[DebuggerSetAsyncCallStackDepthParams]()
-	types.commandResultSchemas["Debugger.setAsyncCallStackDepth"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetAsyncCallStackDepthResult]())
-	types.commandParamsSchemas["Debugger.setBlackboxExecutionContexts"] = abxjsonschema.SchemaFor[DebuggerSetBlackboxExecutionContextsParams]()
-	types.commandResultSchemas["Debugger.setBlackboxExecutionContexts"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxExecutionContextsResult]())
-	types.commandParamsSchemas["Debugger.setBlackboxPatterns"] = abxjsonschema.SchemaFor[DebuggerSetBlackboxPatternsParams]()
-	types.commandResultSchemas["Debugger.setBlackboxPatterns"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxPatternsResult]())
-	types.commandParamsSchemas["Debugger.setBlackboxedRanges"] = abxjsonschema.SchemaFor[DebuggerSetBlackboxedRangesParams]()
-	types.commandResultSchemas["Debugger.setBlackboxedRanges"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxedRangesResult]())
-	types.commandParamsSchemas["Debugger.setBreakpoint"] = abxjsonschema.SchemaFor[DebuggerSetBreakpointParams]()
-	types.commandResultSchemas["Debugger.setBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointResult]())
-	types.commandParamsSchemas["Debugger.setInstrumentationBreakpoint"] = abxjsonschema.SchemaFor[DebuggerSetInstrumentationBreakpointParams]()
-	types.commandResultSchemas["Debugger.setInstrumentationBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetInstrumentationBreakpointResult]())
-	types.commandParamsSchemas["Debugger.setBreakpointByUrl"] = abxjsonschema.SchemaFor[DebuggerSetBreakpointByURLParams]()
-	types.commandResultSchemas["Debugger.setBreakpointByUrl"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointByURLResult]())
-	types.commandParamsSchemas["Debugger.setBreakpointOnFunctionCall"] = abxjsonschema.SchemaFor[DebuggerSetBreakpointOnFunctionCallParams]()
-	types.commandResultSchemas["Debugger.setBreakpointOnFunctionCall"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointOnFunctionCallResult]())
-	types.commandParamsSchemas["Debugger.setBreakpointsActive"] = abxjsonschema.SchemaFor[DebuggerSetBreakpointsActiveParams]()
-	types.commandResultSchemas["Debugger.setBreakpointsActive"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointsActiveResult]())
-	types.commandParamsSchemas["Debugger.setPauseOnExceptions"] = abxjsonschema.SchemaFor[DebuggerSetPauseOnExceptionsParams]()
-	types.commandResultSchemas["Debugger.setPauseOnExceptions"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetPauseOnExceptionsResult]())
-	types.commandParamsSchemas["Debugger.setReturnValue"] = abxjsonschema.SchemaFor[DebuggerSetReturnValueParams]()
-	types.commandResultSchemas["Debugger.setReturnValue"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetReturnValueResult]())
-	types.commandParamsSchemas["Debugger.setScriptSource"] = abxjsonschema.SchemaFor[DebuggerSetScriptSourceParams]()
-	types.commandResultSchemas["Debugger.setScriptSource"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetScriptSourceResult]())
-	types.commandParamsSchemas["Debugger.setSkipAllPauses"] = abxjsonschema.SchemaFor[DebuggerSetSkipAllPausesParams]()
-	types.commandResultSchemas["Debugger.setSkipAllPauses"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetSkipAllPausesResult]())
-	types.commandParamsSchemas["Debugger.setVariableValue"] = abxjsonschema.SchemaFor[DebuggerSetVariableValueParams]()
-	types.commandResultSchemas["Debugger.setVariableValue"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetVariableValueResult]())
-	types.commandParamsSchemas["Debugger.stepInto"] = abxjsonschema.SchemaFor[DebuggerStepIntoParams]()
-	types.commandResultSchemas["Debugger.stepInto"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepIntoResult]())
-	types.commandParamsSchemas["Debugger.stepOut"] = abxjsonschema.SchemaFor[DebuggerStepOutParams]()
-	types.commandResultSchemas["Debugger.stepOut"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepOutResult]())
-	types.commandParamsSchemas["Debugger.stepOver"] = abxjsonschema.SchemaFor[DebuggerStepOverParams]()
-	types.commandResultSchemas["Debugger.stepOver"] = nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepOverResult]())
-	types.commandParamsSchemas["DeviceAccess.enable"] = abxjsonschema.SchemaFor[DeviceAccessEnableParams]()
-	types.commandResultSchemas["DeviceAccess.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessEnableResult]())
-	types.commandParamsSchemas["DeviceAccess.disable"] = abxjsonschema.SchemaFor[DeviceAccessDisableParams]()
-	types.commandResultSchemas["DeviceAccess.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessDisableResult]())
-	types.commandParamsSchemas["DeviceAccess.selectPrompt"] = abxjsonschema.SchemaFor[DeviceAccessSelectPromptParams]()
-	types.commandResultSchemas["DeviceAccess.selectPrompt"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessSelectPromptResult]())
-	types.commandParamsSchemas["DeviceAccess.cancelPrompt"] = abxjsonschema.SchemaFor[DeviceAccessCancelPromptParams]()
-	types.commandResultSchemas["DeviceAccess.cancelPrompt"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessCancelPromptResult]())
-	types.commandParamsSchemas["DeviceOrientation.clearDeviceOrientationOverride"] = abxjsonschema.SchemaFor[DeviceOrientationClearDeviceOrientationOverrideParams]()
-	types.commandResultSchemas["DeviceOrientation.clearDeviceOrientationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceOrientationClearDeviceOrientationOverrideResult]())
-	types.commandParamsSchemas["DeviceOrientation.setDeviceOrientationOverride"] = abxjsonschema.SchemaFor[DeviceOrientationSetDeviceOrientationOverrideParams]()
-	types.commandResultSchemas["DeviceOrientation.setDeviceOrientationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[DeviceOrientationSetDeviceOrientationOverrideResult]())
-	types.commandParamsSchemas["Emulation.canEmulate"] = abxjsonschema.SchemaFor[EmulationCanEmulateParams]()
-	types.commandResultSchemas["Emulation.canEmulate"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationCanEmulateResult]())
-	types.commandParamsSchemas["Emulation.clearDeviceMetricsOverride"] = abxjsonschema.SchemaFor[EmulationClearDeviceMetricsOverrideParams]()
-	types.commandResultSchemas["Emulation.clearDeviceMetricsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDeviceMetricsOverrideResult]())
-	types.commandParamsSchemas["Emulation.clearGeolocationOverride"] = abxjsonschema.SchemaFor[EmulationClearGeolocationOverrideParams]()
-	types.commandResultSchemas["Emulation.clearGeolocationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearGeolocationOverrideResult]())
-	types.commandParamsSchemas["Emulation.resetPageScaleFactor"] = abxjsonschema.SchemaFor[EmulationResetPageScaleFactorParams]()
-	types.commandResultSchemas["Emulation.resetPageScaleFactor"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationResetPageScaleFactorResult]())
-	types.commandParamsSchemas["Emulation.setFocusEmulationEnabled"] = abxjsonschema.SchemaFor[EmulationSetFocusEmulationEnabledParams]()
-	types.commandResultSchemas["Emulation.setFocusEmulationEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetFocusEmulationEnabledResult]())
-	types.commandParamsSchemas["Emulation.setAutoDarkModeOverride"] = abxjsonschema.SchemaFor[EmulationSetAutoDarkModeOverrideParams]()
-	types.commandResultSchemas["Emulation.setAutoDarkModeOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetAutoDarkModeOverrideResult]())
-	types.commandParamsSchemas["Emulation.setCPUThrottlingRate"] = abxjsonschema.SchemaFor[EmulationSetCPUThrottlingRateParams]()
-	types.commandResultSchemas["Emulation.setCPUThrottlingRate"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetCPUThrottlingRateResult]())
-	types.commandParamsSchemas["Emulation.setDefaultBackgroundColorOverride"] = abxjsonschema.SchemaFor[EmulationSetDefaultBackgroundColorOverrideParams]()
-	types.commandResultSchemas["Emulation.setDefaultBackgroundColorOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDefaultBackgroundColorOverrideResult]())
-	types.commandParamsSchemas["Emulation.setSafeAreaInsetsOverride"] = abxjsonschema.SchemaFor[EmulationSetSafeAreaInsetsOverrideParams]()
-	types.commandResultSchemas["Emulation.setSafeAreaInsetsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSafeAreaInsetsOverrideResult]())
-	types.commandParamsSchemas["Emulation.setDeviceMetricsOverride"] = abxjsonschema.SchemaFor[EmulationSetDeviceMetricsOverrideParams]()
-	types.commandResultSchemas["Emulation.setDeviceMetricsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDeviceMetricsOverrideResult]())
-	types.commandParamsSchemas["Emulation.setDevicePostureOverride"] = abxjsonschema.SchemaFor[EmulationSetDevicePostureOverrideParams]()
-	types.commandResultSchemas["Emulation.setDevicePostureOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDevicePostureOverrideResult]())
-	types.commandParamsSchemas["Emulation.clearDevicePostureOverride"] = abxjsonschema.SchemaFor[EmulationClearDevicePostureOverrideParams]()
-	types.commandResultSchemas["Emulation.clearDevicePostureOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDevicePostureOverrideResult]())
-	types.commandParamsSchemas["Emulation.setDisplayFeaturesOverride"] = abxjsonschema.SchemaFor[EmulationSetDisplayFeaturesOverrideParams]()
-	types.commandResultSchemas["Emulation.setDisplayFeaturesOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDisplayFeaturesOverrideResult]())
-	types.commandParamsSchemas["Emulation.clearDisplayFeaturesOverride"] = abxjsonschema.SchemaFor[EmulationClearDisplayFeaturesOverrideParams]()
-	types.commandResultSchemas["Emulation.clearDisplayFeaturesOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDisplayFeaturesOverrideResult]())
-	types.commandParamsSchemas["Emulation.setScrollbarsHidden"] = abxjsonschema.SchemaFor[EmulationSetScrollbarsHiddenParams]()
-	types.commandResultSchemas["Emulation.setScrollbarsHidden"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetScrollbarsHiddenResult]())
-	types.commandParamsSchemas["Emulation.setDocumentCookieDisabled"] = abxjsonschema.SchemaFor[EmulationSetDocumentCookieDisabledParams]()
-	types.commandResultSchemas["Emulation.setDocumentCookieDisabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDocumentCookieDisabledResult]())
-	types.commandParamsSchemas["Emulation.setEmitTouchEventsForMouse"] = abxjsonschema.SchemaFor[EmulationSetEmitTouchEventsForMouseParams]()
-	types.commandResultSchemas["Emulation.setEmitTouchEventsForMouse"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmitTouchEventsForMouseResult]())
-	types.commandParamsSchemas["Emulation.setEmulatedMedia"] = abxjsonschema.SchemaFor[EmulationSetEmulatedMediaParams]()
-	types.commandResultSchemas["Emulation.setEmulatedMedia"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedMediaResult]())
-	types.commandParamsSchemas["Emulation.setEmulatedVisionDeficiency"] = abxjsonschema.SchemaFor[EmulationSetEmulatedVisionDeficiencyParams]()
-	types.commandResultSchemas["Emulation.setEmulatedVisionDeficiency"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedVisionDeficiencyResult]())
-	types.commandParamsSchemas["Emulation.setEmulatedOSTextScale"] = abxjsonschema.SchemaFor[EmulationSetEmulatedOSTextScaleParams]()
-	types.commandResultSchemas["Emulation.setEmulatedOSTextScale"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedOSTextScaleResult]())
-	types.commandParamsSchemas["Emulation.setGeolocationOverride"] = abxjsonschema.SchemaFor[EmulationSetGeolocationOverrideParams]()
-	types.commandResultSchemas["Emulation.setGeolocationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetGeolocationOverrideResult]())
-	types.commandParamsSchemas["Emulation.getOverriddenSensorInformation"] = abxjsonschema.SchemaFor[EmulationGetOverriddenSensorInformationParams]()
-	types.commandResultSchemas["Emulation.getOverriddenSensorInformation"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationGetOverriddenSensorInformationResult]())
-	types.commandParamsSchemas["Emulation.setSensorOverrideEnabled"] = abxjsonschema.SchemaFor[EmulationSetSensorOverrideEnabledParams]()
-	types.commandResultSchemas["Emulation.setSensorOverrideEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSensorOverrideEnabledResult]())
-	types.commandParamsSchemas["Emulation.setSensorOverrideReadings"] = abxjsonschema.SchemaFor[EmulationSetSensorOverrideReadingsParams]()
-	types.commandResultSchemas["Emulation.setSensorOverrideReadings"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSensorOverrideReadingsResult]())
-	types.commandParamsSchemas["Emulation.setPressureSourceOverrideEnabled"] = abxjsonschema.SchemaFor[EmulationSetPressureSourceOverrideEnabledParams]()
-	types.commandResultSchemas["Emulation.setPressureSourceOverrideEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureSourceOverrideEnabledResult]())
-	types.commandParamsSchemas["Emulation.setPressureStateOverride"] = abxjsonschema.SchemaFor[EmulationSetPressureStateOverrideParams]()
-	types.commandResultSchemas["Emulation.setPressureStateOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureStateOverrideResult]())
-	types.commandParamsSchemas["Emulation.setPressureDataOverride"] = abxjsonschema.SchemaFor[EmulationSetPressureDataOverrideParams]()
-	types.commandResultSchemas["Emulation.setPressureDataOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureDataOverrideResult]())
-	types.commandParamsSchemas["Emulation.setIdleOverride"] = abxjsonschema.SchemaFor[EmulationSetIdleOverrideParams]()
-	types.commandResultSchemas["Emulation.setIdleOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetIdleOverrideResult]())
-	types.commandParamsSchemas["Emulation.clearIdleOverride"] = abxjsonschema.SchemaFor[EmulationClearIdleOverrideParams]()
-	types.commandResultSchemas["Emulation.clearIdleOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearIdleOverrideResult]())
-	types.commandParamsSchemas["Emulation.setNavigatorOverrides"] = abxjsonschema.SchemaFor[EmulationSetNavigatorOverridesParams]()
-	types.commandResultSchemas["Emulation.setNavigatorOverrides"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetNavigatorOverridesResult]())
-	types.commandParamsSchemas["Emulation.setPageScaleFactor"] = abxjsonschema.SchemaFor[EmulationSetPageScaleFactorParams]()
-	types.commandResultSchemas["Emulation.setPageScaleFactor"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPageScaleFactorResult]())
-	types.commandParamsSchemas["Emulation.setScriptExecutionDisabled"] = abxjsonschema.SchemaFor[EmulationSetScriptExecutionDisabledParams]()
-	types.commandResultSchemas["Emulation.setScriptExecutionDisabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetScriptExecutionDisabledResult]())
-	types.commandParamsSchemas["Emulation.setTouchEmulationEnabled"] = abxjsonschema.SchemaFor[EmulationSetTouchEmulationEnabledParams]()
-	types.commandResultSchemas["Emulation.setTouchEmulationEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetTouchEmulationEnabledResult]())
-	types.commandParamsSchemas["Emulation.setVirtualTimePolicy"] = abxjsonschema.SchemaFor[EmulationSetVirtualTimePolicyParams]()
-	types.commandResultSchemas["Emulation.setVirtualTimePolicy"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetVirtualTimePolicyResult]())
-	types.commandParamsSchemas["Emulation.setLocaleOverride"] = abxjsonschema.SchemaFor[EmulationSetLocaleOverrideParams]()
-	types.commandResultSchemas["Emulation.setLocaleOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetLocaleOverrideResult]())
-	types.commandParamsSchemas["Emulation.setTimezoneOverride"] = abxjsonschema.SchemaFor[EmulationSetTimezoneOverrideParams]()
-	types.commandResultSchemas["Emulation.setTimezoneOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetTimezoneOverrideResult]())
-	types.commandParamsSchemas["Emulation.setVisibleSize"] = abxjsonschema.SchemaFor[EmulationSetVisibleSizeParams]()
-	types.commandResultSchemas["Emulation.setVisibleSize"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetVisibleSizeResult]())
-	types.commandParamsSchemas["Emulation.setDisabledImageTypes"] = abxjsonschema.SchemaFor[EmulationSetDisabledImageTypesParams]()
-	types.commandResultSchemas["Emulation.setDisabledImageTypes"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDisabledImageTypesResult]())
-	types.commandParamsSchemas["Emulation.setDataSaverOverride"] = abxjsonschema.SchemaFor[EmulationSetDataSaverOverrideParams]()
-	types.commandResultSchemas["Emulation.setDataSaverOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDataSaverOverrideResult]())
-	types.commandParamsSchemas["Emulation.setHardwareConcurrencyOverride"] = abxjsonschema.SchemaFor[EmulationSetHardwareConcurrencyOverrideParams]()
-	types.commandResultSchemas["Emulation.setHardwareConcurrencyOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetHardwareConcurrencyOverrideResult]())
-	types.commandParamsSchemas["Emulation.setUserAgentOverride"] = abxjsonschema.SchemaFor[EmulationSetUserAgentOverrideParams]()
-	types.commandResultSchemas["Emulation.setUserAgentOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetUserAgentOverrideResult]())
-	types.commandParamsSchemas["Emulation.setAutomationOverride"] = abxjsonschema.SchemaFor[EmulationSetAutomationOverrideParams]()
-	types.commandResultSchemas["Emulation.setAutomationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetAutomationOverrideResult]())
-	types.commandParamsSchemas["Emulation.setSmallViewportHeightDifferenceOverride"] = abxjsonschema.SchemaFor[EmulationSetSmallViewportHeightDifferenceOverrideParams]()
-	types.commandResultSchemas["Emulation.setSmallViewportHeightDifferenceOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSmallViewportHeightDifferenceOverrideResult]())
-	types.commandParamsSchemas["Emulation.getScreenInfos"] = abxjsonschema.SchemaFor[EmulationGetScreenInfosParams]()
-	types.commandResultSchemas["Emulation.getScreenInfos"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationGetScreenInfosResult]())
-	types.commandParamsSchemas["Emulation.addScreen"] = abxjsonschema.SchemaFor[EmulationAddScreenParams]()
-	types.commandResultSchemas["Emulation.addScreen"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationAddScreenResult]())
-	types.commandParamsSchemas["Emulation.updateScreen"] = abxjsonschema.SchemaFor[EmulationUpdateScreenParams]()
-	types.commandResultSchemas["Emulation.updateScreen"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationUpdateScreenResult]())
-	types.commandParamsSchemas["Emulation.removeScreen"] = abxjsonschema.SchemaFor[EmulationRemoveScreenParams]()
-	types.commandResultSchemas["Emulation.removeScreen"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationRemoveScreenResult]())
-	types.commandParamsSchemas["Emulation.setPrimaryScreen"] = abxjsonschema.SchemaFor[EmulationSetPrimaryScreenParams]()
-	types.commandResultSchemas["Emulation.setPrimaryScreen"] = nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPrimaryScreenResult]())
-	types.commandParamsSchemas["EventBreakpoints.setInstrumentationBreakpoint"] = abxjsonschema.SchemaFor[EventBreakpointsSetInstrumentationBreakpointParams]()
-	types.commandResultSchemas["EventBreakpoints.setInstrumentationBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsSetInstrumentationBreakpointResult]())
-	types.commandParamsSchemas["EventBreakpoints.removeInstrumentationBreakpoint"] = abxjsonschema.SchemaFor[EventBreakpointsRemoveInstrumentationBreakpointParams]()
-	types.commandResultSchemas["EventBreakpoints.removeInstrumentationBreakpoint"] = nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsRemoveInstrumentationBreakpointResult]())
-	types.commandParamsSchemas["EventBreakpoints.disable"] = abxjsonschema.SchemaFor[EventBreakpointsDisableParams]()
-	types.commandResultSchemas["EventBreakpoints.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsDisableResult]())
-	types.commandParamsSchemas["Extensions.triggerAction"] = abxjsonschema.SchemaFor[ExtensionsTriggerActionParams]()
-	types.commandResultSchemas["Extensions.triggerAction"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsTriggerActionResult]())
-	types.commandParamsSchemas["Extensions.loadUnpacked"] = abxjsonschema.SchemaFor[CDPParams]()
-	types.commandResultSchemas["Extensions.loadUnpacked"] = nativeResultSchema(abxjsonschema.SchemaFor[CDPResult]())
-	types.commandParamsSchemas["Extensions.getExtensions"] = abxjsonschema.SchemaFor[ExtensionsGetExtensionsParams]()
-	types.commandResultSchemas["Extensions.getExtensions"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsGetExtensionsResult]())
-	types.commandParamsSchemas["Extensions.uninstall"] = abxjsonschema.SchemaFor[ExtensionsUninstallParams]()
-	types.commandResultSchemas["Extensions.uninstall"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsUninstallResult]())
-	types.commandParamsSchemas["Extensions.getStorageItems"] = abxjsonschema.SchemaFor[ExtensionsGetStorageItemsParams]()
-	types.commandResultSchemas["Extensions.getStorageItems"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsGetStorageItemsResult]())
-	types.commandParamsSchemas["Extensions.removeStorageItems"] = abxjsonschema.SchemaFor[ExtensionsRemoveStorageItemsParams]()
-	types.commandResultSchemas["Extensions.removeStorageItems"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsRemoveStorageItemsResult]())
-	types.commandParamsSchemas["Extensions.clearStorageItems"] = abxjsonschema.SchemaFor[ExtensionsClearStorageItemsParams]()
-	types.commandResultSchemas["Extensions.clearStorageItems"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsClearStorageItemsResult]())
-	types.commandParamsSchemas["Extensions.setStorageItems"] = abxjsonschema.SchemaFor[ExtensionsSetStorageItemsParams]()
-	types.commandResultSchemas["Extensions.setStorageItems"] = nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsSetStorageItemsResult]())
-	types.commandParamsSchemas["FedCm.enable"] = abxjsonschema.SchemaFor[FedCmEnableParams]()
-	types.commandResultSchemas["FedCm.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmEnableResult]())
-	types.commandParamsSchemas["FedCm.disable"] = abxjsonschema.SchemaFor[FedCmDisableParams]()
-	types.commandResultSchemas["FedCm.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmDisableResult]())
-	types.commandParamsSchemas["FedCm.selectAccount"] = abxjsonschema.SchemaFor[FedCmSelectAccountParams]()
-	types.commandResultSchemas["FedCm.selectAccount"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmSelectAccountResult]())
-	types.commandParamsSchemas["FedCm.clickDialogButton"] = abxjsonschema.SchemaFor[FedCmClickDialogButtonParams]()
-	types.commandResultSchemas["FedCm.clickDialogButton"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmClickDialogButtonResult]())
-	types.commandParamsSchemas["FedCm.openUrl"] = abxjsonschema.SchemaFor[FedCmOpenURLParams]()
-	types.commandResultSchemas["FedCm.openUrl"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmOpenURLResult]())
-	types.commandParamsSchemas["FedCm.dismissDialog"] = abxjsonschema.SchemaFor[FedCmDismissDialogParams]()
-	types.commandResultSchemas["FedCm.dismissDialog"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmDismissDialogResult]())
-	types.commandParamsSchemas["FedCm.resetCooldown"] = abxjsonschema.SchemaFor[FedCmResetCooldownParams]()
-	types.commandResultSchemas["FedCm.resetCooldown"] = nativeResultSchema(abxjsonschema.SchemaFor[FedCmResetCooldownResult]())
-	types.commandParamsSchemas["Fetch.disable"] = abxjsonschema.SchemaFor[FetchDisableParams]()
-	types.commandResultSchemas["Fetch.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchDisableResult]())
-	types.commandParamsSchemas["Fetch.enable"] = abxjsonschema.SchemaFor[FetchEnableParams]()
-	types.commandResultSchemas["Fetch.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchEnableResult]())
-	types.commandParamsSchemas["Fetch.failRequest"] = abxjsonschema.SchemaFor[FetchFailRequestParams]()
-	types.commandResultSchemas["Fetch.failRequest"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchFailRequestResult]())
-	types.commandParamsSchemas["Fetch.fulfillRequest"] = abxjsonschema.SchemaFor[FetchFulfillRequestParams]()
-	types.commandResultSchemas["Fetch.fulfillRequest"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchFulfillRequestResult]())
-	types.commandParamsSchemas["Fetch.continueRequest"] = abxjsonschema.SchemaFor[FetchContinueRequestParams]()
-	types.commandResultSchemas["Fetch.continueRequest"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueRequestResult]())
-	types.commandParamsSchemas["Fetch.continueWithAuth"] = abxjsonschema.SchemaFor[FetchContinueWithAuthParams]()
-	types.commandResultSchemas["Fetch.continueWithAuth"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueWithAuthResult]())
-	types.commandParamsSchemas["Fetch.continueResponse"] = abxjsonschema.SchemaFor[FetchContinueResponseParams]()
-	types.commandResultSchemas["Fetch.continueResponse"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueResponseResult]())
-	types.commandParamsSchemas["Fetch.getResponseBody"] = abxjsonschema.SchemaFor[FetchGetResponseBodyParams]()
-	types.commandResultSchemas["Fetch.getResponseBody"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchGetResponseBodyResult]())
-	types.commandParamsSchemas["Fetch.takeResponseBodyAsStream"] = abxjsonschema.SchemaFor[FetchTakeResponseBodyAsStreamParams]()
-	types.commandResultSchemas["Fetch.takeResponseBodyAsStream"] = nativeResultSchema(abxjsonschema.SchemaFor[FetchTakeResponseBodyAsStreamResult]())
-	types.commandParamsSchemas["FileSystem.getDirectory"] = abxjsonschema.SchemaFor[FileSystemGetDirectoryParams]()
-	types.commandResultSchemas["FileSystem.getDirectory"] = nativeResultSchema(abxjsonschema.SchemaFor[FileSystemGetDirectoryResult]())
-	types.commandParamsSchemas["HeadlessExperimental.beginFrame"] = abxjsonschema.SchemaFor[HeadlessExperimentalBeginFrameParams]()
-	types.commandResultSchemas["HeadlessExperimental.beginFrame"] = nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalBeginFrameResult]())
-	types.commandParamsSchemas["HeadlessExperimental.disable"] = abxjsonschema.SchemaFor[HeadlessExperimentalDisableParams]()
-	types.commandResultSchemas["HeadlessExperimental.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalDisableResult]())
-	types.commandParamsSchemas["HeadlessExperimental.enable"] = abxjsonschema.SchemaFor[HeadlessExperimentalEnableParams]()
-	types.commandResultSchemas["HeadlessExperimental.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalEnableResult]())
-	types.commandParamsSchemas["HeapProfiler.addInspectedHeapObject"] = abxjsonschema.SchemaFor[HeapProfilerAddInspectedHeapObjectParams]()
-	types.commandResultSchemas["HeapProfiler.addInspectedHeapObject"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerAddInspectedHeapObjectResult]())
-	types.commandParamsSchemas["HeapProfiler.collectGarbage"] = abxjsonschema.SchemaFor[HeapProfilerCollectGarbageParams]()
-	types.commandResultSchemas["HeapProfiler.collectGarbage"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerCollectGarbageResult]())
-	types.commandParamsSchemas["HeapProfiler.disable"] = abxjsonschema.SchemaFor[HeapProfilerDisableParams]()
-	types.commandResultSchemas["HeapProfiler.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerDisableResult]())
-	types.commandParamsSchemas["HeapProfiler.enable"] = abxjsonschema.SchemaFor[HeapProfilerEnableParams]()
-	types.commandResultSchemas["HeapProfiler.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerEnableResult]())
-	types.commandParamsSchemas["HeapProfiler.getHeapObjectId"] = abxjsonschema.SchemaFor[HeapProfilerGetHeapObjectIDParams]()
-	types.commandResultSchemas["HeapProfiler.getHeapObjectId"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetHeapObjectIDResult]())
-	types.commandParamsSchemas["HeapProfiler.getObjectByHeapObjectId"] = abxjsonschema.SchemaFor[HeapProfilerGetObjectByHeapObjectIDParams]()
-	types.commandResultSchemas["HeapProfiler.getObjectByHeapObjectId"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetObjectByHeapObjectIDResult]())
-	types.commandParamsSchemas["HeapProfiler.getSamplingProfile"] = abxjsonschema.SchemaFor[HeapProfilerGetSamplingProfileParams]()
-	types.commandResultSchemas["HeapProfiler.getSamplingProfile"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetSamplingProfileResult]())
-	types.commandParamsSchemas["HeapProfiler.startSampling"] = abxjsonschema.SchemaFor[HeapProfilerStartSamplingParams]()
-	types.commandResultSchemas["HeapProfiler.startSampling"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStartSamplingResult]())
-	types.commandParamsSchemas["HeapProfiler.startTrackingHeapObjects"] = abxjsonschema.SchemaFor[HeapProfilerStartTrackingHeapObjectsParams]()
-	types.commandResultSchemas["HeapProfiler.startTrackingHeapObjects"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStartTrackingHeapObjectsResult]())
-	types.commandParamsSchemas["HeapProfiler.stopSampling"] = abxjsonschema.SchemaFor[HeapProfilerStopSamplingParams]()
-	types.commandResultSchemas["HeapProfiler.stopSampling"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStopSamplingResult]())
-	types.commandParamsSchemas["HeapProfiler.stopTrackingHeapObjects"] = abxjsonschema.SchemaFor[HeapProfilerStopTrackingHeapObjectsParams]()
-	types.commandResultSchemas["HeapProfiler.stopTrackingHeapObjects"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStopTrackingHeapObjectsResult]())
-	types.commandParamsSchemas["HeapProfiler.takeHeapSnapshot"] = abxjsonschema.SchemaFor[HeapProfilerTakeHeapSnapshotParams]()
-	types.commandResultSchemas["HeapProfiler.takeHeapSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerTakeHeapSnapshotResult]())
-	types.commandParamsSchemas["IO.close"] = abxjsonschema.SchemaFor[IOCloseParams]()
-	types.commandResultSchemas["IO.close"] = nativeResultSchema(abxjsonschema.SchemaFor[IOCloseResult]())
-	types.commandParamsSchemas["IO.read"] = abxjsonschema.SchemaFor[IOReadParams]()
-	types.commandResultSchemas["IO.read"] = nativeResultSchema(abxjsonschema.SchemaFor[IOReadResult]())
-	types.commandParamsSchemas["IO.resolveBlob"] = abxjsonschema.SchemaFor[IOResolveBlobParams]()
-	types.commandResultSchemas["IO.resolveBlob"] = nativeResultSchema(abxjsonschema.SchemaFor[IOResolveBlobResult]())
-	types.commandParamsSchemas["IndexedDB.clearObjectStore"] = abxjsonschema.SchemaFor[IndexedDBClearObjectStoreParams]()
-	types.commandResultSchemas["IndexedDB.clearObjectStore"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBClearObjectStoreResult]())
-	types.commandParamsSchemas["IndexedDB.deleteDatabase"] = abxjsonschema.SchemaFor[IndexedDBDeleteDatabaseParams]()
-	types.commandResultSchemas["IndexedDB.deleteDatabase"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDeleteDatabaseResult]())
-	types.commandParamsSchemas["IndexedDB.deleteObjectStoreEntries"] = abxjsonschema.SchemaFor[IndexedDBDeleteObjectStoreEntriesParams]()
-	types.commandResultSchemas["IndexedDB.deleteObjectStoreEntries"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDeleteObjectStoreEntriesResult]())
-	types.commandParamsSchemas["IndexedDB.disable"] = abxjsonschema.SchemaFor[IndexedDBDisableParams]()
-	types.commandResultSchemas["IndexedDB.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDisableResult]())
-	types.commandParamsSchemas["IndexedDB.enable"] = abxjsonschema.SchemaFor[IndexedDBEnableParams]()
-	types.commandResultSchemas["IndexedDB.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBEnableResult]())
-	types.commandParamsSchemas["IndexedDB.requestData"] = abxjsonschema.SchemaFor[IndexedDBRequestDataParams]()
-	types.commandResultSchemas["IndexedDB.requestData"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDataResult]())
-	types.commandParamsSchemas["IndexedDB.getMetadata"] = abxjsonschema.SchemaFor[IndexedDBGetMetadataParams]()
-	types.commandResultSchemas["IndexedDB.getMetadata"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBGetMetadataResult]())
-	types.commandParamsSchemas["IndexedDB.requestDatabase"] = abxjsonschema.SchemaFor[IndexedDBRequestDatabaseParams]()
-	types.commandResultSchemas["IndexedDB.requestDatabase"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDatabaseResult]())
-	types.commandParamsSchemas["IndexedDB.requestDatabaseNames"] = abxjsonschema.SchemaFor[IndexedDBRequestDatabaseNamesParams]()
-	types.commandResultSchemas["IndexedDB.requestDatabaseNames"] = nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDatabaseNamesResult]())
-	types.commandParamsSchemas["Input.dispatchDragEvent"] = abxjsonschema.SchemaFor[InputDispatchDragEventParams]()
-	types.commandResultSchemas["Input.dispatchDragEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchDragEventResult]())
-	types.commandParamsSchemas["Input.dispatchKeyEvent"] = abxjsonschema.SchemaFor[InputDispatchKeyEventParams]()
-	types.commandResultSchemas["Input.dispatchKeyEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchKeyEventResult]())
-	types.commandParamsSchemas["Input.insertText"] = abxjsonschema.SchemaFor[InputInsertTextParams]()
-	types.commandResultSchemas["Input.insertText"] = nativeResultSchema(abxjsonschema.SchemaFor[InputInsertTextResult]())
-	types.commandParamsSchemas["Input.imeSetComposition"] = abxjsonschema.SchemaFor[InputImeSetCompositionParams]()
-	types.commandResultSchemas["Input.imeSetComposition"] = nativeResultSchema(abxjsonschema.SchemaFor[InputImeSetCompositionResult]())
-	types.commandParamsSchemas["Input.dispatchMouseEvent"] = abxjsonschema.SchemaFor[InputDispatchMouseEventParams]()
-	types.commandResultSchemas["Input.dispatchMouseEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchMouseEventResult]())
-	types.commandParamsSchemas["Input.dispatchTouchEvent"] = abxjsonschema.SchemaFor[InputDispatchTouchEventParams]()
-	types.commandResultSchemas["Input.dispatchTouchEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchTouchEventResult]())
-	types.commandParamsSchemas["Input.cancelDragging"] = abxjsonschema.SchemaFor[InputCancelDraggingParams]()
-	types.commandResultSchemas["Input.cancelDragging"] = nativeResultSchema(abxjsonschema.SchemaFor[InputCancelDraggingResult]())
-	types.commandParamsSchemas["Input.emulateTouchFromMouseEvent"] = abxjsonschema.SchemaFor[InputEmulateTouchFromMouseEventParams]()
-	types.commandResultSchemas["Input.emulateTouchFromMouseEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[InputEmulateTouchFromMouseEventResult]())
-	types.commandParamsSchemas["Input.setIgnoreInputEvents"] = abxjsonschema.SchemaFor[InputSetIgnoreInputEventsParams]()
-	types.commandResultSchemas["Input.setIgnoreInputEvents"] = nativeResultSchema(abxjsonschema.SchemaFor[InputSetIgnoreInputEventsResult]())
-	types.commandParamsSchemas["Input.setInterceptDrags"] = abxjsonschema.SchemaFor[InputSetInterceptDragsParams]()
-	types.commandResultSchemas["Input.setInterceptDrags"] = nativeResultSchema(abxjsonschema.SchemaFor[InputSetInterceptDragsResult]())
-	types.commandParamsSchemas["Input.synthesizePinchGesture"] = abxjsonschema.SchemaFor[InputSynthesizePinchGestureParams]()
-	types.commandResultSchemas["Input.synthesizePinchGesture"] = nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizePinchGestureResult]())
-	types.commandParamsSchemas["Input.synthesizeScrollGesture"] = abxjsonschema.SchemaFor[InputSynthesizeScrollGestureParams]()
-	types.commandResultSchemas["Input.synthesizeScrollGesture"] = nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizeScrollGestureResult]())
-	types.commandParamsSchemas["Input.synthesizeTapGesture"] = abxjsonschema.SchemaFor[InputSynthesizeTapGestureParams]()
-	types.commandResultSchemas["Input.synthesizeTapGesture"] = nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizeTapGestureResult]())
-	types.commandParamsSchemas["Inspector.disable"] = abxjsonschema.SchemaFor[InspectorDisableParams]()
-	types.commandResultSchemas["Inspector.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[InspectorDisableResult]())
-	types.commandParamsSchemas["Inspector.enable"] = abxjsonschema.SchemaFor[InspectorEnableParams]()
-	types.commandResultSchemas["Inspector.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[InspectorEnableResult]())
-	types.commandParamsSchemas["LayerTree.compositingReasons"] = abxjsonschema.SchemaFor[LayerTreeCompositingReasonsParams]()
-	types.commandResultSchemas["LayerTree.compositingReasons"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeCompositingReasonsResult]())
-	types.commandParamsSchemas["LayerTree.disable"] = abxjsonschema.SchemaFor[LayerTreeDisableParams]()
-	types.commandResultSchemas["LayerTree.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeDisableResult]())
-	types.commandParamsSchemas["LayerTree.enable"] = abxjsonschema.SchemaFor[LayerTreeEnableParams]()
-	types.commandResultSchemas["LayerTree.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeEnableResult]())
-	types.commandParamsSchemas["LayerTree.loadSnapshot"] = abxjsonschema.SchemaFor[LayerTreeLoadSnapshotParams]()
-	types.commandResultSchemas["LayerTree.loadSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeLoadSnapshotResult]())
-	types.commandParamsSchemas["LayerTree.makeSnapshot"] = abxjsonschema.SchemaFor[LayerTreeMakeSnapshotParams]()
-	types.commandResultSchemas["LayerTree.makeSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeMakeSnapshotResult]())
-	types.commandParamsSchemas["LayerTree.profileSnapshot"] = abxjsonschema.SchemaFor[LayerTreeProfileSnapshotParams]()
-	types.commandResultSchemas["LayerTree.profileSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeProfileSnapshotResult]())
-	types.commandParamsSchemas["LayerTree.releaseSnapshot"] = abxjsonschema.SchemaFor[LayerTreeReleaseSnapshotParams]()
-	types.commandResultSchemas["LayerTree.releaseSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeReleaseSnapshotResult]())
-	types.commandParamsSchemas["LayerTree.replaySnapshot"] = abxjsonschema.SchemaFor[LayerTreeReplaySnapshotParams]()
-	types.commandResultSchemas["LayerTree.replaySnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeReplaySnapshotResult]())
-	types.commandParamsSchemas["LayerTree.snapshotCommandLog"] = abxjsonschema.SchemaFor[LayerTreeSnapshotCommandLogParams]()
-	types.commandResultSchemas["LayerTree.snapshotCommandLog"] = nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeSnapshotCommandLogResult]())
-	types.commandParamsSchemas["Log.clear"] = abxjsonschema.SchemaFor[LogClearParams]()
-	types.commandResultSchemas["Log.clear"] = nativeResultSchema(abxjsonschema.SchemaFor[LogClearResult]())
-	types.commandParamsSchemas["Log.disable"] = abxjsonschema.SchemaFor[LogDisableParams]()
-	types.commandResultSchemas["Log.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[LogDisableResult]())
-	types.commandParamsSchemas["Log.enable"] = abxjsonschema.SchemaFor[LogEnableParams]()
-	types.commandResultSchemas["Log.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[LogEnableResult]())
-	types.commandParamsSchemas["Log.startViolationsReport"] = abxjsonschema.SchemaFor[LogStartViolationsReportParams]()
-	types.commandResultSchemas["Log.startViolationsReport"] = nativeResultSchema(abxjsonschema.SchemaFor[LogStartViolationsReportResult]())
-	types.commandParamsSchemas["Log.stopViolationsReport"] = abxjsonschema.SchemaFor[LogStopViolationsReportParams]()
-	types.commandResultSchemas["Log.stopViolationsReport"] = nativeResultSchema(abxjsonschema.SchemaFor[LogStopViolationsReportResult]())
-	types.commandParamsSchemas["Media.enable"] = abxjsonschema.SchemaFor[MediaEnableParams]()
-	types.commandResultSchemas["Media.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[MediaEnableResult]())
-	types.commandParamsSchemas["Media.disable"] = abxjsonschema.SchemaFor[MediaDisableParams]()
-	types.commandResultSchemas["Media.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[MediaDisableResult]())
-	types.commandParamsSchemas["Memory.getDOMCounters"] = abxjsonschema.SchemaFor[MemoryGetDOMCountersParams]()
-	types.commandResultSchemas["Memory.getDOMCounters"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetDOMCountersResult]())
-	types.commandParamsSchemas["Memory.getDOMCountersForLeakDetection"] = abxjsonschema.SchemaFor[MemoryGetDOMCountersForLeakDetectionParams]()
-	types.commandResultSchemas["Memory.getDOMCountersForLeakDetection"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetDOMCountersForLeakDetectionResult]())
-	types.commandParamsSchemas["Memory.prepareForLeakDetection"] = abxjsonschema.SchemaFor[MemoryPrepareForLeakDetectionParams]()
-	types.commandResultSchemas["Memory.prepareForLeakDetection"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryPrepareForLeakDetectionResult]())
-	types.commandParamsSchemas["Memory.forciblyPurgeJavaScriptMemory"] = abxjsonschema.SchemaFor[MemoryForciblyPurgeJavaScriptMemoryParams]()
-	types.commandResultSchemas["Memory.forciblyPurgeJavaScriptMemory"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryForciblyPurgeJavaScriptMemoryResult]())
-	types.commandParamsSchemas["Memory.setPressureNotificationsSuppressed"] = abxjsonschema.SchemaFor[MemorySetPressureNotificationsSuppressedParams]()
-	types.commandResultSchemas["Memory.setPressureNotificationsSuppressed"] = nativeResultSchema(abxjsonschema.SchemaFor[MemorySetPressureNotificationsSuppressedResult]())
-	types.commandParamsSchemas["Memory.simulatePressureNotification"] = abxjsonschema.SchemaFor[MemorySimulatePressureNotificationParams]()
-	types.commandResultSchemas["Memory.simulatePressureNotification"] = nativeResultSchema(abxjsonschema.SchemaFor[MemorySimulatePressureNotificationResult]())
-	types.commandParamsSchemas["Memory.startSampling"] = abxjsonschema.SchemaFor[MemoryStartSamplingParams]()
-	types.commandResultSchemas["Memory.startSampling"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryStartSamplingResult]())
-	types.commandParamsSchemas["Memory.stopSampling"] = abxjsonschema.SchemaFor[MemoryStopSamplingParams]()
-	types.commandResultSchemas["Memory.stopSampling"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryStopSamplingResult]())
-	types.commandParamsSchemas["Memory.getAllTimeSamplingProfile"] = abxjsonschema.SchemaFor[MemoryGetAllTimeSamplingProfileParams]()
-	types.commandResultSchemas["Memory.getAllTimeSamplingProfile"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetAllTimeSamplingProfileResult]())
-	types.commandParamsSchemas["Memory.getBrowserSamplingProfile"] = abxjsonschema.SchemaFor[MemoryGetBrowserSamplingProfileParams]()
-	types.commandResultSchemas["Memory.getBrowserSamplingProfile"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetBrowserSamplingProfileResult]())
-	types.commandParamsSchemas["Memory.getSamplingProfile"] = abxjsonschema.SchemaFor[MemoryGetSamplingProfileParams]()
-	types.commandResultSchemas["Memory.getSamplingProfile"] = nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetSamplingProfileResult]())
-	types.commandParamsSchemas["Network.setAcceptedEncodings"] = abxjsonschema.SchemaFor[NetworkSetAcceptedEncodingsParams]()
-	types.commandResultSchemas["Network.setAcceptedEncodings"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetAcceptedEncodingsResult]())
-	types.commandParamsSchemas["Network.clearAcceptedEncodingsOverride"] = abxjsonschema.SchemaFor[NetworkClearAcceptedEncodingsOverrideParams]()
-	types.commandResultSchemas["Network.clearAcceptedEncodingsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearAcceptedEncodingsOverrideResult]())
-	types.commandParamsSchemas["Network.canClearBrowserCache"] = abxjsonschema.SchemaFor[NetworkCanClearBrowserCacheParams]()
-	types.commandResultSchemas["Network.canClearBrowserCache"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanClearBrowserCacheResult]())
-	types.commandParamsSchemas["Network.canClearBrowserCookies"] = abxjsonschema.SchemaFor[NetworkCanClearBrowserCookiesParams]()
-	types.commandResultSchemas["Network.canClearBrowserCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanClearBrowserCookiesResult]())
-	types.commandParamsSchemas["Network.canEmulateNetworkConditions"] = abxjsonschema.SchemaFor[NetworkCanEmulateNetworkConditionsParams]()
-	types.commandResultSchemas["Network.canEmulateNetworkConditions"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanEmulateNetworkConditionsResult]())
-	types.commandParamsSchemas["Network.clearBrowserCache"] = abxjsonschema.SchemaFor[NetworkClearBrowserCacheParams]()
-	types.commandResultSchemas["Network.clearBrowserCache"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearBrowserCacheResult]())
-	types.commandParamsSchemas["Network.clearBrowserCookies"] = abxjsonschema.SchemaFor[NetworkClearBrowserCookiesParams]()
-	types.commandResultSchemas["Network.clearBrowserCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearBrowserCookiesResult]())
-	types.commandParamsSchemas["Network.continueInterceptedRequest"] = abxjsonschema.SchemaFor[NetworkContinueInterceptedRequestParams]()
-	types.commandResultSchemas["Network.continueInterceptedRequest"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkContinueInterceptedRequestResult]())
-	types.commandParamsSchemas["Network.deleteCookies"] = abxjsonschema.SchemaFor[NetworkDeleteCookiesParams]()
-	types.commandResultSchemas["Network.deleteCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkDeleteCookiesResult]())
-	types.commandParamsSchemas["Network.disable"] = abxjsonschema.SchemaFor[NetworkDisableParams]()
-	types.commandResultSchemas["Network.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkDisableResult]())
-	types.commandParamsSchemas["Network.emulateNetworkConditions"] = abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsParams]()
-	types.commandResultSchemas["Network.emulateNetworkConditions"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsResult]())
-	types.commandParamsSchemas["Network.emulateNetworkConditionsByRule"] = abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsByRuleParams]()
-	types.commandResultSchemas["Network.emulateNetworkConditionsByRule"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsByRuleResult]())
-	types.commandParamsSchemas["Network.overrideNetworkState"] = abxjsonschema.SchemaFor[NetworkOverrideNetworkStateParams]()
-	types.commandResultSchemas["Network.overrideNetworkState"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkOverrideNetworkStateResult]())
-	types.commandParamsSchemas["Network.enable"] = abxjsonschema.SchemaFor[NetworkEnableParams]()
-	types.commandResultSchemas["Network.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableResult]())
-	types.commandParamsSchemas["Network.configureDurableMessages"] = abxjsonschema.SchemaFor[NetworkConfigureDurableMessagesParams]()
-	types.commandResultSchemas["Network.configureDurableMessages"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkConfigureDurableMessagesResult]())
-	types.commandParamsSchemas["Network.getAllCookies"] = abxjsonschema.SchemaFor[NetworkGetAllCookiesParams]()
-	types.commandResultSchemas["Network.getAllCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetAllCookiesResult]())
-	types.commandParamsSchemas["Network.getCertificate"] = abxjsonschema.SchemaFor[NetworkGetCertificateParams]()
-	types.commandResultSchemas["Network.getCertificate"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetCertificateResult]())
-	types.commandParamsSchemas["Network.getCookies"] = abxjsonschema.SchemaFor[NetworkGetCookiesParams]()
-	types.commandResultSchemas["Network.getCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetCookiesResult]())
-	types.commandParamsSchemas["Network.getResponseBody"] = abxjsonschema.SchemaFor[NetworkGetResponseBodyParams]()
-	types.commandResultSchemas["Network.getResponseBody"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetResponseBodyResult]())
-	types.commandParamsSchemas["Network.getRequestPostData"] = abxjsonschema.SchemaFor[NetworkGetRequestPostDataParams]()
-	types.commandResultSchemas["Network.getRequestPostData"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetRequestPostDataResult]())
-	types.commandParamsSchemas["Network.getResponseBodyForInterception"] = abxjsonschema.SchemaFor[NetworkGetResponseBodyForInterceptionParams]()
-	types.commandResultSchemas["Network.getResponseBodyForInterception"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetResponseBodyForInterceptionResult]())
-	types.commandParamsSchemas["Network.takeResponseBodyForInterceptionAsStream"] = abxjsonschema.SchemaFor[NetworkTakeResponseBodyForInterceptionAsStreamParams]()
-	types.commandResultSchemas["Network.takeResponseBodyForInterceptionAsStream"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkTakeResponseBodyForInterceptionAsStreamResult]())
-	types.commandParamsSchemas["Network.replayXHR"] = abxjsonschema.SchemaFor[NetworkReplayXHRParams]()
-	types.commandResultSchemas["Network.replayXHR"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkReplayXHRResult]())
-	types.commandParamsSchemas["Network.searchInResponseBody"] = abxjsonschema.SchemaFor[NetworkSearchInResponseBodyParams]()
-	types.commandResultSchemas["Network.searchInResponseBody"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSearchInResponseBodyResult]())
-	types.commandParamsSchemas["Network.setBlockedURLs"] = abxjsonschema.SchemaFor[NetworkSetBlockedURLsParams]()
-	types.commandResultSchemas["Network.setBlockedURLs"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetBlockedURLsResult]())
-	types.commandParamsSchemas["Network.setBypassServiceWorker"] = abxjsonschema.SchemaFor[NetworkSetBypassServiceWorkerParams]()
-	types.commandResultSchemas["Network.setBypassServiceWorker"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetBypassServiceWorkerResult]())
-	types.commandParamsSchemas["Network.setCacheDisabled"] = abxjsonschema.SchemaFor[NetworkSetCacheDisabledParams]()
-	types.commandResultSchemas["Network.setCacheDisabled"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCacheDisabledResult]())
-	types.commandParamsSchemas["Network.setCookie"] = abxjsonschema.SchemaFor[NetworkSetCookieParams]()
-	types.commandResultSchemas["Network.setCookie"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookieResult]())
-	types.commandParamsSchemas["Network.setCookies"] = abxjsonschema.SchemaFor[NetworkSetCookiesParams]()
-	types.commandResultSchemas["Network.setCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookiesResult]())
-	types.commandParamsSchemas["Network.setExtraHTTPHeaders"] = abxjsonschema.SchemaFor[NetworkSetExtraHTTPHeadersParams]()
-	types.commandResultSchemas["Network.setExtraHTTPHeaders"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetExtraHTTPHeadersResult]())
-	types.commandParamsSchemas["Network.setAttachDebugStack"] = abxjsonschema.SchemaFor[NetworkSetAttachDebugStackParams]()
-	types.commandResultSchemas["Network.setAttachDebugStack"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetAttachDebugStackResult]())
-	types.commandParamsSchemas["Network.setRequestInterception"] = abxjsonschema.SchemaFor[NetworkSetRequestInterceptionParams]()
-	types.commandResultSchemas["Network.setRequestInterception"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetRequestInterceptionResult]())
-	types.commandParamsSchemas["Network.setUserAgentOverride"] = abxjsonschema.SchemaFor[NetworkSetUserAgentOverrideParams]()
-	types.commandResultSchemas["Network.setUserAgentOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetUserAgentOverrideResult]())
-	types.commandParamsSchemas["Network.streamResourceContent"] = abxjsonschema.SchemaFor[NetworkStreamResourceContentParams]()
-	types.commandResultSchemas["Network.streamResourceContent"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkStreamResourceContentResult]())
-	types.commandParamsSchemas["Network.getSecurityIsolationStatus"] = abxjsonschema.SchemaFor[NetworkGetSecurityIsolationStatusParams]()
-	types.commandResultSchemas["Network.getSecurityIsolationStatus"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetSecurityIsolationStatusResult]())
-	types.commandParamsSchemas["Network.enableReportingApi"] = abxjsonschema.SchemaFor[NetworkEnableReportingAPIParams]()
-	types.commandResultSchemas["Network.enableReportingApi"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableReportingAPIResult]())
-	types.commandParamsSchemas["Network.enableDeviceBoundSessions"] = abxjsonschema.SchemaFor[NetworkEnableDeviceBoundSessionsParams]()
-	types.commandResultSchemas["Network.enableDeviceBoundSessions"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableDeviceBoundSessionsResult]())
-	types.commandParamsSchemas["Network.fetchSchemefulSite"] = abxjsonschema.SchemaFor[NetworkFetchSchemefulSiteParams]()
-	types.commandResultSchemas["Network.fetchSchemefulSite"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkFetchSchemefulSiteResult]())
-	types.commandParamsSchemas["Network.loadNetworkResource"] = abxjsonschema.SchemaFor[NetworkLoadNetworkResourceParams]()
-	types.commandResultSchemas["Network.loadNetworkResource"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkLoadNetworkResourceResult]())
-	types.commandParamsSchemas["Network.setCookieControls"] = abxjsonschema.SchemaFor[NetworkSetCookieControlsParams]()
-	types.commandResultSchemas["Network.setCookieControls"] = nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookieControlsResult]())
-	types.commandParamsSchemas["Overlay.disable"] = abxjsonschema.SchemaFor[OverlayDisableParams]()
-	types.commandResultSchemas["Overlay.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayDisableResult]())
-	types.commandParamsSchemas["Overlay.enable"] = abxjsonschema.SchemaFor[OverlayEnableParams]()
-	types.commandResultSchemas["Overlay.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayEnableResult]())
-	types.commandParamsSchemas["Overlay.getHighlightObjectForTest"] = abxjsonschema.SchemaFor[OverlayGetHighlightObjectForTestParams]()
-	types.commandResultSchemas["Overlay.getHighlightObjectForTest"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetHighlightObjectForTestResult]())
-	types.commandParamsSchemas["Overlay.getGridHighlightObjectsForTest"] = abxjsonschema.SchemaFor[OverlayGetGridHighlightObjectsForTestParams]()
-	types.commandResultSchemas["Overlay.getGridHighlightObjectsForTest"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetGridHighlightObjectsForTestResult]())
-	types.commandParamsSchemas["Overlay.getSourceOrderHighlightObjectForTest"] = abxjsonschema.SchemaFor[OverlayGetSourceOrderHighlightObjectForTestParams]()
-	types.commandResultSchemas["Overlay.getSourceOrderHighlightObjectForTest"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetSourceOrderHighlightObjectForTestResult]())
-	types.commandParamsSchemas["Overlay.hideHighlight"] = abxjsonschema.SchemaFor[OverlayHideHighlightParams]()
-	types.commandResultSchemas["Overlay.hideHighlight"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHideHighlightResult]())
-	types.commandParamsSchemas["Overlay.highlightFrame"] = abxjsonschema.SchemaFor[OverlayHighlightFrameParams]()
-	types.commandResultSchemas["Overlay.highlightFrame"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightFrameResult]())
-	types.commandParamsSchemas["Overlay.highlightNode"] = abxjsonschema.SchemaFor[OverlayHighlightNodeParams]()
-	types.commandResultSchemas["Overlay.highlightNode"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightNodeResult]())
-	types.commandParamsSchemas["Overlay.highlightQuad"] = abxjsonschema.SchemaFor[OverlayHighlightQuadParams]()
-	types.commandResultSchemas["Overlay.highlightQuad"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightQuadResult]())
-	types.commandParamsSchemas["Overlay.highlightRect"] = abxjsonschema.SchemaFor[OverlayHighlightRectParams]()
-	types.commandResultSchemas["Overlay.highlightRect"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightRectResult]())
-	types.commandParamsSchemas["Overlay.highlightSourceOrder"] = abxjsonschema.SchemaFor[OverlayHighlightSourceOrderParams]()
-	types.commandResultSchemas["Overlay.highlightSourceOrder"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightSourceOrderResult]())
-	types.commandParamsSchemas["Overlay.setInspectMode"] = abxjsonschema.SchemaFor[OverlaySetInspectModeParams]()
-	types.commandResultSchemas["Overlay.setInspectMode"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetInspectModeResult]())
-	types.commandParamsSchemas["Overlay.setShowAdHighlights"] = abxjsonschema.SchemaFor[OverlaySetShowAdHighlightsParams]()
-	types.commandResultSchemas["Overlay.setShowAdHighlights"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowAdHighlightsResult]())
-	types.commandParamsSchemas["Overlay.setPausedInDebuggerMessage"] = abxjsonschema.SchemaFor[OverlaySetPausedInDebuggerMessageParams]()
-	types.commandResultSchemas["Overlay.setPausedInDebuggerMessage"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetPausedInDebuggerMessageResult]())
-	types.commandParamsSchemas["Overlay.setShowDebugBorders"] = abxjsonschema.SchemaFor[OverlaySetShowDebugBordersParams]()
-	types.commandResultSchemas["Overlay.setShowDebugBorders"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowDebugBordersResult]())
-	types.commandParamsSchemas["Overlay.setShowFPSCounter"] = abxjsonschema.SchemaFor[OverlaySetShowFPSCounterParams]()
-	types.commandResultSchemas["Overlay.setShowFPSCounter"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowFPSCounterResult]())
-	types.commandParamsSchemas["Overlay.setShowGridOverlays"] = abxjsonschema.SchemaFor[OverlaySetShowGridOverlaysParams]()
-	types.commandResultSchemas["Overlay.setShowGridOverlays"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowGridOverlaysResult]())
-	types.commandParamsSchemas["Overlay.setShowFlexOverlays"] = abxjsonschema.SchemaFor[OverlaySetShowFlexOverlaysParams]()
-	types.commandResultSchemas["Overlay.setShowFlexOverlays"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowFlexOverlaysResult]())
-	types.commandParamsSchemas["Overlay.setShowScrollSnapOverlays"] = abxjsonschema.SchemaFor[OverlaySetShowScrollSnapOverlaysParams]()
-	types.commandResultSchemas["Overlay.setShowScrollSnapOverlays"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowScrollSnapOverlaysResult]())
-	types.commandParamsSchemas["Overlay.setShowContainerQueryOverlays"] = abxjsonschema.SchemaFor[OverlaySetShowContainerQueryOverlaysParams]()
-	types.commandResultSchemas["Overlay.setShowContainerQueryOverlays"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowContainerQueryOverlaysResult]())
-	types.commandParamsSchemas["Overlay.setShowInspectedElementAnchor"] = abxjsonschema.SchemaFor[OverlaySetShowInspectedElementAnchorParams]()
-	types.commandResultSchemas["Overlay.setShowInspectedElementAnchor"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowInspectedElementAnchorResult]())
-	types.commandParamsSchemas["Overlay.setShowPaintRects"] = abxjsonschema.SchemaFor[OverlaySetShowPaintRectsParams]()
-	types.commandResultSchemas["Overlay.setShowPaintRects"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowPaintRectsResult]())
-	types.commandParamsSchemas["Overlay.setShowLayoutShiftRegions"] = abxjsonschema.SchemaFor[OverlaySetShowLayoutShiftRegionsParams]()
-	types.commandResultSchemas["Overlay.setShowLayoutShiftRegions"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowLayoutShiftRegionsResult]())
-	types.commandParamsSchemas["Overlay.setShowScrollBottleneckRects"] = abxjsonschema.SchemaFor[OverlaySetShowScrollBottleneckRectsParams]()
-	types.commandResultSchemas["Overlay.setShowScrollBottleneckRects"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowScrollBottleneckRectsResult]())
-	types.commandParamsSchemas["Overlay.setShowHitTestBorders"] = abxjsonschema.SchemaFor[OverlaySetShowHitTestBordersParams]()
-	types.commandResultSchemas["Overlay.setShowHitTestBorders"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowHitTestBordersResult]())
-	types.commandParamsSchemas["Overlay.setShowWebVitals"] = abxjsonschema.SchemaFor[OverlaySetShowWebVitalsParams]()
-	types.commandResultSchemas["Overlay.setShowWebVitals"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowWebVitalsResult]())
-	types.commandParamsSchemas["Overlay.setShowViewportSizeOnResize"] = abxjsonschema.SchemaFor[OverlaySetShowViewportSizeOnResizeParams]()
-	types.commandResultSchemas["Overlay.setShowViewportSizeOnResize"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowViewportSizeOnResizeResult]())
-	types.commandParamsSchemas["Overlay.setShowHinge"] = abxjsonschema.SchemaFor[OverlaySetShowHingeParams]()
-	types.commandResultSchemas["Overlay.setShowHinge"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowHingeResult]())
-	types.commandParamsSchemas["Overlay.setShowIsolatedElements"] = abxjsonschema.SchemaFor[OverlaySetShowIsolatedElementsParams]()
-	types.commandResultSchemas["Overlay.setShowIsolatedElements"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowIsolatedElementsResult]())
-	types.commandParamsSchemas["Overlay.setShowWindowControlsOverlay"] = abxjsonschema.SchemaFor[OverlaySetShowWindowControlsOverlayParams]()
-	types.commandResultSchemas["Overlay.setShowWindowControlsOverlay"] = nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowWindowControlsOverlayResult]())
-	types.commandParamsSchemas["PWA.getOsAppState"] = abxjsonschema.SchemaFor[PWAGetOsAppStateParams]()
-	types.commandResultSchemas["PWA.getOsAppState"] = nativeResultSchema(abxjsonschema.SchemaFor[PWAGetOsAppStateResult]())
-	types.commandParamsSchemas["PWA.install"] = abxjsonschema.SchemaFor[PWAInstallParams]()
-	types.commandResultSchemas["PWA.install"] = nativeResultSchema(abxjsonschema.SchemaFor[PWAInstallResult]())
-	types.commandParamsSchemas["PWA.uninstall"] = abxjsonschema.SchemaFor[PWAUninstallParams]()
-	types.commandResultSchemas["PWA.uninstall"] = nativeResultSchema(abxjsonschema.SchemaFor[PWAUninstallResult]())
-	types.commandParamsSchemas["PWA.launch"] = abxjsonschema.SchemaFor[PWALaunchParams]()
-	types.commandResultSchemas["PWA.launch"] = nativeResultSchema(abxjsonschema.SchemaFor[PWALaunchResult]())
-	types.commandParamsSchemas["PWA.launchFilesInApp"] = abxjsonschema.SchemaFor[PWALaunchFilesInAppParams]()
-	types.commandResultSchemas["PWA.launchFilesInApp"] = nativeResultSchema(abxjsonschema.SchemaFor[PWALaunchFilesInAppResult]())
-	types.commandParamsSchemas["PWA.openCurrentPageInApp"] = abxjsonschema.SchemaFor[PWAOpenCurrentPageInAppParams]()
-	types.commandResultSchemas["PWA.openCurrentPageInApp"] = nativeResultSchema(abxjsonschema.SchemaFor[PWAOpenCurrentPageInAppResult]())
-	types.commandParamsSchemas["PWA.changeAppUserSettings"] = abxjsonschema.SchemaFor[PWAChangeAppUserSettingsParams]()
-	types.commandResultSchemas["PWA.changeAppUserSettings"] = nativeResultSchema(abxjsonschema.SchemaFor[PWAChangeAppUserSettingsResult]())
-	types.commandParamsSchemas["Page.addScriptToEvaluateOnLoad"] = abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnLoadParams]()
-	types.commandResultSchemas["Page.addScriptToEvaluateOnLoad"] = nativeResultSchema(abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnLoadResult]())
-	types.commandParamsSchemas["Page.addScriptToEvaluateOnNewDocument"] = abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnNewDocumentParams]()
-	types.commandResultSchemas["Page.addScriptToEvaluateOnNewDocument"] = nativeResultSchema(abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnNewDocumentResult]())
-	types.commandParamsSchemas["Page.bringToFront"] = abxjsonschema.SchemaFor[PageBringToFrontParams]()
-	types.commandResultSchemas["Page.bringToFront"] = nativeResultSchema(abxjsonschema.SchemaFor[PageBringToFrontResult]())
-	types.commandParamsSchemas["Page.captureScreenshot"] = abxjsonschema.SchemaFor[PageCaptureScreenshotParams]()
-	types.commandResultSchemas["Page.captureScreenshot"] = nativeResultSchema(abxjsonschema.SchemaFor[PageCaptureScreenshotResult]())
-	types.commandParamsSchemas["Page.captureSnapshot"] = abxjsonschema.SchemaFor[PageCaptureSnapshotParams]()
-	types.commandResultSchemas["Page.captureSnapshot"] = nativeResultSchema(abxjsonschema.SchemaFor[PageCaptureSnapshotResult]())
-	types.commandParamsSchemas["Page.clearDeviceMetricsOverride"] = abxjsonschema.SchemaFor[PageClearDeviceMetricsOverrideParams]()
-	types.commandResultSchemas["Page.clearDeviceMetricsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageClearDeviceMetricsOverrideResult]())
-	types.commandParamsSchemas["Page.clearDeviceOrientationOverride"] = abxjsonschema.SchemaFor[PageClearDeviceOrientationOverrideParams]()
-	types.commandResultSchemas["Page.clearDeviceOrientationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageClearDeviceOrientationOverrideResult]())
-	types.commandParamsSchemas["Page.clearGeolocationOverride"] = abxjsonschema.SchemaFor[PageClearGeolocationOverrideParams]()
-	types.commandResultSchemas["Page.clearGeolocationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageClearGeolocationOverrideResult]())
-	types.commandParamsSchemas["Page.createIsolatedWorld"] = abxjsonschema.SchemaFor[PageCreateIsolatedWorldParams]()
-	types.commandResultSchemas["Page.createIsolatedWorld"] = nativeResultSchema(abxjsonschema.SchemaFor[PageCreateIsolatedWorldResult]())
-	types.commandParamsSchemas["Page.deleteCookie"] = abxjsonschema.SchemaFor[PageDeleteCookieParams]()
-	types.commandResultSchemas["Page.deleteCookie"] = nativeResultSchema(abxjsonschema.SchemaFor[PageDeleteCookieResult]())
-	types.commandParamsSchemas["Page.disable"] = abxjsonschema.SchemaFor[PageDisableParams]()
-	types.commandResultSchemas["Page.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[PageDisableResult]())
-	types.commandParamsSchemas["Page.enable"] = abxjsonschema.SchemaFor[PageEnableParams]()
-	types.commandResultSchemas["Page.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[PageEnableResult]())
-	types.commandParamsSchemas["Page.getAppManifest"] = abxjsonschema.SchemaFor[PageGetAppManifestParams]()
-	types.commandResultSchemas["Page.getAppManifest"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetAppManifestResult]())
-	types.commandParamsSchemas["Page.getInstallabilityErrors"] = abxjsonschema.SchemaFor[PageGetInstallabilityErrorsParams]()
-	types.commandResultSchemas["Page.getInstallabilityErrors"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetInstallabilityErrorsResult]())
-	types.commandParamsSchemas["Page.getManifestIcons"] = abxjsonschema.SchemaFor[PageGetManifestIconsParams]()
-	types.commandResultSchemas["Page.getManifestIcons"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetManifestIconsResult]())
-	types.commandParamsSchemas["Page.getAppId"] = abxjsonschema.SchemaFor[PageGetAppIDParams]()
-	types.commandResultSchemas["Page.getAppId"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetAppIDResult]())
-	types.commandParamsSchemas["Page.getAdScriptAncestry"] = abxjsonschema.SchemaFor[PageGetAdScriptAncestryParams]()
-	types.commandResultSchemas["Page.getAdScriptAncestry"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetAdScriptAncestryResult]())
-	types.commandParamsSchemas["Page.getFrameTree"] = abxjsonschema.SchemaFor[PageGetFrameTreeParams]()
-	types.commandResultSchemas["Page.getFrameTree"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetFrameTreeResult]())
-	types.commandParamsSchemas["Page.getLayoutMetrics"] = abxjsonschema.SchemaFor[PageGetLayoutMetricsParams]()
-	types.commandResultSchemas["Page.getLayoutMetrics"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetLayoutMetricsResult]())
-	types.commandParamsSchemas["Page.getNavigationHistory"] = abxjsonschema.SchemaFor[PageGetNavigationHistoryParams]()
-	types.commandResultSchemas["Page.getNavigationHistory"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetNavigationHistoryResult]())
-	types.commandParamsSchemas["Page.resetNavigationHistory"] = abxjsonschema.SchemaFor[PageResetNavigationHistoryParams]()
-	types.commandResultSchemas["Page.resetNavigationHistory"] = nativeResultSchema(abxjsonschema.SchemaFor[PageResetNavigationHistoryResult]())
-	types.commandParamsSchemas["Page.getResourceContent"] = abxjsonschema.SchemaFor[PageGetResourceContentParams]()
-	types.commandResultSchemas["Page.getResourceContent"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetResourceContentResult]())
-	types.commandParamsSchemas["Page.getResourceTree"] = abxjsonschema.SchemaFor[PageGetResourceTreeParams]()
-	types.commandResultSchemas["Page.getResourceTree"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetResourceTreeResult]())
-	types.commandParamsSchemas["Page.handleJavaScriptDialog"] = abxjsonschema.SchemaFor[PageHandleJavaScriptDialogParams]()
-	types.commandResultSchemas["Page.handleJavaScriptDialog"] = nativeResultSchema(abxjsonschema.SchemaFor[PageHandleJavaScriptDialogResult]())
-	types.commandParamsSchemas["Page.navigate"] = abxjsonschema.SchemaFor[PageNavigateParams]()
-	types.commandResultSchemas["Page.navigate"] = nativeResultSchema(abxjsonschema.SchemaFor[PageNavigateResult]())
-	types.commandParamsSchemas["Page.navigateToHistoryEntry"] = abxjsonschema.SchemaFor[PageNavigateToHistoryEntryParams]()
-	types.commandResultSchemas["Page.navigateToHistoryEntry"] = nativeResultSchema(abxjsonschema.SchemaFor[PageNavigateToHistoryEntryResult]())
-	types.commandParamsSchemas["Page.printToPDF"] = abxjsonschema.SchemaFor[PagePrintToPDFParams]()
-	types.commandResultSchemas["Page.printToPDF"] = nativeResultSchema(abxjsonschema.SchemaFor[PagePrintToPDFResult]())
-	types.commandParamsSchemas["Page.reload"] = abxjsonschema.SchemaFor[PageReloadParams]()
-	types.commandResultSchemas["Page.reload"] = nativeResultSchema(abxjsonschema.SchemaFor[PageReloadResult]())
-	types.commandParamsSchemas["Page.removeScriptToEvaluateOnLoad"] = abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnLoadParams]()
-	types.commandResultSchemas["Page.removeScriptToEvaluateOnLoad"] = nativeResultSchema(abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnLoadResult]())
-	types.commandParamsSchemas["Page.removeScriptToEvaluateOnNewDocument"] = abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnNewDocumentParams]()
-	types.commandResultSchemas["Page.removeScriptToEvaluateOnNewDocument"] = nativeResultSchema(abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnNewDocumentResult]())
-	types.commandParamsSchemas["Page.screencastFrameAck"] = abxjsonschema.SchemaFor[PageScreencastFrameAckParams]()
-	types.commandResultSchemas["Page.screencastFrameAck"] = nativeResultSchema(abxjsonschema.SchemaFor[PageScreencastFrameAckResult]())
-	types.commandParamsSchemas["Page.searchInResource"] = abxjsonschema.SchemaFor[PageSearchInResourceParams]()
-	types.commandResultSchemas["Page.searchInResource"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSearchInResourceResult]())
-	types.commandParamsSchemas["Page.setAdBlockingEnabled"] = abxjsonschema.SchemaFor[PageSetAdBlockingEnabledParams]()
-	types.commandResultSchemas["Page.setAdBlockingEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetAdBlockingEnabledResult]())
-	types.commandParamsSchemas["Page.setBypassCSP"] = abxjsonschema.SchemaFor[PageSetBypassCSPParams]()
-	types.commandResultSchemas["Page.setBypassCSP"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetBypassCSPResult]())
-	types.commandParamsSchemas["Page.getPermissionsPolicyState"] = abxjsonschema.SchemaFor[PageGetPermissionsPolicyStateParams]()
-	types.commandResultSchemas["Page.getPermissionsPolicyState"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetPermissionsPolicyStateResult]())
-	types.commandParamsSchemas["Page.getOriginTrials"] = abxjsonschema.SchemaFor[PageGetOriginTrialsParams]()
-	types.commandResultSchemas["Page.getOriginTrials"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetOriginTrialsResult]())
-	types.commandParamsSchemas["Page.setDeviceMetricsOverride"] = abxjsonschema.SchemaFor[PageSetDeviceMetricsOverrideParams]()
-	types.commandResultSchemas["Page.setDeviceMetricsOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetDeviceMetricsOverrideResult]())
-	types.commandParamsSchemas["Page.setDeviceOrientationOverride"] = abxjsonschema.SchemaFor[PageSetDeviceOrientationOverrideParams]()
-	types.commandResultSchemas["Page.setDeviceOrientationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetDeviceOrientationOverrideResult]())
-	types.commandParamsSchemas["Page.setFontFamilies"] = abxjsonschema.SchemaFor[PageSetFontFamiliesParams]()
-	types.commandResultSchemas["Page.setFontFamilies"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetFontFamiliesResult]())
-	types.commandParamsSchemas["Page.setFontSizes"] = abxjsonschema.SchemaFor[PageSetFontSizesParams]()
-	types.commandResultSchemas["Page.setFontSizes"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetFontSizesResult]())
-	types.commandParamsSchemas["Page.setDocumentContent"] = abxjsonschema.SchemaFor[PageSetDocumentContentParams]()
-	types.commandResultSchemas["Page.setDocumentContent"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetDocumentContentResult]())
-	types.commandParamsSchemas["Page.setDownloadBehavior"] = abxjsonschema.SchemaFor[PageSetDownloadBehaviorParams]()
-	types.commandResultSchemas["Page.setDownloadBehavior"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetDownloadBehaviorResult]())
-	types.commandParamsSchemas["Page.setGeolocationOverride"] = abxjsonschema.SchemaFor[PageSetGeolocationOverrideParams]()
-	types.commandResultSchemas["Page.setGeolocationOverride"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetGeolocationOverrideResult]())
-	types.commandParamsSchemas["Page.setLifecycleEventsEnabled"] = abxjsonschema.SchemaFor[PageSetLifecycleEventsEnabledParams]()
-	types.commandResultSchemas["Page.setLifecycleEventsEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetLifecycleEventsEnabledResult]())
-	types.commandParamsSchemas["Page.setTouchEmulationEnabled"] = abxjsonschema.SchemaFor[PageSetTouchEmulationEnabledParams]()
-	types.commandResultSchemas["Page.setTouchEmulationEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetTouchEmulationEnabledResult]())
-	types.commandParamsSchemas["Page.startScreencast"] = abxjsonschema.SchemaFor[PageStartScreencastParams]()
-	types.commandResultSchemas["Page.startScreencast"] = nativeResultSchema(abxjsonschema.SchemaFor[PageStartScreencastResult]())
-	types.commandParamsSchemas["Page.stopLoading"] = abxjsonschema.SchemaFor[PageStopLoadingParams]()
-	types.commandResultSchemas["Page.stopLoading"] = nativeResultSchema(abxjsonschema.SchemaFor[PageStopLoadingResult]())
-	types.commandParamsSchemas["Page.crash"] = abxjsonschema.SchemaFor[PageCrashParams]()
-	types.commandResultSchemas["Page.crash"] = nativeResultSchema(abxjsonschema.SchemaFor[PageCrashResult]())
-	types.commandParamsSchemas["Page.close"] = abxjsonschema.SchemaFor[PageCloseParams]()
-	types.commandResultSchemas["Page.close"] = nativeResultSchema(abxjsonschema.SchemaFor[PageCloseResult]())
-	types.commandParamsSchemas["Page.setWebLifecycleState"] = abxjsonschema.SchemaFor[PageSetWebLifecycleStateParams]()
-	types.commandResultSchemas["Page.setWebLifecycleState"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetWebLifecycleStateResult]())
-	types.commandParamsSchemas["Page.stopScreencast"] = abxjsonschema.SchemaFor[PageStopScreencastParams]()
-	types.commandResultSchemas["Page.stopScreencast"] = nativeResultSchema(abxjsonschema.SchemaFor[PageStopScreencastResult]())
-	types.commandParamsSchemas["Page.produceCompilationCache"] = abxjsonschema.SchemaFor[PageProduceCompilationCacheParams]()
-	types.commandResultSchemas["Page.produceCompilationCache"] = nativeResultSchema(abxjsonschema.SchemaFor[PageProduceCompilationCacheResult]())
-	types.commandParamsSchemas["Page.addCompilationCache"] = abxjsonschema.SchemaFor[PageAddCompilationCacheParams]()
-	types.commandResultSchemas["Page.addCompilationCache"] = nativeResultSchema(abxjsonschema.SchemaFor[PageAddCompilationCacheResult]())
-	types.commandParamsSchemas["Page.clearCompilationCache"] = abxjsonschema.SchemaFor[PageClearCompilationCacheParams]()
-	types.commandResultSchemas["Page.clearCompilationCache"] = nativeResultSchema(abxjsonschema.SchemaFor[PageClearCompilationCacheResult]())
-	types.commandParamsSchemas["Page.setSPCTransactionMode"] = abxjsonschema.SchemaFor[PageSetSPCTransactionModeParams]()
-	types.commandResultSchemas["Page.setSPCTransactionMode"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetSPCTransactionModeResult]())
-	types.commandParamsSchemas["Page.setRPHRegistrationMode"] = abxjsonschema.SchemaFor[PageSetRPHRegistrationModeParams]()
-	types.commandResultSchemas["Page.setRPHRegistrationMode"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetRPHRegistrationModeResult]())
-	types.commandParamsSchemas["Page.generateTestReport"] = abxjsonschema.SchemaFor[PageGenerateTestReportParams]()
-	types.commandResultSchemas["Page.generateTestReport"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGenerateTestReportResult]())
-	types.commandParamsSchemas["Page.waitForDebugger"] = abxjsonschema.SchemaFor[PageWaitForDebuggerParams]()
-	types.commandResultSchemas["Page.waitForDebugger"] = nativeResultSchema(abxjsonschema.SchemaFor[PageWaitForDebuggerResult]())
-	types.commandParamsSchemas["Page.setInterceptFileChooserDialog"] = abxjsonschema.SchemaFor[PageSetInterceptFileChooserDialogParams]()
-	types.commandResultSchemas["Page.setInterceptFileChooserDialog"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetInterceptFileChooserDialogResult]())
-	types.commandParamsSchemas["Page.setPrerenderingAllowed"] = abxjsonschema.SchemaFor[PageSetPrerenderingAllowedParams]()
-	types.commandResultSchemas["Page.setPrerenderingAllowed"] = nativeResultSchema(abxjsonschema.SchemaFor[PageSetPrerenderingAllowedResult]())
-	types.commandParamsSchemas["Page.getAnnotatedPageContent"] = abxjsonschema.SchemaFor[PageGetAnnotatedPageContentParams]()
-	types.commandResultSchemas["Page.getAnnotatedPageContent"] = nativeResultSchema(abxjsonschema.SchemaFor[PageGetAnnotatedPageContentResult]())
-	types.commandParamsSchemas["Performance.disable"] = abxjsonschema.SchemaFor[PerformanceDisableParams]()
-	types.commandResultSchemas["Performance.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[PerformanceDisableResult]())
-	types.commandParamsSchemas["Performance.enable"] = abxjsonschema.SchemaFor[PerformanceEnableParams]()
-	types.commandResultSchemas["Performance.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[PerformanceEnableResult]())
-	types.commandParamsSchemas["Performance.setTimeDomain"] = abxjsonschema.SchemaFor[PerformanceSetTimeDomainParams]()
-	types.commandResultSchemas["Performance.setTimeDomain"] = nativeResultSchema(abxjsonschema.SchemaFor[PerformanceSetTimeDomainResult]())
-	types.commandParamsSchemas["Performance.getMetrics"] = abxjsonschema.SchemaFor[PerformanceGetMetricsParams]()
-	types.commandResultSchemas["Performance.getMetrics"] = nativeResultSchema(abxjsonschema.SchemaFor[PerformanceGetMetricsResult]())
-	types.commandParamsSchemas["PerformanceTimeline.enable"] = abxjsonschema.SchemaFor[PerformanceTimelineEnableParams]()
-	types.commandResultSchemas["PerformanceTimeline.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[PerformanceTimelineEnableResult]())
-	types.commandParamsSchemas["Preload.enable"] = abxjsonschema.SchemaFor[PreloadEnableParams]()
-	types.commandResultSchemas["Preload.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[PreloadEnableResult]())
-	types.commandParamsSchemas["Preload.disable"] = abxjsonschema.SchemaFor[PreloadDisableParams]()
-	types.commandResultSchemas["Preload.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[PreloadDisableResult]())
-	types.commandParamsSchemas["Profiler.disable"] = abxjsonschema.SchemaFor[ProfilerDisableParams]()
-	types.commandResultSchemas["Profiler.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerDisableResult]())
-	types.commandParamsSchemas["Profiler.enable"] = abxjsonschema.SchemaFor[ProfilerEnableParams]()
-	types.commandResultSchemas["Profiler.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerEnableResult]())
-	types.commandParamsSchemas["Profiler.getBestEffortCoverage"] = abxjsonschema.SchemaFor[ProfilerGetBestEffortCoverageParams]()
-	types.commandResultSchemas["Profiler.getBestEffortCoverage"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerGetBestEffortCoverageResult]())
-	types.commandParamsSchemas["Profiler.setSamplingInterval"] = abxjsonschema.SchemaFor[ProfilerSetSamplingIntervalParams]()
-	types.commandResultSchemas["Profiler.setSamplingInterval"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerSetSamplingIntervalResult]())
-	types.commandParamsSchemas["Profiler.start"] = abxjsonschema.SchemaFor[ProfilerStartParams]()
-	types.commandResultSchemas["Profiler.start"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStartResult]())
-	types.commandParamsSchemas["Profiler.startPreciseCoverage"] = abxjsonschema.SchemaFor[ProfilerStartPreciseCoverageParams]()
-	types.commandResultSchemas["Profiler.startPreciseCoverage"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStartPreciseCoverageResult]())
-	types.commandParamsSchemas["Profiler.stop"] = abxjsonschema.SchemaFor[ProfilerStopParams]()
-	types.commandResultSchemas["Profiler.stop"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStopResult]())
-	types.commandParamsSchemas["Profiler.stopPreciseCoverage"] = abxjsonschema.SchemaFor[ProfilerStopPreciseCoverageParams]()
-	types.commandResultSchemas["Profiler.stopPreciseCoverage"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStopPreciseCoverageResult]())
-	types.commandParamsSchemas["Profiler.takePreciseCoverage"] = abxjsonschema.SchemaFor[ProfilerTakePreciseCoverageParams]()
-	types.commandResultSchemas["Profiler.takePreciseCoverage"] = nativeResultSchema(abxjsonschema.SchemaFor[ProfilerTakePreciseCoverageResult]())
-	types.commandParamsSchemas["Runtime.awaitPromise"] = abxjsonschema.SchemaFor[RuntimeAwaitPromiseParams]()
-	types.commandResultSchemas["Runtime.awaitPromise"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeAwaitPromiseResult]())
-	types.commandParamsSchemas["Runtime.callFunctionOn"] = abxjsonschema.SchemaFor[RuntimeCallFunctionOnParams]()
-	types.commandResultSchemas["Runtime.callFunctionOn"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeCallFunctionOnResult]())
-	types.commandParamsSchemas["Runtime.compileScript"] = abxjsonschema.SchemaFor[RuntimeCompileScriptParams]()
-	types.commandResultSchemas["Runtime.compileScript"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeCompileScriptResult]())
-	types.commandParamsSchemas["Runtime.disable"] = abxjsonschema.SchemaFor[RuntimeDisableParams]()
-	types.commandResultSchemas["Runtime.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeDisableResult]())
-	types.commandParamsSchemas["Runtime.discardConsoleEntries"] = abxjsonschema.SchemaFor[RuntimeDiscardConsoleEntriesParams]()
-	types.commandResultSchemas["Runtime.discardConsoleEntries"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeDiscardConsoleEntriesResult]())
-	types.commandParamsSchemas["Runtime.enable"] = abxjsonschema.SchemaFor[RuntimeEnableParams]()
-	types.commandResultSchemas["Runtime.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeEnableResult]())
-	types.commandParamsSchemas["Runtime.evaluate"] = abxjsonschema.SchemaFor[RuntimeEvaluateParams]()
-	types.commandResultSchemas["Runtime.evaluate"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeEvaluateResult]())
-	types.commandParamsSchemas["Runtime.getIsolateId"] = abxjsonschema.SchemaFor[RuntimeGetIsolateIDParams]()
-	types.commandResultSchemas["Runtime.getIsolateId"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetIsolateIDResult]())
-	types.commandParamsSchemas["Runtime.getHeapUsage"] = abxjsonschema.SchemaFor[RuntimeGetHeapUsageParams]()
-	types.commandResultSchemas["Runtime.getHeapUsage"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetHeapUsageResult]())
-	types.commandParamsSchemas["Runtime.getProperties"] = abxjsonschema.SchemaFor[RuntimeGetPropertiesParams]()
-	types.commandResultSchemas["Runtime.getProperties"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetPropertiesResult]())
-	types.commandParamsSchemas["Runtime.globalLexicalScopeNames"] = abxjsonschema.SchemaFor[RuntimeGlobalLexicalScopeNamesParams]()
-	types.commandResultSchemas["Runtime.globalLexicalScopeNames"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGlobalLexicalScopeNamesResult]())
-	types.commandParamsSchemas["Runtime.queryObjects"] = abxjsonschema.SchemaFor[RuntimeQueryObjectsParams]()
-	types.commandResultSchemas["Runtime.queryObjects"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeQueryObjectsResult]())
-	types.commandParamsSchemas["Runtime.releaseObject"] = abxjsonschema.SchemaFor[RuntimeReleaseObjectParams]()
-	types.commandResultSchemas["Runtime.releaseObject"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeReleaseObjectResult]())
-	types.commandParamsSchemas["Runtime.releaseObjectGroup"] = abxjsonschema.SchemaFor[RuntimeReleaseObjectGroupParams]()
-	types.commandResultSchemas["Runtime.releaseObjectGroup"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeReleaseObjectGroupResult]())
-	types.commandParamsSchemas["Runtime.runIfWaitingForDebugger"] = abxjsonschema.SchemaFor[RuntimeRunIfWaitingForDebuggerParams]()
-	types.commandResultSchemas["Runtime.runIfWaitingForDebugger"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRunIfWaitingForDebuggerResult]())
-	types.commandParamsSchemas["Runtime.runScript"] = abxjsonschema.SchemaFor[RuntimeRunScriptParams]()
-	types.commandResultSchemas["Runtime.runScript"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRunScriptResult]())
-	types.commandParamsSchemas["Runtime.setAsyncCallStackDepth"] = abxjsonschema.SchemaFor[RuntimeSetAsyncCallStackDepthParams]()
-	types.commandResultSchemas["Runtime.setAsyncCallStackDepth"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetAsyncCallStackDepthResult]())
-	types.commandParamsSchemas["Runtime.setCustomObjectFormatterEnabled"] = abxjsonschema.SchemaFor[RuntimeSetCustomObjectFormatterEnabledParams]()
-	types.commandResultSchemas["Runtime.setCustomObjectFormatterEnabled"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetCustomObjectFormatterEnabledResult]())
-	types.commandParamsSchemas["Runtime.setMaxCallStackSizeToCapture"] = abxjsonschema.SchemaFor[RuntimeSetMaxCallStackSizeToCaptureParams]()
-	types.commandResultSchemas["Runtime.setMaxCallStackSizeToCapture"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetMaxCallStackSizeToCaptureResult]())
-	types.commandParamsSchemas["Runtime.terminateExecution"] = abxjsonschema.SchemaFor[RuntimeTerminateExecutionParams]()
-	types.commandResultSchemas["Runtime.terminateExecution"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeTerminateExecutionResult]())
-	types.commandParamsSchemas["Runtime.addBinding"] = abxjsonschema.SchemaFor[RuntimeAddBindingParams]()
-	types.commandResultSchemas["Runtime.addBinding"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeAddBindingResult]())
-	types.commandParamsSchemas["Runtime.removeBinding"] = abxjsonschema.SchemaFor[RuntimeRemoveBindingParams]()
-	types.commandResultSchemas["Runtime.removeBinding"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRemoveBindingResult]())
-	types.commandParamsSchemas["Runtime.getExceptionDetails"] = abxjsonschema.SchemaFor[RuntimeGetExceptionDetailsParams]()
-	types.commandResultSchemas["Runtime.getExceptionDetails"] = nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetExceptionDetailsResult]())
-	types.commandParamsSchemas["Schema.getDomains"] = abxjsonschema.SchemaFor[SchemaGetDomainsParams]()
-	types.commandResultSchemas["Schema.getDomains"] = nativeResultSchema(abxjsonschema.SchemaFor[SchemaGetDomainsResult]())
-	types.commandParamsSchemas["Security.disable"] = abxjsonschema.SchemaFor[SecurityDisableParams]()
-	types.commandResultSchemas["Security.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[SecurityDisableResult]())
-	types.commandParamsSchemas["Security.enable"] = abxjsonschema.SchemaFor[SecurityEnableParams]()
-	types.commandResultSchemas["Security.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[SecurityEnableResult]())
-	types.commandParamsSchemas["Security.setIgnoreCertificateErrors"] = abxjsonschema.SchemaFor[SecuritySetIgnoreCertificateErrorsParams]()
-	types.commandResultSchemas["Security.setIgnoreCertificateErrors"] = nativeResultSchema(abxjsonschema.SchemaFor[SecuritySetIgnoreCertificateErrorsResult]())
-	types.commandParamsSchemas["Security.handleCertificateError"] = abxjsonschema.SchemaFor[SecurityHandleCertificateErrorParams]()
-	types.commandResultSchemas["Security.handleCertificateError"] = nativeResultSchema(abxjsonschema.SchemaFor[SecurityHandleCertificateErrorResult]())
-	types.commandParamsSchemas["Security.setOverrideCertificateErrors"] = abxjsonschema.SchemaFor[SecuritySetOverrideCertificateErrorsParams]()
-	types.commandResultSchemas["Security.setOverrideCertificateErrors"] = nativeResultSchema(abxjsonschema.SchemaFor[SecuritySetOverrideCertificateErrorsResult]())
-	types.commandParamsSchemas["ServiceWorker.deliverPushMessage"] = abxjsonschema.SchemaFor[ServiceWorkerDeliverPushMessageParams]()
-	types.commandResultSchemas["ServiceWorker.deliverPushMessage"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDeliverPushMessageResult]())
-	types.commandParamsSchemas["ServiceWorker.disable"] = abxjsonschema.SchemaFor[ServiceWorkerDisableParams]()
-	types.commandResultSchemas["ServiceWorker.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDisableResult]())
-	types.commandParamsSchemas["ServiceWorker.dispatchSyncEvent"] = abxjsonschema.SchemaFor[ServiceWorkerDispatchSyncEventParams]()
-	types.commandResultSchemas["ServiceWorker.dispatchSyncEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDispatchSyncEventResult]())
-	types.commandParamsSchemas["ServiceWorker.dispatchPeriodicSyncEvent"] = abxjsonschema.SchemaFor[ServiceWorkerDispatchPeriodicSyncEventParams]()
-	types.commandResultSchemas["ServiceWorker.dispatchPeriodicSyncEvent"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDispatchPeriodicSyncEventResult]())
-	types.commandParamsSchemas["ServiceWorker.enable"] = abxjsonschema.SchemaFor[ServiceWorkerEnableParams]()
-	types.commandResultSchemas["ServiceWorker.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerEnableResult]())
-	types.commandParamsSchemas["ServiceWorker.setForceUpdateOnPageLoad"] = abxjsonschema.SchemaFor[ServiceWorkerSetForceUpdateOnPageLoadParams]()
-	types.commandResultSchemas["ServiceWorker.setForceUpdateOnPageLoad"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerSetForceUpdateOnPageLoadResult]())
-	types.commandParamsSchemas["ServiceWorker.skipWaiting"] = abxjsonschema.SchemaFor[ServiceWorkerSkipWaitingParams]()
-	types.commandResultSchemas["ServiceWorker.skipWaiting"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerSkipWaitingResult]())
-	types.commandParamsSchemas["ServiceWorker.startWorker"] = abxjsonschema.SchemaFor[ServiceWorkerStartWorkerParams]()
-	types.commandResultSchemas["ServiceWorker.startWorker"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStartWorkerResult]())
-	types.commandParamsSchemas["ServiceWorker.stopAllWorkers"] = abxjsonschema.SchemaFor[ServiceWorkerStopAllWorkersParams]()
-	types.commandResultSchemas["ServiceWorker.stopAllWorkers"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStopAllWorkersResult]())
-	types.commandParamsSchemas["ServiceWorker.stopWorker"] = abxjsonschema.SchemaFor[ServiceWorkerStopWorkerParams]()
-	types.commandResultSchemas["ServiceWorker.stopWorker"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStopWorkerResult]())
-	types.commandParamsSchemas["ServiceWorker.unregister"] = abxjsonschema.SchemaFor[ServiceWorkerUnregisterParams]()
-	types.commandResultSchemas["ServiceWorker.unregister"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerUnregisterResult]())
-	types.commandParamsSchemas["ServiceWorker.updateRegistration"] = abxjsonschema.SchemaFor[ServiceWorkerUpdateRegistrationParams]()
-	types.commandResultSchemas["ServiceWorker.updateRegistration"] = nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerUpdateRegistrationResult]())
-	types.commandParamsSchemas["SmartCardEmulation.enable"] = abxjsonschema.SchemaFor[SmartCardEmulationEnableParams]()
-	types.commandResultSchemas["SmartCardEmulation.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationEnableResult]())
-	types.commandParamsSchemas["SmartCardEmulation.disable"] = abxjsonschema.SchemaFor[SmartCardEmulationDisableParams]()
-	types.commandResultSchemas["SmartCardEmulation.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationDisableResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportEstablishContextResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportEstablishContextResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportEstablishContextResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportEstablishContextResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportReleaseContextResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportReleaseContextResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportReleaseContextResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportReleaseContextResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportListReadersResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportListReadersResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportListReadersResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportListReadersResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportGetStatusChangeResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportGetStatusChangeResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportGetStatusChangeResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportGetStatusChangeResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportBeginTransactionResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportBeginTransactionResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportBeginTransactionResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportBeginTransactionResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportPlainResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportPlainResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportPlainResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportPlainResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportConnectResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportConnectResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportConnectResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportConnectResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportDataResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportDataResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportDataResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportDataResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportStatusResult"] = abxjsonschema.SchemaFor[SmartCardEmulationReportStatusResultParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportStatusResult"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportStatusResultResult]())
-	types.commandParamsSchemas["SmartCardEmulation.reportError"] = abxjsonschema.SchemaFor[SmartCardEmulationReportErrorParams]()
-	types.commandResultSchemas["SmartCardEmulation.reportError"] = nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportErrorResult]())
-	types.commandParamsSchemas["Storage.getStorageKeyForFrame"] = abxjsonschema.SchemaFor[StorageGetStorageKeyForFrameParams]()
-	types.commandResultSchemas["Storage.getStorageKeyForFrame"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetStorageKeyForFrameResult]())
-	types.commandParamsSchemas["Storage.getStorageKey"] = abxjsonschema.SchemaFor[StorageGetStorageKeyParams]()
-	types.commandResultSchemas["Storage.getStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetStorageKeyResult]())
-	types.commandParamsSchemas["Storage.clearDataForOrigin"] = abxjsonschema.SchemaFor[StorageClearDataForOriginParams]()
-	types.commandResultSchemas["Storage.clearDataForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageClearDataForOriginResult]())
-	types.commandParamsSchemas["Storage.clearDataForStorageKey"] = abxjsonschema.SchemaFor[StorageClearDataForStorageKeyParams]()
-	types.commandResultSchemas["Storage.clearDataForStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageClearDataForStorageKeyResult]())
-	types.commandParamsSchemas["Storage.getCookies"] = abxjsonschema.SchemaFor[StorageGetCookiesParams]()
-	types.commandResultSchemas["Storage.getCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetCookiesResult]())
-	types.commandParamsSchemas["Storage.setCookies"] = abxjsonschema.SchemaFor[StorageSetCookiesParams]()
-	types.commandResultSchemas["Storage.setCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetCookiesResult]())
-	types.commandParamsSchemas["Storage.clearCookies"] = abxjsonschema.SchemaFor[StorageClearCookiesParams]()
-	types.commandResultSchemas["Storage.clearCookies"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageClearCookiesResult]())
-	types.commandParamsSchemas["Storage.getUsageAndQuota"] = abxjsonschema.SchemaFor[StorageGetUsageAndQuotaParams]()
-	types.commandResultSchemas["Storage.getUsageAndQuota"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetUsageAndQuotaResult]())
-	types.commandParamsSchemas["Storage.overrideQuotaForOrigin"] = abxjsonschema.SchemaFor[StorageOverrideQuotaForOriginParams]()
-	types.commandResultSchemas["Storage.overrideQuotaForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageOverrideQuotaForOriginResult]())
-	types.commandParamsSchemas["Storage.trackCacheStorageForOrigin"] = abxjsonschema.SchemaFor[StorageTrackCacheStorageForOriginParams]()
-	types.commandResultSchemas["Storage.trackCacheStorageForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackCacheStorageForOriginResult]())
-	types.commandParamsSchemas["Storage.trackCacheStorageForStorageKey"] = abxjsonschema.SchemaFor[StorageTrackCacheStorageForStorageKeyParams]()
-	types.commandResultSchemas["Storage.trackCacheStorageForStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackCacheStorageForStorageKeyResult]())
-	types.commandParamsSchemas["Storage.trackIndexedDBForOrigin"] = abxjsonschema.SchemaFor[StorageTrackIndexedDBForOriginParams]()
-	types.commandResultSchemas["Storage.trackIndexedDBForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackIndexedDBForOriginResult]())
-	types.commandParamsSchemas["Storage.trackIndexedDBForStorageKey"] = abxjsonschema.SchemaFor[StorageTrackIndexedDBForStorageKeyParams]()
-	types.commandResultSchemas["Storage.trackIndexedDBForStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackIndexedDBForStorageKeyResult]())
-	types.commandParamsSchemas["Storage.untrackCacheStorageForOrigin"] = abxjsonschema.SchemaFor[StorageUntrackCacheStorageForOriginParams]()
-	types.commandResultSchemas["Storage.untrackCacheStorageForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackCacheStorageForOriginResult]())
-	types.commandParamsSchemas["Storage.untrackCacheStorageForStorageKey"] = abxjsonschema.SchemaFor[StorageUntrackCacheStorageForStorageKeyParams]()
-	types.commandResultSchemas["Storage.untrackCacheStorageForStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackCacheStorageForStorageKeyResult]())
-	types.commandParamsSchemas["Storage.untrackIndexedDBForOrigin"] = abxjsonschema.SchemaFor[StorageUntrackIndexedDBForOriginParams]()
-	types.commandResultSchemas["Storage.untrackIndexedDBForOrigin"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackIndexedDBForOriginResult]())
-	types.commandParamsSchemas["Storage.untrackIndexedDBForStorageKey"] = abxjsonschema.SchemaFor[StorageUntrackIndexedDBForStorageKeyParams]()
-	types.commandResultSchemas["Storage.untrackIndexedDBForStorageKey"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackIndexedDBForStorageKeyResult]())
-	types.commandParamsSchemas["Storage.getTrustTokens"] = abxjsonschema.SchemaFor[StorageGetTrustTokensParams]()
-	types.commandResultSchemas["Storage.getTrustTokens"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetTrustTokensResult]())
-	types.commandParamsSchemas["Storage.clearTrustTokens"] = abxjsonschema.SchemaFor[StorageClearTrustTokensParams]()
-	types.commandResultSchemas["Storage.clearTrustTokens"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageClearTrustTokensResult]())
-	types.commandParamsSchemas["Storage.getInterestGroupDetails"] = abxjsonschema.SchemaFor[StorageGetInterestGroupDetailsParams]()
-	types.commandResultSchemas["Storage.getInterestGroupDetails"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetInterestGroupDetailsResult]())
-	types.commandParamsSchemas["Storage.setInterestGroupTracking"] = abxjsonschema.SchemaFor[StorageSetInterestGroupTrackingParams]()
-	types.commandResultSchemas["Storage.setInterestGroupTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetInterestGroupTrackingResult]())
-	types.commandParamsSchemas["Storage.setInterestGroupAuctionTracking"] = abxjsonschema.SchemaFor[StorageSetInterestGroupAuctionTrackingParams]()
-	types.commandResultSchemas["Storage.setInterestGroupAuctionTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetInterestGroupAuctionTrackingResult]())
-	types.commandParamsSchemas["Storage.getSharedStorageMetadata"] = abxjsonschema.SchemaFor[StorageGetSharedStorageMetadataParams]()
-	types.commandResultSchemas["Storage.getSharedStorageMetadata"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetSharedStorageMetadataResult]())
-	types.commandParamsSchemas["Storage.getSharedStorageEntries"] = abxjsonschema.SchemaFor[StorageGetSharedStorageEntriesParams]()
-	types.commandResultSchemas["Storage.getSharedStorageEntries"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetSharedStorageEntriesResult]())
-	types.commandParamsSchemas["Storage.setSharedStorageEntry"] = abxjsonschema.SchemaFor[StorageSetSharedStorageEntryParams]()
-	types.commandResultSchemas["Storage.setSharedStorageEntry"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetSharedStorageEntryResult]())
-	types.commandParamsSchemas["Storage.deleteSharedStorageEntry"] = abxjsonschema.SchemaFor[StorageDeleteSharedStorageEntryParams]()
-	types.commandResultSchemas["Storage.deleteSharedStorageEntry"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageDeleteSharedStorageEntryResult]())
-	types.commandParamsSchemas["Storage.clearSharedStorageEntries"] = abxjsonschema.SchemaFor[StorageClearSharedStorageEntriesParams]()
-	types.commandResultSchemas["Storage.clearSharedStorageEntries"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageClearSharedStorageEntriesResult]())
-	types.commandParamsSchemas["Storage.resetSharedStorageBudget"] = abxjsonschema.SchemaFor[StorageResetSharedStorageBudgetParams]()
-	types.commandResultSchemas["Storage.resetSharedStorageBudget"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageResetSharedStorageBudgetResult]())
-	types.commandParamsSchemas["Storage.setSharedStorageTracking"] = abxjsonschema.SchemaFor[StorageSetSharedStorageTrackingParams]()
-	types.commandResultSchemas["Storage.setSharedStorageTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetSharedStorageTrackingResult]())
-	types.commandParamsSchemas["Storage.setStorageBucketTracking"] = abxjsonschema.SchemaFor[StorageSetStorageBucketTrackingParams]()
-	types.commandResultSchemas["Storage.setStorageBucketTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetStorageBucketTrackingResult]())
-	types.commandParamsSchemas["Storage.deleteStorageBucket"] = abxjsonschema.SchemaFor[StorageDeleteStorageBucketParams]()
-	types.commandResultSchemas["Storage.deleteStorageBucket"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageDeleteStorageBucketResult]())
-	types.commandParamsSchemas["Storage.runBounceTrackingMitigations"] = abxjsonschema.SchemaFor[StorageRunBounceTrackingMitigationsParams]()
-	types.commandResultSchemas["Storage.runBounceTrackingMitigations"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageRunBounceTrackingMitigationsResult]())
-	types.commandParamsSchemas["Storage.setAttributionReportingLocalTestingMode"] = abxjsonschema.SchemaFor[StorageSetAttributionReportingLocalTestingModeParams]()
-	types.commandResultSchemas["Storage.setAttributionReportingLocalTestingMode"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetAttributionReportingLocalTestingModeResult]())
-	types.commandParamsSchemas["Storage.setAttributionReportingTracking"] = abxjsonschema.SchemaFor[StorageSetAttributionReportingTrackingParams]()
-	types.commandResultSchemas["Storage.setAttributionReportingTracking"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetAttributionReportingTrackingResult]())
-	types.commandParamsSchemas["Storage.sendPendingAttributionReports"] = abxjsonschema.SchemaFor[StorageSendPendingAttributionReportsParams]()
-	types.commandResultSchemas["Storage.sendPendingAttributionReports"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSendPendingAttributionReportsResult]())
-	types.commandParamsSchemas["Storage.getRelatedWebsiteSets"] = abxjsonschema.SchemaFor[StorageGetRelatedWebsiteSetsParams]()
-	types.commandResultSchemas["Storage.getRelatedWebsiteSets"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetRelatedWebsiteSetsResult]())
-	types.commandParamsSchemas["Storage.getAffectedUrlsForThirdPartyCookieMetadata"] = abxjsonschema.SchemaFor[StorageGetAffectedUrlsForThirdPartyCookieMetadataParams]()
-	types.commandResultSchemas["Storage.getAffectedUrlsForThirdPartyCookieMetadata"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageGetAffectedUrlsForThirdPartyCookieMetadataResult]())
-	types.commandParamsSchemas["Storage.setProtectedAudienceKAnonymity"] = abxjsonschema.SchemaFor[StorageSetProtectedAudienceKAnonymityParams]()
-	types.commandResultSchemas["Storage.setProtectedAudienceKAnonymity"] = nativeResultSchema(abxjsonschema.SchemaFor[StorageSetProtectedAudienceKAnonymityResult]())
-	types.commandParamsSchemas["SystemInfo.getInfo"] = abxjsonschema.SchemaFor[SystemInfoGetInfoParams]()
-	types.commandResultSchemas["SystemInfo.getInfo"] = nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetInfoResult]())
-	types.commandParamsSchemas["SystemInfo.getFeatureState"] = abxjsonschema.SchemaFor[SystemInfoGetFeatureStateParams]()
-	types.commandResultSchemas["SystemInfo.getFeatureState"] = nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetFeatureStateResult]())
-	types.commandParamsSchemas["SystemInfo.getProcessInfo"] = abxjsonschema.SchemaFor[SystemInfoGetProcessInfoParams]()
-	types.commandResultSchemas["SystemInfo.getProcessInfo"] = nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetProcessInfoResult]())
-	types.commandParamsSchemas["Target.activateTarget"] = abxjsonschema.SchemaFor[TargetActivateTargetParams]()
-	types.commandResultSchemas["Target.activateTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetActivateTargetResult]())
-	types.commandParamsSchemas["Target.attachToTarget"] = abxjsonschema.SchemaFor[TargetAttachToTargetParams]()
-	types.commandResultSchemas["Target.attachToTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetAttachToTargetResult]())
-	types.commandParamsSchemas["Target.attachToBrowserTarget"] = abxjsonschema.SchemaFor[TargetAttachToBrowserTargetParams]()
-	types.commandResultSchemas["Target.attachToBrowserTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetAttachToBrowserTargetResult]())
-	types.commandParamsSchemas["Target.closeTarget"] = abxjsonschema.SchemaFor[TargetCloseTargetParams]()
-	types.commandResultSchemas["Target.closeTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetCloseTargetResult]())
-	types.commandParamsSchemas["Target.exposeDevToolsProtocol"] = abxjsonschema.SchemaFor[TargetExposeDevToolsProtocolParams]()
-	types.commandResultSchemas["Target.exposeDevToolsProtocol"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetExposeDevToolsProtocolResult]())
-	types.commandParamsSchemas["Target.createBrowserContext"] = abxjsonschema.SchemaFor[TargetCreateBrowserContextParams]()
-	types.commandResultSchemas["Target.createBrowserContext"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetCreateBrowserContextResult]())
-	types.commandParamsSchemas["Target.getBrowserContexts"] = abxjsonschema.SchemaFor[TargetGetBrowserContextsParams]()
-	types.commandResultSchemas["Target.getBrowserContexts"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetGetBrowserContextsResult]())
-	types.commandParamsSchemas["Target.createTarget"] = abxjsonschema.SchemaFor[TargetCreateTargetParams]()
-	types.commandResultSchemas["Target.createTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetCreateTargetResult]())
-	types.commandParamsSchemas["Target.detachFromTarget"] = abxjsonschema.SchemaFor[TargetDetachFromTargetParams]()
-	types.commandResultSchemas["Target.detachFromTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetDetachFromTargetResult]())
-	types.commandParamsSchemas["Target.disposeBrowserContext"] = abxjsonschema.SchemaFor[TargetDisposeBrowserContextParams]()
-	types.commandResultSchemas["Target.disposeBrowserContext"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetDisposeBrowserContextResult]())
-	types.commandParamsSchemas["Target.getTargetInfo"] = abxjsonschema.SchemaFor[TargetGetTargetInfoParams]()
-	types.commandResultSchemas["Target.getTargetInfo"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetGetTargetInfoResult]())
-	types.commandParamsSchemas["Target.getTargets"] = abxjsonschema.SchemaFor[TargetGetTargetsParams]()
-	types.commandResultSchemas["Target.getTargets"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetGetTargetsResult]())
-	types.commandParamsSchemas["Target.sendMessageToTarget"] = abxjsonschema.SchemaFor[TargetSendMessageToTargetParams]()
-	types.commandResultSchemas["Target.sendMessageToTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetSendMessageToTargetResult]())
-	types.commandParamsSchemas["Target.setAutoAttach"] = abxjsonschema.SchemaFor[TargetSetAutoAttachParams]()
-	types.commandResultSchemas["Target.setAutoAttach"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetSetAutoAttachResult]())
-	types.commandParamsSchemas["Target.autoAttachRelated"] = abxjsonschema.SchemaFor[TargetAutoAttachRelatedParams]()
-	types.commandResultSchemas["Target.autoAttachRelated"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetAutoAttachRelatedResult]())
-	types.commandParamsSchemas["Target.setDiscoverTargets"] = abxjsonschema.SchemaFor[TargetSetDiscoverTargetsParams]()
-	types.commandResultSchemas["Target.setDiscoverTargets"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetSetDiscoverTargetsResult]())
-	types.commandParamsSchemas["Target.setRemoteLocations"] = abxjsonschema.SchemaFor[TargetSetRemoteLocationsParams]()
-	types.commandResultSchemas["Target.setRemoteLocations"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetSetRemoteLocationsResult]())
-	types.commandParamsSchemas["Target.getDevToolsTarget"] = abxjsonschema.SchemaFor[TargetGetDevToolsTargetParams]()
-	types.commandResultSchemas["Target.getDevToolsTarget"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetGetDevToolsTargetResult]())
-	types.commandParamsSchemas["Target.openDevTools"] = abxjsonschema.SchemaFor[TargetOpenDevToolsParams]()
-	types.commandResultSchemas["Target.openDevTools"] = nativeResultSchema(abxjsonschema.SchemaFor[TargetOpenDevToolsResult]())
-	types.commandParamsSchemas["Tethering.bind"] = abxjsonschema.SchemaFor[TetheringBindParams]()
-	types.commandResultSchemas["Tethering.bind"] = nativeResultSchema(abxjsonschema.SchemaFor[TetheringBindResult]())
-	types.commandParamsSchemas["Tethering.unbind"] = abxjsonschema.SchemaFor[TetheringUnbindParams]()
-	types.commandResultSchemas["Tethering.unbind"] = nativeResultSchema(abxjsonschema.SchemaFor[TetheringUnbindResult]())
-	types.commandParamsSchemas["Tracing.end"] = abxjsonschema.SchemaFor[TracingEndParams]()
-	types.commandResultSchemas["Tracing.end"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingEndResult]())
-	types.commandParamsSchemas["Tracing.getCategories"] = abxjsonschema.SchemaFor[TracingGetCategoriesParams]()
-	types.commandResultSchemas["Tracing.getCategories"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingGetCategoriesResult]())
-	types.commandParamsSchemas["Tracing.getTrackEventDescriptor"] = abxjsonschema.SchemaFor[TracingGetTrackEventDescriptorParams]()
-	types.commandResultSchemas["Tracing.getTrackEventDescriptor"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingGetTrackEventDescriptorResult]())
-	types.commandParamsSchemas["Tracing.recordClockSyncMarker"] = abxjsonschema.SchemaFor[TracingRecordClockSyncMarkerParams]()
-	types.commandResultSchemas["Tracing.recordClockSyncMarker"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingRecordClockSyncMarkerResult]())
-	types.commandParamsSchemas["Tracing.requestMemoryDump"] = abxjsonschema.SchemaFor[TracingRequestMemoryDumpParams]()
-	types.commandResultSchemas["Tracing.requestMemoryDump"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingRequestMemoryDumpResult]())
-	types.commandParamsSchemas["Tracing.start"] = abxjsonschema.SchemaFor[TracingStartParams]()
-	types.commandResultSchemas["Tracing.start"] = nativeResultSchema(abxjsonschema.SchemaFor[TracingStartResult]())
-	types.commandParamsSchemas["WebAudio.enable"] = abxjsonschema.SchemaFor[WebAudioEnableParams]()
-	types.commandResultSchemas["WebAudio.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAudioEnableResult]())
-	types.commandParamsSchemas["WebAudio.disable"] = abxjsonschema.SchemaFor[WebAudioDisableParams]()
-	types.commandResultSchemas["WebAudio.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAudioDisableResult]())
-	types.commandParamsSchemas["WebAudio.getRealtimeData"] = abxjsonschema.SchemaFor[WebAudioGetRealtimeDataParams]()
-	types.commandResultSchemas["WebAudio.getRealtimeData"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAudioGetRealtimeDataResult]())
-	types.commandParamsSchemas["WebAuthn.enable"] = abxjsonschema.SchemaFor[WebAuthnEnableParams]()
-	types.commandResultSchemas["WebAuthn.enable"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnEnableResult]())
-	types.commandParamsSchemas["WebAuthn.disable"] = abxjsonschema.SchemaFor[WebAuthnDisableParams]()
-	types.commandResultSchemas["WebAuthn.disable"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnDisableResult]())
-	types.commandParamsSchemas["WebAuthn.addVirtualAuthenticator"] = abxjsonschema.SchemaFor[WebAuthnAddVirtualAuthenticatorParams]()
-	types.commandResultSchemas["WebAuthn.addVirtualAuthenticator"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnAddVirtualAuthenticatorResult]())
-	types.commandParamsSchemas["WebAuthn.setResponseOverrideBits"] = abxjsonschema.SchemaFor[WebAuthnSetResponseOverrideBitsParams]()
-	types.commandResultSchemas["WebAuthn.setResponseOverrideBits"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetResponseOverrideBitsResult]())
-	types.commandParamsSchemas["WebAuthn.removeVirtualAuthenticator"] = abxjsonschema.SchemaFor[WebAuthnRemoveVirtualAuthenticatorParams]()
-	types.commandResultSchemas["WebAuthn.removeVirtualAuthenticator"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnRemoveVirtualAuthenticatorResult]())
-	types.commandParamsSchemas["WebAuthn.addCredential"] = abxjsonschema.SchemaFor[WebAuthnAddCredentialParams]()
-	types.commandResultSchemas["WebAuthn.addCredential"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnAddCredentialResult]())
-	types.commandParamsSchemas["WebAuthn.getCredential"] = abxjsonschema.SchemaFor[WebAuthnGetCredentialParams]()
-	types.commandResultSchemas["WebAuthn.getCredential"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnGetCredentialResult]())
-	types.commandParamsSchemas["WebAuthn.getCredentials"] = abxjsonschema.SchemaFor[WebAuthnGetCredentialsParams]()
-	types.commandResultSchemas["WebAuthn.getCredentials"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnGetCredentialsResult]())
-	types.commandParamsSchemas["WebAuthn.removeCredential"] = abxjsonschema.SchemaFor[WebAuthnRemoveCredentialParams]()
-	types.commandResultSchemas["WebAuthn.removeCredential"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnRemoveCredentialResult]())
-	types.commandParamsSchemas["WebAuthn.clearCredentials"] = abxjsonschema.SchemaFor[WebAuthnClearCredentialsParams]()
-	types.commandResultSchemas["WebAuthn.clearCredentials"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnClearCredentialsResult]())
-	types.commandParamsSchemas["WebAuthn.setUserVerified"] = abxjsonschema.SchemaFor[WebAuthnSetUserVerifiedParams]()
-	types.commandResultSchemas["WebAuthn.setUserVerified"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetUserVerifiedResult]())
-	types.commandParamsSchemas["WebAuthn.setAutomaticPresenceSimulation"] = abxjsonschema.SchemaFor[WebAuthnSetAutomaticPresenceSimulationParams]()
-	types.commandResultSchemas["WebAuthn.setAutomaticPresenceSimulation"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetAutomaticPresenceSimulationResult]())
-	types.commandParamsSchemas["WebAuthn.setCredentialProperties"] = abxjsonschema.SchemaFor[WebAuthnSetCredentialPropertiesParams]()
-	types.commandResultSchemas["WebAuthn.setCredentialProperties"] = nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetCredentialPropertiesResult]())
+	types.commandSchemas["Accessibility.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityDisableResult]()),
+	}
+	types.commandSchemas["Accessibility.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityEnableResult]()),
+	}
+	types.commandSchemas["Accessibility.getPartialAXTree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityGetPartialAXTreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetPartialAXTreeResult]()),
+	}
+	types.commandSchemas["Accessibility.getFullAXTree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityGetFullAXTreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetFullAXTreeResult]()),
+	}
+	types.commandSchemas["Accessibility.getRootAXNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityGetRootAXNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetRootAXNodeResult]()),
+	}
+	types.commandSchemas["Accessibility.getAXNodeAndAncestors"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityGetAXNodeAndAncestorsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetAXNodeAndAncestorsResult]()),
+	}
+	types.commandSchemas["Accessibility.getChildAXNodes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityGetChildAXNodesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityGetChildAXNodesResult]()),
+	}
+	types.commandSchemas["Accessibility.queryAXTree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AccessibilityQueryAXTreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityQueryAXTreeResult]()),
+	}
+	types.commandSchemas["Animation.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationDisableResult]()),
+	}
+	types.commandSchemas["Animation.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationEnableResult]()),
+	}
+	types.commandSchemas["Animation.getCurrentTime"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationGetCurrentTimeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationGetCurrentTimeResult]()),
+	}
+	types.commandSchemas["Animation.getPlaybackRate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationGetPlaybackRateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationGetPlaybackRateResult]()),
+	}
+	types.commandSchemas["Animation.releaseAnimations"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationReleaseAnimationsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationReleaseAnimationsResult]()),
+	}
+	types.commandSchemas["Animation.resolveAnimation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationResolveAnimationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationResolveAnimationResult]()),
+	}
+	types.commandSchemas["Animation.seekAnimations"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationSeekAnimationsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationSeekAnimationsResult]()),
+	}
+	types.commandSchemas["Animation.setPaused"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationSetPausedParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetPausedResult]()),
+	}
+	types.commandSchemas["Animation.setPlaybackRate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationSetPlaybackRateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetPlaybackRateResult]()),
+	}
+	types.commandSchemas["Animation.setTiming"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AnimationSetTimingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AnimationSetTimingResult]()),
+	}
+	types.commandSchemas["Audits.getEncodedResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AuditsGetEncodedResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AuditsGetEncodedResponseResult]()),
+	}
+	types.commandSchemas["Audits.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AuditsDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AuditsDisableResult]()),
+	}
+	types.commandSchemas["Audits.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AuditsEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AuditsEnableResult]()),
+	}
+	types.commandSchemas["Audits.checkFormsIssues"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AuditsCheckFormsIssuesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AuditsCheckFormsIssuesResult]()),
+	}
+	types.commandSchemas["Autofill.trigger"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AutofillTriggerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AutofillTriggerResult]()),
+	}
+	types.commandSchemas["Autofill.setAddresses"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AutofillSetAddressesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AutofillSetAddressesResult]()),
+	}
+	types.commandSchemas["Autofill.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AutofillDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AutofillDisableResult]()),
+	}
+	types.commandSchemas["Autofill.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[AutofillEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[AutofillEnableResult]()),
+	}
+	types.commandSchemas["BackgroundService.startObserving"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BackgroundServiceStartObservingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceStartObservingResult]()),
+	}
+	types.commandSchemas["BackgroundService.stopObserving"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BackgroundServiceStopObservingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceStopObservingResult]()),
+	}
+	types.commandSchemas["BackgroundService.setRecording"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BackgroundServiceSetRecordingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceSetRecordingResult]()),
+	}
+	types.commandSchemas["BackgroundService.clearEvents"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BackgroundServiceClearEventsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BackgroundServiceClearEventsResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationEnableResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.setSimulatedCentralState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSetSimulatedCentralStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSetSimulatedCentralStateResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationDisableResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulatePreconnectedPeripheral"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulatePreconnectedPeripheralParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulatePreconnectedPeripheralResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulateAdvertisement"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulateAdvertisementParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateAdvertisementResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulateGATTOperationResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTOperationResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTOperationResponseResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulateCharacteristicOperationResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulateCharacteristicOperationResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateCharacteristicOperationResponseResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulateDescriptorOperationResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulateDescriptorOperationResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateDescriptorOperationResponseResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.addService"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationAddServiceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddServiceResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.removeService"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationRemoveServiceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveServiceResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.addCharacteristic"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationAddCharacteristicParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddCharacteristicResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.removeCharacteristic"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationRemoveCharacteristicParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveCharacteristicResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.addDescriptor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationAddDescriptorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationAddDescriptorResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.removeDescriptor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationRemoveDescriptorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationRemoveDescriptorResult]()),
+	}
+	types.commandSchemas["BluetoothEmulation.simulateGATTDisconnection"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTDisconnectionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BluetoothEmulationSimulateGATTDisconnectionResult]()),
+	}
+	types.commandSchemas["Browser.setPermission"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserSetPermissionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetPermissionResult]()),
+	}
+	types.commandSchemas["Browser.grantPermissions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGrantPermissionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGrantPermissionsResult]()),
+	}
+	types.commandSchemas["Browser.resetPermissions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserResetPermissionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserResetPermissionsResult]()),
+	}
+	types.commandSchemas["Browser.setDownloadBehavior"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserSetDownloadBehaviorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetDownloadBehaviorResult]()),
+	}
+	types.commandSchemas["Browser.cancelDownload"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserCancelDownloadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserCancelDownloadResult]()),
+	}
+	types.commandSchemas["Browser.close"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserCloseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserCloseResult]()),
+	}
+	types.commandSchemas["Browser.crash"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserCrashParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserCrashResult]()),
+	}
+	types.commandSchemas["Browser.crashGpuProcess"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserCrashGPUProcessParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserCrashGPUProcessResult]()),
+	}
+	types.commandSchemas["Browser.getVersion"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetVersionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetVersionResult]()),
+	}
+	types.commandSchemas["Browser.getBrowserCommandLine"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetBrowserCommandLineParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetBrowserCommandLineResult]()),
+	}
+	types.commandSchemas["Browser.getHistograms"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetHistogramsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetHistogramsResult]()),
+	}
+	types.commandSchemas["Browser.getHistogram"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetHistogramParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetHistogramResult]()),
+	}
+	types.commandSchemas["Browser.getWindowBounds"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetWindowBoundsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetWindowBoundsResult]()),
+	}
+	types.commandSchemas["Browser.getWindowForTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserGetWindowForTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserGetWindowForTargetResult]()),
+	}
+	types.commandSchemas["Browser.setWindowBounds"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserSetWindowBoundsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetWindowBoundsResult]()),
+	}
+	types.commandSchemas["Browser.setContentsSize"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserSetContentsSizeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetContentsSizeResult]()),
+	}
+	types.commandSchemas["Browser.setDockTile"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserSetDockTileParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserSetDockTileResult]()),
+	}
+	types.commandSchemas["Browser.executeBrowserCommand"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserExecuteBrowserCommandParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserExecuteBrowserCommandResult]()),
+	}
+	types.commandSchemas["Browser.addPrivacySandboxEnrollmentOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserAddPrivacySandboxEnrollmentOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserAddPrivacySandboxEnrollmentOverrideResult]()),
+	}
+	types.commandSchemas["Browser.addPrivacySandboxCoordinatorKeyConfig"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[BrowserAddPrivacySandboxCoordinatorKeyConfigParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[BrowserAddPrivacySandboxCoordinatorKeyConfigResult]()),
+	}
+	types.commandSchemas["CSS.addRule"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSAddRuleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSAddRuleResult]()),
+	}
+	types.commandSchemas["CSS.collectClassNames"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSCollectClassNamesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSCollectClassNamesResult]()),
+	}
+	types.commandSchemas["CSS.createStyleSheet"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSCreateStyleSheetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSCreateStyleSheetResult]()),
+	}
+	types.commandSchemas["CSS.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSDisableResult]()),
+	}
+	types.commandSchemas["CSS.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSEnableResult]()),
+	}
+	types.commandSchemas["CSS.forcePseudoState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSForcePseudoStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSForcePseudoStateResult]()),
+	}
+	types.commandSchemas["CSS.forceStartingStyle"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSForceStartingStyleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSForceStartingStyleResult]()),
+	}
+	types.commandSchemas["CSS.getBackgroundColors"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetBackgroundColorsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetBackgroundColorsResult]()),
+	}
+	types.commandSchemas["CSS.getComputedStyleForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetComputedStyleForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetComputedStyleForNodeResult]()),
+	}
+	types.commandSchemas["CSS.resolveValues"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSResolveValuesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSResolveValuesResult]()),
+	}
+	types.commandSchemas["CSS.getLonghandProperties"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetLonghandPropertiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLonghandPropertiesResult]()),
+	}
+	types.commandSchemas["CSS.getInlineStylesForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetInlineStylesForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetInlineStylesForNodeResult]()),
+	}
+	types.commandSchemas["CSS.getAnimatedStylesForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetAnimatedStylesForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetAnimatedStylesForNodeResult]()),
+	}
+	types.commandSchemas["CSS.getMatchedStylesForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetMatchedStylesForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetMatchedStylesForNodeResult]()),
+	}
+	types.commandSchemas["CSS.getEnvironmentVariables"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetEnvironmentVariablesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetEnvironmentVariablesResult]()),
+	}
+	types.commandSchemas["CSS.getMediaQueries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetMediaQueriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetMediaQueriesResult]()),
+	}
+	types.commandSchemas["CSS.getPlatformFontsForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetPlatformFontsForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetPlatformFontsForNodeResult]()),
+	}
+	types.commandSchemas["CSS.getStyleSheetText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetStyleSheetTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetStyleSheetTextResult]()),
+	}
+	types.commandSchemas["CSS.getLayersForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetLayersForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLayersForNodeResult]()),
+	}
+	types.commandSchemas["CSS.getLocationForSelector"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSGetLocationForSelectorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSGetLocationForSelectorResult]()),
+	}
+	types.commandSchemas["CSS.trackComputedStyleUpdatesForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesForNodeResult]()),
+	}
+	types.commandSchemas["CSS.trackComputedStyleUpdates"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSTrackComputedStyleUpdatesResult]()),
+	}
+	types.commandSchemas["CSS.takeComputedStyleUpdates"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSTakeComputedStyleUpdatesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSTakeComputedStyleUpdatesResult]()),
+	}
+	types.commandSchemas["CSS.setEffectivePropertyValueForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetEffectivePropertyValueForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetEffectivePropertyValueForNodeResult]()),
+	}
+	types.commandSchemas["CSS.setPropertyRulePropertyName"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetPropertyRulePropertyNameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetPropertyRulePropertyNameResult]()),
+	}
+	types.commandSchemas["CSS.setKeyframeKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetKeyframeKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetKeyframeKeyResult]()),
+	}
+	types.commandSchemas["CSS.setMediaText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetMediaTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetMediaTextResult]()),
+	}
+	types.commandSchemas["CSS.setContainerQueryText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetContainerQueryTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetContainerQueryTextResult]()),
+	}
+	types.commandSchemas["CSS.setSupportsText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetSupportsTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetSupportsTextResult]()),
+	}
+	types.commandSchemas["CSS.setNavigationText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetNavigationTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetNavigationTextResult]()),
+	}
+	types.commandSchemas["CSS.setScopeText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetScopeTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetScopeTextResult]()),
+	}
+	types.commandSchemas["CSS.setRuleSelector"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetRuleSelectorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetRuleSelectorResult]()),
+	}
+	types.commandSchemas["CSS.setStyleSheetText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetStyleSheetTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetStyleSheetTextResult]()),
+	}
+	types.commandSchemas["CSS.setStyleTexts"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetStyleTextsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetStyleTextsResult]()),
+	}
+	types.commandSchemas["CSS.startRuleUsageTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSStartRuleUsageTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSStartRuleUsageTrackingResult]()),
+	}
+	types.commandSchemas["CSS.stopRuleUsageTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSStopRuleUsageTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSStopRuleUsageTrackingResult]()),
+	}
+	types.commandSchemas["CSS.takeCoverageDelta"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSTakeCoverageDeltaParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSTakeCoverageDeltaResult]()),
+	}
+	types.commandSchemas["CSS.setLocalFontsEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CSSSetLocalFontsEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CSSSetLocalFontsEnabledResult]()),
+	}
+	types.commandSchemas["CacheStorage.deleteCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CacheStorageDeleteCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageDeleteCacheResult]()),
+	}
+	types.commandSchemas["CacheStorage.deleteEntry"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CacheStorageDeleteEntryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageDeleteEntryResult]()),
+	}
+	types.commandSchemas["CacheStorage.requestCacheNames"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CacheStorageRequestCacheNamesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestCacheNamesResult]()),
+	}
+	types.commandSchemas["CacheStorage.requestCachedResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CacheStorageRequestCachedResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestCachedResponseResult]()),
+	}
+	types.commandSchemas["CacheStorage.requestEntries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CacheStorageRequestEntriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CacheStorageRequestEntriesResult]()),
+	}
+	types.commandSchemas["Cast.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastEnableResult]()),
+	}
+	types.commandSchemas["Cast.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastDisableResult]()),
+	}
+	types.commandSchemas["Cast.setSinkToUse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastSetSinkToUseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastSetSinkToUseResult]()),
+	}
+	types.commandSchemas["Cast.startDesktopMirroring"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastStartDesktopMirroringParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastStartDesktopMirroringResult]()),
+	}
+	types.commandSchemas["Cast.startTabMirroring"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastStartTabMirroringParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastStartTabMirroringResult]()),
+	}
+	types.commandSchemas["Cast.stopCasting"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CastStopCastingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CastStopCastingResult]()),
+	}
+	types.commandSchemas["Console.clearMessages"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ConsoleClearMessagesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ConsoleClearMessagesResult]()),
+	}
+	types.commandSchemas["Console.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ConsoleDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ConsoleDisableResult]()),
+	}
+	types.commandSchemas["Console.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ConsoleEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ConsoleEnableResult]()),
+	}
+	types.commandSchemas["DOM.collectClassNamesFromSubtree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMCollectClassNamesFromSubtreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMCollectClassNamesFromSubtreeResult]()),
+	}
+	types.commandSchemas["DOM.copyTo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMCopyToParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMCopyToResult]()),
+	}
+	types.commandSchemas["DOM.describeNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDescribeNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDescribeNodeResult]()),
+	}
+	types.commandSchemas["DOM.scrollIntoViewIfNeeded"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMScrollIntoViewIfNeededParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMScrollIntoViewIfNeededResult]()),
+	}
+	types.commandSchemas["DOM.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDisableResult]()),
+	}
+	types.commandSchemas["DOM.discardSearchResults"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDiscardSearchResultsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDiscardSearchResultsResult]()),
+	}
+	types.commandSchemas["DOM.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMEnableResult]()),
+	}
+	types.commandSchemas["DOM.focus"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMFocusParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMFocusResult]()),
+	}
+	types.commandSchemas["DOM.getAttributes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetAttributesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetAttributesResult]()),
+	}
+	types.commandSchemas["DOM.getBoxModel"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetBoxModelParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetBoxModelResult]()),
+	}
+	types.commandSchemas["DOM.getContentQuads"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetContentQuadsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetContentQuadsResult]()),
+	}
+	types.commandSchemas["DOM.getDocument"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetDocumentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetDocumentResult]()),
+	}
+	types.commandSchemas["DOM.getFlattenedDocument"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetFlattenedDocumentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFlattenedDocumentResult]()),
+	}
+	types.commandSchemas["DOM.getNodesForSubtreeByStyle"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetNodesForSubtreeByStyleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodesForSubtreeByStyleResult]()),
+	}
+	types.commandSchemas["DOM.getNodeForLocation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetNodeForLocationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodeForLocationResult]()),
+	}
+	types.commandSchemas["DOM.getOuterHTML"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetOuterHTMLParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetOuterHTMLResult]()),
+	}
+	types.commandSchemas["DOM.getRelayoutBoundary"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetRelayoutBoundaryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetRelayoutBoundaryResult]()),
+	}
+	types.commandSchemas["DOM.getSearchResults"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetSearchResultsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetSearchResultsResult]()),
+	}
+	types.commandSchemas["DOM.hideHighlight"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMHideHighlightParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMHideHighlightResult]()),
+	}
+	types.commandSchemas["DOM.highlightNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMHighlightNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMHighlightNodeResult]()),
+	}
+	types.commandSchemas["DOM.highlightRect"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMHighlightRectParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMHighlightRectResult]()),
+	}
+	types.commandSchemas["DOM.markUndoableState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMMarkUndoableStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMMarkUndoableStateResult]()),
+	}
+	types.commandSchemas["DOM.moveTo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMMoveToParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMMoveToResult]()),
+	}
+	types.commandSchemas["DOM.performSearch"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMPerformSearchParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMPerformSearchResult]()),
+	}
+	types.commandSchemas["DOM.pushNodeByPathToFrontend"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMPushNodeByPathToFrontendParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMPushNodeByPathToFrontendResult]()),
+	}
+	types.commandSchemas["DOM.pushNodesByBackendIdsToFrontend"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMPushNodesByBackendIdsToFrontendParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMPushNodesByBackendIdsToFrontendResult]()),
+	}
+	types.commandSchemas["DOM.querySelector"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMQuerySelectorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMQuerySelectorResult]()),
+	}
+	types.commandSchemas["DOM.querySelectorAll"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMQuerySelectorAllParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMQuerySelectorAllResult]()),
+	}
+	types.commandSchemas["DOM.getTopLayerElements"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetTopLayerElementsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetTopLayerElementsResult]()),
+	}
+	types.commandSchemas["DOM.getElementByRelation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetElementByRelationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetElementByRelationResult]()),
+	}
+	types.commandSchemas["DOM.redo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMRedoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMRedoResult]()),
+	}
+	types.commandSchemas["DOM.removeAttribute"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMRemoveAttributeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMRemoveAttributeResult]()),
+	}
+	types.commandSchemas["DOM.removeNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMRemoveNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMRemoveNodeResult]()),
+	}
+	types.commandSchemas["DOM.requestChildNodes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMRequestChildNodesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMRequestChildNodesResult]()),
+	}
+	types.commandSchemas["DOM.requestNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMRequestNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMRequestNodeResult]()),
+	}
+	types.commandSchemas["DOM.resolveNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMResolveNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMResolveNodeResult]()),
+	}
+	types.commandSchemas["DOM.setAttributeValue"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetAttributeValueParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetAttributeValueResult]()),
+	}
+	types.commandSchemas["DOM.setAttributesAsText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetAttributesAsTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetAttributesAsTextResult]()),
+	}
+	types.commandSchemas["DOM.setFileInputFiles"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetFileInputFilesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetFileInputFilesResult]()),
+	}
+	types.commandSchemas["DOM.setNodeStackTracesEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetNodeStackTracesEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeStackTracesEnabledResult]()),
+	}
+	types.commandSchemas["DOM.getNodeStackTraces"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetNodeStackTracesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetNodeStackTracesResult]()),
+	}
+	types.commandSchemas["DOM.getFileInfo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetFileInfoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFileInfoResult]()),
+	}
+	types.commandSchemas["DOM.getDetachedDomNodes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetDetachedDOMNodesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetDetachedDOMNodesResult]()),
+	}
+	types.commandSchemas["DOM.setInspectedNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetInspectedNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetInspectedNodeResult]()),
+	}
+	types.commandSchemas["DOM.setNodeName"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetNodeNameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeNameResult]()),
+	}
+	types.commandSchemas["DOM.setNodeValue"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetNodeValueParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetNodeValueResult]()),
+	}
+	types.commandSchemas["DOM.setOuterHTML"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSetOuterHTMLParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSetOuterHTMLResult]()),
+	}
+	types.commandSchemas["DOM.undo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMUndoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMUndoResult]()),
+	}
+	types.commandSchemas["DOM.getFrameOwner"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetFrameOwnerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetFrameOwnerResult]()),
+	}
+	types.commandSchemas["DOM.getContainerForNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetContainerForNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetContainerForNodeResult]()),
+	}
+	types.commandSchemas["DOM.getQueryingDescendantsForContainer"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetQueryingDescendantsForContainerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetQueryingDescendantsForContainerResult]()),
+	}
+	types.commandSchemas["DOM.getAnchorElement"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMGetAnchorElementParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMGetAnchorElementResult]()),
+	}
+	types.commandSchemas["DOM.forceShowPopover"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMForceShowPopoverParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMForceShowPopoverResult]()),
+	}
+	types.commandSchemas["DOMDebugger.getEventListeners"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerGetEventListenersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerGetEventListenersResult]()),
+	}
+	types.commandSchemas["DOMDebugger.removeDOMBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerRemoveDOMBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveDOMBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.removeEventListenerBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerRemoveEventListenerBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveEventListenerBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.removeInstrumentationBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerRemoveInstrumentationBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveInstrumentationBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.removeXHRBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerRemoveXHRBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerRemoveXHRBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.setBreakOnCSPViolation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerSetBreakOnCSPViolationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetBreakOnCSPViolationResult]()),
+	}
+	types.commandSchemas["DOMDebugger.setDOMBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerSetDOMBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetDOMBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.setEventListenerBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerSetEventListenerBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetEventListenerBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.setInstrumentationBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerSetInstrumentationBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetInstrumentationBreakpointResult]()),
+	}
+	types.commandSchemas["DOMDebugger.setXHRBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMDebuggerSetXHRBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMDebuggerSetXHRBreakpointResult]()),
+	}
+	types.commandSchemas["DOMSnapshot.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSnapshotDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotDisableResult]()),
+	}
+	types.commandSchemas["DOMSnapshot.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSnapshotEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotEnableResult]()),
+	}
+	types.commandSchemas["DOMSnapshot.getSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSnapshotGetSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotGetSnapshotResult]()),
+	}
+	types.commandSchemas["DOMSnapshot.captureSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMSnapshotCaptureSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMSnapshotCaptureSnapshotResult]()),
+	}
+	types.commandSchemas["DOMStorage.clear"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageClearParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageClearResult]()),
+	}
+	types.commandSchemas["DOMStorage.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageDisableResult]()),
+	}
+	types.commandSchemas["DOMStorage.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageEnableResult]()),
+	}
+	types.commandSchemas["DOMStorage.getDOMStorageItems"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageGetDOMStorageItemsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageGetDOMStorageItemsResult]()),
+	}
+	types.commandSchemas["DOMStorage.removeDOMStorageItem"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageRemoveDOMStorageItemParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageRemoveDOMStorageItemResult]()),
+	}
+	types.commandSchemas["DOMStorage.setDOMStorageItem"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DOMStorageSetDOMStorageItemParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DOMStorageSetDOMStorageItemResult]()),
+	}
+	types.commandSchemas["Debugger.continueToLocation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerContinueToLocationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerContinueToLocationResult]()),
+	}
+	types.commandSchemas["Debugger.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerDisableResult]()),
+	}
+	types.commandSchemas["Debugger.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerEnableResult]()),
+	}
+	types.commandSchemas["Debugger.evaluateOnCallFrame"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerEvaluateOnCallFrameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerEvaluateOnCallFrameResult]()),
+	}
+	types.commandSchemas["Debugger.getPossibleBreakpoints"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerGetPossibleBreakpointsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetPossibleBreakpointsResult]()),
+	}
+	types.commandSchemas["Debugger.getScriptSource"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerGetScriptSourceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetScriptSourceResult]()),
+	}
+	types.commandSchemas["Debugger.disassembleWasmModule"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerDisassembleWasmModuleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerDisassembleWasmModuleResult]()),
+	}
+	types.commandSchemas["Debugger.nextWasmDisassemblyChunk"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerNextWasmDisassemblyChunkParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerNextWasmDisassemblyChunkResult]()),
+	}
+	types.commandSchemas["Debugger.getWasmBytecode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerGetWasmBytecodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetWasmBytecodeResult]()),
+	}
+	types.commandSchemas["Debugger.getStackTrace"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerGetStackTraceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerGetStackTraceResult]()),
+	}
+	types.commandSchemas["Debugger.pause"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerPauseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerPauseResult]()),
+	}
+	types.commandSchemas["Debugger.pauseOnAsyncCall"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerPauseOnAsyncCallParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerPauseOnAsyncCallResult]()),
+	}
+	types.commandSchemas["Debugger.removeBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerRemoveBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerRemoveBreakpointResult]()),
+	}
+	types.commandSchemas["Debugger.restartFrame"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerRestartFrameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerRestartFrameResult]()),
+	}
+	types.commandSchemas["Debugger.resume"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerResumeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerResumeResult]()),
+	}
+	types.commandSchemas["Debugger.searchInContent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSearchInContentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSearchInContentResult]()),
+	}
+	types.commandSchemas["Debugger.setAsyncCallStackDepth"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetAsyncCallStackDepthParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetAsyncCallStackDepthResult]()),
+	}
+	types.commandSchemas["Debugger.setBlackboxExecutionContexts"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBlackboxExecutionContextsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxExecutionContextsResult]()),
+	}
+	types.commandSchemas["Debugger.setBlackboxPatterns"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBlackboxPatternsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxPatternsResult]()),
+	}
+	types.commandSchemas["Debugger.setBlackboxedRanges"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBlackboxedRangesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBlackboxedRangesResult]()),
+	}
+	types.commandSchemas["Debugger.setBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointResult]()),
+	}
+	types.commandSchemas["Debugger.setInstrumentationBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetInstrumentationBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetInstrumentationBreakpointResult]()),
+	}
+	types.commandSchemas["Debugger.setBreakpointByUrl"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBreakpointByURLParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointByURLResult]()),
+	}
+	types.commandSchemas["Debugger.setBreakpointOnFunctionCall"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBreakpointOnFunctionCallParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointOnFunctionCallResult]()),
+	}
+	types.commandSchemas["Debugger.setBreakpointsActive"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetBreakpointsActiveParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetBreakpointsActiveResult]()),
+	}
+	types.commandSchemas["Debugger.setPauseOnExceptions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetPauseOnExceptionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetPauseOnExceptionsResult]()),
+	}
+	types.commandSchemas["Debugger.setReturnValue"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetReturnValueParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetReturnValueResult]()),
+	}
+	types.commandSchemas["Debugger.setScriptSource"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetScriptSourceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetScriptSourceResult]()),
+	}
+	types.commandSchemas["Debugger.setSkipAllPauses"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetSkipAllPausesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetSkipAllPausesResult]()),
+	}
+	types.commandSchemas["Debugger.setVariableValue"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerSetVariableValueParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerSetVariableValueResult]()),
+	}
+	types.commandSchemas["Debugger.stepInto"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerStepIntoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepIntoResult]()),
+	}
+	types.commandSchemas["Debugger.stepOut"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerStepOutParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepOutResult]()),
+	}
+	types.commandSchemas["Debugger.stepOver"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DebuggerStepOverParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DebuggerStepOverResult]()),
+	}
+	types.commandSchemas["DeviceAccess.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceAccessEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessEnableResult]()),
+	}
+	types.commandSchemas["DeviceAccess.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceAccessDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessDisableResult]()),
+	}
+	types.commandSchemas["DeviceAccess.selectPrompt"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceAccessSelectPromptParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessSelectPromptResult]()),
+	}
+	types.commandSchemas["DeviceAccess.cancelPrompt"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceAccessCancelPromptParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceAccessCancelPromptResult]()),
+	}
+	types.commandSchemas["DeviceOrientation.clearDeviceOrientationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceOrientationClearDeviceOrientationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceOrientationClearDeviceOrientationOverrideResult]()),
+	}
+	types.commandSchemas["DeviceOrientation.setDeviceOrientationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[DeviceOrientationSetDeviceOrientationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[DeviceOrientationSetDeviceOrientationOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.canEmulate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationCanEmulateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationCanEmulateResult]()),
+	}
+	types.commandSchemas["Emulation.clearDeviceMetricsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationClearDeviceMetricsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDeviceMetricsOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.clearGeolocationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationClearGeolocationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearGeolocationOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.resetPageScaleFactor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationResetPageScaleFactorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationResetPageScaleFactorResult]()),
+	}
+	types.commandSchemas["Emulation.setFocusEmulationEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetFocusEmulationEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetFocusEmulationEnabledResult]()),
+	}
+	types.commandSchemas["Emulation.setAutoDarkModeOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetAutoDarkModeOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetAutoDarkModeOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setCPUThrottlingRate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetCPUThrottlingRateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetCPUThrottlingRateResult]()),
+	}
+	types.commandSchemas["Emulation.setDefaultBackgroundColorOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDefaultBackgroundColorOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDefaultBackgroundColorOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setSafeAreaInsetsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetSafeAreaInsetsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSafeAreaInsetsOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setDeviceMetricsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDeviceMetricsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDeviceMetricsOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setDevicePostureOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDevicePostureOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDevicePostureOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.clearDevicePostureOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationClearDevicePostureOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDevicePostureOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setDisplayFeaturesOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDisplayFeaturesOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDisplayFeaturesOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.clearDisplayFeaturesOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationClearDisplayFeaturesOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearDisplayFeaturesOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setScrollbarsHidden"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetScrollbarsHiddenParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetScrollbarsHiddenResult]()),
+	}
+	types.commandSchemas["Emulation.setDocumentCookieDisabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDocumentCookieDisabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDocumentCookieDisabledResult]()),
+	}
+	types.commandSchemas["Emulation.setEmitTouchEventsForMouse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetEmitTouchEventsForMouseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmitTouchEventsForMouseResult]()),
+	}
+	types.commandSchemas["Emulation.setEmulatedMedia"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetEmulatedMediaParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedMediaResult]()),
+	}
+	types.commandSchemas["Emulation.setEmulatedVisionDeficiency"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetEmulatedVisionDeficiencyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedVisionDeficiencyResult]()),
+	}
+	types.commandSchemas["Emulation.setEmulatedOSTextScale"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetEmulatedOSTextScaleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetEmulatedOSTextScaleResult]()),
+	}
+	types.commandSchemas["Emulation.setGeolocationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetGeolocationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetGeolocationOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.getOverriddenSensorInformation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationGetOverriddenSensorInformationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationGetOverriddenSensorInformationResult]()),
+	}
+	types.commandSchemas["Emulation.setSensorOverrideEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetSensorOverrideEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSensorOverrideEnabledResult]()),
+	}
+	types.commandSchemas["Emulation.setSensorOverrideReadings"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetSensorOverrideReadingsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSensorOverrideReadingsResult]()),
+	}
+	types.commandSchemas["Emulation.setPressureSourceOverrideEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetPressureSourceOverrideEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureSourceOverrideEnabledResult]()),
+	}
+	types.commandSchemas["Emulation.setPressureStateOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetPressureStateOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureStateOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setPressureDataOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetPressureDataOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPressureDataOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setIdleOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetIdleOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetIdleOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.clearIdleOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationClearIdleOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationClearIdleOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setNavigatorOverrides"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetNavigatorOverridesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetNavigatorOverridesResult]()),
+	}
+	types.commandSchemas["Emulation.setPageScaleFactor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetPageScaleFactorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPageScaleFactorResult]()),
+	}
+	types.commandSchemas["Emulation.setScriptExecutionDisabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetScriptExecutionDisabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetScriptExecutionDisabledResult]()),
+	}
+	types.commandSchemas["Emulation.setTouchEmulationEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetTouchEmulationEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetTouchEmulationEnabledResult]()),
+	}
+	types.commandSchemas["Emulation.setVirtualTimePolicy"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetVirtualTimePolicyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetVirtualTimePolicyResult]()),
+	}
+	types.commandSchemas["Emulation.setLocaleOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetLocaleOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetLocaleOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setTimezoneOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetTimezoneOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetTimezoneOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setVisibleSize"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetVisibleSizeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetVisibleSizeResult]()),
+	}
+	types.commandSchemas["Emulation.setDisabledImageTypes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDisabledImageTypesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDisabledImageTypesResult]()),
+	}
+	types.commandSchemas["Emulation.setDataSaverOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetDataSaverOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetDataSaverOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setHardwareConcurrencyOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetHardwareConcurrencyOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetHardwareConcurrencyOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setUserAgentOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetUserAgentOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetUserAgentOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setAutomationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetAutomationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetAutomationOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.setSmallViewportHeightDifferenceOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetSmallViewportHeightDifferenceOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetSmallViewportHeightDifferenceOverrideResult]()),
+	}
+	types.commandSchemas["Emulation.getScreenInfos"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationGetScreenInfosParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationGetScreenInfosResult]()),
+	}
+	types.commandSchemas["Emulation.addScreen"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationAddScreenParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationAddScreenResult]()),
+	}
+	types.commandSchemas["Emulation.updateScreen"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationUpdateScreenParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationUpdateScreenResult]()),
+	}
+	types.commandSchemas["Emulation.removeScreen"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationRemoveScreenParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationRemoveScreenResult]()),
+	}
+	types.commandSchemas["Emulation.setPrimaryScreen"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EmulationSetPrimaryScreenParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EmulationSetPrimaryScreenResult]()),
+	}
+	types.commandSchemas["EventBreakpoints.setInstrumentationBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EventBreakpointsSetInstrumentationBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsSetInstrumentationBreakpointResult]()),
+	}
+	types.commandSchemas["EventBreakpoints.removeInstrumentationBreakpoint"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EventBreakpointsRemoveInstrumentationBreakpointParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsRemoveInstrumentationBreakpointResult]()),
+	}
+	types.commandSchemas["EventBreakpoints.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[EventBreakpointsDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[EventBreakpointsDisableResult]()),
+	}
+	types.commandSchemas["Extensions.triggerAction"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsTriggerActionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsTriggerActionResult]()),
+	}
+	types.commandSchemas["Extensions.loadUnpacked"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[CDPParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[CDPResult]()),
+	}
+	types.commandSchemas["Extensions.getExtensions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsGetExtensionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsGetExtensionsResult]()),
+	}
+	types.commandSchemas["Extensions.uninstall"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsUninstallParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsUninstallResult]()),
+	}
+	types.commandSchemas["Extensions.getStorageItems"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsGetStorageItemsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsGetStorageItemsResult]()),
+	}
+	types.commandSchemas["Extensions.removeStorageItems"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsRemoveStorageItemsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsRemoveStorageItemsResult]()),
+	}
+	types.commandSchemas["Extensions.clearStorageItems"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsClearStorageItemsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsClearStorageItemsResult]()),
+	}
+	types.commandSchemas["Extensions.setStorageItems"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ExtensionsSetStorageItemsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ExtensionsSetStorageItemsResult]()),
+	}
+	types.commandSchemas["FedCm.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmEnableResult]()),
+	}
+	types.commandSchemas["FedCm.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmDisableResult]()),
+	}
+	types.commandSchemas["FedCm.selectAccount"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmSelectAccountParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmSelectAccountResult]()),
+	}
+	types.commandSchemas["FedCm.clickDialogButton"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmClickDialogButtonParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmClickDialogButtonResult]()),
+	}
+	types.commandSchemas["FedCm.openUrl"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmOpenURLParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmOpenURLResult]()),
+	}
+	types.commandSchemas["FedCm.dismissDialog"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmDismissDialogParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmDismissDialogResult]()),
+	}
+	types.commandSchemas["FedCm.resetCooldown"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FedCmResetCooldownParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FedCmResetCooldownResult]()),
+	}
+	types.commandSchemas["Fetch.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchDisableResult]()),
+	}
+	types.commandSchemas["Fetch.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchEnableResult]()),
+	}
+	types.commandSchemas["Fetch.failRequest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchFailRequestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchFailRequestResult]()),
+	}
+	types.commandSchemas["Fetch.fulfillRequest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchFulfillRequestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchFulfillRequestResult]()),
+	}
+	types.commandSchemas["Fetch.continueRequest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchContinueRequestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueRequestResult]()),
+	}
+	types.commandSchemas["Fetch.continueWithAuth"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchContinueWithAuthParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueWithAuthResult]()),
+	}
+	types.commandSchemas["Fetch.continueResponse"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchContinueResponseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchContinueResponseResult]()),
+	}
+	types.commandSchemas["Fetch.getResponseBody"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchGetResponseBodyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchGetResponseBodyResult]()),
+	}
+	types.commandSchemas["Fetch.takeResponseBodyAsStream"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FetchTakeResponseBodyAsStreamParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FetchTakeResponseBodyAsStreamResult]()),
+	}
+	types.commandSchemas["FileSystem.getDirectory"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[FileSystemGetDirectoryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[FileSystemGetDirectoryResult]()),
+	}
+	types.commandSchemas["HeadlessExperimental.beginFrame"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeadlessExperimentalBeginFrameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalBeginFrameResult]()),
+	}
+	types.commandSchemas["HeadlessExperimental.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeadlessExperimentalDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalDisableResult]()),
+	}
+	types.commandSchemas["HeadlessExperimental.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeadlessExperimentalEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeadlessExperimentalEnableResult]()),
+	}
+	types.commandSchemas["HeapProfiler.addInspectedHeapObject"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerAddInspectedHeapObjectParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerAddInspectedHeapObjectResult]()),
+	}
+	types.commandSchemas["HeapProfiler.collectGarbage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerCollectGarbageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerCollectGarbageResult]()),
+	}
+	types.commandSchemas["HeapProfiler.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerDisableResult]()),
+	}
+	types.commandSchemas["HeapProfiler.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerEnableResult]()),
+	}
+	types.commandSchemas["HeapProfiler.getHeapObjectId"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerGetHeapObjectIDParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetHeapObjectIDResult]()),
+	}
+	types.commandSchemas["HeapProfiler.getObjectByHeapObjectId"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerGetObjectByHeapObjectIDParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetObjectByHeapObjectIDResult]()),
+	}
+	types.commandSchemas["HeapProfiler.getSamplingProfile"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerGetSamplingProfileParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerGetSamplingProfileResult]()),
+	}
+	types.commandSchemas["HeapProfiler.startSampling"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerStartSamplingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStartSamplingResult]()),
+	}
+	types.commandSchemas["HeapProfiler.startTrackingHeapObjects"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerStartTrackingHeapObjectsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStartTrackingHeapObjectsResult]()),
+	}
+	types.commandSchemas["HeapProfiler.stopSampling"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerStopSamplingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStopSamplingResult]()),
+	}
+	types.commandSchemas["HeapProfiler.stopTrackingHeapObjects"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerStopTrackingHeapObjectsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerStopTrackingHeapObjectsResult]()),
+	}
+	types.commandSchemas["HeapProfiler.takeHeapSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[HeapProfilerTakeHeapSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[HeapProfilerTakeHeapSnapshotResult]()),
+	}
+	types.commandSchemas["IO.close"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IOCloseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IOCloseResult]()),
+	}
+	types.commandSchemas["IO.read"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IOReadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IOReadResult]()),
+	}
+	types.commandSchemas["IO.resolveBlob"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IOResolveBlobParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IOResolveBlobResult]()),
+	}
+	types.commandSchemas["IndexedDB.clearObjectStore"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBClearObjectStoreParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBClearObjectStoreResult]()),
+	}
+	types.commandSchemas["IndexedDB.deleteDatabase"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBDeleteDatabaseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDeleteDatabaseResult]()),
+	}
+	types.commandSchemas["IndexedDB.deleteObjectStoreEntries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBDeleteObjectStoreEntriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDeleteObjectStoreEntriesResult]()),
+	}
+	types.commandSchemas["IndexedDB.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBDisableResult]()),
+	}
+	types.commandSchemas["IndexedDB.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBEnableResult]()),
+	}
+	types.commandSchemas["IndexedDB.requestData"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBRequestDataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDataResult]()),
+	}
+	types.commandSchemas["IndexedDB.getMetadata"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBGetMetadataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBGetMetadataResult]()),
+	}
+	types.commandSchemas["IndexedDB.requestDatabase"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBRequestDatabaseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDatabaseResult]()),
+	}
+	types.commandSchemas["IndexedDB.requestDatabaseNames"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[IndexedDBRequestDatabaseNamesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[IndexedDBRequestDatabaseNamesResult]()),
+	}
+	types.commandSchemas["Input.dispatchDragEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputDispatchDragEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchDragEventResult]()),
+	}
+	types.commandSchemas["Input.dispatchKeyEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputDispatchKeyEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchKeyEventResult]()),
+	}
+	types.commandSchemas["Input.insertText"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputInsertTextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputInsertTextResult]()),
+	}
+	types.commandSchemas["Input.imeSetComposition"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputImeSetCompositionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputImeSetCompositionResult]()),
+	}
+	types.commandSchemas["Input.dispatchMouseEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputDispatchMouseEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchMouseEventResult]()),
+	}
+	types.commandSchemas["Input.dispatchTouchEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputDispatchTouchEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputDispatchTouchEventResult]()),
+	}
+	types.commandSchemas["Input.cancelDragging"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputCancelDraggingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputCancelDraggingResult]()),
+	}
+	types.commandSchemas["Input.emulateTouchFromMouseEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputEmulateTouchFromMouseEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputEmulateTouchFromMouseEventResult]()),
+	}
+	types.commandSchemas["Input.setIgnoreInputEvents"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputSetIgnoreInputEventsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputSetIgnoreInputEventsResult]()),
+	}
+	types.commandSchemas["Input.setInterceptDrags"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputSetInterceptDragsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputSetInterceptDragsResult]()),
+	}
+	types.commandSchemas["Input.synthesizePinchGesture"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputSynthesizePinchGestureParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizePinchGestureResult]()),
+	}
+	types.commandSchemas["Input.synthesizeScrollGesture"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputSynthesizeScrollGestureParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizeScrollGestureResult]()),
+	}
+	types.commandSchemas["Input.synthesizeTapGesture"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InputSynthesizeTapGestureParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InputSynthesizeTapGestureResult]()),
+	}
+	types.commandSchemas["Inspector.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InspectorDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InspectorDisableResult]()),
+	}
+	types.commandSchemas["Inspector.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[InspectorEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[InspectorEnableResult]()),
+	}
+	types.commandSchemas["LayerTree.compositingReasons"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeCompositingReasonsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeCompositingReasonsResult]()),
+	}
+	types.commandSchemas["LayerTree.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeDisableResult]()),
+	}
+	types.commandSchemas["LayerTree.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeEnableResult]()),
+	}
+	types.commandSchemas["LayerTree.loadSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeLoadSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeLoadSnapshotResult]()),
+	}
+	types.commandSchemas["LayerTree.makeSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeMakeSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeMakeSnapshotResult]()),
+	}
+	types.commandSchemas["LayerTree.profileSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeProfileSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeProfileSnapshotResult]()),
+	}
+	types.commandSchemas["LayerTree.releaseSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeReleaseSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeReleaseSnapshotResult]()),
+	}
+	types.commandSchemas["LayerTree.replaySnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeReplaySnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeReplaySnapshotResult]()),
+	}
+	types.commandSchemas["LayerTree.snapshotCommandLog"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LayerTreeSnapshotCommandLogParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LayerTreeSnapshotCommandLogResult]()),
+	}
+	types.commandSchemas["Log.clear"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LogClearParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LogClearResult]()),
+	}
+	types.commandSchemas["Log.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LogDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LogDisableResult]()),
+	}
+	types.commandSchemas["Log.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LogEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LogEnableResult]()),
+	}
+	types.commandSchemas["Log.startViolationsReport"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LogStartViolationsReportParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LogStartViolationsReportResult]()),
+	}
+	types.commandSchemas["Log.stopViolationsReport"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[LogStopViolationsReportParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[LogStopViolationsReportResult]()),
+	}
+	types.commandSchemas["Media.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MediaEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MediaEnableResult]()),
+	}
+	types.commandSchemas["Media.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MediaDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MediaDisableResult]()),
+	}
+	types.commandSchemas["Memory.getDOMCounters"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryGetDOMCountersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetDOMCountersResult]()),
+	}
+	types.commandSchemas["Memory.getDOMCountersForLeakDetection"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryGetDOMCountersForLeakDetectionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetDOMCountersForLeakDetectionResult]()),
+	}
+	types.commandSchemas["Memory.prepareForLeakDetection"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryPrepareForLeakDetectionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryPrepareForLeakDetectionResult]()),
+	}
+	types.commandSchemas["Memory.forciblyPurgeJavaScriptMemory"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryForciblyPurgeJavaScriptMemoryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryForciblyPurgeJavaScriptMemoryResult]()),
+	}
+	types.commandSchemas["Memory.setPressureNotificationsSuppressed"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemorySetPressureNotificationsSuppressedParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemorySetPressureNotificationsSuppressedResult]()),
+	}
+	types.commandSchemas["Memory.simulatePressureNotification"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemorySimulatePressureNotificationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemorySimulatePressureNotificationResult]()),
+	}
+	types.commandSchemas["Memory.startSampling"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryStartSamplingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryStartSamplingResult]()),
+	}
+	types.commandSchemas["Memory.stopSampling"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryStopSamplingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryStopSamplingResult]()),
+	}
+	types.commandSchemas["Memory.getAllTimeSamplingProfile"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryGetAllTimeSamplingProfileParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetAllTimeSamplingProfileResult]()),
+	}
+	types.commandSchemas["Memory.getBrowserSamplingProfile"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryGetBrowserSamplingProfileParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetBrowserSamplingProfileResult]()),
+	}
+	types.commandSchemas["Memory.getSamplingProfile"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[MemoryGetSamplingProfileParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[MemoryGetSamplingProfileResult]()),
+	}
+	types.commandSchemas["Network.setAcceptedEncodings"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetAcceptedEncodingsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetAcceptedEncodingsResult]()),
+	}
+	types.commandSchemas["Network.clearAcceptedEncodingsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkClearAcceptedEncodingsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearAcceptedEncodingsOverrideResult]()),
+	}
+	types.commandSchemas["Network.canClearBrowserCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkCanClearBrowserCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanClearBrowserCacheResult]()),
+	}
+	types.commandSchemas["Network.canClearBrowserCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkCanClearBrowserCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanClearBrowserCookiesResult]()),
+	}
+	types.commandSchemas["Network.canEmulateNetworkConditions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkCanEmulateNetworkConditionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkCanEmulateNetworkConditionsResult]()),
+	}
+	types.commandSchemas["Network.clearBrowserCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkClearBrowserCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearBrowserCacheResult]()),
+	}
+	types.commandSchemas["Network.clearBrowserCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkClearBrowserCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkClearBrowserCookiesResult]()),
+	}
+	types.commandSchemas["Network.continueInterceptedRequest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkContinueInterceptedRequestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkContinueInterceptedRequestResult]()),
+	}
+	types.commandSchemas["Network.deleteCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkDeleteCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkDeleteCookiesResult]()),
+	}
+	types.commandSchemas["Network.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkDisableResult]()),
+	}
+	types.commandSchemas["Network.emulateNetworkConditions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsResult]()),
+	}
+	types.commandSchemas["Network.emulateNetworkConditionsByRule"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsByRuleParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkEmulateNetworkConditionsByRuleResult]()),
+	}
+	types.commandSchemas["Network.overrideNetworkState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkOverrideNetworkStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkOverrideNetworkStateResult]()),
+	}
+	types.commandSchemas["Network.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableResult]()),
+	}
+	types.commandSchemas["Network.configureDurableMessages"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkConfigureDurableMessagesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkConfigureDurableMessagesResult]()),
+	}
+	types.commandSchemas["Network.getAllCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetAllCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetAllCookiesResult]()),
+	}
+	types.commandSchemas["Network.getCertificate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetCertificateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetCertificateResult]()),
+	}
+	types.commandSchemas["Network.getCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetCookiesResult]()),
+	}
+	types.commandSchemas["Network.getResponseBody"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetResponseBodyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetResponseBodyResult]()),
+	}
+	types.commandSchemas["Network.getRequestPostData"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetRequestPostDataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetRequestPostDataResult]()),
+	}
+	types.commandSchemas["Network.getResponseBodyForInterception"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetResponseBodyForInterceptionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetResponseBodyForInterceptionResult]()),
+	}
+	types.commandSchemas["Network.takeResponseBodyForInterceptionAsStream"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkTakeResponseBodyForInterceptionAsStreamParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkTakeResponseBodyForInterceptionAsStreamResult]()),
+	}
+	types.commandSchemas["Network.replayXHR"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkReplayXHRParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkReplayXHRResult]()),
+	}
+	types.commandSchemas["Network.searchInResponseBody"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSearchInResponseBodyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSearchInResponseBodyResult]()),
+	}
+	types.commandSchemas["Network.setBlockedURLs"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetBlockedURLsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetBlockedURLsResult]()),
+	}
+	types.commandSchemas["Network.setBypassServiceWorker"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetBypassServiceWorkerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetBypassServiceWorkerResult]()),
+	}
+	types.commandSchemas["Network.setCacheDisabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetCacheDisabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCacheDisabledResult]()),
+	}
+	types.commandSchemas["Network.setCookie"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetCookieParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookieResult]()),
+	}
+	types.commandSchemas["Network.setCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookiesResult]()),
+	}
+	types.commandSchemas["Network.setExtraHTTPHeaders"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetExtraHTTPHeadersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetExtraHTTPHeadersResult]()),
+	}
+	types.commandSchemas["Network.setAttachDebugStack"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetAttachDebugStackParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetAttachDebugStackResult]()),
+	}
+	types.commandSchemas["Network.setRequestInterception"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetRequestInterceptionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetRequestInterceptionResult]()),
+	}
+	types.commandSchemas["Network.setUserAgentOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetUserAgentOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetUserAgentOverrideResult]()),
+	}
+	types.commandSchemas["Network.streamResourceContent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkStreamResourceContentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkStreamResourceContentResult]()),
+	}
+	types.commandSchemas["Network.getSecurityIsolationStatus"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkGetSecurityIsolationStatusParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkGetSecurityIsolationStatusResult]()),
+	}
+	types.commandSchemas["Network.enableReportingApi"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkEnableReportingAPIParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableReportingAPIResult]()),
+	}
+	types.commandSchemas["Network.enableDeviceBoundSessions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkEnableDeviceBoundSessionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkEnableDeviceBoundSessionsResult]()),
+	}
+	types.commandSchemas["Network.fetchSchemefulSite"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkFetchSchemefulSiteParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkFetchSchemefulSiteResult]()),
+	}
+	types.commandSchemas["Network.loadNetworkResource"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkLoadNetworkResourceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkLoadNetworkResourceResult]()),
+	}
+	types.commandSchemas["Network.setCookieControls"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[NetworkSetCookieControlsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[NetworkSetCookieControlsResult]()),
+	}
+	types.commandSchemas["Overlay.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayDisableResult]()),
+	}
+	types.commandSchemas["Overlay.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayEnableResult]()),
+	}
+	types.commandSchemas["Overlay.getHighlightObjectForTest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayGetHighlightObjectForTestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetHighlightObjectForTestResult]()),
+	}
+	types.commandSchemas["Overlay.getGridHighlightObjectsForTest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayGetGridHighlightObjectsForTestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetGridHighlightObjectsForTestResult]()),
+	}
+	types.commandSchemas["Overlay.getSourceOrderHighlightObjectForTest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayGetSourceOrderHighlightObjectForTestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayGetSourceOrderHighlightObjectForTestResult]()),
+	}
+	types.commandSchemas["Overlay.hideHighlight"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHideHighlightParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHideHighlightResult]()),
+	}
+	types.commandSchemas["Overlay.highlightFrame"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHighlightFrameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightFrameResult]()),
+	}
+	types.commandSchemas["Overlay.highlightNode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHighlightNodeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightNodeResult]()),
+	}
+	types.commandSchemas["Overlay.highlightQuad"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHighlightQuadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightQuadResult]()),
+	}
+	types.commandSchemas["Overlay.highlightRect"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHighlightRectParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightRectResult]()),
+	}
+	types.commandSchemas["Overlay.highlightSourceOrder"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlayHighlightSourceOrderParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlayHighlightSourceOrderResult]()),
+	}
+	types.commandSchemas["Overlay.setInspectMode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetInspectModeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetInspectModeResult]()),
+	}
+	types.commandSchemas["Overlay.setShowAdHighlights"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowAdHighlightsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowAdHighlightsResult]()),
+	}
+	types.commandSchemas["Overlay.setPausedInDebuggerMessage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetPausedInDebuggerMessageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetPausedInDebuggerMessageResult]()),
+	}
+	types.commandSchemas["Overlay.setShowDebugBorders"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowDebugBordersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowDebugBordersResult]()),
+	}
+	types.commandSchemas["Overlay.setShowFPSCounter"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowFPSCounterParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowFPSCounterResult]()),
+	}
+	types.commandSchemas["Overlay.setShowGridOverlays"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowGridOverlaysParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowGridOverlaysResult]()),
+	}
+	types.commandSchemas["Overlay.setShowFlexOverlays"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowFlexOverlaysParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowFlexOverlaysResult]()),
+	}
+	types.commandSchemas["Overlay.setShowScrollSnapOverlays"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowScrollSnapOverlaysParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowScrollSnapOverlaysResult]()),
+	}
+	types.commandSchemas["Overlay.setShowContainerQueryOverlays"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowContainerQueryOverlaysParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowContainerQueryOverlaysResult]()),
+	}
+	types.commandSchemas["Overlay.setShowInspectedElementAnchor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowInspectedElementAnchorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowInspectedElementAnchorResult]()),
+	}
+	types.commandSchemas["Overlay.setShowPaintRects"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowPaintRectsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowPaintRectsResult]()),
+	}
+	types.commandSchemas["Overlay.setShowLayoutShiftRegions"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowLayoutShiftRegionsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowLayoutShiftRegionsResult]()),
+	}
+	types.commandSchemas["Overlay.setShowScrollBottleneckRects"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowScrollBottleneckRectsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowScrollBottleneckRectsResult]()),
+	}
+	types.commandSchemas["Overlay.setShowHitTestBorders"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowHitTestBordersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowHitTestBordersResult]()),
+	}
+	types.commandSchemas["Overlay.setShowWebVitals"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowWebVitalsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowWebVitalsResult]()),
+	}
+	types.commandSchemas["Overlay.setShowViewportSizeOnResize"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowViewportSizeOnResizeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowViewportSizeOnResizeResult]()),
+	}
+	types.commandSchemas["Overlay.setShowHinge"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowHingeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowHingeResult]()),
+	}
+	types.commandSchemas["Overlay.setShowIsolatedElements"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowIsolatedElementsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowIsolatedElementsResult]()),
+	}
+	types.commandSchemas["Overlay.setShowWindowControlsOverlay"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[OverlaySetShowWindowControlsOverlayParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[OverlaySetShowWindowControlsOverlayResult]()),
+	}
+	types.commandSchemas["PWA.getOsAppState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWAGetOsAppStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWAGetOsAppStateResult]()),
+	}
+	types.commandSchemas["PWA.install"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWAInstallParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWAInstallResult]()),
+	}
+	types.commandSchemas["PWA.uninstall"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWAUninstallParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWAUninstallResult]()),
+	}
+	types.commandSchemas["PWA.launch"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWALaunchParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWALaunchResult]()),
+	}
+	types.commandSchemas["PWA.launchFilesInApp"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWALaunchFilesInAppParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWALaunchFilesInAppResult]()),
+	}
+	types.commandSchemas["PWA.openCurrentPageInApp"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWAOpenCurrentPageInAppParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWAOpenCurrentPageInAppResult]()),
+	}
+	types.commandSchemas["PWA.changeAppUserSettings"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PWAChangeAppUserSettingsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PWAChangeAppUserSettingsResult]()),
+	}
+	types.commandSchemas["Page.addScriptToEvaluateOnLoad"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnLoadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnLoadResult]()),
+	}
+	types.commandSchemas["Page.addScriptToEvaluateOnNewDocument"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnNewDocumentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageAddScriptToEvaluateOnNewDocumentResult]()),
+	}
+	types.commandSchemas["Page.bringToFront"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageBringToFrontParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageBringToFrontResult]()),
+	}
+	types.commandSchemas["Page.captureScreenshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageCaptureScreenshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageCaptureScreenshotResult]()),
+	}
+	types.commandSchemas["Page.captureSnapshot"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageCaptureSnapshotParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageCaptureSnapshotResult]()),
+	}
+	types.commandSchemas["Page.clearDeviceMetricsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageClearDeviceMetricsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageClearDeviceMetricsOverrideResult]()),
+	}
+	types.commandSchemas["Page.clearDeviceOrientationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageClearDeviceOrientationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageClearDeviceOrientationOverrideResult]()),
+	}
+	types.commandSchemas["Page.clearGeolocationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageClearGeolocationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageClearGeolocationOverrideResult]()),
+	}
+	types.commandSchemas["Page.createIsolatedWorld"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageCreateIsolatedWorldParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageCreateIsolatedWorldResult]()),
+	}
+	types.commandSchemas["Page.deleteCookie"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageDeleteCookieParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageDeleteCookieResult]()),
+	}
+	types.commandSchemas["Page.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageDisableResult]()),
+	}
+	types.commandSchemas["Page.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageEnableResult]()),
+	}
+	types.commandSchemas["Page.getAppManifest"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetAppManifestParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetAppManifestResult]()),
+	}
+	types.commandSchemas["Page.getInstallabilityErrors"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetInstallabilityErrorsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetInstallabilityErrorsResult]()),
+	}
+	types.commandSchemas["Page.getManifestIcons"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetManifestIconsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetManifestIconsResult]()),
+	}
+	types.commandSchemas["Page.getAppId"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetAppIDParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetAppIDResult]()),
+	}
+	types.commandSchemas["Page.getAdScriptAncestry"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetAdScriptAncestryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetAdScriptAncestryResult]()),
+	}
+	types.commandSchemas["Page.getFrameTree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetFrameTreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetFrameTreeResult]()),
+	}
+	types.commandSchemas["Page.getLayoutMetrics"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetLayoutMetricsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetLayoutMetricsResult]()),
+	}
+	types.commandSchemas["Page.getNavigationHistory"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetNavigationHistoryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetNavigationHistoryResult]()),
+	}
+	types.commandSchemas["Page.resetNavigationHistory"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageResetNavigationHistoryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageResetNavigationHistoryResult]()),
+	}
+	types.commandSchemas["Page.getResourceContent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetResourceContentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetResourceContentResult]()),
+	}
+	types.commandSchemas["Page.getResourceTree"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetResourceTreeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetResourceTreeResult]()),
+	}
+	types.commandSchemas["Page.handleJavaScriptDialog"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageHandleJavaScriptDialogParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageHandleJavaScriptDialogResult]()),
+	}
+	types.commandSchemas["Page.navigate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageNavigateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageNavigateResult]()),
+	}
+	types.commandSchemas["Page.navigateToHistoryEntry"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageNavigateToHistoryEntryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageNavigateToHistoryEntryResult]()),
+	}
+	types.commandSchemas["Page.printToPDF"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PagePrintToPDFParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PagePrintToPDFResult]()),
+	}
+	types.commandSchemas["Page.reload"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageReloadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageReloadResult]()),
+	}
+	types.commandSchemas["Page.removeScriptToEvaluateOnLoad"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnLoadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnLoadResult]()),
+	}
+	types.commandSchemas["Page.removeScriptToEvaluateOnNewDocument"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnNewDocumentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageRemoveScriptToEvaluateOnNewDocumentResult]()),
+	}
+	types.commandSchemas["Page.screencastFrameAck"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageScreencastFrameAckParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageScreencastFrameAckResult]()),
+	}
+	types.commandSchemas["Page.searchInResource"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSearchInResourceParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSearchInResourceResult]()),
+	}
+	types.commandSchemas["Page.setAdBlockingEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetAdBlockingEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetAdBlockingEnabledResult]()),
+	}
+	types.commandSchemas["Page.setBypassCSP"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetBypassCSPParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetBypassCSPResult]()),
+	}
+	types.commandSchemas["Page.getPermissionsPolicyState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetPermissionsPolicyStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetPermissionsPolicyStateResult]()),
+	}
+	types.commandSchemas["Page.getOriginTrials"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetOriginTrialsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetOriginTrialsResult]()),
+	}
+	types.commandSchemas["Page.setDeviceMetricsOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetDeviceMetricsOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetDeviceMetricsOverrideResult]()),
+	}
+	types.commandSchemas["Page.setDeviceOrientationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetDeviceOrientationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetDeviceOrientationOverrideResult]()),
+	}
+	types.commandSchemas["Page.setFontFamilies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetFontFamiliesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetFontFamiliesResult]()),
+	}
+	types.commandSchemas["Page.setFontSizes"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetFontSizesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetFontSizesResult]()),
+	}
+	types.commandSchemas["Page.setDocumentContent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetDocumentContentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetDocumentContentResult]()),
+	}
+	types.commandSchemas["Page.setDownloadBehavior"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetDownloadBehaviorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetDownloadBehaviorResult]()),
+	}
+	types.commandSchemas["Page.setGeolocationOverride"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetGeolocationOverrideParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetGeolocationOverrideResult]()),
+	}
+	types.commandSchemas["Page.setLifecycleEventsEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetLifecycleEventsEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetLifecycleEventsEnabledResult]()),
+	}
+	types.commandSchemas["Page.setTouchEmulationEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetTouchEmulationEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetTouchEmulationEnabledResult]()),
+	}
+	types.commandSchemas["Page.startScreencast"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageStartScreencastParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageStartScreencastResult]()),
+	}
+	types.commandSchemas["Page.stopLoading"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageStopLoadingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageStopLoadingResult]()),
+	}
+	types.commandSchemas["Page.crash"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageCrashParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageCrashResult]()),
+	}
+	types.commandSchemas["Page.close"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageCloseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageCloseResult]()),
+	}
+	types.commandSchemas["Page.setWebLifecycleState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetWebLifecycleStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetWebLifecycleStateResult]()),
+	}
+	types.commandSchemas["Page.stopScreencast"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageStopScreencastParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageStopScreencastResult]()),
+	}
+	types.commandSchemas["Page.produceCompilationCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageProduceCompilationCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageProduceCompilationCacheResult]()),
+	}
+	types.commandSchemas["Page.addCompilationCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageAddCompilationCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageAddCompilationCacheResult]()),
+	}
+	types.commandSchemas["Page.clearCompilationCache"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageClearCompilationCacheParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageClearCompilationCacheResult]()),
+	}
+	types.commandSchemas["Page.setSPCTransactionMode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetSPCTransactionModeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetSPCTransactionModeResult]()),
+	}
+	types.commandSchemas["Page.setRPHRegistrationMode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetRPHRegistrationModeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetRPHRegistrationModeResult]()),
+	}
+	types.commandSchemas["Page.generateTestReport"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGenerateTestReportParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGenerateTestReportResult]()),
+	}
+	types.commandSchemas["Page.waitForDebugger"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageWaitForDebuggerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageWaitForDebuggerResult]()),
+	}
+	types.commandSchemas["Page.setInterceptFileChooserDialog"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetInterceptFileChooserDialogParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetInterceptFileChooserDialogResult]()),
+	}
+	types.commandSchemas["Page.setPrerenderingAllowed"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageSetPrerenderingAllowedParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageSetPrerenderingAllowedResult]()),
+	}
+	types.commandSchemas["Page.getAnnotatedPageContent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PageGetAnnotatedPageContentParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PageGetAnnotatedPageContentResult]()),
+	}
+	types.commandSchemas["Performance.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PerformanceDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PerformanceDisableResult]()),
+	}
+	types.commandSchemas["Performance.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PerformanceEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PerformanceEnableResult]()),
+	}
+	types.commandSchemas["Performance.setTimeDomain"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PerformanceSetTimeDomainParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PerformanceSetTimeDomainResult]()),
+	}
+	types.commandSchemas["Performance.getMetrics"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PerformanceGetMetricsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PerformanceGetMetricsResult]()),
+	}
+	types.commandSchemas["PerformanceTimeline.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PerformanceTimelineEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PerformanceTimelineEnableResult]()),
+	}
+	types.commandSchemas["Preload.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PreloadEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PreloadEnableResult]()),
+	}
+	types.commandSchemas["Preload.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[PreloadDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[PreloadDisableResult]()),
+	}
+	types.commandSchemas["Profiler.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerDisableResult]()),
+	}
+	types.commandSchemas["Profiler.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerEnableResult]()),
+	}
+	types.commandSchemas["Profiler.getBestEffortCoverage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerGetBestEffortCoverageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerGetBestEffortCoverageResult]()),
+	}
+	types.commandSchemas["Profiler.setSamplingInterval"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerSetSamplingIntervalParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerSetSamplingIntervalResult]()),
+	}
+	types.commandSchemas["Profiler.start"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerStartParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStartResult]()),
+	}
+	types.commandSchemas["Profiler.startPreciseCoverage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerStartPreciseCoverageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStartPreciseCoverageResult]()),
+	}
+	types.commandSchemas["Profiler.stop"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerStopParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStopResult]()),
+	}
+	types.commandSchemas["Profiler.stopPreciseCoverage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerStopPreciseCoverageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerStopPreciseCoverageResult]()),
+	}
+	types.commandSchemas["Profiler.takePreciseCoverage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ProfilerTakePreciseCoverageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ProfilerTakePreciseCoverageResult]()),
+	}
+	types.commandSchemas["Runtime.awaitPromise"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeAwaitPromiseParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeAwaitPromiseResult]()),
+	}
+	types.commandSchemas["Runtime.callFunctionOn"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeCallFunctionOnParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeCallFunctionOnResult]()),
+	}
+	types.commandSchemas["Runtime.compileScript"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeCompileScriptParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeCompileScriptResult]()),
+	}
+	types.commandSchemas["Runtime.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeDisableResult]()),
+	}
+	types.commandSchemas["Runtime.discardConsoleEntries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeDiscardConsoleEntriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeDiscardConsoleEntriesResult]()),
+	}
+	types.commandSchemas["Runtime.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeEnableResult]()),
+	}
+	types.commandSchemas["Runtime.evaluate"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeEvaluateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeEvaluateResult]()),
+	}
+	types.commandSchemas["Runtime.getIsolateId"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeGetIsolateIDParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetIsolateIDResult]()),
+	}
+	types.commandSchemas["Runtime.getHeapUsage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeGetHeapUsageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetHeapUsageResult]()),
+	}
+	types.commandSchemas["Runtime.getProperties"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeGetPropertiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetPropertiesResult]()),
+	}
+	types.commandSchemas["Runtime.globalLexicalScopeNames"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeGlobalLexicalScopeNamesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGlobalLexicalScopeNamesResult]()),
+	}
+	types.commandSchemas["Runtime.queryObjects"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeQueryObjectsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeQueryObjectsResult]()),
+	}
+	types.commandSchemas["Runtime.releaseObject"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeReleaseObjectParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeReleaseObjectResult]()),
+	}
+	types.commandSchemas["Runtime.releaseObjectGroup"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeReleaseObjectGroupParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeReleaseObjectGroupResult]()),
+	}
+	types.commandSchemas["Runtime.runIfWaitingForDebugger"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeRunIfWaitingForDebuggerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRunIfWaitingForDebuggerResult]()),
+	}
+	types.commandSchemas["Runtime.runScript"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeRunScriptParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRunScriptResult]()),
+	}
+	types.commandSchemas["Runtime.setAsyncCallStackDepth"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeSetAsyncCallStackDepthParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetAsyncCallStackDepthResult]()),
+	}
+	types.commandSchemas["Runtime.setCustomObjectFormatterEnabled"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeSetCustomObjectFormatterEnabledParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetCustomObjectFormatterEnabledResult]()),
+	}
+	types.commandSchemas["Runtime.setMaxCallStackSizeToCapture"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeSetMaxCallStackSizeToCaptureParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeSetMaxCallStackSizeToCaptureResult]()),
+	}
+	types.commandSchemas["Runtime.terminateExecution"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeTerminateExecutionParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeTerminateExecutionResult]()),
+	}
+	types.commandSchemas["Runtime.addBinding"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeAddBindingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeAddBindingResult]()),
+	}
+	types.commandSchemas["Runtime.removeBinding"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeRemoveBindingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeRemoveBindingResult]()),
+	}
+	types.commandSchemas["Runtime.getExceptionDetails"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[RuntimeGetExceptionDetailsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[RuntimeGetExceptionDetailsResult]()),
+	}
+	types.commandSchemas["Schema.getDomains"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SchemaGetDomainsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SchemaGetDomainsResult]()),
+	}
+	types.commandSchemas["Security.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SecurityDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SecurityDisableResult]()),
+	}
+	types.commandSchemas["Security.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SecurityEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SecurityEnableResult]()),
+	}
+	types.commandSchemas["Security.setIgnoreCertificateErrors"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SecuritySetIgnoreCertificateErrorsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SecuritySetIgnoreCertificateErrorsResult]()),
+	}
+	types.commandSchemas["Security.handleCertificateError"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SecurityHandleCertificateErrorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SecurityHandleCertificateErrorResult]()),
+	}
+	types.commandSchemas["Security.setOverrideCertificateErrors"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SecuritySetOverrideCertificateErrorsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SecuritySetOverrideCertificateErrorsResult]()),
+	}
+	types.commandSchemas["ServiceWorker.deliverPushMessage"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerDeliverPushMessageParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDeliverPushMessageResult]()),
+	}
+	types.commandSchemas["ServiceWorker.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDisableResult]()),
+	}
+	types.commandSchemas["ServiceWorker.dispatchSyncEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerDispatchSyncEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDispatchSyncEventResult]()),
+	}
+	types.commandSchemas["ServiceWorker.dispatchPeriodicSyncEvent"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerDispatchPeriodicSyncEventParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerDispatchPeriodicSyncEventResult]()),
+	}
+	types.commandSchemas["ServiceWorker.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerEnableResult]()),
+	}
+	types.commandSchemas["ServiceWorker.setForceUpdateOnPageLoad"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerSetForceUpdateOnPageLoadParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerSetForceUpdateOnPageLoadResult]()),
+	}
+	types.commandSchemas["ServiceWorker.skipWaiting"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerSkipWaitingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerSkipWaitingResult]()),
+	}
+	types.commandSchemas["ServiceWorker.startWorker"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerStartWorkerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStartWorkerResult]()),
+	}
+	types.commandSchemas["ServiceWorker.stopAllWorkers"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerStopAllWorkersParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStopAllWorkersResult]()),
+	}
+	types.commandSchemas["ServiceWorker.stopWorker"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerStopWorkerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerStopWorkerResult]()),
+	}
+	types.commandSchemas["ServiceWorker.unregister"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerUnregisterParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerUnregisterResult]()),
+	}
+	types.commandSchemas["ServiceWorker.updateRegistration"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[ServiceWorkerUpdateRegistrationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[ServiceWorkerUpdateRegistrationResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationEnableResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationDisableResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportEstablishContextResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportEstablishContextResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportEstablishContextResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportReleaseContextResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportReleaseContextResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportReleaseContextResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportListReadersResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportListReadersResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportListReadersResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportGetStatusChangeResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportGetStatusChangeResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportGetStatusChangeResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportBeginTransactionResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportBeginTransactionResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportBeginTransactionResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportPlainResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportPlainResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportPlainResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportConnectResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportConnectResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportConnectResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportDataResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportDataResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportDataResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportStatusResult"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportStatusResultParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportStatusResultResult]()),
+	}
+	types.commandSchemas["SmartCardEmulation.reportError"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SmartCardEmulationReportErrorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SmartCardEmulationReportErrorResult]()),
+	}
+	types.commandSchemas["Storage.getStorageKeyForFrame"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetStorageKeyForFrameParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetStorageKeyForFrameResult]()),
+	}
+	types.commandSchemas["Storage.getStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.clearDataForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageClearDataForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageClearDataForOriginResult]()),
+	}
+	types.commandSchemas["Storage.clearDataForStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageClearDataForStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageClearDataForStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.getCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetCookiesResult]()),
+	}
+	types.commandSchemas["Storage.setCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetCookiesResult]()),
+	}
+	types.commandSchemas["Storage.clearCookies"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageClearCookiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageClearCookiesResult]()),
+	}
+	types.commandSchemas["Storage.getUsageAndQuota"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetUsageAndQuotaParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetUsageAndQuotaResult]()),
+	}
+	types.commandSchemas["Storage.overrideQuotaForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageOverrideQuotaForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageOverrideQuotaForOriginResult]()),
+	}
+	types.commandSchemas["Storage.trackCacheStorageForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageTrackCacheStorageForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackCacheStorageForOriginResult]()),
+	}
+	types.commandSchemas["Storage.trackCacheStorageForStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageTrackCacheStorageForStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackCacheStorageForStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.trackIndexedDBForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageTrackIndexedDBForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackIndexedDBForOriginResult]()),
+	}
+	types.commandSchemas["Storage.trackIndexedDBForStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageTrackIndexedDBForStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageTrackIndexedDBForStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.untrackCacheStorageForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageUntrackCacheStorageForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackCacheStorageForOriginResult]()),
+	}
+	types.commandSchemas["Storage.untrackCacheStorageForStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageUntrackCacheStorageForStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackCacheStorageForStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.untrackIndexedDBForOrigin"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageUntrackIndexedDBForOriginParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackIndexedDBForOriginResult]()),
+	}
+	types.commandSchemas["Storage.untrackIndexedDBForStorageKey"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageUntrackIndexedDBForStorageKeyParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageUntrackIndexedDBForStorageKeyResult]()),
+	}
+	types.commandSchemas["Storage.getTrustTokens"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetTrustTokensParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetTrustTokensResult]()),
+	}
+	types.commandSchemas["Storage.clearTrustTokens"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageClearTrustTokensParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageClearTrustTokensResult]()),
+	}
+	types.commandSchemas["Storage.getInterestGroupDetails"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetInterestGroupDetailsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetInterestGroupDetailsResult]()),
+	}
+	types.commandSchemas["Storage.setInterestGroupTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetInterestGroupTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetInterestGroupTrackingResult]()),
+	}
+	types.commandSchemas["Storage.setInterestGroupAuctionTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetInterestGroupAuctionTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetInterestGroupAuctionTrackingResult]()),
+	}
+	types.commandSchemas["Storage.getSharedStorageMetadata"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetSharedStorageMetadataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetSharedStorageMetadataResult]()),
+	}
+	types.commandSchemas["Storage.getSharedStorageEntries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetSharedStorageEntriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetSharedStorageEntriesResult]()),
+	}
+	types.commandSchemas["Storage.setSharedStorageEntry"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetSharedStorageEntryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetSharedStorageEntryResult]()),
+	}
+	types.commandSchemas["Storage.deleteSharedStorageEntry"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageDeleteSharedStorageEntryParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageDeleteSharedStorageEntryResult]()),
+	}
+	types.commandSchemas["Storage.clearSharedStorageEntries"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageClearSharedStorageEntriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageClearSharedStorageEntriesResult]()),
+	}
+	types.commandSchemas["Storage.resetSharedStorageBudget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageResetSharedStorageBudgetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageResetSharedStorageBudgetResult]()),
+	}
+	types.commandSchemas["Storage.setSharedStorageTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetSharedStorageTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetSharedStorageTrackingResult]()),
+	}
+	types.commandSchemas["Storage.setStorageBucketTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetStorageBucketTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetStorageBucketTrackingResult]()),
+	}
+	types.commandSchemas["Storage.deleteStorageBucket"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageDeleteStorageBucketParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageDeleteStorageBucketResult]()),
+	}
+	types.commandSchemas["Storage.runBounceTrackingMitigations"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageRunBounceTrackingMitigationsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageRunBounceTrackingMitigationsResult]()),
+	}
+	types.commandSchemas["Storage.setAttributionReportingLocalTestingMode"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetAttributionReportingLocalTestingModeParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetAttributionReportingLocalTestingModeResult]()),
+	}
+	types.commandSchemas["Storage.setAttributionReportingTracking"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetAttributionReportingTrackingParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetAttributionReportingTrackingResult]()),
+	}
+	types.commandSchemas["Storage.sendPendingAttributionReports"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSendPendingAttributionReportsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSendPendingAttributionReportsResult]()),
+	}
+	types.commandSchemas["Storage.getRelatedWebsiteSets"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetRelatedWebsiteSetsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetRelatedWebsiteSetsResult]()),
+	}
+	types.commandSchemas["Storage.getAffectedUrlsForThirdPartyCookieMetadata"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageGetAffectedUrlsForThirdPartyCookieMetadataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageGetAffectedUrlsForThirdPartyCookieMetadataResult]()),
+	}
+	types.commandSchemas["Storage.setProtectedAudienceKAnonymity"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[StorageSetProtectedAudienceKAnonymityParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[StorageSetProtectedAudienceKAnonymityResult]()),
+	}
+	types.commandSchemas["SystemInfo.getInfo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SystemInfoGetInfoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetInfoResult]()),
+	}
+	types.commandSchemas["SystemInfo.getFeatureState"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SystemInfoGetFeatureStateParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetFeatureStateResult]()),
+	}
+	types.commandSchemas["SystemInfo.getProcessInfo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[SystemInfoGetProcessInfoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[SystemInfoGetProcessInfoResult]()),
+	}
+	types.commandSchemas["Target.activateTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetActivateTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetActivateTargetResult]()),
+	}
+	types.commandSchemas["Target.attachToTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetAttachToTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetAttachToTargetResult]()),
+	}
+	types.commandSchemas["Target.attachToBrowserTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetAttachToBrowserTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetAttachToBrowserTargetResult]()),
+	}
+	types.commandSchemas["Target.closeTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetCloseTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetCloseTargetResult]()),
+	}
+	types.commandSchemas["Target.exposeDevToolsProtocol"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetExposeDevToolsProtocolParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetExposeDevToolsProtocolResult]()),
+	}
+	types.commandSchemas["Target.createBrowserContext"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetCreateBrowserContextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetCreateBrowserContextResult]()),
+	}
+	types.commandSchemas["Target.getBrowserContexts"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetGetBrowserContextsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetGetBrowserContextsResult]()),
+	}
+	types.commandSchemas["Target.createTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetCreateTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetCreateTargetResult]()),
+	}
+	types.commandSchemas["Target.detachFromTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetDetachFromTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetDetachFromTargetResult]()),
+	}
+	types.commandSchemas["Target.disposeBrowserContext"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetDisposeBrowserContextParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetDisposeBrowserContextResult]()),
+	}
+	types.commandSchemas["Target.getTargetInfo"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetGetTargetInfoParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetGetTargetInfoResult]()),
+	}
+	types.commandSchemas["Target.getTargets"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetGetTargetsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetGetTargetsResult]()),
+	}
+	types.commandSchemas["Target.sendMessageToTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetSendMessageToTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetSendMessageToTargetResult]()),
+	}
+	types.commandSchemas["Target.setAutoAttach"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetSetAutoAttachParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetSetAutoAttachResult]()),
+	}
+	types.commandSchemas["Target.autoAttachRelated"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetAutoAttachRelatedParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetAutoAttachRelatedResult]()),
+	}
+	types.commandSchemas["Target.setDiscoverTargets"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetSetDiscoverTargetsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetSetDiscoverTargetsResult]()),
+	}
+	types.commandSchemas["Target.setRemoteLocations"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetSetRemoteLocationsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetSetRemoteLocationsResult]()),
+	}
+	types.commandSchemas["Target.getDevToolsTarget"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetGetDevToolsTargetParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetGetDevToolsTargetResult]()),
+	}
+	types.commandSchemas["Target.openDevTools"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TargetOpenDevToolsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TargetOpenDevToolsResult]()),
+	}
+	types.commandSchemas["Tethering.bind"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TetheringBindParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TetheringBindResult]()),
+	}
+	types.commandSchemas["Tethering.unbind"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TetheringUnbindParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TetheringUnbindResult]()),
+	}
+	types.commandSchemas["Tracing.end"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingEndParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingEndResult]()),
+	}
+	types.commandSchemas["Tracing.getCategories"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingGetCategoriesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingGetCategoriesResult]()),
+	}
+	types.commandSchemas["Tracing.getTrackEventDescriptor"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingGetTrackEventDescriptorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingGetTrackEventDescriptorResult]()),
+	}
+	types.commandSchemas["Tracing.recordClockSyncMarker"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingRecordClockSyncMarkerParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingRecordClockSyncMarkerResult]()),
+	}
+	types.commandSchemas["Tracing.requestMemoryDump"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingRequestMemoryDumpParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingRequestMemoryDumpResult]()),
+	}
+	types.commandSchemas["Tracing.start"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[TracingStartParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[TracingStartResult]()),
+	}
+	types.commandSchemas["WebAudio.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAudioEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAudioEnableResult]()),
+	}
+	types.commandSchemas["WebAudio.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAudioDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAudioDisableResult]()),
+	}
+	types.commandSchemas["WebAudio.getRealtimeData"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAudioGetRealtimeDataParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAudioGetRealtimeDataResult]()),
+	}
+	types.commandSchemas["WebAuthn.enable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnEnableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnEnableResult]()),
+	}
+	types.commandSchemas["WebAuthn.disable"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnDisableParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnDisableResult]()),
+	}
+	types.commandSchemas["WebAuthn.addVirtualAuthenticator"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnAddVirtualAuthenticatorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnAddVirtualAuthenticatorResult]()),
+	}
+	types.commandSchemas["WebAuthn.setResponseOverrideBits"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnSetResponseOverrideBitsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetResponseOverrideBitsResult]()),
+	}
+	types.commandSchemas["WebAuthn.removeVirtualAuthenticator"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnRemoveVirtualAuthenticatorParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnRemoveVirtualAuthenticatorResult]()),
+	}
+	types.commandSchemas["WebAuthn.addCredential"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnAddCredentialParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnAddCredentialResult]()),
+	}
+	types.commandSchemas["WebAuthn.getCredential"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnGetCredentialParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnGetCredentialResult]()),
+	}
+	types.commandSchemas["WebAuthn.getCredentials"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnGetCredentialsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnGetCredentialsResult]()),
+	}
+	types.commandSchemas["WebAuthn.removeCredential"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnRemoveCredentialParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnRemoveCredentialResult]()),
+	}
+	types.commandSchemas["WebAuthn.clearCredentials"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnClearCredentialsParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnClearCredentialsResult]()),
+	}
+	types.commandSchemas["WebAuthn.setUserVerified"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnSetUserVerifiedParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetUserVerifiedResult]()),
+	}
+	types.commandSchemas["WebAuthn.setAutomaticPresenceSimulation"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnSetAutomaticPresenceSimulationParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetAutomaticPresenceSimulationResult]()),
+	}
+	types.commandSchemas["WebAuthn.setCredentialProperties"] = CDPCommandSchema{
+		Params: abxjsonschema.SchemaFor[WebAuthnSetCredentialPropertiesParams](),
+		Result: nativeResultSchema(abxjsonschema.SchemaFor[WebAuthnSetCredentialPropertiesResult]()),
+	}
 	types.eventSchemas["Accessibility.loadComplete"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityLoadCompleteEvent]())
 	types.eventSchemas["Accessibility.nodesUpdated"] = nativeResultSchema(abxjsonschema.SchemaFor[AccessibilityNodesUpdatedEvent]())
 	types.eventSchemas["Animation.animationCanceled"] = nativeResultSchema(abxjsonschema.SchemaFor[AnimationAnimationCanceledEvent]())
