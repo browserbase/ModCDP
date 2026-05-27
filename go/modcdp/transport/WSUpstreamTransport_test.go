@@ -30,6 +30,10 @@ func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *test
 	if _, err := NewWSUpstreamTransport(UpstreamTransportConfig{}).Send("Browser.getVersion", map[string]any{}, ""); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
 		t.Fatalf("send error = %v", err)
 	}
+	state := transport.ToJSON()["state"].(map[string]any)
+	if state["connected"] != false {
+		t.Fatalf("connected state = %#v", state["connected"])
+	}
 }
 
 func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
@@ -114,11 +118,19 @@ func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
 	if transport.Conn == nil {
 		t.Fatal("expected connected websocket")
 	}
+	state := transport.ToJSON()["state"].(map[string]any)
+	if state["connected"] != true {
+		t.Fatalf("connected state = %#v", state["connected"])
+	}
 	if err := transport.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if transport.Conn != nil {
 		t.Fatal("Close left Conn set")
+	}
+	state = transport.ToJSON()["state"].(map[string]any)
+	if state["connected"] != false {
+		t.Fatalf("connected state after close = %#v", state["connected"])
 	}
 	if _, err := transport.Send("Browser.getVersion", map[string]any{}, ""); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
 		t.Fatalf("Send after close error = %v", err)

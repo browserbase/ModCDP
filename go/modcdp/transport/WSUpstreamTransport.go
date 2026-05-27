@@ -82,6 +82,19 @@ func (t *WSUpstreamTransport) Close() error {
 	return nil
 }
 
+func (t *WSUpstreamTransport) ToJSON() map[string]any {
+	jsonValue := t.UpstreamTransport.ToJSON()
+	state, _ := jsonValue["state"].(map[string]any)
+	if state == nil {
+		state = map[string]any{}
+	}
+	t.writeMu.Lock()
+	state["connected"] = t.Conn != nil
+	t.writeMu.Unlock()
+	jsonValue["state"] = state
+	return jsonValue
+}
+
 func (t *WSUpstreamTransport) readLoop(conn net.Conn) {
 	for {
 		data, err := wsutil.ReadServerText(conn)

@@ -77,6 +77,13 @@ class WSUpstreamTransport(UpstreamTransport):
             self._reader_thread.join(timeout=1)
         self._reader_thread = None
 
+    def toJSON(self) -> dict[str, object]:
+        json_value = super().toJSON()
+        state_raw = json_value.get("state")
+        state: dict[str, object] = dict(state_raw) if isinstance(state_raw, dict) else {}
+        state["connected"] = self.ws is not None
+        return {**json_value, "state": state}
+
     def _read_loop(self, generation: int | None = None) -> None:
         generation = self._generation if generation is None else generation
         ws = self.ws
