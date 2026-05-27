@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: only runs in browser.
 import type { z } from "zod";
 import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
@@ -30,8 +32,6 @@ const target_auto_attach_params = {
  *    typed `on(event, listener)` subscriptions.
  */
 class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "chromedebugger" as const;
-
   // JSON(debuggee) values attached in this service worker. Updated by
   // attachDebuggee/onDetach; read before attach to avoid duplicate native
   // chrome.debugger.attach calls.
@@ -63,7 +63,7 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   private debugger_onDetach_listener: ((source: chrome.debugger.Debuggee, reason?: string) => void) | null = null;
 
   constructor(options: UpstreamTransportConfig = {}) {
-    super(options);
+    super({ ...options, upstream_mode: "chromedebugger" });
   }
 
   /** Install chrome.debugger listeners for this service-worker lifetime. */
@@ -281,6 +281,22 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
         else resolve(result as ProtocolResult);
       }),
     );
+  }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return {
+      ...json,
+      state: {
+        ...json.state,
+        attached_debuggees: this.attached_debuggees.size,
+        targetId_from_sessionId: this.targetId_from_sessionId.size,
+        targetId_from_tabId: this.targetId_from_tabId.size,
+        debuggee_from_targetId: this.debuggee_from_targetId.size,
+        debugger_onEvent_listener: this.debugger_onEvent_listener != null,
+        debugger_onDetach_listener: this.debugger_onDetach_listener != null,
+      },
+    };
   }
 }
 

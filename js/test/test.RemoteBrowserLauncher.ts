@@ -9,7 +9,7 @@ const LIVE_BROWSER_TIMEOUT_MS = 60_000;
 describe("RemoteBrowserLauncher", () => {
   it("requires launcher_remote_cdp_url", async () => {
     await expect(new RemoteBrowserLauncher().launch()).rejects.toThrow(
-      "launcher.launcher_mode=remote requires launcher_remote_cdp_url.",
+      "launcher_mode=remote requires launcher_remote_cdp_url.",
     );
   });
 

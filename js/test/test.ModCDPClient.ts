@@ -49,6 +49,7 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
     },
     router: {
       router_routes: { "*.*": "direct_cdp" },
+      loopback_execution_context_timeout_ms: 4321,
     },
     client_options: {
       client_hydrate_aliases: false,
@@ -66,21 +67,21 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
     },
   });
 
-  assert.equal(cdp.launcher.launcher_local_headless, true);
-  assert.equal(cdp.launcher.launcher_local_executable_path, "/tmp/chrome");
-  assert.equal(cdp.launcher.launcher_local_user_data_dir, "/tmp/profile");
-  assert.equal(cdp.upstream.upstream_ws_connect_error_settle_timeout_ms, 321);
+  assert.equal(cdp.launcher.config.launcher_local_headless, true);
+  assert.equal(cdp.launcher.config.launcher_local_executable_path, "/tmp/chrome");
+  assert.equal(cdp.launcher.config.launcher_local_user_data_dir, "/tmp/profile");
+  assert.equal(cdp.upstream.config.upstream_ws_connect_error_settle_timeout_ms, 321);
   assert.equal(cdp.injector.config.injector_execution_context_timeout_ms, 4321);
   assert.equal(cdp.injector.config.injector_service_worker_probe_timeout_ms, 5432);
   assert.equal(cdp.injector.config.injector_service_worker_ready_timeout_ms, 6543);
   assert.equal(cdp.injector.config.injector_service_worker_poll_interval_ms, 76);
   assert.equal(cdp.injector.config.injector_target_session_poll_interval_ms, 87);
-  assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
-  assert.equal(cdp.client_options.client_hydrate_aliases, false);
-  assert.equal(cdp.client_options.client_mirror_upstream_events, false);
-  assert.equal(cdp.client_options.client_cdp_send_timeout_ms, 1234);
-  assert.equal(cdp.client_options.client_event_wait_timeout_ms, 2345);
-  assert.equal(cdp.client_options.client_heartbeat_interval_ms, 3456);
+  assert.equal(cdp.router.config.router_routes["*.*"], "direct_cdp");
+  assert.equal(cdp.config.client_hydrate_aliases, false);
+  assert.equal(cdp.config.client_mirror_upstream_events, false);
+  assert.equal(cdp.config.client_cdp_send_timeout_ms, 1234);
+  assert.equal(cdp.config.client_event_wait_timeout_ms, 2345);
+  assert.equal(cdp.config.client_heartbeat_interval_ms, 3456);
   assert.equal("routes" in cdp, false);
   assert.equal("cdp_send_timeout_ms" in cdp, false);
   assert.equal("service_worker_probe_timeout_ms" in cdp, false);
@@ -111,8 +112,8 @@ test("ModCDPClient constructs chrome debugger upstream transport from upstream o
   });
 
   assert.equal(cdp.upstream.constructor.name, "ChromeDebuggerUpstreamTransport");
-  assert.equal(cdp.upstream.upstream_mode, "chromedebugger");
-  assert.equal(cdp.upstream.upstream_cdp_send_timeout_ms, 4321);
+  assert.equal(cdp.upstream.config.upstream_mode, "chromedebugger");
+  assert.equal(cdp.upstream.config.upstream_cdp_send_timeout_ms, 4321);
 });
 
 test("ModCDPClient dispatches root events before extension session is attached", () => {
@@ -243,12 +244,12 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
   let direct_session_target_id: string | null = null;
   try {
     await cdp.connect();
-    assert.equal(cdp.launcher.launcher_mode, "local");
-    assert.equal(cdp.upstream.upstream_mode, "ws");
+    assert.equal(cdp.launcher.config.launcher_mode, "local");
+    assert.equal(cdp.upstream.config.upstream_mode, "ws");
     assert.equal(cdp.injector?.config.injector_mode, "cli");
     assert.equal(["discover", "cli", "cdp", "borrow"].includes(String(cdp.connect_timing?.injector_source)), true);
-    assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
-    assert.match(cdp.upstream.upstream_ws_cdp_url ?? "", /^ws:\/\//);
+    assert.equal(cdp.router.config.router_routes["*.*"], "direct_cdp");
+    assert.match(cdp.upstream.config.upstream_ws_cdp_url ?? "", /^ws:\/\//);
     const service_worker_url = await cdp.Mod.evaluate({
       expression: "chrome.runtime.getURL('modcdp/service_worker.js')",
     });
@@ -473,11 +474,11 @@ test("ModCDPClient uses no injector unless injector_mode is explicit", () => {
       launcher: { launcher_mode: "local" },
       upstream: { upstream_mode: mode },
     });
-    assert.equal(launched.launcher.launcher_mode, "local");
+    assert.equal(launched.launcher.config.launcher_mode, "local");
     assert.equal(launched.injector, null);
 
     const attach_only = new ModCDPClient({ upstream: { upstream_mode: mode } });
-    assert.equal(attach_only.launcher.launcher_mode, "none");
+    assert.equal(attach_only.launcher.config.launcher_mode, "none");
     assert.equal(attach_only.injector, null);
   }
 });
@@ -525,21 +526,21 @@ test("ModCDPClient rejects unknown component modes at their owning factory bound
       new ModCDPClient({
         upstream: { upstream_mode: "bogus" as any },
       }),
-    /unknown upstream\.upstream_mode=bogus/,
+    /Invalid option/,
   );
   assert.throws(
     () =>
       new ModCDPClient({
         launcher: { launcher_mode: "bogus" as any },
       }),
-    /unknown launcher\.launcher_mode=bogus/,
+    /Invalid option/,
   );
   assert.throws(
     () =>
       new ModCDPClient({
         injector: { injector_mode: "bogus" as any },
       }),
-    /unknown injector\.config.injector_mode=bogus/,
+    /Invalid option/,
   );
 });
 

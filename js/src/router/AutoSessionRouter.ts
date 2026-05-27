@@ -1,15 +1,22 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/router/AutoSessionRouter.py
+// - ./go/modcdp/router/AutoSessionRouter.go
 import type { cdp } from "../types/generated/cdp.js";
+import type { z } from "zod";
 import * as DOM from "../types/generated/zod/DOM.js";
 import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { TargetRoute, UpstreamTransport } from "../transport/UpstreamTransport.js";
 import type { CDPTypes } from "../types/CDPTypes.js";
+import { modCDPToJSON } from "../types/toJSON.js";
 import {
   CdpDebuggeeCommandParamsSchema,
   type CdpDebuggeeCommandParams,
   type ModCDPGetTopologyParams,
   type ModCDPRouterConfig,
+  ModCDPRouterConfigSchema,
   type ModCDPRoutes,
   type ModCDPTopology,
   type ModCDPTopologyDomRoot,
@@ -33,10 +40,9 @@ type ExecutionContextWaiter = {
   timeout: ReturnType<typeof setTimeout>;
   matches: (context: ModCDPTopologyExecutionContext) => boolean;
 };
-type AutoSessionRouterConfig = ModCDPRouterConfig & {
+type AutoSessionRouterConfig = z.input<typeof ModCDPRouterConfigSchema> & {
   upstream: UpstreamTransport;
   types: CDPTypes;
-  loopback_execution_context_timeout_ms: number;
 };
 
 const topologyConcurrency = 8;
@@ -72,7 +78,7 @@ const targetAutoAttachParams = {
  *    only the state affected by the browser event.
  */
 class AutoSessionRouter {
-  readonly router_routes: ModCDPRoutes;
+  config: ModCDPRouterConfig;
 
   // TargetID -> native flattened Target.SessionID. Updated by ensureRouteForTarget
   // and Target.attachedToTarget events; read by routing, injectors, and topology.
@@ -104,22 +110,18 @@ class AutoSessionRouter {
   // before routing. The router does not own custom command behavior or aliases.
   private readonly types: CDPTypes;
 
-  // Timeout in milliseconds for Runtime.executionContextCreated waits. Set once
-  // by the owner when constructing the router; read when installing a new
-  // execution-context waiter.
-  readonly loopback_execution_context_timeout_ms: number;
   private subscription_cleanup: (() => void) | null = null;
 
-  constructor({
-    upstream,
-    types,
-    router_routes = DEFAULT_CLIENT_ROUTER_ROUTES,
-    loopback_execution_context_timeout_ms,
-  }: AutoSessionRouterConfig) {
+  constructor({ upstream, types, ...config }: AutoSessionRouterConfig) {
     this.upstream = upstream;
     this.types = types;
-    this.router_routes = { ...router_routes };
-    this.loopback_execution_context_timeout_ms = loopback_execution_context_timeout_ms;
+    this.config = ModCDPRouterConfigSchema.parse({
+      ...config,
+      router_routes: {
+        ...DEFAULT_CLIENT_ROUTER_ROUTES,
+        ...(config.router_routes ?? {}),
+      },
+    });
   }
 
   /** Install routing event listeners and enable browser-side target discovery. */
@@ -146,6 +148,22 @@ class AutoSessionRouter {
     this.subscription_cleanup = null;
   }
 
+  toJSON() {
+    return modCDPToJSON(this, {
+      config: {
+        router_routes: this.config.router_routes,
+        loopback_execution_context_timeout_ms: this.config.loopback_execution_context_timeout_ms,
+      },
+      state: {
+        started: this.subscription_cleanup != null,
+        sessions: this.sessionId_from_targetId.size,
+        targets: this.targets.size,
+        contexts: this.contexts.size,
+        execution_context_waiters: this.execution_context_waiters.size,
+      },
+    });
+  }
+
   /** Route a CDP command using router-owned target/session policy. */
   async send(
     method: string,
@@ -155,8 +173,6 @@ class AutoSessionRouter {
     const command = this.types.nativeCommandSchema(method);
     if (!command) throw new Error(`AutoSessionRouter cannot route unknown CDP command ${method}.`);
     const domain = command.id.split(".")[0] ?? "";
-    if (domain === "Browser" || domain === "Target" || domain === "SystemInfo")
-      return await this.upstream.send(command, params);
     if (requestedSessionId != null) {
       const targetId = this.targetId_from_sessionId.get(requestedSessionId);
       if (!targetId) throw new Error(`No target is recorded for sessionId=${requestedSessionId}.`);
@@ -170,6 +186,8 @@ class AutoSessionRouter {
           : params;
       return await this.upstream.send(command, routed_params, route);
     }
+    if (domain === "Browser" || domain === "Target" || domain === "SystemInfo")
+      return await this.upstream.send(command, params);
     const route = await this.ensureRouteForTarget(
       await this.resolveTargetId(CdpDebuggeeCommandParamsSchema.parse(params)),
     );
@@ -608,7 +626,7 @@ class AutoSessionRouter {
   private waitForExecutionContextMatching(
     matches: (context: ModCDPTopologyExecutionContext) => boolean,
     waiterKey: string | null,
-    timeoutMs = this.loopback_execution_context_timeout_ms,
+    timeoutMs = this.config.loopback_execution_context_timeout_ms,
   ): Promise<ModCDPTopologyExecutionContext> {
     for (const context of this.contexts.values()) {
       if (matches(context)) return Promise.resolve(context);

@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./js/src/injector/CDPExtensionInjector.ts
+// - ./python/modcdp/injector/CDPExtensionInjector.py
 package injector
 
 import (

@@ -1,23 +1,17 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME } from "../types/modcdp.js";
 import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
-const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
-
 class NativeMessagingUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "nativemessaging" as const;
-  declare upstream_nativemessaging_host_name: string;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
 
-  constructor({
-    upstream_nativemessaging_host_name = DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
-    ...options
-  }: UpstreamTransportConfig = {}) {
-    super(options);
-    this.upstream_nativemessaging_host_name =
-      upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
+  constructor(options: UpstreamTransportConfig = {}) {
+    super({ ...options, upstream_mode: "nativemessaging" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -48,7 +42,9 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.read_native_message)
-        throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
+        throw new Error(
+          `Native messaging stdio is not connected for ${this.config.upstream_nativemessaging_host_name}.`,
+        );
       writeLengthPrefixedJSON(process.stdout, command_or_message_or_method);
       return;
     }
@@ -70,7 +66,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
 
   async connect() {
     if (typeof process !== "object" || !process?.versions?.node) {
-      throw new Error("upstream.upstream_mode=nativemessaging requires Node.");
+      throw new Error("upstream_mode=nativemessaging requires Node.");
     }
     if (this.read_native_message) return;
     this.read_native_message = (chunk) => {
@@ -86,7 +82,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
 
   async waitForPeer() {
     if (!this.read_native_message)
-      throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
+      throw new Error(`Native messaging stdio is not connected for ${this.config.upstream_nativemessaging_host_name}.`);
   }
 
   async close() {
@@ -94,6 +90,14 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
       process.stdin.off("data", this.read_native_message);
       this.read_native_message = null;
     }
+  }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return {
+      ...json,
+      state: { ...json.state, connected: this.read_native_message != null, buffered_bytes: this.buffer.length },
+    };
   }
 }
 

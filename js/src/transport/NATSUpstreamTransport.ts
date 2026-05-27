@@ -1,18 +1,16 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import net from "node:net";
 import tls from "node:tls";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import {
-  UpstreamTransport,
-  type TargetRoute,
-  type UpstreamNatsRole,
-  type UpstreamTransportConfig,
-} from "./UpstreamTransport.js";
-
-const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
-const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
-const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
+  DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX,
+  DEFAULT_UPSTREAM_NATS_URL,
+  DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS,
+} from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 type NatsTcpSocket = {
   write(data: string): void;
@@ -25,8 +23,6 @@ type NatsTcpSocket = {
 type NatsSocket = WebSocket | NatsTcpSocket;
 
 class NATSUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "nats" as const;
-  private upstream_nats_role: UpstreamNatsRole;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
   private ws_buffer = "";
@@ -40,16 +36,8 @@ class NATSUpstreamTransport extends UpstreamTransport {
   }>();
 
   constructor(options: UpstreamTransportConfig = {}) {
-    super(options);
-    const { url, upstream_nats_subject_prefix } = normalizeNatsUrl(
-      options.upstream_nats_url ?? DEFAULT_UPSTREAM_NATS_URL,
-      options.upstream_nats_subject_prefix,
-    );
-    this.upstream_nats_url = url;
-    this.upstream_nats_subject_prefix = upstream_nats_subject_prefix;
-    this.upstream_nats_role = options.upstream_nats_role ?? "client";
-    this.upstream_nats_wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
-    this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
+    super({ ...options, upstream_mode: "nats" });
+    this.client_reply_subject = `${this.config.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -82,7 +70,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
       if (!this.socket) throw new Error("NATS transport is not connected.");
       this.publish(this.outgoingSubject(), {
         type: "modcdp.nats.message",
-        ...(this.upstream_nats_role === "client" ? { reply_subject: this.client_reply_subject } : {}),
+        ...(this.config.upstream_nats_role === "client" ? { reply_subject: this.client_reply_subject } : {}),
         message: command_or_message_or_method,
       });
       return;
@@ -99,39 +87,28 @@ class NATSUpstreamTransport extends UpstreamTransport {
   }
 
   update(config: UpstreamTransportConfig = {}) {
+    const previous_subject_prefix = this.config.upstream_nats_subject_prefix;
     super.update(config);
-    if (config.upstream_nats_url || config.upstream_nats_subject_prefix) {
-      const normalized = normalizeNatsUrl(
-        config.upstream_nats_url ?? this.upstream_nats_url ?? DEFAULT_UPSTREAM_NATS_URL,
-        config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix,
-      );
-      this.upstream_nats_url = normalized.url;
-      this.upstream_nats_subject_prefix = normalized.upstream_nats_subject_prefix;
-      this.client_reply_subject = `${this.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
-    }
-    if (config.upstream_nats_role === "client" || config.upstream_nats_role === "browser")
-      this.upstream_nats_role = config.upstream_nats_role;
-    if (typeof config.upstream_nats_wait_timeout_ms === "number") {
-      this.upstream_nats_wait_timeout_ms = config.upstream_nats_wait_timeout_ms;
+    if (this.config.upstream_nats_subject_prefix !== previous_subject_prefix) {
+      this.client_reply_subject = `${this.config.upstream_nats_subject_prefix}.client.${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
     }
     return this;
   }
 
   async connect() {
     if (this.socket) return;
-    if (!this.upstream_nats_url) throw new Error("upstream.upstream_mode=nats requires upstream_nats_url.");
     try {
-      const parsed = new URL(this.upstream_nats_url);
+      const parsed = new URL(this.config.upstream_nats_url);
       if (parsed.protocol === "ws:" || parsed.protocol === "wss:") await this.connectWebSocket(parsed);
       else if (parsed.protocol === "nats:" || parsed.protocol === "tls:") await this.connectTcp(parsed);
       else
         throw new Error(
-          `upstream.upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got ${this.upstream_nats_url}.`,
+          `upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got ${this.config.upstream_nats_url}.`,
         );
       this.subscribe();
       this.publish(this.outgoingSubject(), {
         type: "modcdp.nats.hello",
-        role: this.upstream_nats_role,
+        role: this.config.upstream_nats_role,
         version: 1,
       });
     } catch (error) {
@@ -148,7 +125,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
         reject: (error: Error) => void;
         timeout: ReturnType<typeof setTimeout>;
       };
-      const wait_timeout_ms = this.upstream_nats_wait_timeout_ms ?? DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS;
+      const wait_timeout_ms = this.config.upstream_nats_wait_timeout_ms;
       const timeout = setTimeout(() => {
         this.peer_waiters.delete(waiter);
         reject(new Error(`Timed out waiting ${wait_timeout_ms}ms for NATS ModCDP peer.`));
@@ -168,7 +145,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
     for (const waiter of this.peer_waiters) {
       clearTimeout(waiter.timeout);
       waiter.reject(
-        new Error(`NATS transport for ${this.upstream_nats_subject_prefix} closed before a peer connected.`),
+        new Error(`NATS transport for ${this.config.upstream_nats_subject_prefix} closed before a peer connected.`),
       );
     }
     this.peer_waiters.clear();
@@ -234,7 +211,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
 
   private subscribe() {
     this.writeProtocol(`SUB ${this.incomingSubject()} ${this.next_sid++}\r\n`);
-    if (this.upstream_nats_role === "client") {
+    if (this.config.upstream_nats_role === "client") {
       this.writeProtocol(`SUB ${this.client_reply_subject} ${this.next_sid++}\r\n`);
     }
   }
@@ -252,11 +229,11 @@ class NATSUpstreamTransport extends UpstreamTransport {
   }
 
   private incomingSubject() {
-    return `${this.upstream_nats_subject_prefix}.${this.upstream_nats_role === "client" ? "browser_to_client" : "client_to_browser"}`;
+    return `${this.config.upstream_nats_subject_prefix}.${this.config.upstream_nats_role === "client" ? "browser_to_client" : "client_to_browser"}`;
   }
 
   private outgoingSubject() {
-    return `${this.upstream_nats_subject_prefix}.${this.upstream_nats_role === "client" ? "client_to_browser" : "browser_to_client"}`;
+    return `${this.config.upstream_nats_subject_prefix}.${this.config.upstream_nats_role === "client" ? "client_to_browser" : "browser_to_client"}`;
   }
 
   private async readWebSocket(data: unknown) {
@@ -317,6 +294,20 @@ class NATSUpstreamTransport extends UpstreamTransport {
     const message = record?.type === "modcdp.nats.message" ? record.message : parsed;
     this.parseAndEmitRecv(JSON.stringify(message));
   }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return {
+      ...json,
+      state: {
+        ...json.state,
+        connected: this.socket != null,
+        peer_seen: this.peer_seen,
+        peer_waiters: this.peer_waiters.size,
+        buffered_bytes: this.tcp_buffer.length + this.ws_buffer.length,
+      },
+    };
+  }
 }
 
 function connectOptions() {
@@ -327,22 +318,6 @@ function connectOptions() {
     version: "1",
     protocol: 1,
   };
-}
-
-function normalizeNatsUrl(url: string, upstream_nats_subject_prefix?: string | null) {
-  const parsed = new URL(url);
-  const subject = upstream_nats_subject_prefix || parsed.searchParams.get("upstream_nats_subject_prefix");
-  parsed.searchParams.delete("upstream_nats_subject_prefix");
-  return {
-    url: parsed.toString(),
-    upstream_nats_subject_prefix: sanitizeSubjectPrefix(subject || DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX),
-  };
-}
-
-function sanitizeSubjectPrefix(value: string) {
-  const subject = value.trim();
-  if (!subject || /[\s*>]/.test(subject)) throw new Error(`Invalid NATS subject prefix ${value}`);
-  return subject;
 }
 
 export {

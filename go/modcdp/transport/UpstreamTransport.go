@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./js/src/transport/UpstreamTransport.ts
+// - ./python/modcdp/transport/UpstreamTransport.py
 package transport
 
 import (
@@ -45,12 +49,7 @@ func websocketURLFor(endpoint string) (string, error) {
 type UpstreamMode string
 
 const (
-	UpstreamModeWS              UpstreamMode = "ws"
-	UpstreamModePipe            UpstreamMode = "pipe"
-	UpstreamModeNativeMessaging UpstreamMode = "nativemessaging"
-	UpstreamModeReverseWS       UpstreamMode = "reversews"
-	UpstreamModeNATS            UpstreamMode = "nats"
-	UpstreamModeChromeDebugger  UpstreamMode = "chromedebugger"
+	UpstreamModeWS UpstreamMode = "ws"
 )
 
 type UpstreamTransport struct {
@@ -81,27 +80,6 @@ func (e *UpstreamTransport) Update(config map[string]any) {
 	}
 	if value, ok := config["upstream_ws_cdp_url"].(string); ok {
 		e.Options.UpstreamWSCDPURL = value
-	}
-	if value, ok := config["upstream_nats_url"].(string); ok {
-		e.Options.UpstreamNATSURL = value
-	}
-	if value, ok := config["upstream_nats_subject_prefix"].(string); ok {
-		e.Options.UpstreamNATSSubjectPrefix = value
-	}
-	if value, ok := config["upstream_nats_role"].(string); ok {
-		e.Options.UpstreamNATSRole = value
-	}
-	if value, ok := intFromConfig(config["upstream_nats_wait_timeout_ms"]); ok {
-		e.Options.UpstreamNATSWaitTimeoutMS = value
-	}
-	if value, ok := config["upstream_reversews_bind"].(string); ok {
-		e.Options.UpstreamReverseWSBind = value
-	}
-	if value, ok := intFromConfig(config["upstream_reversews_wait_timeout_ms"]); ok {
-		e.Options.UpstreamReverseWSWaitTimeoutMS = value
-	}
-	if value, ok := config["upstream_nativemessaging_host_name"].(string); ok {
-		e.Options.UpstreamNativeMessagingHostName = value
 	}
 	if value, ok := intFromConfig(config["upstream_ws_connect_error_settle_timeout_ms"]); ok {
 		e.Options.UpstreamWSConnectErrorSettleTimeoutMS = value

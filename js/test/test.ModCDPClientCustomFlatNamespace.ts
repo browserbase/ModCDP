@@ -59,18 +59,18 @@ test("custom commands install flat namespace methods through a real service work
   try {
     await cdp.connect();
 
-    const success: boolean = await cdp.Custom.doSomething({ id: "abc" });
-    const rawSuccess: boolean = Boolean(await cdp.send("Custom.doSomething", { id: "abc" }));
+    const success: { success: boolean } = await cdp.Custom.doSomething({ id: "abc" });
+    const rawSuccess = await cdp.send("Custom.doSomething", { id: "abc" });
 
-    assert.equal(success, true);
-    assert.equal(rawSuccess, true);
+    assert.deepEqual(success, { success: true });
+    assert.deepEqual(rawSuccess, { success: true });
     if (false) {
       const typed_params: Parameters<typeof cdp.Custom.doSomething>[0] = { id: "abc" };
       void typed_params;
-      const typed_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = true;
+      const typed_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = { success: true };
       void typed_result;
-      // @ts-expect-error custom command result unwraps the single success field to boolean.
-      const bad_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = { success: true };
+      // @ts-expect-error custom command results follow native CDP result-object shape.
+      const bad_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = true;
       void bad_result;
     }
     // @ts-expect-error typed custom command params reject non-string ids statically.
@@ -173,8 +173,12 @@ test("dynamic custom command, event, and middleware registration validates throu
         phase: cdp.REQUEST,
         expression: "async (payload, next) => next(payload)",
       });
-      // @ts-expect-error Mod.addMiddleware phase is request, response, or event.
-      cdp.Mod.addMiddleware({ name: "Custom.dynamic", phase: "after", expression: "async (payload, next) => next(payload)" });
+      cdp.Mod.addMiddleware({
+        name: "Custom.dynamic",
+        // @ts-expect-error Mod.addMiddleware phase is request, response, or event.
+        phase: "after",
+        expression: "async (payload, next) => next(payload)",
+      });
     }
 
     assert.deepEqual(
@@ -208,7 +212,7 @@ test("dynamic custom command, event, and middleware registration validates throu
       { name: "Custom.dynamic", phase: "request", registered: true },
     );
 
-    assert.equal(await cdp.send("Custom.dynamic", { text: "live" }), true);
+    assert.deepEqual(await cdp.send("Custom.dynamic", { text: "live" }), { ok: true });
     await assert.rejects(() => cdp.send("Custom.dynamic", { text: "" }), /Too small/);
     await assert.rejects(() => cdp.send("Custom.dynamicBadResult", { text: "live" }), /boolean/);
     await assert.rejects(
@@ -298,7 +302,7 @@ test("assigned type registry validates updated custom command, event, and middle
   if (false) {
     const params: Parameters<typeof typed_client.Custom.updated>[0] = { count: 1 };
     void params;
-    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
+    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = { done: true };
     void result;
     typed_client.on("Custom.updatedReady", (event) => {
       const ready: boolean = event.ready;
@@ -309,15 +313,15 @@ test("assigned type registry validates updated custom command, event, and middle
     });
     // @ts-expect-error Custom.updated count is required.
     typed_client.Custom.updated({});
-    // @ts-expect-error Custom.updated unwraps the single done result field to boolean.
-    const badResult: Awaited<ReturnType<typeof typed_client.Custom.updated>> = { done: true };
+    // @ts-expect-error Custom.updated returns a CDP-style result object.
+    const badResult: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
     void badResult;
   }
 
   try {
     await cdp.connect();
 
-    assert.equal(await cdp.send("Custom.updated", { count: 1 }), true);
+    assert.deepEqual(await cdp.send("Custom.updated", { count: 1 }), { done: true });
     await assert.rejects(() => cdp.send("Custom.updated", { count: -1 }), /Too small/);
     await assert.rejects(() => cdp.send("Custom.updatedBadResult", { count: 1 }), /boolean/);
 
@@ -461,7 +465,7 @@ test("assigned type registry updates runtime validation and aliases", () => {
 
   assert.equal(typeof (cdp as unknown as { Custom: { later: unknown } }).Custom.later, "function");
   assert.deepEqual(cdp.types.command_params_schemas.get("Custom.later")?.parse({ value: 1 }), { value: 1 });
-  assert.equal(cdp.types.parseCommandResult("Custom.later", { ok: true }), true);
+  assert.deepEqual(cdp.types.parseCommandResult("Custom.later", { ok: true }), { ok: true });
   assert.deepEqual(cdp.types.parseEventPayload("Custom.laterReady", { value: "ok" }), { value: "ok" });
 });
 

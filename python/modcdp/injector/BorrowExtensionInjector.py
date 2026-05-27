@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/injector/BorrowExtensionInjector.ts
+# - ./go/modcdp/injector/BorrowExtensionInjector.go
 from __future__ import annotations
 
 import tempfile
@@ -128,8 +132,8 @@ class BorrowExtensionInjector(ExtensionInjector):
                 },
                 session_id,
             )
-            result = cast(Mapping[str, Any], status.get("result")) if isinstance(status.get("result"), Mapping) else {}
-            raw_value = result.get("value")
+            status_result = cast(Mapping[str, Any], status.get("result")) if isinstance(status.get("result"), Mapping) else {}
+            raw_value = status_result.get("value")
             value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
             if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
@@ -146,8 +150,8 @@ class BorrowExtensionInjector(ExtensionInjector):
                     },
                     session_id,
                 )
-                result = cast(Mapping[str, Any], bootstrap.get("result")) if isinstance(bootstrap.get("result"), Mapping) else {}
-                raw_value = result.get("value")
+                bootstrap_result = cast(Mapping[str, Any], bootstrap.get("result")) if isinstance(bootstrap.get("result"), Mapping) else {}
+                raw_value = bootstrap_result.get("value")
                 value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
             if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})

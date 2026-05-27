@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/transport/UpstreamTransport.py
+// - ./go/modcdp/transport/UpstreamTransport.go
 import type { z } from "zod";
 import type { LauncherConfig } from "../launcher/BrowserLauncher.js";
 import type { cdp } from "../types/generated/cdp.js";
@@ -13,6 +17,7 @@ import type {
   ProtocolResult,
 } from "../types/modcdp.js";
 import { CdpEventMessageSchema, CdpResponseMessageSchema, ModCDPUpstreamConfigSchema } from "../types/modcdp.js";
+import { modCDPToJSON } from "../types/toJSON.js";
 
 type UpstreamMode =
   | "ws" // connect via CDP WebSocket over TCP (default, used by normal CDP, loopback CDP)
@@ -22,7 +27,7 @@ type UpstreamMode =
   | "nats" // connect via NATS messaging (chrome -> NATS -> sdk via hardcoded NATS localhost:port relay)
   | "chromedebugger"; // connect via CDP over Extension API chrome.debugger to pages (Browser.* methods not supported, only page-scoped methods allowed, not recommended for production)
 type UpstreamNatsRole = "client" | "browser";
-type UpstreamTransportConfig = ModCDPUpstreamConfig;
+type UpstreamTransportConfig = z.input<typeof ModCDPUpstreamConfigSchema>;
 
 type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
@@ -36,17 +41,7 @@ type UpstreamEventListener = (
 ) => void;
 
 class UpstreamTransport {
-  config: ReturnType<typeof ModCDPUpstreamConfigSchema.parse>;
-  readonly upstream_mode!: UpstreamMode;
-  upstream_ws_cdp_url?: string | null = null;
-  upstream_nats_url?: string | null = null;
-  upstream_nats_subject_prefix?: string | null = null;
-  upstream_nats_wait_timeout_ms?: number | null = null;
-  upstream_reversews_bind?: string | null = null;
-  upstream_reversews_wait_timeout_ms?: number | null = null;
-  upstream_nativemessaging_host_name?: string | null = null;
-  upstream_ws_connect_error_settle_timeout_ms?: number | null = null;
-  upstream_cdp_send_timeout_ms = 10_000;
+  config: ModCDPUpstreamConfig;
   private next_id = 1;
   private pending = new Map<
     number,
@@ -63,7 +58,6 @@ class UpstreamTransport {
 
   constructor(options: UpstreamTransportConfig = {}) {
     this.config = ModCDPUpstreamConfigSchema.parse(options);
-    Object.assign(this, this.config);
   }
 
   async connect() {
@@ -72,7 +66,6 @@ class UpstreamTransport {
 
   update(config: UpstreamTransportConfig = {}) {
     this.config = ModCDPUpstreamConfigSchema.parse({ ...this.config, ...config });
-    Object.assign(this, this.config);
     return this;
   }
 
@@ -114,7 +107,7 @@ class UpstreamTransport {
     if (typeof command_or_message_or_method === "string") {
       const method = command_or_message_or_method;
       const sessionId = typeof route_or_sessionId === "string" ? route_or_sessionId : null;
-      const timeout_ms = options.timeout_ms ?? this.upstream_cdp_send_timeout_ms;
+      const timeout_ms = options.timeout_ms ?? this.config.upstream_cdp_send_timeout_ms;
       const id = this.next_id++;
       const message: CdpCommandMessage = {
         id,
@@ -256,6 +249,19 @@ class UpstreamTransport {
   }
 
   async waitForPeer() {}
+
+  toJSON() {
+    const { upstream_pipe_read, upstream_pipe_write, ...config } = this.config;
+    return modCDPToJSON(this, {
+      config,
+      state: {
+        pending: this.pending.size,
+        recv_listeners: this.recv_listeners.size,
+        close_listeners: this.close_listeners.size,
+        event_listeners: this.event_listeners.size,
+      },
+    });
+  }
 }
 
 function parseHostPort(value: string, defaultHost: string, defaultPort: number) {

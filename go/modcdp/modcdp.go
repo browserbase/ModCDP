@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./js/src/index.ts
+// - ./python/modcdp/__init__.py
 package modcdp
 
 import (
@@ -18,7 +22,6 @@ type CustomCommand = client.CustomCommand
 type CustomEvent = client.CustomEvent
 type CustomMiddleware = client.CustomMiddleware
 type CDPEvent = client.CDPEvent
-type LaunchOptions = launcher.LaunchOptions
 type LaunchedBrowser = launcher.LaunchedBrowser
 type BrowserLauncher = launcher.BrowserLauncher
 type LocalBrowserLauncher = launcher.LocalBrowserLauncher
@@ -37,10 +40,6 @@ type UpstreamMode = transport.UpstreamMode
 type UpstreamTransportOptions = transport.UpstreamTransportOptions
 type UpstreamTransport = transport.UpstreamTransport
 type WSUpstreamTransport = transport.WSUpstreamTransport
-type PipeUpstreamTransport = transport.PipeUpstreamTransport
-type ReverseWSUpstreamTransport = transport.ReverseWSUpstreamTransport
-type NativeMessagingUpstreamTransport = transport.NativeMessagingUpstreamTransport
-type NATSUpstreamTransport = transport.NATSUpstreamTransport
 type AutoSessionRouter = client.AutoSessionRouter
 
 var New = client.New
@@ -57,21 +56,9 @@ var NewCDPExtensionInjector = injector.NewCDPExtensionInjector
 var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewUpstreamTransport = transport.NewUpstreamTransport
 var NewWSUpstreamTransport = transport.NewWSUpstreamTransport
-var NewPipeUpstreamTransport = transport.NewPipeUpstreamTransport
-var NewReverseWSUpstreamTransport = transport.NewReverseWSUpstreamTransport
-var NewNativeMessagingUpstreamTransport = transport.NewNativeMessagingUpstreamTransport
-var NewNATSUpstreamTransport = transport.NewNATSUpstreamTransport
 var NewAutoSessionRouter = client.NewAutoSessionRouter
 
 const UpstreamModeWS = transport.UpstreamModeWS
-const UpstreamModePipe = transport.UpstreamModePipe
-const UpstreamModeNativeMessaging = transport.UpstreamModeNativeMessaging
-const UpstreamModeReverseWS = transport.UpstreamModeReverseWS
-const UpstreamModeNATS = transport.UpstreamModeNATS
-const UpstreamModeChromeDebugger = transport.UpstreamModeChromeDebugger
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
-const DefaultUpstreamReverseWSBind = transport.DefaultUpstreamReverseWSBind
-const DefaultUpstreamReverseWSWaitTimeoutMS = transport.DefaultUpstreamReverseWSWaitTimeoutMS
-const DefaultUpstreamNATSWaitTimeoutMS = transport.DefaultUpstreamNATSWaitTimeoutMS
 
 var DefaultModCDPServiceWorkerURLSuffixes = injector.DefaultModCDPServiceWorkerURLSuffixes

@@ -30,20 +30,8 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	if NewWSUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewWSUpstreamTransport returned nil")
 	}
-	if NewPipeUpstreamTransport(UpstreamTransportOptions{}) == nil {
-		t.Fatal("NewPipeUpstreamTransport returned nil")
-	}
-	if NewReverseWSUpstreamTransport(UpstreamTransportOptions{}) == nil {
-		t.Fatal("NewReverseWSUpstreamTransport returned nil")
-	}
-	if NewNativeMessagingUpstreamTransport(UpstreamTransportOptions{}) == nil {
-		t.Fatal("NewNativeMessagingUpstreamTransport returned nil")
-	}
-	if NewNATSUpstreamTransport(UpstreamTransportOptions{}) == nil {
-		t.Fatal("NewNATSUpstreamTransport returned nil")
-	}
 
-	if UpstreamModeWS != "ws" || UpstreamModePipe != "pipe" || UpstreamModeNativeMessaging != "nativemessaging" || UpstreamModeReverseWS != "reversews" || UpstreamModeNATS != "nats" || UpstreamModeChromeDebugger != "chromedebugger" {
+	if UpstreamModeWS != "ws" {
 		t.Fatal("upstream mode constants drifted")
 	}
 }

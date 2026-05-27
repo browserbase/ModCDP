@@ -12,16 +12,16 @@ const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
 test("pipe upstream constructor, update, launcher config, and unconnected errors match the transport surface", async () => {
   const transport = new PipeUpstreamTransport();
-  assert.equal(transport.upstream_mode, "pipe");
-  assert.equal(transport.upstream_ws_cdp_url, null);
+  assert.equal(transport.config.upstream_mode, "pipe");
+  assert.equal(transport.config.upstream_ws_cdp_url, undefined);
   assert.equal(
     transport.update({
       upstream_ws_cdp_url: "ws://127.0.0.1:9222/devtools/browser/ignored",
     }),
     transport,
   );
-  assert.equal(transport.upstream_ws_cdp_url, null);
-  await assert.rejects(() => transport.connect(), /upstream\.upstream_mode=pipe requires/);
+  assert.equal(transport.config.upstream_ws_cdp_url, undefined);
+  await assert.rejects(() => transport.connect(), /upstream_mode=pipe requires/);
   assert.throws(() => transport.send({ id: 1, method: "Runtime.evaluate" }), /CDP pipe is not connected/);
 });
 
@@ -79,9 +79,8 @@ test("pipe upstream launches a real browser without a CDP URL", async () => {
 
   try {
     await cdp.connect();
-    assert.equal(cdp.upstream?.upstream_mode, "pipe");
-    assert.equal(cdp.upstream.upstream_ws_cdp_url, null);
-    assert.equal(cdp.upstream?.upstream_ws_cdp_url, null);
+    assert.equal(cdp.upstream?.config.upstream_mode, "pipe");
+    assert.equal(cdp.upstream?.config.upstream_ws_cdp_url, undefined);
     await cdp.Mod.addCustomCommand("Custom.runtimeReadyState", {
       expression:
         "async () => await upstream.send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true })",

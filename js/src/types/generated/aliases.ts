@@ -32,12 +32,11 @@ type DomainName<TName extends string> = TName extends `${infer TDomain}.${string
 type MemberName<TName extends string> = TName extends `${string}.${infer TMember}` ? TMember : never;
 type RequiredKeys<TValue> = TValue extends object ? { [TKey in keyof TValue]-?: {} extends Pick<TValue, TKey> ? never : TKey }[keyof TValue] : keyof TValue;
 type HasRequiredParams<TParams> = TParams extends object ? [RequiredKeys<TParams>] extends [never] ? false : true : true;
-type SingleKey<TValue> = TValue extends object ? keyof TValue extends infer TKey ? TKey extends keyof TValue ? keyof TValue extends TKey ? TValue[TKey] : TValue : TValue : TValue : TValue;
 type NativeCommandAliasSpec<TCommand> = TCommand extends { params: infer TParams extends z.ZodType; result: infer TResult extends z.ZodType } ? { params: z.input<TParams>; result: z.output<TResult> } : never;
 type NativeEventAliasSpec<TEvent> = TEvent extends z.ZodType ? z.output<TEvent> : never;
 type CustomCommandAliasSpec<TCommand extends CdpCommandSpec> = {
   params: TCommand["params_schema"] extends z.ZodType ? z.input<TCommand["params_schema"]> : ProtocolParams;
-  result: TCommand["result_schema"] extends z.ZodType ? SingleKey<z.output<TCommand["result_schema"]>> : ProtocolResult;
+  result: TCommand["result_schema"] extends z.ZodType ? z.output<TCommand["result_schema"]> : ProtocolResult;
 };
 type CustomEventAliasSpec<TEvent extends CdpEventSpec> = TEvent["event_schema"] extends z.ZodType ? z.output<TEvent["event_schema"]> : ProtocolPayload;
 type ModCommandBase = Extract<keyof typeof Mod, `${string}Params`> extends infer TKey ? TKey extends `${infer TBase}Params` ? `${TBase}Response` extends keyof typeof Mod ? TBase : never : never : never;
@@ -1138,7 +1137,7 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
         const name = normalizeModCDPName(parsed.name);
         const params_schema = validateZodSchema(parsed.params_schema);
         const result_schema = validateZodSchema(parsed.result_schema);
-        const response = Mod.AddCustomCommandResponse.parse(await send("Mod.addCustomCommand", { ...parsed, name, params_schema: null, result_schema: null }));
+        const response = Mod.AddCustomCommandResponse.parse(await send("Mod.addCustomCommand", { ...parsed, name }));
         hooks.onCustomCommand?.(name, params_schema, result_schema);
         return response;
       }, "Mod.addCustomCommand", "command"),
@@ -1149,14 +1148,14 @@ export function createCdpAliases(send: CdpAliasSend, hooks: CdpAliasHooks = {}):
         if (direct_schema.success) {
           const name = normalizeModCDPName(direct_schema.data);
           const event_schema = validateZodSchema(direct_schema.data);
-          const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { name, event_schema: null }));
+          const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { name, event_schema }));
           hooks.onCustomEvent?.(name, event_schema);
           return response;
         }
         const object_params = Mod.AddCustomEventObjectParams.parse(parsed);
         const name = normalizeModCDPName(object_params.name);
         const event_schema = validateZodSchema(object_params.event_schema);
-        const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { ...object_params, name, event_schema: null }));
+        const response = Mod.AddCustomEventResponse.parse(await send("Mod.addCustomEvent", { ...object_params, name, event_schema }));
         hooks.onCustomEvent?.(name, event_schema);
         return response;
       }, "Mod.addCustomEvent", "command"),

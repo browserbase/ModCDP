@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./js/src/client/ModCDPClient.ts
+// - ./python/modcdp/client/ModCDPClient.py
 // ModCDPClient (Go): importable, no CLI, no demo code.
 //
 // Option groups mirror the JS / Python ports:
@@ -80,10 +84,6 @@ type UpstreamMode = transportpkg.UpstreamMode
 type UpstreamTransportOptions = types.UpstreamTransportOptions
 type UpstreamTransport = transportpkg.UpstreamTransport
 type WSUpstreamTransport = transportpkg.WSUpstreamTransport
-type PipeUpstreamTransport = transportpkg.PipeUpstreamTransport
-type ReverseWSUpstreamTransport = transportpkg.ReverseWSUpstreamTransport
-type NativeMessagingUpstreamTransport = transportpkg.NativeMessagingUpstreamTransport
-type NATSUpstreamTransport = transportpkg.NATSUpstreamTransport
 type AutoSessionRouter = router.AutoSessionRouter
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
@@ -96,18 +96,11 @@ var NewCLIExtensionInjector = injector.NewCLIExtensionInjector
 var NewCDPExtensionInjector = injector.NewCDPExtensionInjector
 var NewBorrowExtensionInjector = injector.NewBorrowExtensionInjector
 var NewWSUpstreamTransport = transportpkg.NewWSUpstreamTransport
-var NewPipeUpstreamTransport = transportpkg.NewPipeUpstreamTransport
-var NewReverseWSUpstreamTransport = transportpkg.NewReverseWSUpstreamTransport
-var NewNativeMessagingUpstreamTransport = transportpkg.NewNativeMessagingUpstreamTransport
-var NewNATSUpstreamTransport = transportpkg.NewNATSUpstreamTransport
 var NewAutoSessionRouter = router.NewAutoSessionRouter
 
 var DefaultModCDPServiceWorkerURLSuffixes = injector.DefaultModCDPServiceWorkerURLSuffixes
 
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
-const DefaultUpstreamReverseWSBind = transportpkg.DefaultUpstreamReverseWSBind
-const DefaultUpstreamReverseWSWaitTimeoutMS = transportpkg.DefaultUpstreamReverseWSWaitTimeoutMS
-const DefaultUpstreamNATSWaitTimeoutMS = transportpkg.DefaultUpstreamNATSWaitTimeoutMS
 
 func firstNonEmptyString(values ...string) string {
 	for _, value := range values {
@@ -411,7 +404,7 @@ func New(opts Options) *ModCDPClient {
 	if opts.Launcher.LauncherMode == "" {
 		if opts.Upstream.UpstreamMode == "ws" && opts.Upstream.UpstreamWSCDPURL != "" {
 			opts.Launcher.LauncherMode = "remote"
-		} else if opts.Upstream.UpstreamMode == "ws" || opts.Upstream.UpstreamMode == "pipe" {
+		} else if opts.Upstream.UpstreamMode == "ws" {
 			opts.Launcher.LauncherMode = "local"
 		} else {
 			opts.Launcher.LauncherMode = "none"
@@ -439,9 +432,6 @@ func New(opts Options) *ModCDPClient {
 	}
 	if opts.ServerOptions == nil && !opts.serverOptionsConfigured {
 		opts.ServerOptions = &ServerConfig{}
-	}
-	if opts.Upstream.UpstreamMode != "ws" && opts.Upstream.UpstreamMode != "pipe" && opts.ServerOptions != nil && opts.ServerOptions.Router.RouterRoutes == nil {
-		opts.ServerOptions.Router.RouterRoutes = map[string]string{"*.*": "chromedebugger"}
 	}
 	if opts.Injector.InjectorServiceWorkerURLSuffixes == nil {
 		opts.Injector.InjectorServiceWorkerURLSuffixes = append([]string{}, DefaultModCDPServiceWorkerURLSuffixes...)
@@ -472,15 +462,6 @@ func New(opts Options) *ModCDPClient {
 	}
 	if opts.Upstream.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
 		opts.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = DefaultWSConnectErrorSettleTimeoutMS
-	}
-	if opts.Upstream.UpstreamReverseWSBind == "" {
-		opts.Upstream.UpstreamReverseWSBind = DefaultUpstreamReverseWSBind
-	}
-	if opts.Upstream.UpstreamNATSWaitTimeoutMS == 0 {
-		opts.Upstream.UpstreamNATSWaitTimeoutMS = DefaultUpstreamNATSWaitTimeoutMS
-	}
-	if opts.Upstream.UpstreamReverseWSWaitTimeoutMS == 0 {
-		opts.Upstream.UpstreamReverseWSWaitTimeoutMS = DefaultUpstreamReverseWSWaitTimeoutMS
 	}
 	client := &ModCDPClient{
 		Launcher:                opts.Launcher,
@@ -529,7 +510,7 @@ func (c *ModCDPClient) Connect() error {
 		c.stopHeartbeat()
 		c.rejectAll(err)
 	})
-	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
+	if c.Upstream.UpstreamMode != "ws" {
 		if err := c.transport.WaitForPeer(); err != nil {
 			c.Close()
 			return err
@@ -700,7 +681,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	launcher.Update(LaunchOptions{LauncherLocalLoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
 	transport.Update(launcher.ConfigForUpstream())
 
-	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
+	if c.Upstream.UpstreamMode != "ws" {
 		if err := transport.Connect(); err != nil {
 			return err
 		}
@@ -724,7 +705,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	if c.launchedBrowser != nil {
 		launchedCDPURL = c.launchedBrowser.CDPURL
 	}
-	if c.Upstream.UpstreamMode == "ws" || c.Upstream.UpstreamMode == "pipe" {
+	if c.Upstream.UpstreamMode == "ws" {
 		if err := transport.Connect(); err != nil {
 			return err
 		}
@@ -743,9 +724,6 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	}
 
 	serverConfig := map[string]any{}
-	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" && launchedCDPURL != "" {
-		serverConfig["upstream"] = map[string]any{"upstream_ws_cdp_url": launchedCDPURL}
-	}
 	for key, value := range launcher.ConfigForServer() {
 		serverConfig[key] = value
 	}
@@ -795,12 +773,6 @@ func (c *ModCDPClient) ensureModCDPServerConfigured() error {
 func (c *ModCDPClient) upstreamTransportConfig() map[string]any {
 	return map[string]any{
 		"upstream_ws_cdp_url":                  c.Upstream.UpstreamWSCDPURL,
-		"upstream_nats_url":                    c.Upstream.UpstreamNATSURL,
-		"upstream_nats_subject_prefix":         c.Upstream.UpstreamNATSSubjectPrefix,
-		"upstream_nats_wait_timeout_ms":        c.Upstream.UpstreamNATSWaitTimeoutMS,
-		"upstream_reversews_bind":              c.Upstream.UpstreamReverseWSBind,
-		"upstream_reversews_wait_timeout_ms":   c.Upstream.UpstreamReverseWSWaitTimeoutMS,
-		"upstream_nativemessaging_host_name":   c.Upstream.UpstreamNativeMessagingHostName,
 		"injector_service_worker_extension_id": c.Injector.InjectorServiceWorkerExtensionID,
 	}
 }
@@ -1216,7 +1188,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		if err != nil {
 			return nil, err
 		}
-		if c.ExtSessionID == "" && (c.Upstream.UpstreamMode == "ws" || c.Upstream.UpstreamMode == "pipe") {
+		if c.ExtSessionID == "" {
 			completedAt := time.Now().UnixMilli()
 			c.LastCommandTiming = map[string]any{
 				"method":       method,
@@ -1233,7 +1205,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 			return nil, err
 		}
 	}
-	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
+	if c.Upstream.UpstreamMode != "ws" {
 		if method != "Mod.configure" {
 			if err := c.ensureModCDPServerConfigured(); err != nil {
 				return nil, err
@@ -1412,14 +1384,6 @@ func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 	switch c.Upstream.UpstreamMode {
 	case "ws":
 		return NewWSUpstreamTransport(c.Upstream)
-	case "pipe":
-		return NewPipeUpstreamTransport(c.Upstream)
-	case "reversews":
-		return NewReverseWSUpstreamTransport(c.Upstream)
-	case "nativemessaging":
-		return NewNativeMessagingUpstreamTransport(c.Upstream)
-	case "nats":
-		return NewNATSUpstreamTransport(c.Upstream)
 	default:
 		return nil
 	}
@@ -1457,7 +1421,7 @@ func isKnownLaunchMode(mode string) bool {
 }
 
 func isKnownUpstreamMode(mode string) bool {
-	return mode == "ws" || mode == "pipe" || mode == "nativemessaging" || mode == "reversews" || mode == "nats" || mode == "chromedebugger"
+	return mode == "ws"
 }
 
 func isKnownExtensionMode(mode string) bool {

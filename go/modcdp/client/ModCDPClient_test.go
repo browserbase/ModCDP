@@ -34,9 +34,6 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 		Upstream: UpstreamTransportOptions{
 			UpstreamMode:                          "ws",
 			UpstreamWSCDPURL:                      "http://127.0.0.1:9222",
-			UpstreamNATSWaitTimeoutMS:             345,
-			UpstreamReverseWSWaitTimeoutMS:        456,
-			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
 		Injector: InjectorOptions{
@@ -245,11 +242,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 			LauncherBBSessionCreateParams:     map[string]any{"keepAlive": true},
 		},
 		Upstream: UpstreamTransportOptions{
-			UpstreamMode:                          "nativemessaging",
-			UpstreamNATSSubjectPrefix:             "modcdp.test",
-			UpstreamNATSWaitTimeoutMS:             789,
-			UpstreamReverseWSWaitTimeoutMS:        1_234,
-			UpstreamNativeMessagingHostName:       "com.modcdp.custom",
+			UpstreamMode:                          "ws",
 			UpstreamWSConnectErrorSettleTimeoutMS: 321,
 		},
 		Injector: InjectorOptions{
@@ -278,7 +271,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 	raw := string(encoded)
 	for _, wrong := range []string{
 		"Launcher", "ExecutablePath", "LocalCDPTransport", "BrowserbaseAPIKey",
-		"Upstream", "UpstreamNATSSubjectPrefix", "UpstreamNATSWaitTimeoutMS", "UpstreamReverseWSWaitTimeoutMS", "UpstreamNativeMessagingHostName",
+		"Upstream",
 		"Injector", "InjectorServiceWorkerURLSuffixes", "InjectorTrustServiceWorkerTarget",
 		"Client", "HydrateAliases", "CustomCommands",
 	} {
@@ -296,10 +289,7 @@ func TestModCDPClientOptionsMarshalToSnakeCaseConfigShape(t *testing.T) {
 		`"launcher_bb_session_create_params"`,
 		`"upstream"`,
 		`"upstream_mode"`,
-		`"upstream_nats_subject_prefix"`,
-		`"upstream_nats_wait_timeout_ms"`,
-		`"upstream_reversews_wait_timeout_ms"`,
-		`"upstream_nativemessaging_host_name"`,
+		`"upstream_ws_connect_error_settle_timeout_ms"`,
 		`"injector"`,
 		`"injector_mode"`,
 		`"injector_service_worker_url_suffixes"`,
@@ -356,18 +346,6 @@ func TestModCDPClientPreservesExplicitNoneServerOptionsConfig(t *testing.T) {
 	}
 }
 
-func TestModCDPClientAllowsDisabledServerOptionsWithModCDPServerUpstreams(t *testing.T) {
-	for _, mode := range []string{"nativemessaging", "reversews", "nats"} {
-		cdp := New(Options{
-			Upstream:      UpstreamTransportOptions{UpstreamMode: mode},
-			ServerOptions: ServerOptionsNone,
-		})
-		if cdp.ServerOptions != nil {
-			t.Fatalf("%s ServerOptions = %#v", mode, cdp.ServerOptions)
-		}
-	}
-}
-
 func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.T) {
 	cdp := New(Options{})
 
@@ -377,31 +355,6 @@ func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.
 	injectorConfig := cdp.baseInjectorOptions(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 1 || injectorConfig.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("injector InjectorServiceWorkerURLSuffixes = %#v", injectorConfig.InjectorServiceWorkerURLSuffixes)
-	}
-}
-
-func TestModCDPClientDefaultsUnconfiguredModCDPServerUpstreamsToNoInjector(t *testing.T) {
-	for _, mode := range []string{"nativemessaging", "reversews", "nats"} {
-		launched := New(Options{
-			Launcher: LaunchOptions{LauncherMode: "local"},
-			Upstream: UpstreamTransportOptions{UpstreamMode: mode},
-		})
-		if launched.Launcher.LauncherMode != "local" {
-			t.Fatalf("%s launched Launcher.LauncherMode = %q", mode, launched.Launcher.LauncherMode)
-		}
-		if launched.Injector.InjectorMode != "none" {
-			t.Fatalf("%s launched Injector.InjectorMode = %q", mode, launched.Injector.InjectorMode)
-		}
-
-		attachOnly := New(Options{
-			Upstream: UpstreamTransportOptions{UpstreamMode: mode},
-		})
-		if attachOnly.Launcher.LauncherMode != "none" {
-			t.Fatalf("%s attach-only Launcher.LauncherMode = %q", mode, attachOnly.Launcher.LauncherMode)
-		}
-		if attachOnly.Injector.InjectorMode != "none" {
-			t.Fatalf("%s attach-only Injector.InjectorMode = %q", mode, attachOnly.Injector.InjectorMode)
-		}
 	}
 }
 

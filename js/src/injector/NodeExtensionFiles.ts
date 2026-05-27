@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/ExtensionInjector.py
+// - ./go/modcdp/injector/ExtensionInjector.go
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

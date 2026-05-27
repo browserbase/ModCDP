@@ -1,4 +1,9 @@
-import { ExtensionInjector, type InjectorConfig, type TargetInfo } from "./ExtensionInjector.js";
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/CDPExtensionInjector.py
+// - ./go/modcdp/injector/CDPExtensionInjector.go
+import { ExtensionInjector, InjectorConfigSchema, type TargetInfo } from "./ExtensionInjector.js";
+import type { z } from "zod";
 import { defaultModCDPExtensionPath, prepareUnpackedExtension } from "./NodeExtensionFiles.js";
 import * as Extensions from "../types/generated/zod/Extensions.js";
 
@@ -6,9 +11,8 @@ class CDPExtensionInjector extends ExtensionInjector {
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: InjectorConfig = {}) {
-    super(options);
-    this.config.injector_mode = "cdp";
+  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...options, injector_mode: "cdp" });
   }
 
   async prepare() {
@@ -46,11 +50,11 @@ class CDPExtensionInjector extends ExtensionInjector {
     if (typeof extension_id !== "string" || !extension_id) {
       throw new Error(`Extensions.loadUnpacked returned no extension id (got ${JSON.stringify(load_result)})`);
     }
-    this.config.injector_cdp_extension_id = extension_id;
-    this.config.injector_service_worker_extension_id = extension_id;
+    this.extension_id = extension_id;
+    this.service_worker_extension_id = extension_id;
 
     const sw_url_prefix = `chrome-extension://${extension_id}/`;
-    const deadline = Date.now() + (this.config.injector_service_worker_ready_timeout_ms ?? 60_000);
+    const deadline = Date.now() + this.config.injector_service_worker_ready_timeout_ms;
     while (Date.now() < deadline) {
       const target_infos = await this.targetInfos();
       const target = target_infos.find(
@@ -65,7 +69,7 @@ class CDPExtensionInjector extends ExtensionInjector {
             extension_id,
           };
       }
-      await new Promise((resolve) => setTimeout(resolve, this.config.injector_service_worker_poll_interval_ms ?? 100));
+      await new Promise((resolve) => setTimeout(resolve, this.config.injector_service_worker_poll_interval_ms));
     }
     throw new Error(`Timed out waiting for service worker target for extension ${extension_id}.`);
   }

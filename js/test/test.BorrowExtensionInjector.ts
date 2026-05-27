@@ -27,8 +27,8 @@ test("BorrowExtensionInjector bootstraps ModCDP inside a live extension service 
   try {
     await owner.connect();
     cdp = new ModCDPClient({
-      launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.upstream_ws_cdp_url },
-      upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+      launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
+      upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
       injector: {
         injector_mode: "borrow",
         injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],

@@ -148,12 +148,6 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *tes
 	if transportConfig["upstream_ws_cdp_url"] != "" {
 		t.Fatalf("transport cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
-	if transportConfig["upstream_pipe_read"] != chrome.PipeRead {
-		t.Fatal("expected transport pipe_read to use launched pipe")
-	}
-	if transportConfig["upstream_pipe_write"] != chrome.PipeWrite {
-		t.Fatal("expected transport pipe_write to use launched pipe")
-	}
 	if chrome.CDPURL != "" {
 		t.Fatalf("CDPURL = %q", chrome.CDPURL)
 	}

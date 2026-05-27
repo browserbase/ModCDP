@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
@@ -5,9 +7,17 @@ import {
   type CdpResponseMessage,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
+import { z } from "zod";
 
 const DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME = "com.modcdp.bridge";
 const DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+
+const NativeMessagingDownstreamTransportConfigSchema = z
+  .object({
+    upstream_nativemessaging_host_name: z.string().default(DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME),
+    reconnect_interval_ms: z.number().positive().default(DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS),
+  })
+  .strict();
 
 /**
  * Owns the native messaging downstream connection from the extension service
@@ -31,13 +41,12 @@ const DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  */
 class NativeMessagingDownstreamTransport extends DownstreamTransport {
   readonly name = "nativemessaging" as const;
+  config: z.infer<typeof NativeMessagingDownstreamTransportConfigSchema> =
+    NativeMessagingDownstreamTransportConfigSchema.parse({});
 
-  // Configured native host name. Set by start, read by reconnect scheduling.
-  private host_name: string | null = null;
-
-  // Reconnect interval currently configured for the native host. Set by start
-  // and read by disconnect/error handling.
-  private reconnect_interval_ms = DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS;
+  // True after start configures the native host. Cleared by stop and read by
+  // reconnect scheduling/status.
+  private started = false;
 
   // Active native messaging port. Set by connect, cleared by disconnect/error,
   // read by start and emit.
@@ -64,30 +73,24 @@ class NativeMessagingDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the nativemessaging downstream connection. */
-  start(
-    hostName = DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME,
-    {
-      reconnect_interval_ms = DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS,
-    }: {
-      reconnect_interval_ms?: number;
-    } = {},
-  ) {
-    this.host_name = hostName;
-    this.reconnect_interval_ms = reconnect_interval_ms;
-    return this.connect(hostName);
+  start(hostName?: string, options: z.input<typeof NativeMessagingDownstreamTransportConfigSchema> = {}) {
+    this.config = NativeMessagingDownstreamTransportConfigSchema.parse({
+      ...options,
+      upstream_nativemessaging_host_name: hostName,
+    });
+    this.started = true;
+    return this.connect(this.config.upstream_nativemessaging_host_name);
   }
 
   /** Start polling for native messaging clients using the shipped extension default. */
   startPollingForClients() {
-    return this.start(DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME, {
-      reconnect_interval_ms: DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS,
-    });
+    return this.start();
   }
 
   /** Stop reconnecting and disconnect the active native messaging port. */
   stop(reason = "stopped") {
-    const upstream_nativemessaging_host_name = this.host_name;
-    this.host_name = null;
+    const upstream_nativemessaging_host_name = this.started ? this.config.upstream_nativemessaging_host_name : null;
+    this.started = false;
     if (this.reconnect_timer) {
       clearTimeout(this.reconnect_timer);
       this.reconnect_timer = null;
@@ -122,23 +125,23 @@ class NativeMessagingDownstreamTransport extends DownstreamTransport {
       connected: this.connected,
       attempts: this.attempts,
       last_error: this.last_error,
-      config: this.host_name ? { upstream_nativemessaging_host_name: this.host_name } : {},
+      config: this.started ? this.config : {},
     };
   }
 
-  private scheduleReconnect(delay_ms: number) {
-    if (!this.host_name) return;
+  private scheduleReconnect() {
+    if (!this.started) return;
     if (this.reconnect_timer) return;
     this.reconnect_timer = setTimeout(() => {
       this.reconnect_timer = null;
-      if (this.host_name) this.connect(this.host_name);
-    }, delay_ms);
+      if (this.started) this.connect(this.config.upstream_nativemessaging_host_name);
+    }, this.config.reconnect_interval_ms);
   }
 
   private connect(hostName: string) {
     const chrome_api = globalThis.chrome;
     if (!chrome_api?.runtime?.connectNative) {
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
       return {
         upstream_nativemessaging_host_name: hostName,
         connected: false,
@@ -163,13 +166,13 @@ class NativeMessagingDownstreamTransport extends DownstreamTransport {
       port.onDisconnect.addListener(() => {
         if (this.port === port) this.port = null;
         this.last_error = chrome_api.runtime.lastError?.message ?? "Native messaging port disconnected.";
-        this.scheduleReconnect(this.reconnect_interval_ms);
+        this.scheduleReconnect();
       });
       return { upstream_nativemessaging_host_name: hostName, connected: true };
     } catch (error) {
       this.port = null;
       this.last_error = error instanceof Error ? error.message : String(error);
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
       return {
         upstream_nativemessaging_host_name: hostName,
         connected: false,

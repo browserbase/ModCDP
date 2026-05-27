@@ -6,7 +6,7 @@ import { NativeMessagingUpstreamTransport } from "../src/transport/NativeMessagi
 describe.sequential("NativeMessagingUpstreamTransport", () => {
   test("nativemessaging upstream connects to native messaging stdio directly", async () => {
     const transport = new NativeMessagingUpstreamTransport();
-    assert.equal(transport.upstream_nativemessaging_host_name, "com.modcdp.bridge");
+    assert.equal(transport.config.upstream_nativemessaging_host_name, "com.modcdp.bridge");
 
     try {
       await transport.connect();

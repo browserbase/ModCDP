@@ -108,7 +108,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     : ({ launcher_mode: "local", ...launch_options } as const);
   const upstream = {
     upstream_mode,
-    upstream_ws_cdp_url: cdp_url,
+    ...(cdp_url ? { upstream_ws_cdp_url: cdp_url } : {}),
     ...(upstream_mode === "reversews"
       ? { upstream_reversews_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS }
       : {}),
@@ -247,7 +247,7 @@ async function main() {
 
   try {
     await cdp.connect();
-    console.log("upstream cdp:", cdp.upstream.upstream_ws_cdp_url);
+    console.log("upstream cdp:", cdp.upstream.config.upstream_ws_cdp_url);
     console.log("connected; ext", cdp.injector?.extension_id, "session", cdp.injector?.session_id);
     console.log("connect timing    ->", cdp.connect_timing);
 

@@ -1,6 +1,8 @@
-from .NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from .NATSUpstreamTransport import NATSUpstreamTransport
-from .PipeUpstreamTransport import PipeUpstreamTransport
-from .ReverseWSUpstreamTransport import ReverseWSUpstreamTransport
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/transport/UpstreamTransport.ts
+# - ./js/src/transport/WSUpstreamTransport.ts
+# - ./go/modcdp/transport/UpstreamTransport.go
+# - ./go/modcdp/transport/WSUpstreamTransport.go
 from .UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 from .WSUpstreamTransport import WSUpstreamTransport

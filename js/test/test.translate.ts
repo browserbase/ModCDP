@@ -37,10 +37,16 @@ test("translate routes, wraps, and unwraps ModCDP protocol messages deterministi
   );
   assert.equal(wrapped.target, "service_worker");
   assert.equal(wrapped.steps[0]?.method, "Runtime.callFunctionOn");
-  const wrapped_step_params = wrapped.steps[0]?.params as { functionDeclaration?: unknown } | undefined;
-  assert.match(String(wrapped_step_params?.functionDeclaration), /const upstream = globalThis\.ModCDP\.client/);
-  assert.match(String(wrapped_step_params?.functionDeclaration), /const cdpSessionId = "session-1"/);
-  assert.equal(wrapped.steps[0]?.unwrap, "runtime");
+  const wrapped_step_params = wrapped.steps[0]?.params as
+    | { arguments?: Array<{ value?: unknown }>; functionDeclaration?: unknown }
+    | undefined;
+  assert.match(String(wrapped_step_params?.functionDeclaration), /globalThis\.ModCDP\.handleCommand/);
+  assert.deepEqual(JSON.parse(String(wrapped_step_params?.arguments?.[1]?.value)), {
+    expression: "({ ok: true })",
+    params: { value: 1 },
+  });
+  assert.equal(wrapped_step_params?.arguments?.[2]?.value, "session-1");
+  assert.equal(wrapped.steps[0]?.unwrap, "runtime_json");
 
   const configured = wrapCommandIfNeeded("Mod.configure", {
     router: { router_routes: { "*.*": "loopback_cdp" } },

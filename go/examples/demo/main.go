@@ -5,9 +5,7 @@
 //   --direct     *.* -> direct_cdp on the client.
 //   --loopback   *.* -> service_worker on client; *.* -> loopback_cdp on server. Default.
 //   --debugger   *.* -> service_worker on client; *.* -> chromedebugger on server.
-//   --upstream   ws|pipe|reversews|nativemessaging|nats. Defaults to ws.
-//                reversews and nativemessaging use the fixed extension defaults:
-//                ws://127.0.0.1:29292 and com.modcdp.bridge.
+//   --upstream   ws. Defaults to ws.
 
 package main
 
@@ -30,16 +28,9 @@ import (
 
 const demoCDPSendTimeoutMS = 60_000
 const demoExecutionContextTimeoutMS = 60_000
-const reverseTransportWaitTimeoutMS = 60_000
 
 func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
 	upstream := modcdp.UpstreamTransportOptions{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
-	if upstreamMode == "reversews" {
-		upstream.UpstreamReverseWSWaitTimeoutMS = reverseTransportWaitTimeoutMS
-	}
-	if upstreamMode == "nats" {
-		upstream.UpstreamNATSWaitTimeoutMS = reverseTransportWaitTimeoutMS
-	}
 	launcher := launchOptions
 	if cdpURL != "" {
 		launcher.LauncherMode = "remote"
@@ -165,15 +156,15 @@ func parseArgs(argv []string) (string, string, bool, error) {
 			upstreamMode = strings.TrimPrefix(a, "--upstream=")
 		}
 	}
-	for _, mode := range []string{"ws", "pipe", "reversews", "nativemessaging", "nats"} {
+	for _, mode := range []string{"ws"} {
 		if flags[mode] {
 			upstreamMode = mode
 		}
 	}
 	switch upstreamMode {
-	case "ws", "pipe", "reversews", "nativemessaging", "nats":
+	case "ws":
 	default:
-		return "", "", false, fmt.Errorf("unknown --upstream=%s; expected ws|pipe|reversews|nativemessaging|nats", upstreamMode)
+		return "", "", false, fmt.Errorf("unknown --upstream=%s; expected ws", upstreamMode)
 	}
 	live := flags["live"]
 	mode := "loopback"
@@ -185,12 +176,6 @@ func parseArgs(argv []string) (string, string, bool, error) {
 		mode = "loopback"
 	} else if live {
 		mode = "direct"
-	}
-	if live && upstreamMode == "pipe" {
-		return "", "", false, fmt.Errorf("--live cannot be combined with --upstream=pipe because pipe handles only exist for launched browsers")
-	}
-	if mode == "direct" && (upstreamMode == "reversews" || upstreamMode == "nativemessaging" || upstreamMode == "nats") {
-		return "", "", false, fmt.Errorf("--direct cannot be combined with --upstream=%s; reverse transports terminate at ModCDPServer", upstreamMode)
 	}
 	return mode, upstreamMode, live, nil
 }
@@ -223,10 +208,10 @@ func main() {
 			headless = true
 		}
 		launchOptions = modcdp.LaunchOptions{
-			ExecutablePath:       chromePath,
-			ChromeReadyTimeoutMS: 60_000,
-			Headless:             &headless,
-			Sandbox:              &sandbox,
+			LauncherLocalExecutablePath:       chromePath,
+			LauncherLocalChromeReadyTimeoutMS: 60_000,
+			LauncherLocalHeadless:             &headless,
+			LauncherLocalSandbox:              &sandbox,
 		}
 	}
 

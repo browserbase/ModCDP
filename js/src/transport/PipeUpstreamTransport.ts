@@ -1,21 +1,16 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
 import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 class PipeUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "pipe" as const;
   private buffer = "";
   private pipe_cleanup: (() => void) | null = null;
 
-  private upstream_pipe_read: NodeJS.ReadableStream | null;
-  private upstream_pipe_write: NodeJS.WritableStream | null;
-
   constructor(options: UpstreamTransportConfig = {}) {
-    super(options);
-    this.upstream_ws_cdp_url = null;
-    this.upstream_pipe_read = options.upstream_pipe_read ?? null;
-    this.upstream_pipe_write = options.upstream_pipe_write ?? null;
+    super({ ...options, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -45,8 +40,8 @@ class PipeUpstreamTransport extends UpstreamTransport {
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
     if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
-      if (!this.upstream_pipe_write || !this.pipe_cleanup) throw new Error("CDP pipe is not connected.");
-      this.upstream_pipe_write.write(`${JSON.stringify(command_or_message_or_method)}\0`);
+      if (!this.config.upstream_pipe_write || !this.pipe_cleanup) throw new Error("CDP pipe is not connected.");
+      this.config.upstream_pipe_write.write(`${JSON.stringify(command_or_message_or_method)}\0`);
       return;
     }
     if (typeof command_or_message_or_method === "string") {
@@ -61,10 +56,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
   }
 
   update(config: UpstreamTransportConfig = {}) {
-    super.update(config);
-    this.upstream_ws_cdp_url = null;
-    this.upstream_pipe_read = config.upstream_pipe_read ?? this.upstream_pipe_read;
-    this.upstream_pipe_write = config.upstream_pipe_write ?? this.upstream_pipe_write;
+    super.update({ ...config, upstream_mode: "pipe", upstream_ws_cdp_url: undefined });
     return this;
   }
 
@@ -73,23 +65,23 @@ class PipeUpstreamTransport extends UpstreamTransport {
   }
 
   async connect() {
-    if (!this.upstream_pipe_read || !this.upstream_pipe_write) {
-      throw new Error("upstream.upstream_mode=pipe requires launcher-provided CDP pipe handles.");
+    if (!this.config.upstream_pipe_read || !this.config.upstream_pipe_write) {
+      throw new Error("upstream_mode=pipe requires launcher-provided CDP pipe handles.");
     }
     if (this.pipe_cleanup) return;
     const on_data = (chunk: Buffer | string) => this.read(chunk);
     const on_end = () => this.handleClose(new Error("CDP pipe closed"));
     const on_read_error = () => this.handleClose(new Error("CDP pipe error"));
     const on_write_error = () => this.handleClose(new Error("CDP pipe write error"));
-    this.upstream_pipe_read.on("data", on_data);
-    this.upstream_pipe_read.on("end", on_end);
-    this.upstream_pipe_read.on("error", on_read_error);
-    this.upstream_pipe_write.on("error", on_write_error);
+    this.config.upstream_pipe_read.on("data", on_data);
+    this.config.upstream_pipe_read.on("end", on_end);
+    this.config.upstream_pipe_read.on("error", on_read_error);
+    this.config.upstream_pipe_write.on("error", on_write_error);
     this.pipe_cleanup = () => {
-      this.upstream_pipe_read?.off("data", on_data);
-      this.upstream_pipe_read?.off("end", on_end);
-      this.upstream_pipe_read?.off("error", on_read_error);
-      this.upstream_pipe_write?.off("error", on_write_error);
+      this.config.upstream_pipe_read?.off("data", on_data);
+      this.config.upstream_pipe_read?.off("end", on_end);
+      this.config.upstream_pipe_read?.off("error", on_read_error);
+      this.config.upstream_pipe_write?.off("error", on_write_error);
     };
   }
 
@@ -98,10 +90,10 @@ class PipeUpstreamTransport extends UpstreamTransport {
     this.pipe_cleanup = null;
     pipe_cleanup?.();
     try {
-      this.upstream_pipe_write?.end();
+      this.config.upstream_pipe_write?.end();
     } catch {}
     try {
-      (this.upstream_pipe_read as { destroy?: () => void } | null)?.destroy?.();
+      (this.config.upstream_pipe_read as { destroy?: () => void } | undefined)?.destroy?.();
     } catch {}
   }
 
@@ -121,6 +113,14 @@ class PipeUpstreamTransport extends UpstreamTransport {
     this.pipe_cleanup = null;
     pipe_cleanup?.();
     this.emitClose(error);
+  }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return {
+      ...json,
+      state: { ...json.state, connected: this.pipe_cleanup != null, buffered_bytes: this.buffer.length },
+    };
   }
 }
 

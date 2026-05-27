@@ -1,4 +1,9 @@
-import { ExtensionInjector, type InjectorConfig } from "./ExtensionInjector.js";
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/CLIExtensionInjector.py
+// - ./go/modcdp/injector/CLIExtensionInjector.go
+import { ExtensionInjector, InjectorConfigSchema } from "./ExtensionInjector.js";
+import type { z } from "zod";
 import {
   defaultModCDPExtensionPath,
   extensionIdFromManifestKey,
@@ -9,9 +14,8 @@ class CLIExtensionInjector extends ExtensionInjector {
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: InjectorConfig = {}) {
-    super(options);
-    this.config.injector_mode = "cli";
+  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...options, injector_mode: "cli" });
   }
 
   async prepare() {
@@ -50,8 +54,8 @@ class CLIExtensionInjector extends ExtensionInjector {
       this.extension_id = await extensionIdFromManifestKey(this.unpacked_extension_path);
     }
     if (this.extension_id) {
-      this.config.injector_cli_extension_id = this.extension_id;
-      this.config.injector_service_worker_extension_id = this.extension_id;
+      this.service_worker_extension_id = this.extension_id;
+      this.update({ injector_service_worker_extension_id: this.extension_id });
     }
     if (this.unpacked_extension_path) this.extra_args = [`--load-extension=${this.unpacked_extension_path}`];
     return this.extension_id;

@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
@@ -5,10 +7,22 @@ import {
   type CdpResponseMessage,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
+import { z } from "zod";
 
 const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 const DEFAULT_NATS_BRIDGE_URL = "ws://127.0.0.1:4223";
 const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
+
+const NATSDownstreamTransportConfigSchema = z
+  .object({
+    upstream_nats_url: z.string().default(DEFAULT_NATS_BRIDGE_URL),
+    upstream_nats_subject_prefix: z
+      .string()
+      .refine((value) => value.trim().length > 0 && !/[\s*>]/.test(value), "Invalid NATS subject prefix")
+      .default(DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX),
+    reconnect_interval_ms: z.number().positive().default(DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS),
+  })
+  .strict();
 
 /**
  * Owns the NATS-over-WebSocket downstream connection from the extension service
@@ -33,16 +47,11 @@ const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
  */
 class NATSDownstreamTransport extends DownstreamTransport {
   readonly name = "nats" as const;
+  config: z.infer<typeof NATSDownstreamTransportConfigSchema> = NATSDownstreamTransportConfigSchema.parse({});
 
-  // Configured NATS WebSocket URL. Set by start and read by reconnect handling.
-  private endpoint: string | null = null;
-
-  // Configured NATS subject prefix. Set by start and read by SUB/PUB handling.
-  private subject_prefix = DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX;
-
-  // Reconnect interval currently configured for the endpoint. Set by start and
-  // read by error/close handlers.
-  private reconnect_interval_ms = DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS;
+  // True after start configures the NATS endpoint. Cleared by stop and read by
+  // reconnect scheduling/status.
+  private started = false;
 
   // Active NATS WebSocket. Set by connect, cleared by error/close, read by
   // start/write/emit.
@@ -66,44 +75,33 @@ class NATSDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the NATS downstream connection. */
-  start(
-    endpoint: string,
-    {
-      upstream_nats_subject_prefix = DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-      reconnect_interval_ms = DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS,
-    }: {
-      upstream_nats_subject_prefix?: string;
-      reconnect_interval_ms?: number;
-    } = {},
-  ) {
-    if (!upstream_nats_subject_prefix || /[\s*>]/.test(upstream_nats_subject_prefix))
-      throw new Error(`Invalid NATS subject prefix ${upstream_nats_subject_prefix}`);
-    this.endpoint = endpoint;
-    this.subject_prefix = upstream_nats_subject_prefix;
-    this.reconnect_interval_ms = reconnect_interval_ms;
-    void this.connect(endpoint).catch(() => {
-      this.scheduleReconnect(this.reconnect_interval_ms);
+  start(endpoint?: string, options: z.input<typeof NATSDownstreamTransportConfigSchema> = {}) {
+    this.config = NATSDownstreamTransportConfigSchema.parse({
+      ...options,
+      upstream_nats_url: endpoint,
+    });
+    this.started = true;
+    void this.connect(this.config.upstream_nats_url).catch(() => {
+      this.scheduleReconnect();
     });
     return {
-      upstream_nats_url: endpoint,
-      upstream_nats_subject_prefix,
-      reconnect_interval_ms,
+      upstream_nats_url: this.config.upstream_nats_url,
+      upstream_nats_subject_prefix: this.config.upstream_nats_subject_prefix,
+      reconnect_interval_ms: this.config.reconnect_interval_ms,
       connecting: true,
     };
   }
 
   /** Start polling for NATS clients using the shipped extension default. */
   startPollingForClients() {
-    return this.start(DEFAULT_NATS_BRIDGE_URL, {
-      upstream_nats_subject_prefix: DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
-    });
+    return this.start();
   }
 
   /** Stop reconnecting and close the active NATS socket. */
   stop(reason = "stopped") {
-    const upstream_nats_url = this.endpoint;
-    const upstream_nats_subject_prefix = this.subject_prefix;
-    this.endpoint = null;
+    const upstream_nats_url = this.started ? this.config.upstream_nats_url : null;
+    const upstream_nats_subject_prefix = this.config.upstream_nats_subject_prefix;
+    this.started = false;
     if (this.reconnect_timer) {
       clearTimeout(this.reconnect_timer);
       this.reconnect_timer = null;
@@ -132,7 +130,7 @@ class NATSDownstreamTransport extends DownstreamTransport {
   /** Publish one CDP event message to the NATS browser-to-client subject. */
   sendEvent(message: CdpEventMessage) {
     if (this.socket?.readyState !== WebSocket.OPEN) return 0;
-    this.publish(`${this.subject_prefix}.browser_to_client`, {
+    this.publish(`${this.config.upstream_nats_subject_prefix}.browser_to_client`, {
       type: "modcdp.nats.message",
       message,
     });
@@ -143,24 +141,18 @@ class NATSDownstreamTransport extends DownstreamTransport {
   status() {
     return {
       connected: this.connected,
-      config: this.endpoint
-        ? {
-            upstream_nats_url: this.endpoint,
-            upstream_nats_subject_prefix: this.subject_prefix,
-            reconnect_interval_ms: this.reconnect_interval_ms,
-          }
-        : {},
+      config: this.started ? this.config : {},
     };
   }
 
-  private scheduleReconnect(delay_ms: number) {
-    if (!this.endpoint) return;
+  private scheduleReconnect() {
+    if (!this.started) return;
     if (this.reconnect_timer) return;
     this.reconnect_timer = setTimeout(() => {
       this.reconnect_timer = null;
-      if (!this.endpoint) return;
-      void this.connect(this.endpoint).catch(() => {});
-    }, delay_ms);
+      if (!this.started) return;
+      void this.connect(this.config.upstream_nats_url).catch(() => {});
+    }, this.config.reconnect_interval_ms);
   }
 
   private async connect(endpoint: string) {
@@ -172,7 +164,7 @@ class NATSDownstreamTransport extends DownstreamTransport {
     if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
       return {
         upstream_nats_url: endpoint,
-        upstream_nats_subject_prefix: this.subject_prefix,
+        upstream_nats_subject_prefix: this.config.upstream_nats_subject_prefix,
         connected: this.socket.readyState === WebSocket.OPEN,
       };
     }
@@ -181,8 +173,8 @@ class NATSDownstreamTransport extends DownstreamTransport {
     this.buffer = "";
     ws.addEventListener("open", () => {
       this.write(`CONNECT ${JSON.stringify(this.connectOptions())}\r\nPING\r\n`);
-      this.write(`SUB ${this.subject_prefix}.client_to_browser 1\r\n`);
-      this.publish(`${this.subject_prefix}.browser_to_client`, {
+      this.write(`SUB ${this.config.upstream_nats_subject_prefix}.client_to_browser 1\r\n`);
+      this.publish(`${this.config.upstream_nats_subject_prefix}.browser_to_client`, {
         type: "modcdp.nats.hello",
         role: "extension-service-worker",
         version: 1,
@@ -194,15 +186,15 @@ class NATSDownstreamTransport extends DownstreamTransport {
     });
     ws.addEventListener("error", () => {
       if (this.socket === ws) this.socket = null;
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
     });
     ws.addEventListener("close", () => {
       if (this.socket === ws) this.socket = null;
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
     });
     return {
       upstream_nats_url: endpoint,
-      upstream_nats_subject_prefix: this.subject_prefix,
+      upstream_nats_subject_prefix: this.config.upstream_nats_subject_prefix,
       connected: false,
     };
   }
@@ -259,7 +251,7 @@ class NATSDownstreamTransport extends DownstreamTransport {
         ? (parsed as { type?: unknown; message?: unknown; reply_subject?: unknown })
         : null;
     if (record?.type === "modcdp.nats.hello") {
-      this.publish(`${this.subject_prefix}.browser_to_client`, {
+      this.publish(`${this.config.upstream_nats_subject_prefix}.browser_to_client`, {
         type: "modcdp.nats.hello",
         role: "extension-service-worker",
         version: 1,

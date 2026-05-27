@@ -187,7 +187,7 @@ test("constructor custom schemas validate command params, return values, events,
       right: 2,
     };
     void params;
-    const result: Awaited<ReturnType<typeof client.Custom.sum>> = 3;
+    const result: Awaited<ReturnType<typeof client.Custom.sum>> = { value: 3 };
     void result;
     client.on("Custom.finished", (event) => {
       const total: number = event.total;
@@ -198,15 +198,13 @@ test("constructor custom schemas validate command params, return values, events,
     });
     // @ts-expect-error Custom.sum requires numeric left/right params.
     client.Custom.sum({ left: "1", right: 2 });
-    // @ts-expect-error Custom.sum aliases unwrap the single value field to number.
-    const badResult: Awaited<ReturnType<typeof client.Custom.sum>> = {
-      value: 3,
-    };
+    // @ts-expect-error Custom.sum returns a CDP-style result object.
+    const badResult: Awaited<ReturnType<typeof client.Custom.sum>> = 3;
     void badResult;
   }
 
   assert.deepEqual(client.types.parseCommandParams("Custom.sum", { left: 1, right: 2 }), { left: 1, right: 2 });
-  assert.equal(client.types.parseCommandResult("Custom.sum", { value: 3 }), 3);
+  assert.deepEqual(client.types.parseCommandResult("Custom.sum", { value: 3 }), { value: 3 });
   assert.deepEqual(
     client.types.parseEventPayload("Custom.finished", {
       total: 3,
@@ -275,7 +273,7 @@ test("dynamic Mod registration updates custom command, event, and middleware val
 
   assert.equal(typeof (client as unknown as { Custom: { dynamic: unknown } }).Custom.dynamic, "function");
   assert.deepEqual(client.types.parseCommandParams("Custom.dynamic", { text: "ok" }), { text: "ok" });
-  assert.equal(client.types.parseCommandResult("Custom.dynamic", { ok: true }), true);
+  assert.deepEqual(client.types.parseCommandResult("Custom.dynamic", { ok: true }), { ok: true });
   assert.deepEqual(
     client.types.parseEventPayload("Custom.dynamicReady", {
       id: "550e8400-e29b-41d4-a716-446655440000",
@@ -340,7 +338,7 @@ test("client.types update replaces the registry with extended runtime validation
       count: 1,
     };
     void params;
-    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
+    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = { done: true };
     void result;
     typed_client.on("Custom.updatedReady", (event) => {
       const ready: boolean = event.ready;
@@ -351,16 +349,14 @@ test("client.types update replaces the registry with extended runtime validation
     });
     // @ts-expect-error Custom.updated count is required.
     typed_client.Custom.updated({});
-    // @ts-expect-error Custom.updated aliases unwrap the single done field to boolean.
-    const badResult: Awaited<ReturnType<typeof typed_client.Custom.updated>> = {
-      done: true,
-    };
+    // @ts-expect-error Custom.updated returns a CDP-style result object.
+    const badResult: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
     void badResult;
   }
 
   assert.equal(typeof (client as unknown as { Custom: { updated: unknown } }).Custom.updated, "function");
   assert.deepEqual(client.types.parseCommandParams("Custom.updated", { count: 1 }), { count: 1 });
-  assert.equal(client.types.parseCommandResult("Custom.updated", { done: true }), true);
+  assert.deepEqual(client.types.parseCommandResult("Custom.updated", { done: true }), { done: true });
   assert.deepEqual(client.types.parseEventPayload("Custom.updatedReady", { ready: true }), { ready: true });
   assert.deepEqual(client.types.customMiddlewareWireRegistrations(), [
     {

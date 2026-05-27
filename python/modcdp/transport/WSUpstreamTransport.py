@@ -1,8 +1,12 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/transport/WSUpstreamTransport.ts
+# - ./go/modcdp/transport/WSUpstreamTransport.go
 from __future__ import annotations
 
 import json
 import threading
-from typing import Any
+from typing import Any, cast
 
 from websocket import create_connection
 
@@ -15,7 +19,7 @@ class WSUpstreamTransport(UpstreamTransport):
 
     def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
         super().__init__(options)
-        options = options or {}
+        options = cast(UpstreamTransportOptions, dict(options or {}))
         self.url = str(options.get("upstream_ws_cdp_url") or "")
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None

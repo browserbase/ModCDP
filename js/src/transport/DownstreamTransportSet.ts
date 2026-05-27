@@ -1,4 +1,8 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: only runs in browser.
 import type { ModCDPClient } from "../client/ModCDPClient.js";
+import type { z } from "zod";
+import { events as nativeEventSchemas } from "../types/generated/zod.js";
 import {
   type CdpCommandMessage,
   type CdpEventMessage,
@@ -7,16 +11,14 @@ import {
   ModCDPDownstreamConfigSchema,
   type ProtocolPayload,
 } from "../types/modcdp.js";
+import { modCDPToJSON } from "../types/toJSON.js";
+import { CUSTOM_EVENT_BINDING_NAME, UPSTREAM_EVENT_BINDING_NAME } from "../translate/translate.js";
 import {
   type DownstreamRequestHandler,
   type DownstreamTransportName,
   type DownstreamTransportStatus,
   DownstreamTransport,
 } from "./DownstreamTransport.js";
-
-const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
-
-type DownstreamTransportSetConfig = ModCDPDownstreamConfig;
 
 /**
  * Owns the SDK/client-facing transports installed in the extension service worker.
@@ -29,24 +31,19 @@ type DownstreamTransportSetConfig = ModCDPDownstreamConfig;
  * transport talks to its peers.
  */
 class DownstreamTransportSet {
-  config: ReturnType<typeof ModCDPDownstreamConfigSchema.parse>;
-  downstream_client_timeout_ms: number;
-  downstream_close_browser_on_disconnect: boolean;
-  closeBrowser: () => void | Promise<void>;
+  config: ModCDPDownstreamConfig;
 
   // Transport name -> concrete downstream transport. Written during service
   // worker setup; read for fan-out, status, and lifecycle transitions.
   private readonly transports = new Map<DownstreamTransportName, DownstreamTransport>();
   private downstream_client_lease: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(options: DownstreamTransportSetConfig = {}) {
+  constructor(options: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
     this.config = ModCDPDownstreamConfigSchema.parse(options);
-    Object.assign(this, this.config);
   }
 
-  update(config: DownstreamTransportSetConfig = {}) {
+  update(config: z.input<typeof ModCDPDownstreamConfigSchema> = {}) {
     this.config = ModCDPDownstreamConfigSchema.parse({ ...this.config, ...config });
-    Object.assign(this, this.config);
     return this;
   }
 
@@ -63,14 +60,14 @@ class DownstreamTransportSet {
   }
 
   touchClientLease() {
-    const timeout_ms = this.downstream_client_timeout_ms;
+    const timeout_ms = this.config.downstream_client_timeout_ms;
     if (!(timeout_ms > 0)) return;
     this.clearClientLease();
     this.downstream_client_lease = setTimeout(() => {
       const expired = this.clearClientLease();
       if (!expired) return;
-      if (this.downstream_close_browser_on_disconnect !== true) return;
-      void this.closeBrowser();
+      if (this.config.downstream_close_browser_on_disconnect !== true) return;
+      void this.config.closeBrowser();
     }, timeout_ms);
   }
 
@@ -124,20 +121,51 @@ class DownstreamTransportSet {
 
   /** Broadcast one CDP event to connected downstream clients. */
   sendEvent(message: CdpEventMessage) {
+    const binding_name = nativeEventSchemas[message.method] ? UPSTREAM_EVENT_BINDING_NAME : CUSTOM_EVENT_BINDING_NAME;
+    const binding = Reflect.get(globalThis, binding_name);
+    if (typeof binding === "function") {
+      binding(
+        JSON.stringify({
+          event: message.method,
+          data: message.params ?? {},
+          cdpSessionId: message.sessionId ?? null,
+        }),
+      );
+    }
     return [...this.transports.values()].reduce((count, transport) => count + transport.sendEvent(message), 0);
   }
 
-  /** Mirror browser-target upstream events into downstream transports. */
-  mirrorEventsFrom(client: Pick<ModCDPClient, "upstream">) {
-    const subscriptions = [...this.transports.values()].map((transport) => transport.mirrorEventsFrom(client));
-    return { remove: () => subscriptions.every((subscription) => subscription.remove()) };
+  /** Mirror all CDP-shaped ModCDPClient events into downstream transports. */
+  mirrorEventsFrom(client: ModCDPClient) {
+    const listener = (event_name: unknown, payload: unknown, cdpSessionId: unknown) => {
+      if (typeof event_name !== "string" || !event_name.includes(".")) return;
+      const message: CdpEventMessage = {
+        method: event_name,
+        params: (payload ?? {}) as CdpEventMessage["params"],
+      };
+      if (typeof cdpSessionId === "string") message.sessionId = cdpSessionId;
+      this.sendEvent(message);
+    };
+    client.on("*", listener);
+    return { remove: () => client.off("*", listener) };
   }
 
   /** True when at least one downstream transport currently has a connected client. */
   hasConnectedClient() {
     return [...this.transports.values()].some((transport) => transport.status().connected);
   }
+
+  toJSON() {
+    return modCDPToJSON(this, {
+      config: { ...this.config, closeBrowser: undefined },
+      state: {
+        downstream_client_lease: this.downstream_client_lease != null,
+        transports: this.transports.size,
+        connected: this.hasConnectedClient(),
+      },
+      children: Object.fromEntries(this.transports),
+    });
+  }
 }
 
-export { DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS, DownstreamTransportSet };
-export type { DownstreamTransportSetConfig };
+export { DownstreamTransportSet };

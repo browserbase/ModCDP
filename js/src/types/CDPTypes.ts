@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/client/ModCDPClient.py
+// - ./go/modcdp/client/ModCDPClient.go
 import { z } from "zod";
 
 import {
@@ -14,6 +18,7 @@ import {
   events as nativeEventSchemas,
   types as runtimeTypes,
 } from "./generated/zod.js";
+import * as Runtime from "./generated/zod/Runtime.js";
 import type { CdpCommandSchema } from "./generated/zod/helpers.js";
 import {
   type ModCDPAddCustomCommandParams,
@@ -23,13 +28,17 @@ import {
   type ModCDPPayloadSchemaSpec,
   type ProtocolParams,
   type ProtocolResult,
+  type TranslatedStep,
   Mod,
   normalizeModCDPName,
   validateZodSchema,
 } from "./modcdp.js";
+import { modCDPToJSON } from "./toJSON.js";
 
-type CDPCommandSpec<TParamsSchema extends z.ZodType = z.ZodType, TResultSchema extends z.ZodType = z.ZodType> =
-  CdpCommandSpec<TParamsSchema, TResultSchema>;
+type CDPCommandSpec<
+  TParamsSchema extends z.ZodType = z.ZodType,
+  TResultSchema extends z.ZodType = z.ZodType,
+> = CdpCommandSpec<TParamsSchema, TResultSchema>;
 type CDPEventSpec<TEventSchema extends z.ZodType = z.ZodType> = CdpEventSpec<TEventSchema>;
 type CDPCommandMap = CdpCommandMap;
 type CDPEventMap = CdpEventMap;
@@ -74,6 +83,77 @@ type CDPAliasBinding = {
 };
 type CDPCommandAliases<TCommands extends CDPCommandMap = {}> = CdpCommandAliases<TCommands>;
 type CDPEventMapPayloads<TEvents extends CDPEventMap = {}> = CdpEventPayloads<TEvents>;
+type ServiceWorkerExpressionBuilder = (params: ProtocolParams, cdpSessionId: string | null) => string;
+
+const DEFAULT_BUILTIN_COMMANDS: ReadonlyArray<ModCDPAddCustomCommandParams> = [
+  {
+    name: "Mod.ping",
+    params_schema: Mod.PingParams,
+    result_schema: Mod.PingResponse,
+    expression: `
+      async (params) => {
+        const received_at = Date.now();
+        const message = {
+          method: "Mod.pong",
+          params: {
+            sent_at:
+              typeof params.sent_at === "number"
+                ? params.sent_at
+                : received_at,
+            received_at,
+            from: "extension-service-worker",
+          },
+        };
+        if (cdpSessionId) message.sessionId = cdpSessionId;
+        downstream.sendEvent(message);
+        return { ok: true };
+      }
+      `,
+  },
+  {
+    name: "Mod.configure",
+    params_schema: Mod.ConfigureParams,
+    result_schema: Mod.ConfigureResponse,
+    expression: `async (params) => { await ModCDP.configure(params); return {}; }`,
+  },
+  {
+    name: "Mod.evaluate",
+    params_schema: Mod.EvaluateParams,
+    result_schema: Mod.EvaluateResponse,
+    expression: `
+      async ({ expression, params = {}, cdpSessionId = null }) =>
+        ModCDP.evaluateInServiceWorker({ expression, params, cdpSessionId })
+      `,
+  },
+  {
+    name: "Mod.getTopology",
+    params_schema: Mod.GetTopologyParams,
+    result_schema: Mod.GetTopologyResponse,
+    expression: `async (params) => ModCDP.client.router.getTopology(params)`,
+  },
+  {
+    name: "Mod.addCustomCommand",
+    params_schema: Mod.AddCustomCommandParams,
+    result_schema: Mod.AddCustomCommandResponse,
+    expression: `async (params) => ModCDP.addCustomCommand(params)`,
+  },
+  {
+    name: "Mod.addCustomEvent",
+    params_schema: Mod.AddCustomEventObjectParams,
+    result_schema: Mod.AddCustomEventResponse,
+    expression: `async (params) => ModCDP.addCustomEvent(params)`,
+  },
+  {
+    name: "Mod.addMiddleware",
+    params_schema: Mod.AddMiddlewareParams,
+    result_schema: Mod.AddMiddlewareResponse,
+    expression: `async (params) => ModCDP.addMiddleware(params)`,
+  },
+];
+
+const DEFAULT_BUILTIN_EVENTS: ReadonlyArray<ModCDPAddCustomEventObjectParams> = [
+  { name: "Mod.pong", event_schema: Mod.PongEvent },
+];
 
 function hasCommandExpression(
   command: ModCDPAddCustomCommandParams,
@@ -84,7 +164,12 @@ function hasCommandExpression(
 function serializablePayloadSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
   if (!schema) return null;
   const normalized_schema = validateZodSchema(schema);
-  return normalized_schema ? (z.toJSONSchema(normalized_schema) as ModCDPPayloadSchemaSpec) : null;
+  if (!normalized_schema) return null;
+  try {
+    return z.toJSONSchema(normalized_schema) as ModCDPPayloadSchemaSpec;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -104,8 +189,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
   readonly event_schemas = new Map<string, ProtocolEventSchema>();
   readonly command_params_schemas = new Map<string, z.ZodType>();
   readonly command_result_schemas = new Map<string, z.ZodType>();
-  readonly command_result_unwrap_keys = new Map<string, string>();
-  readonly command_result_unwrap_schemas = new Map<string, z.ZodType>();
+  readonly service_worker_expression_builders = new Map<string, ServiceWorkerExpressionBuilder>();
   private readonly alias_bindings: CDPAliasBinding[] = [];
   private readonly alias_targets = new WeakSet<object>();
 
@@ -114,9 +198,20 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     this.custom_events = new Map();
     this.custom_middlewares = [];
     this.hydrateBuiltinSchemas();
+    for (const command of DEFAULT_BUILTIN_COMMANDS) this.addCustomCommand(command);
+    for (const event of DEFAULT_BUILTIN_EVENTS) this.addCustomEvent(event);
     this.registerCustomCommands(options.custom_commands ?? []);
     this.registerCustomEvents(options.custom_events ?? []);
     for (const middleware of options.custom_middlewares ?? []) this.addCustomMiddleware(middleware);
+    this.service_worker_expression_builders.set("Mod.evaluate", (params) => {
+      const parsed = Mod.EvaluateParams.parse(params);
+      return `
+        async ({ params = {}, cdpSessionId = null }) => {
+          const value = (${parsed.expression});
+          return typeof value === "function" ? await value(params) : value;
+        }
+      `;
+    });
   }
 
   update<TMoreCommands extends CDPCommandMap = {}, TMoreEvents extends CDPEventMap = {}>(
@@ -167,11 +262,13 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
           local_result: { name, registered: true },
           custom_command_name: name,
         };
+      const params_schema = serializablePayloadSchema(parsed.params_schema);
+      const result_schema = serializablePayloadSchema(parsed.result_schema);
       command_params = this.customCommandWireRegistration(name) ?? {
         ...parsed,
         name,
-        params_schema: serializablePayloadSchema(parsed.params_schema),
-        result_schema: serializablePayloadSchema(parsed.result_schema),
+        ...(params_schema == null ? {} : { params_schema }),
+        ...(result_schema == null ? {} : { result_schema }),
       };
     } else if (method === "Mod.addCustomEvent") {
       const parsed = Mod.AddCustomEventObjectParams.parse(params ?? {});
@@ -182,10 +279,11 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
           local_result: { name, registered: true },
           custom_command_name: null,
         };
+      const event_schema = serializablePayloadSchema(parsed.event_schema);
       command_params = this.customEventWireRegistration(name) ?? {
         ...parsed,
         name,
-        event_schema: serializablePayloadSchema(parsed.event_schema),
+        ...(event_schema == null ? {} : { event_schema }),
       };
     } else if (method === "Mod.addMiddleware") {
       const parsed = Mod.AddMiddlewareParams.parse(command_params);
@@ -217,18 +315,68 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
 
   parseCommandResult(method: string, result: unknown) {
     const result_schema = this.command_result_schemas.get(method);
-    if (!result_schema) return result;
-    const unwrap_key = this.command_result_unwrap_keys.get(method);
-    const unwrap_schema = this.command_result_unwrap_schemas.get(method);
-    if (unwrap_key && unwrap_schema && (result == null || typeof result !== "object")) return unwrap_schema.parse(result);
-    const parsed_result = result_schema.parse(result);
-    return unwrap_key && parsed_result && typeof parsed_result === "object"
-      ? Reflect.get(parsed_result, unwrap_key)
-      : parsed_result;
+    return result_schema ? result_schema.parse(result) : result;
   }
 
   parseEventPayload(event_name: string, payload: unknown = {}) {
     return this.event_schemas.get(event_name)?.parse(payload) ?? payload;
+  }
+
+  serviceWorkerCommandStep(
+    method: string,
+    params: ProtocolParams = {},
+    cdpSessionId: string | null = null,
+    execution_context_id: number | null = null,
+  ): TranslatedStep {
+    const command = this.custom_commands.get(method);
+    if (command && hasCommandExpression(command)) {
+      const command_expression =
+        this.service_worker_expression_builders.get(method)?.(params, cdpSessionId) ?? command.expression;
+      return {
+        method: Runtime.EvaluateCommand.id,
+        params: {
+          expression: this.serviceWorkerRuntimeExpression(method, params, cdpSessionId, command_expression),
+          awaitPromise: true,
+          returnByValue: true,
+          ...(execution_context_id == null ? {} : { contextId: execution_context_id }),
+        },
+        unwrap: "runtime",
+      };
+    }
+    return {
+      method: Runtime.CallFunctionOnCommand.id,
+      params: {
+        functionDeclaration:
+          "async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }",
+        arguments: [{ value: method }, { value: JSON.stringify(params) }, { value: cdpSessionId }],
+        awaitPromise: true,
+        returnByValue: true,
+        ...(execution_context_id == null ? {} : { executionContextId: execution_context_id }),
+      },
+      unwrap: "runtime_json",
+    };
+  }
+
+  toJSON() {
+    return modCDPToJSON(this, {
+      config: {
+        custom_commands: this.customCommandWireRegistrations().map(
+          ({ expression: _expression, ...command }) => command,
+        ),
+        custom_events: this.customEventWireRegistrations(),
+        custom_middlewares: this.customMiddlewareWireRegistrations().map(
+          ({ expression: _expression, ...middleware }) => middleware,
+        ),
+      },
+      state: {
+        custom_commands: this.custom_commands.size,
+        custom_events: this.custom_events.size,
+        custom_middlewares: this.custom_middlewares.length,
+        command_params_schemas: this.command_params_schemas.size,
+        command_result_schemas: this.command_result_schemas.size,
+        event_schemas: this.event_schemas.size,
+      },
+    });
   }
 
   addCustomCommand(registration: ModCDPAddCustomCommandParams) {
@@ -238,10 +386,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     const params_schema = validateZodSchema(parsed.params_schema);
     const result_schema = validateZodSchema(parsed.result_schema);
     if (params_schema) this.command_params_schemas.set(name, params_schema);
-    if (result_schema) {
-      this.command_result_schemas.set(name, result_schema);
-      this.setResultUnwrapKey(name, result_schema);
-    }
+    if (result_schema) this.command_result_schemas.set(name, result_schema);
     this.upsertCustomCommand({
       ...parsed,
       name,
@@ -254,12 +399,26 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
   customCommandWireRegistrations({ expression_required = false }: { expression_required?: boolean } = {}) {
     return [...this.custom_commands.values()]
       .filter((command) => !expression_required || hasCommandExpression(command))
-      .map((command) => ({
-        name: normalizeModCDPName(command.name),
-        expression: command.expression ?? null,
-        params_schema: serializablePayloadSchema(command.params_schema),
-        result_schema: serializablePayloadSchema(command.result_schema),
-      }));
+      .map((command) => {
+        const params_schema = serializablePayloadSchema(command.params_schema);
+        const result_schema = serializablePayloadSchema(command.result_schema);
+        return {
+          name: normalizeModCDPName(command.name),
+          expression: command.expression ?? null,
+          ...(params_schema == null ? {} : { params_schema }),
+          ...(result_schema == null ? {} : { result_schema }),
+        };
+      });
+  }
+
+  customEventWireRegistrations() {
+    return [...this.custom_events.values()].map((event) => {
+      const event_schema = serializablePayloadSchema(event.event_schema);
+      return {
+        name: normalizeModCDPName(event.name),
+        ...(event_schema == null ? {} : { event_schema }),
+      };
+    });
   }
 
   addCustomMiddleware(registration: ModCDPAddMiddlewareParams) {
@@ -307,15 +466,16 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     if (this.alias_targets.has(target)) return;
     const { types: _runtime_types, ...aliases } = createCdpAliases(send, {
       onCustomCommand: (name, params_schema, result_schema) => {
-        this.addCustomCommand({
-          name,
-          params_schema: params_schema ?? null,
-          result_schema: result_schema ?? null,
-        });
+        if (!this.custom_commands.has(name))
+          this.addCustomCommand({
+            name,
+            params_schema: params_schema ?? null,
+            result_schema: result_schema ?? null,
+          });
         this.installCustomCommandAlias(target, name, send);
       },
       onCustomEvent: (name, event_schema) => {
-        this.addCustomEvent({ name, event_schema: event_schema ?? null });
+        if (!this.custom_events.has(name)) this.addCustomEvent({ name, event_schema: event_schema ?? null });
       },
     });
     Object.assign(target, aliases);
@@ -332,40 +492,45 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     if (method === "*") {
       const existing_domain = Reflect.get(target, domain);
       const domain_target = existing_domain != null && typeof existing_domain === "object" ? existing_domain : {};
-      Reflect.set(target, domain, new Proxy(domain_target, {
-        get(existing, property, receiver) {
-          if (typeof property !== "string") return Reflect.get(existing, property, receiver);
-          if (property in existing) return Reflect.get(existing, property, receiver);
-          const command_name = `${domain}.${property}`;
-          const alias = (params?: unknown) => send(command_name, params ?? {});
-          Object.defineProperties(alias, {
-            cdp_command_name: {
-              value: command_name,
-              enumerable: true,
-              configurable: true,
-            },
-            id: { value: command_name, enumerable: true, configurable: true },
-            name: { value: command_name, configurable: true },
-            kind: { value: "command", enumerable: true, configurable: true },
-            meta: {
-              value: () => ({
-                cdp_command_name: command_name,
-                id: command_name,
-                name: command_name,
-                kind: "command",
-              }),
-              configurable: true,
-            },
-          });
-          Reflect.set(existing, property, alias);
-          return alias;
-        },
-      }));
+      Reflect.set(
+        target,
+        domain,
+        new Proxy(domain_target, {
+          get(existing, property, receiver) {
+            if (typeof property !== "string") return Reflect.get(existing, property, receiver);
+            if (property in existing) return Reflect.get(existing, property, receiver);
+            const command_name = `${domain}.${property}`;
+            const alias = (params?: unknown) => send(command_name, params ?? {});
+            Object.defineProperties(alias, {
+              cdp_command_name: {
+                value: command_name,
+                enumerable: true,
+                configurable: true,
+              },
+              id: { value: command_name, enumerable: true, configurable: true },
+              name: { value: command_name, configurable: true },
+              kind: { value: "command", enumerable: true, configurable: true },
+              meta: {
+                value: () => ({
+                  cdp_command_name: command_name,
+                  id: command_name,
+                  name: command_name,
+                  kind: "command",
+                }),
+                configurable: true,
+              },
+            });
+            Reflect.set(existing, property, alias);
+            return alias;
+          },
+        }),
+      );
       return;
     }
     const existing_domain = Reflect.get(target, domain);
     const domain_target = existing_domain != null && typeof existing_domain === "object" ? existing_domain : {};
     if (existing_domain !== domain_target) Reflect.set(target, domain, domain_target);
+    if (Reflect.has(domain_target, method)) return;
     const alias = (params?: unknown) => send(name, params ?? {});
     Object.defineProperties(alias, {
       cdp_command_name: { value: name, enumerable: true, configurable: true },
@@ -407,7 +572,87 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     for (const [event, schema] of Object.entries(nativeEventSchemas) as [string, ProtocolEventSchema][]) {
       this.event_schemas.set(event, schema);
     }
-    this.event_schemas.set("Mod.pong", Mod.PongEvent);
+  }
+
+  private serviceWorkerRuntimeExpression(
+    method: string,
+    params: ProtocolParams,
+    cdpSessionId: string | null,
+    command_expression: string,
+  ) {
+    return `
+      (async () => {
+        const method = ${JSON.stringify(method)};
+        let commandParams = ${JSON.stringify(params ?? {})};
+        const cdpSessionId = ${JSON.stringify(cdpSessionId)};
+        const upstream = globalThis.ModCDP.client;
+        const downstream = globalThis.ModCDP.downstream;
+        const ModCDP = globalThis.ModCDP;
+        const cdp = {
+          upstream,
+          client: upstream,
+          downstream,
+          send: (method, params = {}, targetCdpSessionId = cdpSessionId) =>
+            ModCDP.handleCommand(method, params, targetCdpSessionId),
+        };
+        const chrome = globalThis.chrome;
+        const runMiddlewares = async (middlewares, payload, context = {}) => {
+          const dispatch = async (index, value) => {
+            const middleware = middlewares[index];
+            if (!middleware) return value;
+            let nextCalled = false;
+            const next = async (nextValue = value) => {
+              if (nextCalled) throw new Error("Middleware called next() more than once.");
+              nextCalled = true;
+              return await dispatch(index + 1, nextValue);
+            };
+            const result = await middleware(value, next, context);
+            if (result && result.__ModCDP_middleware_next__ === true) {
+              const nextResult = await next(result.value);
+              const { __ModCDP_middleware_next__, value: _value, ...overrides } = result;
+              if (Object.keys(overrides).length === 0) return nextResult;
+              return nextResult && typeof nextResult === "object" && !Array.isArray(nextResult)
+                ? { ...nextResult, ...overrides }
+                : overrides;
+            }
+            return result;
+          };
+          return await dispatch(0, payload);
+        };
+        const requestMiddlewares = [${this.serviceWorkerMiddlewareExpressions("request", method).join(",")}];
+        const responseMiddlewares = [${this.serviceWorkerMiddlewareExpressions("response", method).join(",")}];
+        const request = { method, params: commandParams, cdpSessionId };
+        commandParams = await runMiddlewares(requestMiddlewares, commandParams, {
+          cdpSessionId,
+          request,
+          name: method,
+          phase: "request",
+        });
+        if (commandParams == null) throw new Error("Request middleware returned no params.");
+        commandParams = ModCDP.types.parseCommandParams(method, commandParams);
+        const handler = (${command_expression});
+        let result = await handler(commandParams || {}, method);
+        result = await runMiddlewares(responseMiddlewares, result, {
+          cdpSessionId,
+          request: { ...request, params: commandParams },
+          response: { result },
+          name: method,
+          phase: "response",
+        });
+        return ModCDP.types.parseCommandResult(method, result);
+      })()
+    `;
+  }
+
+  private serviceWorkerMiddlewareExpressions(phase: "request" | "response", method: string) {
+    return this.customMiddlewareRegistrations(phase, method).map(
+      (middleware) => `
+        async (payload, next, context = {}) => {
+          const middleware = (${middleware.expression});
+          return await middleware(payload, next, context);
+        }
+      `,
+    );
   }
 
   private registerCustomCommands(custom_commands: CDPTypesCustomCommands<TCommands>) {
@@ -424,12 +669,12 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
 
   private customEventWireRegistration(name: string) {
     const event = this.custom_events.get(name);
-    return event
-      ? {
-          name,
-          event_schema: serializablePayloadSchema(event.event_schema),
-        }
-      : null;
+    if (!event) return null;
+    const event_schema = serializablePayloadSchema(event.event_schema);
+    return {
+      name,
+      ...(event_schema == null ? {} : { event_schema }),
+    };
   }
 
   private customCommandEntries<TInputCommands extends CDPCommandMap>(
@@ -458,21 +703,9 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     const name = normalizeModCDPName(command.name);
     this.custom_commands.set(name, { ...command, name });
   }
-
-  private setResultUnwrapKey(name: string, schema: z.ZodType) {
-    const shape = "shape" in schema && schema.shape && typeof schema.shape === "object" ? schema.shape : null;
-    const keys = shape ? Object.keys(shape) : [];
-    if (keys.length === 1) {
-      this.command_result_unwrap_keys.set(name, keys[0]);
-      this.command_result_unwrap_schemas.set(name, (shape as Record<string, z.ZodType>)[keys[0]]);
-    } else {
-      this.command_result_unwrap_keys.delete(name);
-      this.command_result_unwrap_schemas.delete(name);
-    }
-  }
 }
 
-export { hasCommandExpression, serializablePayloadSchema, CDPTypes };
+export { DEFAULT_BUILTIN_COMMANDS, DEFAULT_BUILTIN_EVENTS, hasCommandExpression, serializablePayloadSchema, CDPTypes };
 export type {
   CDPCommandSpec,
   CDPEventSpec,

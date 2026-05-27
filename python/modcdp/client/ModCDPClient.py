@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/client/ModCDPClient.ts
+# - ./go/modcdp/client/ModCDPClient.go
 """ModCDPClient (Python): importable, no CLI, no demo code.
 
 Constructor option groups mirror the JS / Go ports:
@@ -39,15 +43,7 @@ from ..injector.CLIExtensionInjector import CLIExtensionInjector
 from ..launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from ..launcher.NoneBrowserLauncher import NoneBrowserLauncher
 from ..launcher.RemoteBrowserLauncher import RemoteBrowserLauncher
-from ..transport.NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
-from ..transport.NATSUpstreamTransport import DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS, NATSUpstreamTransport
-from ..transport.PipeUpstreamTransport import PipeUpstreamTransport
-from ..transport.ReverseWSUpstreamTransport import (
-    DEFAULT_UPSTREAM_REVERSEWS_BIND,
-    DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
-    ReverseWSUpstreamTransport,
-)
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamMode, UpstreamTransport, UpstreamTransportOptions
 from ..transport.WSUpstreamTransport import WSUpstreamTransport
 from ..translate.translate import (
     CUSTOM_EVENT_BINDING_NAME,
@@ -228,20 +224,13 @@ class ModCDPClient(CDPSurfaceMixin):
         upstream_input = dict(upstream or {})
         injector_input = dict(injector or {})
         client_options_input = dict(client_options or {})
-        upstream_mode = str(upstream_input.get("upstream_mode") or "ws")
-        self.upstream: dict[str, Any] = {
+        upstream_mode_input = upstream_input.get("upstream_mode") or "ws"
+        if upstream_mode_input != "ws":
+            raise RuntimeError(f"unknown upstream.upstream_mode={upstream_mode_input}")
+        upstream_mode: UpstreamMode = upstream_mode_input
+        self.upstream: UpstreamTransportOptions = {
             "upstream_mode": upstream_mode,
             "upstream_ws_cdp_url": upstream_input.get("upstream_ws_cdp_url"),
-            "upstream_nats_url": upstream_input.get("upstream_nats_url"),
-            "upstream_nats_subject_prefix": upstream_input.get("upstream_nats_subject_prefix"),
-            "upstream_nats_wait_timeout_ms": int(
-                _defaulted(upstream_input.get("upstream_nats_wait_timeout_ms"), DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS)
-            ),
-            "upstream_reversews_bind": _defaulted(upstream_input.get("upstream_reversews_bind"), DEFAULT_UPSTREAM_REVERSEWS_BIND),
-            "upstream_reversews_wait_timeout_ms": int(
-                _defaulted(upstream_input.get("upstream_reversews_wait_timeout_ms"), DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS)
-            ),
-            "upstream_nativemessaging_host_name": upstream_input.get("upstream_nativemessaging_host_name"),
             "upstream_ws_connect_error_settle_timeout_ms": int(
                 _defaulted(
                     upstream_input.get("upstream_ws_connect_error_settle_timeout_ms"),
@@ -250,9 +239,8 @@ class ModCDPClient(CDPSurfaceMixin):
             ),
         }
         launcher_mode = launcher_input.get("launcher_mode") or (
-            "remote" if upstream_mode in ("ws", "pipe") and self.upstream.get("upstream_ws_cdp_url")
-            else "local" if upstream_mode in ("ws", "pipe")
-            else "none"
+            "remote" if self.upstream.get("upstream_ws_cdp_url")
+            else "local"
         )
         self.launcher: dict[str, Any] = {
             **launcher_input,
@@ -314,16 +302,13 @@ class ModCDPClient(CDPSurfaceMixin):
                 _defaulted(client_options_input.get("client_heartbeat_interval_ms"), DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS)
             ),
         }
-        self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_ws_cdp_url"))
+        self.cdp_url: str | None = self.upstream.get("upstream_ws_cdp_url")
         if server_options is DEFAULT_SERVER:
-            self.server_options: ModCDPServerConfig | None = {"router": {"router_routes": {"*.*": "chromedebugger"}}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}
+            self.server_options: ModCDPServerConfig | None = {}
         elif server_options is None:
             self.server_options = None
         elif isinstance(server_options, Mapping):
-            self.server_options = cast(ModCDPServerConfig, {
-                **({"router": {"router_routes": {"*.*": "chromedebugger"}}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}),
-                **dict(server_options),
-            })
+            self.server_options = cast(ModCDPServerConfig, dict(server_options))
         else:
             raise TypeError("server_options must be a mapping, None, or omitted")
         self.custom_commands: list[ModCDPAddCustomCommandParams] = list(custom_commands or [])
@@ -377,24 +362,6 @@ class ModCDPClient(CDPSurfaceMixin):
             raise RuntimeError("upstream transport did not connect.")
         self.transport.onRecv(lambda message: self._on_recv(cast(CdpMessage, message)))
         self.transport.onClose(lambda error: self._handle_transport_close(error))
-
-        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
-            self.transport.waitForPeer()
-            if self.server_options is not None:
-                self._send_message("Mod.configure", cast(ProtocolParams, self._server_configure_params()))
-            threading.Thread(target=self._measure_ping_latency, daemon=True).start()
-            self._start_heartbeat()
-            connected_at = int(time.time() * 1000)
-            self.connect_timing = cast(ModCDPConnectTiming, {
-                "started_at": connect_started_at,
-                "upstream_mode": self.upstream.get("upstream_mode"),
-                "transport_started_at": transport_started_at,
-                "transport_connected_at": transport_connected_at,
-                "transport_duration_ms": transport_connected_at - transport_started_at,
-                "connected_at": connected_at,
-                "duration_ms": connected_at - connect_started_at,
-            })
-            return self
 
         self._initialize_raw_cdp_transport()
 
@@ -465,7 +432,7 @@ class ModCDPClient(CDPSurfaceMixin):
             command_params = self._custom_command_wire_params(command_params)
         elif method == "Mod.addCustomEvent":
             self._register_custom_event(command_params)
-            if self.ext_session_id is None and self.upstream["upstream_mode"] not in ("nativemessaging", "reversews", "nats"):
+            if self.ext_session_id is None:
                 completed_at = int(time.time() * 1000)
                 self.last_command_timing = {
                     "method": method,
@@ -480,20 +447,6 @@ class ModCDPClient(CDPSurfaceMixin):
         should_validate_result = validate_custom_schema or method in self._command_result_schemas
         if method not in {"Mod.addCustomCommand", "Mod.addCustomEvent"} and should_validate_params:
             command_params = self._validate_command_params(method, command_params)
-
-        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
-            result = self._send_message(method, command_params)
-            if should_validate_result and method != "Mod.addCustomCommand":
-                result = self._validate_command_result(method, result)
-            completed_at = int(time.time() * 1000)
-            self.last_command_timing = {
-                "method": method,
-                "target": "modcdp_server",
-                "started_at": started_at,
-                "completed_at": completed_at,
-                "duration_ms": completed_at - started_at,
-            }
-            return AwaitableDict(result) if isinstance(result, dict) else AwaitableValue(result)
 
         command = wrap_command_if_needed(
             method,
@@ -623,7 +576,7 @@ class ModCDPClient(CDPSurfaceMixin):
         custom_middlewares: list[ModCDPAddMiddlewareParams] = list(self.custom_middlewares)
         return cast(ModCDPServerConfig, {
             "upstream": {
-                "upstream_ws_connect_error_settle_timeout_ms": self.upstream["upstream_ws_connect_error_settle_timeout_ms"],
+                "upstream_ws_connect_error_settle_timeout_ms": self.upstream.get("upstream_ws_connect_error_settle_timeout_ms"),
                 **upstream,
             },
             "router": {
@@ -737,8 +690,6 @@ class ModCDPClient(CDPSurfaceMixin):
         launcher.update({"launcher_local_loopback_cdp": self._server_needs_loopback_cdp()})
         transport.update(launcher.configForUpstream())
 
-        if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
-            transport.connect()
         if self.launcher.get("launcher_mode") != "none":
             launched = launcher.launch()
             self._launched_browser = launched
@@ -748,20 +699,17 @@ class ModCDPClient(CDPSurfaceMixin):
             for injector in injectors:
                 transport.update(injector.configForUpstream())
         launched_cdp_url = cast(str | None, self._launched_browser.get("cdp_url")) if self._launched_browser else None
-        if self.upstream["upstream_mode"] in ("ws", "pipe"):
-            transport.connect()
+        transport.connect()
 
         self.transport = transport
         self.cdp_url = cast(
             str | None,
-            (transport.url or launched_cdp_url) if self.upstream["upstream_mode"] == "ws" else launched_cdp_url,
+            transport.url or launched_cdp_url,
         )
         if transport.upstream_mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream["upstream_ws_cdp_url"] = transport.url
-        server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream["upstream_mode"] == "ws" and transport.url else {}
-        if self.upstream["upstream_mode"] not in ("ws", "pipe") and launched_cdp_url:
-            server_config["upstream"] = {"upstream_ws_cdp_url": launched_cdp_url}
+        server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream.get("upstream_mode") == "ws" and transport.url else {}
         transport_server_config = transport.configForServer()
         server_config.update(launcher.configForServer())
         server_config.update(transport_server_config)
@@ -783,12 +731,6 @@ class ModCDPClient(CDPSurfaceMixin):
     def _upstream_transport_config(self) -> dict[str, Any]:
         return {
             "upstream_ws_cdp_url": self.upstream.get("upstream_ws_cdp_url"),
-            "upstream_nats_url": self.upstream.get("upstream_nats_url"),
-            "upstream_nats_subject_prefix": self.upstream.get("upstream_nats_subject_prefix"),
-            "upstream_nats_wait_timeout_ms": self.upstream.get("upstream_nats_wait_timeout_ms"),
-            "upstream_reversews_bind": self.upstream.get("upstream_reversews_bind"),
-            "upstream_reversews_wait_timeout_ms": self.upstream.get("upstream_reversews_wait_timeout_ms"),
-            "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
             "injector_service_worker_extension_id": self.injector.get("injector_service_worker_extension_id"),
         }
 
@@ -804,16 +746,6 @@ class ModCDPClient(CDPSurfaceMixin):
         upstream_mode = self.upstream.get("upstream_mode")
         if upstream_mode == "ws":
             return WSUpstreamTransport()
-        if upstream_mode == "pipe":
-            return PipeUpstreamTransport()
-        if upstream_mode == "reversews":
-            return ReverseWSUpstreamTransport()
-        if upstream_mode == "nativemessaging":
-            return NativeMessagingUpstreamTransport({
-                "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
-            })
-        if upstream_mode == "nats":
-            return NATSUpstreamTransport(self.upstream)
         raise RuntimeError(f"unknown upstream.upstream_mode={upstream_mode}")
 
     def _extension_injectors_for_config(self) -> list[ExtensionInjector]:

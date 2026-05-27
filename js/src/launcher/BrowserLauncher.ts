@@ -1,8 +1,14 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/launcher/BrowserLauncher.py
+// - ./go/modcdp/launcher/BrowserLauncher.go
 import type { UpstreamTransport, UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
-import { ModCDPLauncherConfigSchema, type ModCDPLauncherConfig, type ModCDPServerConfig } from "../types/modcdp.js";
+import { ModCDPLauncherConfigSchema, ModCDPServerConfigSchema, type ModCDPLauncherConfig } from "../types/modcdp.js";
+import { modCDPToJSON } from "../types/toJSON.js";
+import type { z } from "zod";
 
-type LauncherConfig = ModCDPLauncherConfig;
-type LauncherMode = NonNullable<NonNullable<LauncherConfig["launcher_mode"]>>;
+type LauncherConfig = z.input<typeof ModCDPLauncherConfigSchema>;
+type LauncherMode = ReturnType<typeof ModCDPLauncherConfigSchema.parse>["launcher_mode"];
 
 type LaunchedBrowser = {
   proc?: unknown;
@@ -46,41 +52,13 @@ function mergeChromeArgs(existing: string[] = [], incoming: string[] = []) {
 }
 
 class BrowserLauncher {
-  config: ReturnType<typeof ModCDPLauncherConfigSchema.parse>;
-
-  // setup options
-  launcher_mode: LauncherMode;
-  launcher_local_executable_path: string | null;
-  launcher_local_user_data_dir: string | null;
-  launcher_remote_cdp_url: string | null;
-  launcher_local_cdp_listen_port: number | null;
-  launcher_local_headless?: boolean;
-  launcher_local_sandbox?: boolean;
-  launcher_local_args?: string[];
-  launcher_local_extra_args?: string[];
-  launcher_local_cdp_transport?: "port" | "pipe";
-  launcher_local_loopback_cdp?: boolean;
-  launcher_local_cleanup_user_data_dir?: boolean;
-  launcher_local_chrome_ready_timeout_ms: number;
-  launcher_local_chrome_ready_poll_interval_ms: number;
-  launcher_bb_api_key: string | null;
-  launcher_bb_base_url: string | null;
-  launcher_bb_session_id: string | null;
-  launcher_bb_keep_alive?: boolean;
-  launcher_bb_close_session_on_close?: boolean;
-  launcher_bb_region: string | null;
-  launcher_bb_timeout: number | null;
-  launcher_bb_extension_id: string | null;
-  launcher_bb_browser_settings: Record<string, unknown> | null;
-  launcher_bb_user_metadata: Record<string, unknown> | null;
-  launcher_bb_session_create_params: Record<string, unknown> | null;
+  config: ModCDPLauncherConfig;
 
   // runtime state
   launched: LaunchedBrowser | null = null;
 
   constructor(options: LauncherConfig = {}) {
     this.config = ModCDPLauncherConfigSchema.parse(options);
-    Object.assign(this, this.config);
   }
 
   update(config: LauncherConfig = {}) {
@@ -95,7 +73,6 @@ class BrowserLauncher {
       );
     }
     this.config = next_config;
-    Object.assign(this, this.config);
     return this;
   }
 
@@ -104,19 +81,20 @@ class BrowserLauncher {
   }
 
   configForUpstream(): UpstreamTransportConfig {
-    return {
-      upstream_ws_cdp_url: this.launched?.cdp_url ?? this.launcher_remote_cdp_url,
-      upstream_pipe_read: this.launched?.pipe_read,
-      upstream_pipe_write: this.launched?.pipe_write,
-    };
+    const config: UpstreamTransportConfig = {};
+    const upstream_ws_cdp_url = this.launched?.cdp_url ?? this.config.launcher_remote_cdp_url;
+    if (upstream_ws_cdp_url) config.upstream_ws_cdp_url = upstream_ws_cdp_url;
+    if (this.launched?.pipe_read) config.upstream_pipe_read = this.launched.pipe_read;
+    if (this.launched?.pipe_write) config.upstream_pipe_write = this.launched.pipe_write;
+    return config;
   }
 
-  configForServer(upstream: UpstreamTransport): ModCDPServerConfig {
+  configForServer(upstream: UpstreamTransport): z.input<typeof ModCDPServerConfigSchema> {
     const launcher_local_loopback_cdp_url =
       this.launched?.loopback_cdp_url ??
-      (upstream.upstream_mode === "ws" && upstream.upstream_ws_cdp_url
-        ? upstream.upstream_ws_cdp_url
-        : upstream.upstream_mode !== "ws" && upstream.upstream_mode !== "pipe" && this.launched?.cdp_url
+      (upstream.config.upstream_mode === "ws" && upstream.config.upstream_ws_cdp_url
+        ? upstream.config.upstream_ws_cdp_url
+        : upstream.config.upstream_mode !== "ws" && upstream.config.upstream_mode !== "pipe" && this.launched?.cdp_url
           ? this.launched.cdp_url
           : null);
     return launcher_local_loopback_cdp_url
@@ -128,6 +106,21 @@ class BrowserLauncher {
     const launched = this.launched;
     this.launched = null;
     await launched?.close();
+  }
+
+  toJSON() {
+    return modCDPToJSON(this, {
+      state: {
+        launched: this.launched != null,
+        cdp_url: this.launched?.cdp_url ?? null,
+        loopback_cdp_url: this.launched?.loopback_cdp_url ?? null,
+        cdp_listen_port: this.launched?.cdp_listen_port ?? null,
+        profile_dir: this.launched?.profile_dir ?? null,
+        browserbase_session_id: this.launched?.browserbase_session_id ?? null,
+        browserbase_session_url: this.launched?.browserbase_session_url ?? null,
+        browserbase_debug_url: this.launched?.browserbase_debug_url ?? null,
+      },
+    });
   }
 }
 

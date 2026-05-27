@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/launcher/RemoteBrowserLauncher.ts
+# - ./go/modcdp/launcher/RemoteBrowserLauncher.go
 from __future__ import annotations
 
 from typing import cast

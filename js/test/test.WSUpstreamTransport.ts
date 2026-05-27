@@ -12,9 +12,9 @@ const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
 test("ws upstream constructor, update, server config, and unconnected errors match the transport surface", async () => {
   const transport = new WSUpstreamTransport();
-  assert.equal(transport.upstream_ws_cdp_url, "");
+  assert.equal(transport.config.upstream_ws_cdp_url, undefined);
   assert.equal(transport.update({ upstream_ws_cdp_url: "ws://127.0.0.1:1/devtools/browser/test" }), transport);
-  assert.equal(transport.upstream_ws_cdp_url, "ws://127.0.0.1:1/devtools/browser/test");
+  assert.equal(transport.config.upstream_ws_cdp_url, "ws://127.0.0.1:1/devtools/browser/test");
   const unconfigured = new WSUpstreamTransport();
   await assert.rejects(() => unconfigured.connect(), /WSUpstreamTransport requires/);
   assert.throws(() => unconfigured.send({ id: 1, method: "Browser.getVersion" }), /CDP websocket is not connected/);
@@ -37,7 +37,7 @@ test("ws upstream launches a real browser and speaks raw CDP", async () => {
 
   try {
     await cdp.connect();
-    assert.equal(cdp.upstream?.upstream_mode, "ws");
+    assert.equal(cdp.upstream?.config.upstream_mode, "ws");
     assert.equal(cdp.connect_timing?.upstream_mode, "ws");
     const connect_timing = cdp.connect_timing as
       | {
@@ -50,7 +50,7 @@ test("ws upstream launches a real browser and speaks raw CDP", async () => {
       connect_timing?.transport_duration_ms,
       (connect_timing?.transport_connected_at ?? 0) - (connect_timing?.transport_started_at ?? 0),
     );
-    assert.match(cdp.upstream.upstream_ws_cdp_url ?? "", /^ws:\/\//);
+    assert.match(cdp.upstream.config.upstream_ws_cdp_url ?? "", /^ws:\/\//);
     const version = (await cdp.upstream.send("Browser.getVersion")) as Record<string, unknown>;
     assert.equal(typeof version.product, "string");
     await new Promise((resolve) => setTimeout(resolve, 1_500));
@@ -87,7 +87,7 @@ test("ws upstream resolves a bare host:port CDP endpoint to the browser websocke
       });
     });
     await transport.connect();
-    assert.match(transport.upstream_ws_cdp_url ?? "", /^ws:\/\//);
+    assert.match(transport.config.upstream_ws_cdp_url ?? "", /^ws:\/\//);
     transport.send({ id: 1, method: "Browser.getVersion", params: {} });
     const message = await response;
     assert.equal(typeof (message.result as Record<string, unknown>).product, "string");

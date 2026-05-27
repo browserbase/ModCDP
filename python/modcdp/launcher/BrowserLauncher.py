@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/launcher/BrowserLauncher.ts
+# - ./go/modcdp/launcher/BrowserLauncher.go
 from __future__ import annotations
 
 import json
@@ -84,8 +88,6 @@ class BrowserLauncher:
     def configForUpstream(self) -> dict[str, Any]:
         return {
             "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.options.get("launcher_remote_cdp_url"),
-            "upstream_pipe_read": (self.launched or {}).get("pipe_read"),
-            "upstream_pipe_write": (self.launched or {}).get("pipe_write"),
         }
 
     def configForServer(self) -> dict[str, Any]:

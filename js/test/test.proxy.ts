@@ -257,7 +257,7 @@ test("proxy CLI maps ws upstream URL and route shorthands into an existing real 
       "--launcher-mode=remote",
       "--upstream-mode=ws",
       "--upstream-ws-cdp-url",
-      owner.upstream.upstream_ws_cdp_url!,
+      owner.upstream.config.upstream_ws_cdp_url!,
       "--injector-mode=discover",
       "--router-routes",
       JSON.stringify({

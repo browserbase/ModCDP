@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/launcher/LocalBrowserLauncher.ts
+# - ./go/modcdp/launcher/LocalBrowserLauncher.go
 from __future__ import annotations
 
 import glob
@@ -119,7 +123,7 @@ class LocalBrowserLauncher(BrowserLauncher):
                 pipe_write.close()
                 _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir)
                 raise
-            launched: LaunchedBrowser = {
+            launched = cast(LaunchedBrowser, {
                 "cdp_url": None,
                 **({"cdp_listen_port": port} if isinstance(port, int) else {}),
                 "profile_dir": profile_dir,
@@ -132,7 +136,7 @@ class LocalBrowserLauncher(BrowserLauncher):
                     pipe_write,
                     cleanup_profile_dir=cleanup_profile_dir,
                 ),
-            }
+            })
             if loopback_cdp_url:
                 launched["loopback_cdp_url"] = loopback_cdp_url
             self.launched = launched
@@ -147,6 +151,7 @@ class LocalBrowserLauncher(BrowserLauncher):
         timeout_s = int(merged.get("launcher_local_chrome_ready_timeout_ms") or DEFAULT_CHROME_READY_TIMEOUT_MS) / 1000
         poll_s = int(merged.get("launcher_local_chrome_ready_poll_interval_ms") or DEFAULT_CHROME_READY_POLL_INTERVAL_MS) / 1000
         deadline = time.time() + timeout_s
+        active_port: int | None = None
         while time.time() < deadline:
             exit_code = process.poll()
             if exit_code is not None:

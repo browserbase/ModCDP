@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./js/src/launcher/BrowserLauncher.ts
+// - ./python/modcdp/launcher/BrowserLauncher.py
 package launcher
 
 import (
@@ -112,8 +116,6 @@ func (l *BrowserLauncher) Update(config LaunchOptions) *BrowserLauncher {
 func (l BrowserLauncher) ConfigForUpstream() map[string]any {
 	return map[string]any{
 		"upstream_ws_cdp_url": firstString(launchedCDPURL(l.Launched), l.Options.LauncherRemoteCDPURL),
-		"upstream_pipe_read":  launchedPipeRead(l.Launched),
-		"upstream_pipe_write": launchedPipeWrite(l.Launched),
 	}
 }
 
@@ -276,18 +278,4 @@ func launchedProfileDir(launched *LaunchedBrowser) string {
 		return ""
 	}
 	return launched.ProfileDir
-}
-
-func launchedPipeRead(launched *LaunchedBrowser) *os.File {
-	if launched == nil {
-		return nil
-	}
-	return launched.PipeRead
-}
-
-func launchedPipeWrite(launched *LaunchedBrowser) *os.File {
-	if launched == nil {
-		return nil
-	}
-	return launched.PipeWrite
 }

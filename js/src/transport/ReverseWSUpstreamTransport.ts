@@ -1,12 +1,12 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import type { WebSocket as WsSocket, WebSocketServer as WsServer } from "ws";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { DEFAULT_UPSTREAM_REVERSEWS_BIND, DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS } from "../types/modcdp.js";
 import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
-
-const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
-const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
 
 type ReverseHello = {
   type: "modcdp.reverse.hello";
@@ -16,8 +16,7 @@ type ReverseHello = {
 };
 
 class ReverseWSUpstreamTransport extends UpstreamTransport {
-  readonly upstream_mode = "reversews" as const;
-  private endpoint_url: string;
+  endpoint_url: string;
   private reversews_listener: WsServer | null = null;
   private socket: WsSocket | null = null;
   private peer_waiters = new Set<{
@@ -27,16 +26,9 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
   }>();
   peer_info: ReverseHello | null = null;
 
-  get upstream_reversews_url() {
-    return this.endpoint_url;
-  }
-
   constructor(options: UpstreamTransportConfig = {}) {
-    super(options);
-    this.upstream_reversews_bind = options.upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND;
-    this.upstream_reversews_wait_timeout_ms =
-      options.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
-    this.endpoint_url = endpointFromBind(this.upstream_reversews_bind);
+    super({ ...options, upstream_mode: "reversews" });
+    this.endpoint_url = endpointFromBind(this.config.upstream_reversews_bind);
   }
 
   override send(message: CdpCommandMessage): void;
@@ -84,14 +76,8 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
   }
 
   update(config: UpstreamTransportConfig = {}) {
-    super.update(config);
-    if (config.upstream_reversews_bind) {
-      this.upstream_reversews_bind = config.upstream_reversews_bind;
-      this.endpoint_url = endpointFromBind(config.upstream_reversews_bind);
-    }
-    if (typeof config.upstream_reversews_wait_timeout_ms === "number") {
-      this.upstream_reversews_wait_timeout_ms = config.upstream_reversews_wait_timeout_ms;
-    }
+    super.update({ ...config, upstream_mode: "reversews" });
+    this.endpoint_url = endpointFromBind(this.config.upstream_reversews_bind);
     return this;
   }
 
@@ -115,7 +101,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
         reject: (error: Error) => void;
         timeout: ReturnType<typeof setTimeout>;
       };
-      const wait_timeout_ms = this.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS;
+      const wait_timeout_ms = this.config.upstream_reversews_wait_timeout_ms;
       const timeout = setTimeout(() => {
         this.peer_waiters.delete(waiter);
         reject(new Error(`Timed out waiting ${wait_timeout_ms}ms for reverse ModCDP extension connection.`));
@@ -146,10 +132,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
         socket.close(1008, message.slice(0, 120));
       } catch {}
     };
-    const timeout = setTimeout(
-      () => fail("reverse hello timeout"),
-      this.upstream_reversews_wait_timeout_ms ?? DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
-    );
+    const timeout = setTimeout(() => fail("reverse hello timeout"), this.config.upstream_reversews_wait_timeout_ms);
     socket.once("message", (buf: unknown) => {
       clearTimeout(timeout);
       let hello: ReverseHello;
@@ -188,6 +171,19 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
       }
       this.peer_waiters.clear();
     });
+  }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return {
+      ...json,
+      state: {
+        ...json.state,
+        connected: this.socket?.readyState === this.socket?.OPEN,
+        peer_waiters: this.peer_waiters.size,
+        has_peer_info: this.peer_info != null,
+      },
+    };
   }
 }
 

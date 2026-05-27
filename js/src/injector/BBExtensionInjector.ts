@@ -1,31 +1,26 @@
-import { ExtensionInjector, type InjectorConfig } from "./ExtensionInjector.js";
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/BBExtensionInjector.py
+// - ./go/modcdp/injector/BBExtensionInjector.go
+import { ExtensionInjector, InjectorConfigSchema } from "./ExtensionInjector.js";
+import type { z } from "zod";
+import type { LauncherConfig } from "../launcher/BrowserLauncher.js";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com";
-
-function firstString(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
 class BBExtensionInjector extends ExtensionInjector {
   private zip_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: InjectorConfig = {}) {
-    super(options);
-    this.config.injector_mode = "bb";
+  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...options, injector_mode: "bb" });
   }
 
   async prepare() {
-    const configured_extension_id = firstString(this.config.injector_bb_extension_id);
-    if (configured_extension_id) {
-      this.extension_id = configured_extension_id;
+    if (this.config.injector_bb_extension_id) {
+      this.extension_id = this.config.injector_bb_extension_id;
       return;
     }
     if (this.extension_id) return;
@@ -34,7 +29,6 @@ class BBExtensionInjector extends ExtensionInjector {
     this.zip_path = extension_path.endsWith(".zip") ? extension_path : await this.zipExtensionDir(extension_path);
     try {
       this.extension_id = await this.uploadExtension(this.zip_path);
-      this.config.injector_bb_extension_id = this.extension_id;
     } catch (error) {
       await this.close();
       throw error;
@@ -42,19 +36,17 @@ class BBExtensionInjector extends ExtensionInjector {
   }
 
   async inject() {
-    const extension_id = this.config.injector_service_worker_extension_id;
-    this.config.injector_service_worker_extension_id = null;
-    try {
-      const discovered = await this.waitForReadyServiceWorker(
-        this.config.injector_service_worker_ready_timeout_ms ?? 60_000,
-        {
-          matched_only: this.config.injector_trust_service_worker_target,
-        },
-      );
-      return discovered ? { ...discovered, source: "bb" } : null;
-    } finally {
-      this.config.injector_service_worker_extension_id = extension_id;
-    }
+    const discovered = await this.waitForReadyServiceWorker(this.config.injector_service_worker_ready_timeout_ms, {
+      matched_only: this.config.injector_trust_service_worker_target,
+    });
+    return discovered ? { ...discovered, source: "bb" } : null;
+  }
+
+  override configForLauncher(): LauncherConfig {
+    return {
+      ...super.configForLauncher(),
+      launcher_bb_extension_id: this.extension_id ?? this.config.injector_bb_extension_id,
+    };
   }
 
   async close() {
@@ -70,12 +62,11 @@ class BBExtensionInjector extends ExtensionInjector {
   }
 
   private async uploadExtension(zip_path: string) {
-    const browserbase_api_key = firstString(this.config.injector_bb_api_key, process.env.BROWSERBASE_API_KEY);
+    const browserbase_api_key = this.config.injector_bb_api_key ?? process.env.BROWSERBASE_API_KEY;
     if (!browserbase_api_key) {
       throw new Error("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.");
     }
-    const base_url =
-      firstString(this.config.injector_bb_base_url, process.env.BROWSERBASE_BASE_URL) ?? DEFAULT_BROWSERBASE_BASE_URL;
+    const base_url = this.config.injector_bb_base_url;
     const form = new FormData();
     const zip_bytes = readFileSync(zip_path);
     const zip_array_buffer = zip_bytes.buffer.slice(

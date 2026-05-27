@@ -1,21 +1,20 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/transport/WSUpstreamTransport.py
+// - ./go/modcdp/transport/WSUpstreamTransport.go
 import { resolveCdpWebSocketUrl } from "../launcher/BrowserLauncher.js";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS } from "../types/modcdp.js";
 import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
-const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
-
 class WSUpstreamTransport extends UpstreamTransport {
-  override readonly upstream_mode = "ws" as const;
   ws: WebSocket | null = null;
   private connect_promise: Promise<void> | null = null;
 
   constructor(options: UpstreamTransportConfig = {}) {
-    super(options);
-    this.upstream_ws_cdp_url = options.upstream_ws_cdp_url ?? "";
-    this.upstream_ws_connect_error_settle_timeout_ms =
-      options.upstream_ws_connect_error_settle_timeout_ms ?? DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS;
+    super({ ...options, upstream_mode: "ws" });
   }
 
   override send(message: CdpCommandMessage): void;
@@ -76,12 +75,13 @@ class WSUpstreamTransport extends UpstreamTransport {
   async connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
     if (this.connect_promise) return await this.connect_promise;
-    if (!this.upstream_ws_cdp_url)
+    if (!this.config.upstream_ws_cdp_url)
       throw new Error("WSUpstreamTransport requires upstream_ws_cdp_url or launcher-provided cdp_url.");
     this.connect_promise = (async () => {
       // upstream_ws_cdp_url may start as an HTTP discovery endpoint; from here on it is the resolved WebSocket CDP endpoint.
-      this.upstream_ws_cdp_url = await resolveCdpWebSocketUrl(this.upstream_ws_cdp_url!, "upstream_ws_cdp_url");
-      const ws = new WebSocket(this.upstream_ws_cdp_url);
+      const upstream_ws_cdp_url = await resolveCdpWebSocketUrl(this.config.upstream_ws_cdp_url, "upstream_ws_cdp_url");
+      this.update({ upstream_ws_cdp_url });
+      const ws = new WebSocket(upstream_ws_cdp_url);
       this.ws = ws;
       ws.addEventListener("message", (event) => this.parseAndEmitRecv(event.data));
       ws.addEventListener("close", () => {
@@ -125,6 +125,11 @@ class WSUpstreamTransport extends UpstreamTransport {
     } catch {}
     this.ws = null;
     this.connect_promise = null;
+  }
+
+  override toJSON() {
+    const json = super.toJSON();
+    return { ...json, state: { ...json.state, connected: this.ws?.readyState === WebSocket.OPEN } };
   }
 }
 

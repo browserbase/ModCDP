@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: not needed by Stagehand (exotic transport).
 import {
   CdpCommandMessageSchema,
   type CdpCommandMessage,
@@ -5,8 +7,17 @@ import {
   type CdpResponseMessage,
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
+import { z } from "zod";
 
 const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+const DEFAULT_REVERSE_BRIDGE_URL = "ws://127.0.0.1:29292";
+
+const ReverseWSDownstreamTransportConfigSchema = z
+  .object({
+    upstream_reversews_url: z.string().default(DEFAULT_REVERSE_BRIDGE_URL),
+    reconnect_interval_ms: z.number().positive().default(DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS),
+  })
+  .strict();
 
 /**
  * Owns the reverse WebSocket downstream connection from the extension service
@@ -31,14 +42,11 @@ const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  */
 class ReverseWSDownstreamTransport extends DownstreamTransport {
   readonly name = "reversews" as const;
+  config: z.infer<typeof ReverseWSDownstreamTransportConfigSchema> = ReverseWSDownstreamTransportConfigSchema.parse({});
 
-  // Configured reversews endpoint. Set by start, cleared by stop, read by
-  // reconnect scheduling.
-  private endpoint: string | null = null;
-
-  // Reconnect interval currently configured for the endpoint. Set by start and
-  // read by error/close handlers.
-  private reconnect_interval_ms = DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS;
+  // True after start configures the reversews endpoint. Cleared by stop and read
+  // by reconnect scheduling/status.
+  private started = false;
 
   // Active reversews socket. Set by connect, cleared by error/close/stop, read
   // by start and emit.
@@ -58,38 +66,36 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
   }
 
   /** Configure and start the reversews downstream connection. */
-  start(
-    endpoint: string,
-    {
-      reconnect_interval_ms = DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS,
-    }: {
-      reconnect_interval_ms?: number;
-    } = {},
-  ) {
-    if (!/^wss?:\/\//i.test(endpoint)) {
-      throw new Error(`reverse proxy endpoint must be a ws:// or wss:// URL, got ${endpoint}.`);
+  start(endpoint?: string, options: z.input<typeof ReverseWSDownstreamTransportConfigSchema> = {}) {
+    this.config = ReverseWSDownstreamTransportConfigSchema.parse({
+      ...options,
+      upstream_reversews_url: endpoint,
+    });
+    if (!/^wss?:\/\//i.test(this.config.upstream_reversews_url)) {
+      throw new Error(
+        `reverse proxy endpoint must be a ws:// or wss:// URL, got ${this.config.upstream_reversews_url}.`,
+      );
     }
-    this.endpoint = endpoint;
-    this.reconnect_interval_ms = reconnect_interval_ms;
-    void this.connect(endpoint).catch(() => {
-      this.scheduleReconnect(this.reconnect_interval_ms);
+    this.started = true;
+    void this.connect(this.config.upstream_reversews_url).catch(() => {
+      this.scheduleReconnect();
     });
     return {
-      upstream_reversews_url: endpoint,
-      reconnect_interval_ms,
+      upstream_reversews_url: this.config.upstream_reversews_url,
+      reconnect_interval_ms: this.config.reconnect_interval_ms,
       connecting: true,
     };
   }
 
   /** Start polling for reversews clients using the shipped extension default. */
   startPollingForClients() {
-    return this.start("ws://127.0.0.1:29292", { reconnect_interval_ms: DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS });
+    return this.start();
   }
 
   /** Stop reconnecting and close the active reversews socket. */
   stop(reason = "stopped") {
-    const upstream_reversews_url = this.endpoint;
-    this.endpoint = null;
+    const upstream_reversews_url = this.started ? this.config.upstream_reversews_url : null;
+    this.started = false;
     if (this.reconnect_timer) {
       clearTimeout(this.reconnect_timer);
       this.reconnect_timer = null;
@@ -122,20 +128,18 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
   status() {
     return {
       connected: this.connected,
-      config: this.endpoint
-        ? { upstream_reversews_url: this.endpoint, reconnect_interval_ms: this.reconnect_interval_ms }
-        : {},
+      config: this.started ? this.config : {},
     };
   }
 
-  private scheduleReconnect(delay_ms: number) {
-    if (!this.endpoint) return;
+  private scheduleReconnect() {
+    if (!this.started) return;
     if (this.reconnect_timer) return;
     this.reconnect_timer = setTimeout(() => {
       this.reconnect_timer = null;
-      if (!this.endpoint) return;
-      void this.connect(this.endpoint).catch(() => {});
-    }, delay_ms);
+      if (!this.started) return;
+      void this.connect(this.config.upstream_reversews_url).catch(() => {});
+    }, this.config.reconnect_interval_ms);
   }
 
   private async connect(endpoint: string) {
@@ -163,11 +167,11 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
     });
     ws.addEventListener("error", () => {
       if (this.socket === ws) this.socket = null;
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
     });
     ws.addEventListener("close", () => {
       if (this.socket === ws) this.socket = null;
-      this.scheduleReconnect(this.reconnect_interval_ms);
+      this.scheduleReconnect();
     });
     return { upstream_reversews_url: endpoint, connected: false };
   }

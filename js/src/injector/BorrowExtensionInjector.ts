@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/BorrowExtensionInjector.py
+// - ./go/modcdp/injector/BorrowExtensionInjector.go
 import fs from "node:fs";
 import path from "node:path";
 import * as Runtime from "../types/generated/zod/Runtime.js";
@@ -5,10 +9,11 @@ import * as Target from "../types/generated/zod/Target.js";
 import { defaultModCDPExtensionPath, prepareUnpackedExtension } from "./NodeExtensionFiles.js";
 import {
   ExtensionInjector,
+  InjectorConfigSchema,
   type ExtensionInjectionResult,
-  type InjectorConfig,
   type TargetInfo,
 } from "./ExtensionInjector.js";
+import type { z } from "zod";
 
 const EXT_ID_FROM_URL = /^chrome-extension:\/\/([a-z]+)\//;
 const MODCDP_READY_EXPRESSION = "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
@@ -26,9 +31,8 @@ class BorrowExtensionInjector extends ExtensionInjector {
   private cleanup: (() => Promise<void>) | null = null;
   private bootstrap_modcdp_server_expression: string | null = null;
 
-  constructor(options: InjectorConfig = {}) {
-    super(options);
-    this.config.injector_mode = "borrow";
+  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
+    super({ ...options, injector_mode: "borrow" });
   }
 
   async prepare() {
@@ -68,11 +72,11 @@ class BorrowExtensionInjector extends ExtensionInjector {
   }
 
   async inject() {
-    const deadline = Date.now() + (this.config.injector_service_worker_ready_timeout_ms ?? 60_000);
+    const deadline = Date.now() + this.config.injector_service_worker_ready_timeout_ms;
     do {
       const borrowed = await this.borrowVisibleServiceWorkers();
       if (borrowed) return borrowed;
-      await new Promise((resolve) => setTimeout(resolve, this.config.injector_service_worker_poll_interval_ms ?? 100));
+      await new Promise((resolve) => setTimeout(resolve, this.config.injector_service_worker_poll_interval_ms));
     } while (Date.now() < deadline);
     return null;
   }
@@ -89,8 +93,8 @@ class BorrowExtensionInjector extends ExtensionInjector {
     });
     const has_configured_matcher =
       Boolean(this.config.injector_service_worker_extension_id) ||
-      (this.config.injector_service_worker_url_includes?.length ?? 0) > 0 ||
-      (this.config.injector_service_worker_url_suffixes?.length ?? 0) > 0;
+      this.config.injector_service_worker_url_includes.length > 0 ||
+      this.config.injector_service_worker_url_suffixes.length > 0;
     const candidates = has_configured_matcher
       ? visible_service_workers.filter((target) => this.serviceWorkerTargetMatches(target))
       : visible_service_workers;

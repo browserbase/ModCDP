@@ -1,4 +1,8 @@
 /// <reference types="chrome" />
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/types/modcdp.py
+// - ./go/modcdp/types/types.go
 
 import { z } from "zod";
 
@@ -28,31 +32,33 @@ const TargetAttachedToTargetEventSchema = z.object({
 });
 type TargetAttachedToTargetEvent = z.infer<typeof TargetAttachedToTargetEventSchema>;
 
-const DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
+const DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS = 45_000;
+const DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS = 100;
 const DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS = 10_000;
 const DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS = 10_000;
 const DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250;
-const DEFAULT_UPSTREAM_CDP_SEND_TIMEOUT_MS = 10_000;
-const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
 const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
-const DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS = 45_000;
-const DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS = 100;
+const DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
+const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
+const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
+const DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX = "modcdp.default";
+const DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000;
+const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
+const DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS = 10_000;
+const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
+const DEFAULT_LAUNCHER_BB_BASE_URL = "https://api.browserbase.com";
+const DEFAULT_LAUNCHER_BB_VIEWPORT = { width: 1288, height: 711 };
 
 const ModCDPRoutesSchema = z.object({}).catchall(z.string());
 type ModCDPRoutes = z.infer<typeof ModCDPRoutesSchema>;
 
 const ModCDPRouterConfigSchema = z
   .object({
-    router_routes: ModCDPRoutesSchema.optional().nullable(),
-    loopback_execution_context_timeout_ms: z.number().positive().optional().nullable(),
+    router_routes: ModCDPRoutesSchema.default({}),
+    loopback_execution_context_timeout_ms: z.number().positive().default(DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS),
   })
-  .strict()
-  .transform((config) => ({
-    router_routes: config.router_routes ?? {},
-    loopback_execution_context_timeout_ms:
-      config.loopback_execution_context_timeout_ms ?? DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS,
-  }));
-type ModCDPRouterConfig = z.input<typeof ModCDPRouterConfigSchema>;
+  .strict();
+type ModCDPRouterConfig = z.infer<typeof ModCDPRouterConfigSchema>;
 
 const ModCDPCustomPayloadSchema = z.record(z.string(), z.unknown());
 type ModCDPCustomPayload = z.infer<typeof ModCDPCustomPayloadSchema>;
@@ -115,7 +121,7 @@ type ModCDPPayloadSchemaSpec = z.infer<typeof ModCDPPayloadSchemaSpecSchema>;
 function validateZodSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
   if (!schema) return null;
   if (isZodType(schema)) return schema;
-  if (Object.values(schema).every(isZodType)) return z.object(schema as ModCDPPayloadShape);
+  if (Object.values(schema).every(isZodType)) return z.object(schema as ModCDPPayloadShape).passthrough();
   if (typeof schema === "object") {
     const zod_schema = z.fromJSONSchema(schema);
     return isScalarJsonSchema(schema) ? z.object({ value: zod_schema }) : zod_schema;
@@ -162,165 +168,117 @@ const ModCDPAddMiddlewareParamsSchema = z.object({
 });
 type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
 
+const BrowserbaseBrowserSettingsSchema = z
+  .object({
+    extensionId: z.string().optional(),
+    viewport: z.unknown().default(DEFAULT_LAUNCHER_BB_VIEWPORT),
+  })
+  .catchall(z.unknown());
+
+const BrowserbaseSessionCreateParamsSchema = z
+  .object({
+    browserSettings: BrowserbaseBrowserSettingsSchema.optional(),
+    userMetadata: z.record(z.string(), z.unknown()).default({}),
+    extensionId: z.string().optional(),
+    region: z.string().optional(),
+  })
+  .catchall(z.unknown());
+
 const ModCDPLauncherConfigSchema = z
   .object({
-    launcher_mode: z.enum(["local", "remote", "bb", "none"]).optional().nullable(),
-    launcher_local_executable_path: z.string().optional().nullable(),
-    launcher_local_user_data_dir: z.string().optional().nullable(),
-    launcher_remote_cdp_url: z.string().optional().nullable(),
-    launcher_local_cdp_listen_port: z.number().int().min(0).optional().nullable(),
-    launcher_local_headless: z.boolean().optional().nullable(),
-    launcher_local_sandbox: z.boolean().optional().nullable(),
-    launcher_local_args: z.array(z.string()).optional().nullable(),
-    launcher_local_extra_args: z.array(z.string()).optional().nullable(),
-    launcher_local_cdp_transport: z.enum(["port", "pipe"]).optional().nullable(),
-    launcher_local_loopback_cdp: z.boolean().optional().nullable(),
-    launcher_local_cleanup_user_data_dir: z.boolean().optional().nullable(),
-    launcher_local_chrome_ready_timeout_ms: z.number().positive().optional().nullable(),
-    launcher_local_chrome_ready_poll_interval_ms: z.number().positive().optional().nullable(),
-    launcher_bb_api_key: z.string().optional().nullable(),
-    launcher_bb_base_url: z.string().optional().nullable(),
-    launcher_bb_session_id: z.string().optional().nullable(),
-    launcher_bb_keep_alive: z.boolean().optional().nullable(),
-    launcher_bb_close_session_on_close: z.boolean().optional().nullable(),
-    launcher_bb_region: z.string().optional().nullable(),
-    launcher_bb_timeout: z.number().positive().optional().nullable(),
-    launcher_bb_extension_id: z.string().optional().nullable(),
-    launcher_bb_browser_settings: z.record(z.string(), z.unknown()).optional().nullable(),
-    launcher_bb_user_metadata: z.record(z.string(), z.unknown()).optional().nullable(),
-    launcher_bb_session_create_params: z.record(z.string(), z.unknown()).optional().nullable(),
+    launcher_mode: z.enum(["local", "remote", "bb", "none"]).default("none"),
+    launcher_local_executable_path: z.string().optional(),
+    launcher_local_user_data_dir: z.string().optional(),
+    launcher_remote_cdp_url: z.string().optional(),
+    launcher_local_cdp_listen_port: z.number().int().min(0).optional(),
+    launcher_local_headless: z.boolean().optional(),
+    launcher_local_sandbox: z.boolean().optional(),
+    launcher_local_args: z.array(z.string()).default([]),
+    launcher_local_extra_args: z.array(z.string()).default([]),
+    launcher_local_cdp_transport: z.enum(["port", "pipe"]).default("port"),
+    launcher_local_loopback_cdp: z.boolean().default(false),
+    launcher_local_cleanup_user_data_dir: z.boolean().default(false),
+    launcher_local_chrome_ready_timeout_ms: z.number().positive().default(DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS),
+    launcher_local_chrome_ready_poll_interval_ms: z
+      .number()
+      .positive()
+      .default(DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS),
+    launcher_bb_api_key: z.string().optional(),
+    launcher_bb_base_url: z.string().default(DEFAULT_LAUNCHER_BB_BASE_URL),
+    launcher_bb_session_id: z.string().optional(),
+    launcher_bb_keep_alive: z.boolean().default(false),
+    launcher_bb_close_session_on_close: z.boolean().optional(),
+    launcher_bb_region: z.string().optional(),
+    launcher_bb_timeout: z.number().positive().optional(),
+    launcher_bb_extension_id: z.string().optional(),
+    launcher_bb_browser_settings: BrowserbaseBrowserSettingsSchema.default({ viewport: DEFAULT_LAUNCHER_BB_VIEWPORT }),
+    launcher_bb_user_metadata: z.record(z.string(), z.unknown()).default({}),
+    launcher_bb_session_create_params: BrowserbaseSessionCreateParamsSchema.default({ userMetadata: {} }),
   })
-  .strict()
-  .transform((config) => ({
-    launcher_mode: config.launcher_mode ?? "none",
-    launcher_local_executable_path: config.launcher_local_executable_path ?? null,
-    launcher_local_user_data_dir: config.launcher_local_user_data_dir ?? null,
-    launcher_remote_cdp_url: config.launcher_remote_cdp_url ?? null,
-    launcher_local_cdp_listen_port: config.launcher_local_cdp_listen_port ?? null,
-    launcher_local_headless: config.launcher_local_headless ?? null,
-    launcher_local_sandbox: config.launcher_local_sandbox ?? null,
-    launcher_local_args: config.launcher_local_args ?? [],
-    launcher_local_extra_args: config.launcher_local_extra_args ?? [],
-    launcher_local_cdp_transport: config.launcher_local_cdp_transport ?? "port",
-    launcher_local_loopback_cdp: config.launcher_local_loopback_cdp ?? false,
-    launcher_local_cleanup_user_data_dir: config.launcher_local_cleanup_user_data_dir ?? false,
-    launcher_local_chrome_ready_timeout_ms:
-      config.launcher_local_chrome_ready_timeout_ms ?? DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS,
-    launcher_local_chrome_ready_poll_interval_ms:
-      config.launcher_local_chrome_ready_poll_interval_ms ?? DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS,
-    launcher_bb_api_key: config.launcher_bb_api_key ?? null,
-    launcher_bb_base_url: config.launcher_bb_base_url ?? null,
-    launcher_bb_session_id: config.launcher_bb_session_id ?? null,
-    launcher_bb_keep_alive: config.launcher_bb_keep_alive ?? false,
-    launcher_bb_close_session_on_close: config.launcher_bb_close_session_on_close ?? null,
-    launcher_bb_region: config.launcher_bb_region ?? null,
-    launcher_bb_timeout: config.launcher_bb_timeout ?? null,
-    launcher_bb_extension_id: config.launcher_bb_extension_id ?? null,
-    launcher_bb_browser_settings: config.launcher_bb_browser_settings ?? null,
-    launcher_bb_user_metadata: config.launcher_bb_user_metadata ?? null,
-    launcher_bb_session_create_params: config.launcher_bb_session_create_params ?? null,
-  }));
-type ModCDPLauncherConfig = z.input<typeof ModCDPLauncherConfigSchema>;
+  .strict();
+type ModCDPLauncherConfig = z.infer<typeof ModCDPLauncherConfigSchema>;
 
 const ModCDPUpstreamConfigSchema = z
   .object({
-    upstream_mode: z
-      .enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"])
-      .optional()
-      .nullable(),
-    upstream_ws_cdp_url: z.string().optional().nullable(),
-    upstream_pipe_read: z.custom<NodeJS.ReadableStream>().optional().nullable(),
-    upstream_pipe_write: z.custom<NodeJS.WritableStream>().optional().nullable(),
-    upstream_nats_url: z.string().optional().nullable(),
-    upstream_nats_subject_prefix: z.string().optional().nullable(),
-    upstream_nats_role: z.enum(["client", "browser"]).optional().nullable(),
-    upstream_nats_wait_timeout_ms: z.number().positive().optional().nullable(),
-    upstream_reversews_bind: z.string().optional().nullable(),
-    upstream_reversews_wait_timeout_ms: z.number().positive().optional().nullable(),
-    upstream_nativemessaging_host_name: z.string().optional().nullable(),
-    upstream_ws_connect_error_settle_timeout_ms: z.number().positive().optional().nullable(),
-    upstream_cdp_send_timeout_ms: z.number().positive().optional().nullable(),
+    upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]).default("ws"),
+    upstream_ws_cdp_url: z.string().optional(),
+    upstream_pipe_read: z.custom<NodeJS.ReadableStream>().optional(),
+    upstream_pipe_write: z.custom<NodeJS.WritableStream>().optional(),
+    upstream_nats_url: z.string().default(DEFAULT_UPSTREAM_NATS_URL),
+    upstream_nats_subject_prefix: z
+      .string()
+      .refine((value) => value.trim().length > 0 && !/[\s*>]/.test(value), "Invalid NATS subject prefix")
+      .default(DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX),
+    upstream_nats_role: z.enum(["client", "browser"]).default("client"),
+    upstream_nats_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS),
+    upstream_reversews_bind: z.string().default(DEFAULT_UPSTREAM_REVERSEWS_BIND),
+    upstream_reversews_wait_timeout_ms: z.number().positive().default(DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS),
+    upstream_nativemessaging_host_name: z.string().default(DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME),
+    upstream_ws_connect_error_settle_timeout_ms: z
+      .number()
+      .positive()
+      .default(DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS),
+    upstream_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
   })
-  .strict()
-  .transform((config) => ({
-    upstream_mode: config.upstream_mode ?? "ws",
-    upstream_ws_cdp_url: config.upstream_ws_cdp_url ?? null,
-    upstream_pipe_read: config.upstream_pipe_read ?? null,
-    upstream_pipe_write: config.upstream_pipe_write ?? null,
-    upstream_nats_url: config.upstream_nats_url ?? null,
-    upstream_nats_subject_prefix: config.upstream_nats_subject_prefix ?? null,
-    upstream_nats_role: config.upstream_nats_role ?? "client",
-    upstream_nats_wait_timeout_ms: config.upstream_nats_wait_timeout_ms ?? null,
-    upstream_reversews_bind: config.upstream_reversews_bind ?? null,
-    upstream_reversews_wait_timeout_ms: config.upstream_reversews_wait_timeout_ms ?? null,
-    upstream_nativemessaging_host_name: config.upstream_nativemessaging_host_name ?? null,
-    upstream_ws_connect_error_settle_timeout_ms:
-      config.upstream_ws_connect_error_settle_timeout_ms ?? DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
-    upstream_cdp_send_timeout_ms: config.upstream_cdp_send_timeout_ms ?? DEFAULT_UPSTREAM_CDP_SEND_TIMEOUT_MS,
-  }));
-type ModCDPUpstreamConfig = z.input<typeof ModCDPUpstreamConfigSchema>;
+  .strict();
+type ModCDPUpstreamConfig = z.infer<typeof ModCDPUpstreamConfigSchema>;
 
 const ModCDPClientConfigSchema = z
   .object({
-    client_hydrate_aliases: z.boolean().optional().nullable(),
-    client_mirror_upstream_events: z.boolean().optional().nullable(),
-    client_cdp_send_timeout_ms: z.number().positive().optional().nullable(),
-    client_event_wait_timeout_ms: z.number().positive().optional().nullable(),
-    client_heartbeat_interval_ms: z.number().positive().optional().nullable(),
+    client_hydrate_aliases: z.boolean().default(true),
+    client_mirror_upstream_events: z.boolean().default(true),
+    client_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS),
+    client_event_wait_timeout_ms: z.number().positive().default(DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS),
+    client_heartbeat_interval_ms: z.number().positive().default(DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS),
   })
-  .strict()
-  .transform((config) => ({
-    client_hydrate_aliases: config.client_hydrate_aliases ?? true,
-    client_mirror_upstream_events: config.client_mirror_upstream_events ?? true,
-    client_cdp_send_timeout_ms: config.client_cdp_send_timeout_ms ?? DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS,
-    client_event_wait_timeout_ms: config.client_event_wait_timeout_ms ?? DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS,
-    client_heartbeat_interval_ms: config.client_heartbeat_interval_ms ?? DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS,
-  }));
-type ModCDPClientConfig = z.input<typeof ModCDPClientConfigSchema>;
+  .strict();
+type ModCDPClientConfig = z.infer<typeof ModCDPClientConfigSchema>;
 
 const ModCDPDownstreamConfigSchema = z
   .object({
-    downstream_client_timeout_ms: z.number().positive().optional().nullable(),
-    downstream_close_browser_on_disconnect: z.boolean().optional().nullable(),
-    closeBrowser: z
-      .custom<() => void | Promise<void>>((value) => typeof value === "function")
-      .optional()
-      .nullable(),
+    downstream_client_timeout_ms: z.number().positive().default(DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS),
+    downstream_close_browser_on_disconnect: z.boolean().default(false),
+    closeBrowser: z.custom<() => void | Promise<void>>((value) => typeof value === "function").default(() => () => {}),
   })
-  .strict()
-  .transform((config) => ({
-    downstream_client_timeout_ms: config.downstream_client_timeout_ms ?? DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
-    downstream_close_browser_on_disconnect: config.downstream_close_browser_on_disconnect ?? false,
-    closeBrowser: config.closeBrowser ?? (() => {}),
-  }));
-type ModCDPDownstreamConfig = z.input<typeof ModCDPDownstreamConfigSchema>;
+  .strict();
+type ModCDPDownstreamConfig = z.infer<typeof ModCDPDownstreamConfigSchema>;
 
 const ModCDPServerConfigSchema = z
   .object({
-    upstream: ModCDPUpstreamConfigSchema.optional().nullable(),
-    router: ModCDPRouterConfigSchema.optional().nullable(),
-    client_options: ModCDPClientConfigSchema.optional().nullable(),
-    downstream: ModCDPDownstreamConfigSchema.optional().nullable(),
-    server_browser_token: z.string().optional().nullable(),
-    custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional().nullable(),
-    custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional().nullable(),
-    custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional().nullable(),
+    upstream: ModCDPUpstreamConfigSchema.optional(),
+    router: ModCDPRouterConfigSchema.optional(),
+    client_options: ModCDPClientConfigSchema.optional(),
+    downstream: ModCDPDownstreamConfigSchema.optional(),
+    server_browser_token: z.string().optional(),
+    custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
+    custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional(),
+    custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional(),
   })
-  .strict()
-  .transform((config) => ({
-    upstream: ModCDPUpstreamConfigSchema.parse(config.upstream ?? {}),
-    router: ModCDPRouterConfigSchema.parse(config.router ?? {}),
-    client_options: ModCDPClientConfigSchema.parse(config.client_options ?? {}),
-    downstream: ModCDPDownstreamConfigSchema.parse(config.downstream ?? {}),
-    server_browser_token: config.server_browser_token ?? null,
-    custom_commands: config.custom_commands ?? [],
-    custom_events: config.custom_events ?? [],
-    custom_middlewares: config.custom_middlewares ?? [],
-  }));
-type ModCDPServerConfig = z.input<typeof ModCDPServerConfigSchema>;
+  .strict();
+type ModCDPServerConfig = z.infer<typeof ModCDPServerConfigSchema>;
 
 const ModCDPConfigureParamsSchema = ModCDPServerConfigSchema;
-type ModCDPConfigureParams = z.input<typeof ModCDPConfigureParamsSchema>;
+type ModCDPConfigureParams = z.infer<typeof ModCDPConfigureParamsSchema>;
 
 const ModCDPPingParamsSchema = z.object({
   sent_at: z.number().optional(),
@@ -379,7 +337,7 @@ const ModCDPTopologyTargetSchema = z.object({
   parentId: z.string().optional().nullable(),
   parentFrameId: z.string().optional().nullable(),
   sessionId: z.string().optional().nullable(),
-});
+}).passthrough();
 type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
 
 const ModCDPTopologyExecutionContextSchema = z.object({
@@ -595,6 +553,22 @@ const Mod = {
 } as const;
 
 export {
+  DEFAULT_LAUNCHER_BB_BASE_URL,
+  DEFAULT_LAUNCHER_BB_VIEWPORT,
+  DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS,
+  DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS,
+  DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS,
+  DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS,
+  DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS,
+  DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
+  DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS,
+  DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
+  DEFAULT_UPSTREAM_NATS_URL,
+  DEFAULT_UPSTREAM_NATS_SUBJECT_PREFIX,
+  DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS,
+  DEFAULT_UPSTREAM_REVERSEWS_BIND,
+  DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS,
+  DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
   CdpCommandParamsSchema,
   CdpCommandResultSchema,
   CdpEventParamsSchema,

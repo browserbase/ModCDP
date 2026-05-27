@@ -7,9 +7,7 @@ Modes (mirror the JS / Go demos):
                   the server. Default.
     --debugger    *.* -> service_worker on the client; *.* -> chromedebugger
                   on the server.
-    --upstream    ws|pipe|reversews|nativemessaging|nats. Defaults to ws.
-                  reversews and nativemessaging use the fixed extension
-                  defaults: ws://127.0.0.1:29292 and com.modcdp.bridge.
+    --upstream    ws. Defaults to ws.
 """
 
 import json
@@ -29,7 +27,6 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 EXTENSION_PATH = ROOT / "dist" / "extension"
 DEMO_CDP_SEND_TIMEOUT_MS = 60_000
 DEMO_EXECUTION_CONTEXT_TIMEOUT_MS = 60_000
-REVERSE_TRANSPORT_WAIT_TIMEOUT_MS = 60_000
 LIVE_DEVTOOLS_ACTIVE_PORTS = [
     Path.home() / "Library" / "Application Support" / "Google" / "Chrome" / "DevToolsActivePort",
     Path.home() / "Library" / "Application Support" / "Google" / "Chrome Beta" / "DevToolsActivePort",
@@ -65,7 +62,7 @@ def client_routes_for(mode: str) -> ProtocolPayload:
     return routes
 
 
-UPSTREAM_MODES = {"ws", "pipe", "reversews", "nativemessaging", "nats"}
+UPSTREAM_MODES = {"ws"}
 
 
 def parse_args(argv):
@@ -87,10 +84,6 @@ def parse_args(argv):
         raise RuntimeError(f"unknown --upstream={upstream_mode}; expected {'|'.join(sorted(UPSTREAM_MODES))}")
     live = "live" in flags
     mode = "debugger" if "debugger" in flags else "direct" if "direct" in flags else "loopback" if "loopback" in flags else "direct" if live else "loopback"
-    if live and upstream_mode == "pipe":
-        raise RuntimeError("--live cannot be combined with --upstream=pipe because pipe handles only exist for launched browsers.")
-    if mode == "direct" and upstream_mode in {"reversews", "nativemessaging", "nats"}:
-        raise RuntimeError(f"--direct cannot be combined with --upstream={upstream_mode}; reverse transports terminate at ModCDPServer.")
     return mode, live, upstream_mode
 
 
@@ -104,10 +97,6 @@ def client_options_for(mode, upstream_mode, cdp_url, launch_options=None):
         injector["injector_discover_extension_path"] = str(EXTENSION_PATH)
     else:
         injector["injector_cli_extension_path"] = str(EXTENSION_PATH)
-    if upstream_mode == "reversews":
-        upstream["upstream_reversews_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
-    if upstream_mode == "nats":
-        upstream["upstream_nats_wait_timeout_ms"] = REVERSE_TRANSPORT_WAIT_TIMEOUT_MS
     if mode == "direct":
         return {
             "launcher": {"launcher_mode": "remote" if cdp_url else "local", **(launch_options or {}), **({"launcher_remote_cdp_url": cdp_url} if cdp_url else {})},
@@ -183,7 +172,7 @@ def main():
         configure_result = expect_object(cdp.send("Mod.configure", configure_params), "Mod.configure")
         if expect_object(expect_object(configure_result.get("router"), "Mod.configure.router").get("router_routes"), "Mod.configure.router.router_routes").get("*.*") != server_router_routes_for(mode, upstream_mode)["*.*"]:
             raise RuntimeError(f"unexpected Mod.configure result {configure_result}")
-        print(f"Mod.configure    -> {expect_object(configure_result.get("router"), "Mod.configure.router").get("router_routes")}")
+        print(f"Mod.configure    -> {expect_object(configure_result.get('router'), 'Mod.configure.router').get('router_routes')}")
 
         pong_events = []
         pong_lock = threading.Lock()

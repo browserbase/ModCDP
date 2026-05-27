@@ -20,7 +20,7 @@ test("reversews upstream config owns bind updates and wait timeout", async () =>
     upstream_reversews_bind: "127.0.0.1:29292",
     upstream_reversews_wait_timeout_ms: 10,
   });
-  assert.equal(transport.upstream_reversews_url, "ws://127.0.0.1:29292");
+  assert.equal(transport.endpoint_url, "ws://127.0.0.1:29292");
   assert.equal(
     transport.update({
       upstream_reversews_bind: "127.0.0.1:29293",
@@ -28,7 +28,7 @@ test("reversews upstream config owns bind updates and wait timeout", async () =>
     }),
     transport,
   );
-  assert.equal(transport.upstream_reversews_url, "ws://127.0.0.1:29293");
+  assert.equal(transport.endpoint_url, "ws://127.0.0.1:29293");
   assert.throws(
     () => transport.send({ id: 1, method: "Browser.getVersion" }),
     /No reverse ModCDP extension peer is connected/,
@@ -59,7 +59,7 @@ test("reversews upstream close resets peer wait state", async () => {
     upstream_reversews_wait_timeout_ms: 5,
   });
   await transport.connect();
-  const peer = new WebSocket(transport.upstream_reversews_url);
+  const peer = new WebSocket(transport.endpoint_url);
   await once(peer, "open");
   peer.send(JSON.stringify({ type: "modcdp.reverse.hello", role: "test-peer", version: 1 }));
 
@@ -83,7 +83,7 @@ test("reversews upstream waits again after a peer disconnects", async () => {
     upstream_reversews_wait_timeout_ms: 5,
   });
   await transport.connect();
-  const peer = new WebSocket(transport.upstream_reversews_url);
+  const peer = new WebSocket(transport.endpoint_url);
   await once(peer, "open");
   peer.send(JSON.stringify({ type: "modcdp.reverse.hello", role: "test-peer", version: 1 }));
 
@@ -106,7 +106,7 @@ test("reversews upstream accepts a replacement peer after disconnect", async () 
     upstream_reversews_wait_timeout_ms: 500,
   });
   await transport.connect();
-  const first_peer = new WebSocket(transport.upstream_reversews_url);
+  const first_peer = new WebSocket(transport.endpoint_url);
   await once(first_peer, "open");
   first_peer.send(JSON.stringify({ type: "modcdp.reverse.hello", role: "first-peer", version: 1 }));
 
@@ -115,7 +115,7 @@ test("reversews upstream accepts a replacement peer after disconnect", async () 
     first_peer.close();
     await waitFor(() => (transport as unknown as { socket: unknown | null }).socket === null);
 
-    const second_peer = new WebSocket(transport.upstream_reversews_url);
+    const second_peer = new WebSocket(transport.endpoint_url);
     await once(second_peer, "open");
     second_peer.send(JSON.stringify({ type: "modcdp.reverse.hello", role: "second-peer", version: 1 }));
     try {
@@ -152,8 +152,8 @@ test("reversews upstream accepts a real extension reverse connection and routes 
 
   try {
     await cdp.connect();
-    assert.equal(cdp.upstream?.upstream_mode, "reversews");
-    assert.equal((cdp.upstream as ReverseWSUpstreamTransport).upstream_reversews_url, "ws://127.0.0.1:29292");
+    assert.equal(cdp.upstream?.config.upstream_mode, "reversews");
+    assert.equal((cdp.upstream as ReverseWSUpstreamTransport).endpoint_url, "ws://127.0.0.1:29292");
     assert.equal(
       (cdp.upstream as ReverseWSUpstreamTransport).peer_info?.extension_id,
       "mdedooklbnfejodmnhmkdpkaedafkehf",

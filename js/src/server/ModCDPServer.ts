@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: only runs in browser.
 // ModCDPServer: lives inside an extension service worker. Owns custom command
 // handlers, event bindings, downstream delivery, and the browser-target client.
 // Shape metadata belongs to ModCDPServer.client.types so the server and its
@@ -5,13 +7,15 @@
 
 import * as Browser from "../types/generated/zod/Browser.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
+import type { z } from "zod";
 import { ModCDPClient } from "../client/ModCDPClient.js";
-import { Mod, ModCDPConfigureParamsSchema, ModCDPServerConfigSchema } from "../types/modcdp.js";
+import { ModCDPConfigureParamsSchema, ModCDPServerConfigSchema } from "../types/modcdp.js";
 import { routeFor } from "../translate/translate.js";
 import { DownstreamTransportSet } from "../transport/DownstreamTransportSet.js";
 import { NativeMessagingDownstreamTransport } from "../transport/NativeMessagingDownstreamTransport.js";
 import { NATSDownstreamTransport } from "../transport/NATSDownstreamTransport.js";
 import { ReverseWSDownstreamTransport } from "../transport/ReverseWSDownstreamTransport.js";
+import { modCDPToJSON } from "../types/toJSON.js";
 import type {
   CdpResponseMessage,
   ModCDPConfigureParams,
@@ -38,77 +42,6 @@ const DEFAULT_ROUTES = {
   "*.*": "auto",
 } satisfies ModCDPRoutes;
 
-const DEFAULT_BUILTIN_EVENTS: ReadonlyArray<ModCDPCustomEventRegistration> = [
-  { name: "Mod.pong", event_schema: Mod.PongEvent },
-];
-
-const DEFAULT_BUILTIN_COMMANDS: ReadonlyArray<ModCDPCustomCommandRegistration> = [
-  {
-    name: "Mod.ping",
-    params_schema: Mod.PingParams,
-    result_schema: Mod.PingResponse,
-    expression: `
-      async (params) => {
-        const received_at = Date.now();
-        const message = {
-          method: "Mod.pong",
-          params: {
-            sent_at:
-              typeof params.sent_at === "number"
-                ? params.sent_at
-                : received_at,
-            received_at,
-            from: "extension-service-worker",
-          },
-        };
-        if (cdpSessionId) message.sessionId = cdpSessionId;
-        downstream.sendEvent(message);
-        return { ok: true };
-      }
-      `,
-  },
-  {
-    name: "Mod.configure",
-    params_schema: Mod.ConfigureParams,
-    result_schema: Mod.ConfigureResponse,
-    expression: `async (params) => ModCDP.configure(params)`,
-  },
-  {
-    name: "Mod.evaluate",
-    params_schema: Mod.EvaluateParams,
-    result_schema: Mod.EvaluateResponse,
-    expression: `
-      async ({ expression, params = {}, cdpSessionId = null }) =>
-        ModCDP.evaluateInServiceWorker({ expression, params, cdpSessionId })
-      `,
-  },
-  {
-    name: "Mod.getTopology",
-    params_schema: Mod.GetTopologyParams,
-    result_schema: Mod.GetTopologyResponse,
-    expression: `async (params) => ModCDP.client.router.getTopology(params)`,
-  },
-  {
-    name: "Mod.addCustomCommand",
-    params_schema: Mod.AddCustomCommandParams,
-    result_schema: Mod.AddCustomCommandResponse,
-    expression: `async (params) => ModCDP.addCustomCommand(params)`,
-  },
-  {
-    name: "Mod.addCustomEvent",
-    params_schema: Mod.AddCustomEventObjectParams,
-    result_schema: Mod.AddCustomEventResponse,
-    expression: `async (params) => ModCDP.addCustomEvent(params)`,
-  },
-  {
-    name: "Mod.addMiddleware",
-    params_schema: Mod.AddMiddlewareParams,
-    result_schema: Mod.AddMiddlewareResponse,
-    expression: `async (params) => ModCDP.addMiddleware(params)`,
-  },
-];
-
-const DEFAULT_BUILTIN_MIDDLEWARES: ReadonlyArray<ModCDPMiddlewareRegistration> = [];
 const OFFSCREEN_KEEP_ALIVE_PORT_NAME = "ModCDPOffscreenKeepAlive";
 const OFFSCREEN_KEEP_ALIVE_PATH = "offscreen/keepalive.html";
 
@@ -130,15 +63,15 @@ class ModCDPServer {
   started_at: string | null;
   // Server-only secret used to verify that a discovered loopback endpoint is
   // this same service worker. Browser routing/downstream config live on
-  // client.router, client.upstream, client.client_options, and downstream.
+  // client.router, client.upstream, client.config, and downstream.
   server_browser_token: string | null;
 
   private creating_offscreen_keep_alive: Promise<void> | null = null;
   private offscreen_keep_alive_port: chrome.runtime.Port | null = null;
 
-  constructor(options: ModCDPServerConfig = {}) {
+  constructor(options: z.input<typeof ModCDPServerConfigSchema> = {}) {
     options = ModCDPServerConfigSchema.parse(options);
-    this.server_browser_token = null;
+    this.server_browser_token = options.server_browser_token ?? null;
     this.started_at = null;
     this.downstream = new DownstreamTransportSet({
       ...(options.downstream ?? {}),
@@ -157,19 +90,31 @@ class ModCDPServer {
       },
       client_options: options.client_options ?? {},
       server_options: null,
-    });
-    this.configure({
-      downstream: options.downstream,
-      server_browser_token: options.server_browser_token,
-      custom_commands: [...DEFAULT_BUILTIN_COMMANDS, ...(options.custom_commands ?? [])],
-      custom_events: [...DEFAULT_BUILTIN_EVENTS, ...(options.custom_events ?? [])],
-      custom_middlewares: [...DEFAULT_BUILTIN_MIDDLEWARES, ...(options.custom_middlewares ?? [])],
+      types: {
+        custom_commands: options.custom_commands ?? [],
+        custom_events: options.custom_events ?? [],
+        custom_middlewares: options.custom_middlewares ?? [],
+      },
     });
   }
 
   // server.types == server.client.types, they share one registry to avoid confusion with drifting registries
   get types() {
     return this.client.types;
+  }
+
+  toJSON() {
+    return modCDPToJSON(this, {
+      state: {
+        started_at: this.started_at,
+        creating_offscreen_keep_alive: this.creating_offscreen_keep_alive != null,
+        offscreen_keep_alive_port: this.offscreen_keep_alive_port != null,
+      },
+      children: {
+        client: this.client,
+        downstream: this.downstream,
+      },
+    });
   }
 
   /** Install transports/default commands/listeners and return this server. */
@@ -202,6 +147,9 @@ class ModCDPServer {
       });
       (globalThis as ModCDPGlobalScope).ModCDP = this;
       this.registerChromeLifecycleEvents();
+      await this.client.connect();
+      if (this.client.upstream.config.upstream_mode === "ws") await this.client.router.start();
+      await this.client.upstream.getTargets();
     }
     void this.ensureOffscreenKeepAlive();
     this.downstream.startPollingForClients();
@@ -337,7 +285,7 @@ class ModCDPServer {
       return types.parseCommandResult(method, result) as ProtocolResult;
     }
 
-    const upstream = routeFor(method, this.client.router.router_routes);
+    const upstream = routeFor(method, this.client.router.config.router_routes);
     if (upstream === "service_worker") throw new Error(`No service-worker command registered for ${method}.`);
     if (upstream !== "auto" && upstream !== "loopback_cdp" && upstream !== "chromedebugger")
       throw new Error(`No service-worker command registered for ${method}.`);
@@ -352,7 +300,7 @@ class ModCDPServer {
   }
 
   /** Apply Mod.configure settings, server-owned transport config, and custom registry entries through one path. */
-  configure(params: ModCDPConfigureParams = {}) {
+  async configure(params: z.input<typeof ModCDPConfigureParamsSchema> = {}) {
     params = ModCDPConfigureParamsSchema.parse(params);
     const custom_commands = params.custom_commands ?? [];
     const custom_events = params.custom_events ?? [];
@@ -361,10 +309,14 @@ class ModCDPServer {
     this.server_browser_token = params.server_browser_token ?? this.server_browser_token;
     this.downstream.update(params.downstream ?? {});
     this.client = this.client.configure(params);
-    this.downstream.mirrorEventsFrom(this.client);
     for (const command of custom_commands) this.addCustomCommand(command as ModCDPCustomCommandRegistration);
     for (const event of custom_events) this.addCustomEvent(event as ModCDPCustomEventRegistration);
     for (const middleware of custom_middlewares) this.addMiddleware(middleware as ModCDPMiddlewareRegistration);
+    if (this.started_at !== null) {
+      await this.client.connect();
+      if (this.client.upstream.config.upstream_mode === "ws") await this.client.router.start();
+      await this.client.upstream.getTargets();
+    }
     return this;
   }
 
@@ -413,6 +365,13 @@ class ModCDPServer {
             const upstream = globalThis.ModCDP.client;
             const downstream = globalThis.ModCDP.downstream;
             const ModCDP = globalThis.ModCDP;
+            const cdp = {
+              upstream,
+              client: upstream,
+              downstream,
+              send: (method, params = {}, targetCdpSessionId = cdpSessionId) =>
+                ModCDP.handleCommand(method, params, targetCdpSessionId),
+            };
             const chrome = globalThis.chrome;
             const value = (${expression});
             return typeof value === "function" ? await value(params || {}, method) : value;
@@ -448,31 +407,7 @@ class ModCDPServer {
     });
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type !== "modcdp.options.status") return false;
-      sendResponse({
-        now: new Date().toISOString(),
-        self: {
-          id: "self",
-          runtime: {
-            extension_id: chrome.runtime.id,
-            service_worker_url: chrome.runtime.getURL("modcdp/service_worker.js"),
-            options_url: chrome.runtime.getURL("options.html"),
-            started_at: this.started_at,
-          },
-          server: {
-            router: { router_routes: this.client.router.router_routes },
-            loopback_cdp_url:
-              this.client.upstream.upstream_mode === "ws" ? (this.client.upstream.upstream_ws_cdp_url ?? null) : null,
-            browser_token: this.server_browser_token ? "set" : null,
-            cdp_send_timeout_ms: this.client.client_options.client_cdp_send_timeout_ms,
-            loopback_execution_context_timeout_ms: this.client.router.loopback_execution_context_timeout_ms,
-            ws_connect_error_settle_timeout_ms:
-              this.client.upstream.upstream_ws_connect_error_settle_timeout_ms ?? null,
-            downstream_client_timeout_ms: this.downstream.downstream_client_timeout_ms,
-            downstream_close_browser_on_disconnect: this.downstream.downstream_close_browser_on_disconnect,
-            downstream_transports: this.downstream.status(),
-          },
-        },
-      });
+      sendResponse(this.toJSON());
       return false;
     });
   }

@@ -1,7 +1,9 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/launcher/BBBrowserLauncher.py
+// - ./go/modcdp/launcher/BBBrowserLauncher.go
 import { BrowserLauncher, type LauncherConfig, type LaunchedBrowser } from "./BrowserLauncher.js";
-
-const DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com";
-const DEFAULT_BROWSERBASE_VIEWPORT = { width: 1288, height: 711 };
+import { ModCDPLauncherConfigSchema } from "../types/modcdp.js";
 
 type BrowserbaseSession = {
   id?: string;
@@ -10,24 +12,6 @@ type BrowserbaseSession = {
   debuggerFullscreenUrl?: string;
   status?: string;
 };
-
-function firstString(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-function firstBoolean(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "boolean") return value;
-  }
-  return null;
-}
-
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
 
 function browserbaseUrl(base_url: string, pathname: string) {
   return new URL(pathname, `${base_url.replace(/\/$/, "")}/`).toString();
@@ -91,27 +75,20 @@ async function closeBrowserCDP(cdp_url: string | undefined) {
 
 class BBBrowserLauncher extends BrowserLauncher {
   constructor(options: LauncherConfig = {}) {
-    super(options);
-    this.launcher_mode = "bb";
+    super({ ...options, launcher_mode: "bb" });
   }
 
   async launch(options: LauncherConfig = {}): Promise<LaunchedBrowser> {
-    const browserbase_api_key = firstString(
-      options.launcher_bb_api_key,
-      this.launcher_bb_api_key,
-      process.env.BROWSERBASE_API_KEY,
-    );
+    const config = ModCDPLauncherConfigSchema.parse({ ...this.config, ...options });
+    const browserbase_api_key = config.launcher_bb_api_key ?? process.env.BROWSERBASE_API_KEY;
     if (!browserbase_api_key) {
-      throw new Error("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.");
+      throw new Error("launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.");
     }
 
-    const base_url =
-      firstString(options.launcher_bb_base_url, this.launcher_bb_base_url, process.env.BROWSERBASE_BASE_URL) ??
-      DEFAULT_BROWSERBASE_BASE_URL;
-    const resume_session_id = firstString(options.launcher_bb_session_id, this.launcher_bb_session_id);
-    const keep_alive = firstBoolean(options.launcher_bb_keep_alive, this.launcher_bb_keep_alive) ?? false;
-    const close_session_on_close =
-      firstBoolean(options.launcher_bb_close_session_on_close, this.launcher_bb_close_session_on_close) ?? !keep_alive;
+    const base_url = config.launcher_bb_base_url;
+    const resume_session_id = config.launcher_bb_session_id;
+    const keep_alive = config.launcher_bb_keep_alive;
+    const close_session_on_close = config.launcher_bb_close_session_on_close ?? !keep_alive;
 
     let created_session = false;
     let session: BrowserbaseSession;
@@ -123,41 +100,30 @@ class BBBrowserLauncher extends BrowserLauncher {
         pathname: `/v1/sessions/${resume_session_id}`,
       });
     } else {
-      const session_create_params = objectValue(
-        options.launcher_bb_session_create_params ?? this.launcher_bb_session_create_params,
-      );
+      const session_create_params = config.launcher_bb_session_create_params;
       const browser_settings = {
-        ...objectValue(session_create_params.browserSettings),
-        ...objectValue(options.launcher_bb_browser_settings ?? this.launcher_bb_browser_settings),
+        ...(session_create_params.browserSettings ?? {}),
+        ...config.launcher_bb_browser_settings,
       };
       const user_metadata = {
-        ...objectValue(session_create_params.userMetadata),
-        ...objectValue(options.launcher_bb_user_metadata ?? this.launcher_bb_user_metadata),
+        ...session_create_params.userMetadata,
+        ...config.launcher_bb_user_metadata,
       };
-      const extension_id = firstString(
-        options.launcher_bb_extension_id,
-        this.launcher_bb_extension_id,
-        session_create_params.extensionId,
-        objectValue(session_create_params.browserSettings).extensionId,
-      );
+      const extension_id =
+        config.launcher_bb_extension_id ??
+        session_create_params.extensionId ??
+        session_create_params.browserSettings?.extensionId;
+      const region = config.launcher_bb_region ?? session_create_params.region;
       const body = {
         ...session_create_params,
         ...(keep_alive ? { keepAlive: true } : {}),
-        ...(firstString(options.launcher_bb_region, this.launcher_bb_region, session_create_params.region)
-          ? {
-              region: firstString(options.launcher_bb_region, this.launcher_bb_region, session_create_params.region),
-            }
-          : {}),
-        ...(typeof (options.launcher_bb_timeout ?? this.launcher_bb_timeout) === "number"
-          ? { timeout: options.launcher_bb_timeout ?? this.launcher_bb_timeout }
-          : {}),
+        ...(region ? { region } : {}),
+        ...(typeof config.launcher_bb_timeout === "number" ? { timeout: config.launcher_bb_timeout } : {}),
         ...(extension_id ? { extensionId: extension_id } : {}),
         browserSettings: {
           ...browser_settings,
           ...(extension_id ? { extensionId: extension_id } : {}),
-          viewport: objectValue(browser_settings.viewport).width
-            ? browser_settings.viewport
-            : DEFAULT_BROWSERBASE_VIEWPORT,
+          viewport: browser_settings.viewport,
         },
         userMetadata: {
           ...user_metadata,

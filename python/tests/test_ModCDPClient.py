@@ -15,7 +15,6 @@ from websocket import create_connection
 from modcdp import ModCDPClient
 from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
 from modcdp.types import JsonValue
-from tests.test_ReverseWSUpstreamTransport import reversews_test_browser_path
 
 
 HERE = Path(__file__).resolve().parent
@@ -68,7 +67,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp.launcher["launcher_local_headless"], True)
         self.assertEqual(cdp._launch_options().get("launcher_local_executable_path"), "/tmp/chrome")
         self.assertEqual(cdp._launch_options().get("launcher_local_user_data_dir"), "/tmp/profile")
-        self.assertEqual(cdp.upstream["upstream_ws_connect_error_settle_timeout_ms"], 321)
+        self.assertEqual(cdp.upstream.get("upstream_ws_connect_error_settle_timeout_ms"), 321)
         self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 4321)
         self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 5432)
         self.assertEqual(cdp.injector["injector_service_worker_ready_timeout_ms"], 6543)
@@ -96,8 +95,6 @@ class ModCDPClientTests(unittest.TestCase):
     def test_preserves_explicit_zero_timeout_config(self) -> None:
         cdp = ModCDPClient(
             upstream={
-                "upstream_nats_wait_timeout_ms": 0,
-                "upstream_reversews_wait_timeout_ms": 0,
                 "upstream_ws_connect_error_settle_timeout_ms": 0,
             },
             injector={
@@ -113,9 +110,7 @@ class ModCDPClientTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(cdp.upstream["upstream_nats_wait_timeout_ms"], 0)
-        self.assertEqual(cdp.upstream["upstream_reversews_wait_timeout_ms"], 0)
-        self.assertEqual(cdp.upstream["upstream_ws_connect_error_settle_timeout_ms"], 0)
+        self.assertEqual(cdp.upstream.get("upstream_ws_connect_error_settle_timeout_ms"), 0)
         self.assertEqual(cdp.injector["injector_execution_context_timeout_ms"], 0)
         self.assertEqual(cdp.injector["injector_service_worker_probe_timeout_ms"], 0)
         self.assertEqual(cdp.injector["injector_service_worker_ready_timeout_ms"], 0)
@@ -143,16 +138,6 @@ class ModCDPClientTests(unittest.TestCase):
         cdp = ModCDPClient(server_options=None)
 
         self.assertIsNone(cdp.server_options)
-
-    def test_defaults_unconfigured_modcdp_server_upstreams_to_no_injector(self) -> None:
-        for mode in ("nativemessaging", "reversews", "nats"):
-            launched = ModCDPClient(launcher={"launcher_mode": "local"}, upstream={"upstream_mode": mode})
-            self.assertEqual(launched.launcher["launcher_mode"], "local")
-            self.assertEqual(launched.injector["injector_mode"], "none")
-
-            attach_only = ModCDPClient(upstream={"upstream_mode": mode})
-            self.assertEqual(attach_only.launcher["launcher_mode"], "none")
-            self.assertEqual(attach_only.injector["injector_mode"], "none")
 
     def test_orders_local_auto_injection_as_launch_flag_then_cdp_fallback(self) -> None:
         cdp = ModCDPClient(
@@ -260,7 +245,7 @@ class ModCDPClientTests(unittest.TestCase):
                 "launcher_local_chrome_ready_timeout_ms": 60_000,
                 # This test manually supplies --load-extension, so it intentionally uses
                 # the launch-flag browser path instead of relying on the client fallback.
-                "launcher_local_executable_path": reversews_test_browser_path(),
+                "launcher_local_executable_path": LocalBrowserLauncher.findChromeBinary(),
                 "launcher_local_extra_args": [f"--load-extension={EXTENSION_PATH}"],
             }
         ).launch()
@@ -297,10 +282,7 @@ class ModCDPClientTests(unittest.TestCase):
             launcher={
                 "launcher_mode": "local",
                 "launcher_local_headless": True,
-                # After explicit CHROME_PATH and CI /usr/bin/chromium, this test uses
-                # Chrome for Testing because Canary rejects --load-extension in this
-                # local launch injector path.
-                "launcher_local_executable_path": reversews_test_browser_path(),
+                "launcher_local_executable_path": LocalBrowserLauncher.findChromeBinary(),
             },
             upstream={"upstream_mode": "ws"},
             injector={

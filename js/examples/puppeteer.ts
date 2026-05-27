@@ -29,12 +29,12 @@ try {
     launcher_local_chrome_ready_timeout_ms: 60_000,
     launcher_local_headless: process.platform === "linux" && !process.env.DISPLAY,
     launcher_local_sandbox: process.platform !== "linux",
-    launcher_local_extra_args: [`--load-extension=${extension_path}`],
   });
   proxy = await startProxy({
     proxy_listen_port: await LocalBrowserLauncher.freePort(),
-    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: chrome.cdp_url },
-    injector: { injector_mode: "discover", injector_discover_extension_path: extension_path },
+    launcher: { launcher_mode: "remote", launcher_remote_cdp_url: chrome.cdp_url },
+    upstream: { upstream_mode: "ws" },
+    injector: { injector_mode: "cdp", injector_cdp_extension_path: extension_path },
   });
 
   browser = await puppeteer.connect({ browserURL: proxy.url });
@@ -67,7 +67,9 @@ try {
   await cdp.send("Mod.addCustomCommand", {
     name: "Custom.proxyEcho",
     expression: `async (params) => {
-      await cdp.emit("Custom.proxyEvent", { source: "puppeteer", value: params.value });
+      const event = { method: "Custom.proxyEvent", params: { source: "puppeteer", value: params.value } };
+      if (cdpSessionId) event.sessionId = cdpSessionId;
+      downstream.sendEvent(event);
       return { source: "puppeteer", value: params.value };
     }`,
   });

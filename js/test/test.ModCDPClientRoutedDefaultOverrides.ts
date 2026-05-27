@@ -81,8 +81,8 @@ test(
     });
     await owner.connect();
     const cdp = new ModCDPClient({
-      launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.upstream_ws_cdp_url },
-      upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+      launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
+      upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
       injector: {
         injector_mode: "discover",
         injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
@@ -96,15 +96,15 @@ test(
         },
       },
       server_options: {
-        upstream: { upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+        upstream: { upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
         router: { router_routes: { "*.*": "loopback_cdp" } },
       },
     });
 
     try {
       await cdp.connect();
-      assert.equal(cdp.upstream.upstream_ws_cdp_url, owner.upstream.upstream_ws_cdp_url);
-      assert.equal(cdp.server_options?.upstream?.upstream_ws_cdp_url, owner.upstream.upstream_ws_cdp_url);
+      assert.equal(cdp.upstream.config.upstream_ws_cdp_url, owner.upstream.config.upstream_ws_cdp_url);
+      assert.equal(cdp.server_options?.upstream?.upstream_ws_cdp_url, owner.upstream.config.upstream_ws_cdp_url);
 
       const rawTargets = (await cdp.send("Target.getTargets")) as { targetInfos: { type?: string; tabId?: number }[] };
       assert.ok(rawTargets.targetInfos?.length > 0, "expected raw Target.getTargets targetInfos");

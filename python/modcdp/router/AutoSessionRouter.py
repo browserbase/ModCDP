@@ -1,3 +1,7 @@
+# MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+# Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+# - ./js/src/router/AutoSessionRouter.ts
+# - ./go/modcdp/router/AutoSessionRouter.go
 from __future__ import annotations
 
 import threading
@@ -40,9 +44,9 @@ class AutoSessionRouter:
                     self.targetId_from_sessionId[attached_session_id] = target_id
         elif method == "Runtime.executionContextCreated":
             raw_context = event_data.get("context")
-            context = raw_context if isinstance(raw_context, Mapping) else None
+            context = dict(raw_context) if isinstance(raw_context, Mapping) else None
             context_id = context.get("id") if context else None
-            if session_id and isinstance(context_id, int):
+            if session_id and isinstance(context_id, int) and context is not None:
                 self._recordExecutionContext(session_id, context)
         elif method == "Target.detachedFromTarget":
             detached_session_id = event_data.get("sessionId") if isinstance(event_data.get("sessionId"), str) else session_id

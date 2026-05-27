@@ -1,3 +1,7 @@
+// MODCDP_TRANSLATE: KEEP THIS FILE TRANSLATED ACROSS TYPESCRIPT, PYTHON, AND GO.
+// Keep all shapes, signatures, behavior, and tests 1:1 in sync with:
+// - ./python/modcdp/injector/ExtensionInjector.py
+// - ./go/modcdp/injector/ExtensionInjector.go
 import { z } from "zod";
 import type { LauncherConfig } from "../launcher/BrowserLauncher.js";
 import type { TargetRoute, UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
@@ -6,6 +10,7 @@ import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { ProtocolParams, ProtocolResult } from "../types/modcdp.js";
+import { modCDPToJSON } from "../types/toJSON.js";
 
 const EXT_ID_FROM_URL = /^chrome-extension:\/\/([a-z]+)\//;
 const DEFAULT_MODCDP_EXTENSION_ID = "mdedooklbnfejodmnhmkdpkaedafkehf";
@@ -17,6 +22,7 @@ const DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS = 10_000;
 const DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000;
 const DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100;
 const DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20;
+const DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com";
 
 interface SendCDP {
   (method: string, params?: ProtocolParams, session_id?: string | null): Promise<ProtocolResult>;
@@ -41,133 +47,33 @@ const DefaultSendCDP: SendCDP = async () => {
 
 const InjectorConfigSchema = z
   .object({
-    injector_mode: InjectorModeSchema.optional()
-      .nullable()
-      .transform((value) => value ?? "none"),
-    send: z
-      .custom<SendCDP>((value) => typeof value === "function")
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DefaultSendCDP),
-    injector_cli_extension_path: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_cli_extension_id: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_cdp_extension_path: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_cdp_extension_id: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_bb_extension_path: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_bb_extension_id: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_discover_extension_path: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_borrow_extension_path: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_service_worker_extension_id: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_service_worker_url_includes: z
-      .array(z.string())
-      .optional()
-      .nullable()
-      .transform((value) => value ?? []),
-    injector_service_worker_url_suffixes: z
-      .array(z.string())
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES),
-    injector_trust_service_worker_target: z
-      .boolean()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? false),
-    injector_require_service_worker_target: z
-      .boolean()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? false),
-    injector_service_worker_ready_expression: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_cdp_send_timeout_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_CDP_SEND_TIMEOUT_MS),
-    injector_execution_context_timeout_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS),
-    injector_service_worker_probe_timeout_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS),
-    injector_service_worker_ready_timeout_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS),
-    injector_service_worker_poll_interval_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS),
-    injector_target_session_poll_interval_ms: z
-      .number()
-      .positive()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS),
-    injector_bb_api_key: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
-    injector_bb_base_url: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((value) => value ?? null),
+    injector_mode: InjectorModeSchema.default("none"),
+    send: z.custom<SendCDP>((value) => typeof value === "function").default(() => DefaultSendCDP),
+    injector_cli_extension_path: z.string().optional(),
+    injector_cli_extension_id: z.string().optional(),
+    injector_cdp_extension_path: z.string().optional(),
+    injector_cdp_extension_id: z.string().optional(),
+    injector_bb_extension_path: z.string().optional(),
+    injector_bb_extension_id: z.string().optional(),
+    injector_discover_extension_path: z.string().optional(),
+    injector_borrow_extension_path: z.string().optional(),
+    injector_service_worker_extension_id: z.string().nullable().optional(),
+    injector_service_worker_url_includes: z.array(z.string()).default([]),
+    injector_service_worker_url_suffixes: z.array(z.string()).default(DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES),
+    injector_trust_service_worker_target: z.boolean().default(false),
+    injector_require_service_worker_target: z.boolean().default(false),
+    injector_service_worker_ready_expression: z.string().default(MODCDP_READY_EXPRESSION),
+    injector_cdp_send_timeout_ms: z.number().positive().default(DEFAULT_CDP_SEND_TIMEOUT_MS),
+    injector_execution_context_timeout_ms: z.number().positive().default(DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS),
+    injector_service_worker_probe_timeout_ms: z.number().positive().default(DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS),
+    injector_service_worker_ready_timeout_ms: z.number().positive().default(DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS),
+    injector_service_worker_poll_interval_ms: z.number().positive().default(DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS),
+    injector_target_session_poll_interval_ms: z.number().positive().default(DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS),
+    injector_bb_api_key: z.string().optional(),
+    injector_bb_base_url: z.string().default(DEFAULT_BROWSERBASE_BASE_URL),
   })
   .strict();
-type InjectorConfig = z.input<typeof InjectorConfigSchema>;
+type InjectorConfig = z.infer<typeof InjectorConfigSchema>;
 
 type ExtensionInjectionResult = {
   source: string;
@@ -182,26 +88,28 @@ function delay(ms: number) {
 }
 
 class ExtensionInjector {
-  config: z.output<typeof InjectorConfigSchema>;
+  config: InjectorConfig;
   source: string | null;
   extension_id: string | null;
+  service_worker_extension_id: string | null;
   target_id: string | null;
   url: string | null;
   session_id: string | null;
   extra_args: string[];
   protected unusable_target_ids = new Set<string>();
 
-  constructor(options: InjectorConfig = {}) {
+  constructor(options: z.input<typeof InjectorConfigSchema> = {}) {
     this.config = InjectorConfigSchema.parse(options);
     this.source = null;
     this.extension_id = null;
+    this.service_worker_extension_id = null;
     this.target_id = null;
     this.url = null;
     this.session_id = null;
     this.extra_args = [];
   }
 
-  update(config: InjectorConfig = {}) {
+  update(config: z.input<typeof InjectorConfigSchema> = {}) {
     this.config = InjectorConfigSchema.parse({ ...this.config, ...config });
     return this;
   }
@@ -209,6 +117,7 @@ class ExtensionInjector {
   recordInjectionResult(result: ExtensionInjectionResult) {
     this.source = result.source;
     this.extension_id = result.extension_id ?? null;
+    this.service_worker_extension_id = result.extension_id ?? this.service_worker_extension_id;
     this.target_id = result.target_id;
     this.url = result.url ?? null;
     this.session_id = result.session_id;
@@ -234,10 +143,16 @@ class ExtensionInjector {
     return {};
   }
 
+  toJSON() {
+    return modCDPToJSON(this, {
+      config: { ...this.config, send: undefined },
+    });
+  }
+
   protected readyExpression() {
     const expression = this.config.injector_service_worker_ready_expression;
-    return expression == null || expression.length === 0
-      ? MODCDP_READY_EXPRESSION
+    return expression === MODCDP_READY_EXPRESSION
+      ? expression
       : `(${MODCDP_READY_EXPRESSION}) && Boolean(${expression})`;
   }
 
@@ -322,7 +237,7 @@ class ExtensionInjector {
         matched_only,
       });
       if (discovered) return discovered;
-      await delay(this.config.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS);
+      await delay(this.config.injector_service_worker_poll_interval_ms);
     }
     return null;
   }
@@ -331,14 +246,13 @@ class ExtensionInjector {
     const url = candidate.url ?? "";
     if (candidate.type !== "service_worker") return false;
     if (!url.startsWith("chrome-extension://")) return false;
-    const has_extension_id = Boolean(this.config.injector_service_worker_extension_id);
-    if (
-      this.config.injector_service_worker_extension_id &&
-      !url.startsWith(`chrome-extension://${this.config.injector_service_worker_extension_id}/`)
-    )
+    const service_worker_extension_id =
+      this.config.injector_service_worker_extension_id ?? this.service_worker_extension_id;
+    const has_extension_id = Boolean(service_worker_extension_id);
+    if (service_worker_extension_id && !url.startsWith(`chrome-extension://${service_worker_extension_id}/`))
       return false;
-    const includes = this.config.injector_service_worker_url_includes ?? [];
-    const suffixes = this.config.injector_service_worker_url_suffixes ?? [];
+    const includes = this.config.injector_service_worker_url_includes;
+    const suffixes = this.config.injector_service_worker_url_suffixes;
     if (includes.length > 0 && !includes.every((part) => url.includes(part))) return false;
     if (suffixes.length > 0 && !suffixes.some((suffix) => url.endsWith(suffix))) return false;
     return has_extension_id || includes.length > 0 || suffixes.length > 0;
@@ -354,6 +268,7 @@ export {
   DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
   DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
   DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS,
+  DEFAULT_BROWSERBASE_BASE_URL,
   ExtensionInjector,
 };
 export { InjectorModeSchema, InjectorConfigSchema };

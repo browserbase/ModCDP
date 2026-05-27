@@ -1,3 +1,5 @@
+// MODCDP_TS_ONLY: DO NOT TRANSLATE THIS FILE TO OTHER LANGUAGES.
+// Reason: only runs in browser.
 import {
   CdpResponseMessageSchema,
   type CdpCommandMessage,
@@ -5,9 +7,7 @@ import {
   type CdpResponseMessage,
   type ProtocolPayload,
 } from "../types/modcdp.js";
-import type { ModCDPClient } from "../client/ModCDPClient.js";
-import { events as nativeEventSchemas } from "../types/generated/zod.js";
-import type { UpstreamTransport } from "./UpstreamTransport.js";
+import { modCDPToJSON } from "../types/toJSON.js";
 
 type DownstreamTransportName = "reversews" | "nativemessaging" | "nats";
 
@@ -43,11 +43,6 @@ abstract class DownstreamTransport {
   // by transport message handlers when a downstream client sends a command.
   private readonly request_handlers = new Set<DownstreamRequestHandler>();
 
-  // Per-transport event mirror cleanup and its browser-target upstream. Each
-  // downstream transport owns its own upstream subscription because clients,
-  // fan-out, and delivery semantics are downstream-specific.
-  private upstream_event_mirror: { upstream: UpstreamTransport; remove: () => void } | null = null;
-
   /** Start this transport's built-in client polling/listening path. */
   abstract startPollingForClients(): ProtocolPayload | null;
 
@@ -69,30 +64,6 @@ abstract class DownstreamTransport {
     return { remove: () => this.request_handlers.delete(handler) };
   }
 
-  /** Mirror browser-target upstream events into this downstream transport. */
-  mirrorEventsFrom(client: Pick<ModCDPClient, "upstream">) {
-    if (this.upstream_event_mirror?.upstream === client.upstream) return this.upstream_event_mirror;
-    this.upstream_event_mirror?.remove();
-    const upstream_event_subscriptions = Object.values(nativeEventSchemas).map((event) =>
-      client.upstream.on(event, (payload, _targetId, cdpSessionId) => {
-        const message: CdpEventMessage = {
-          method: event.id,
-          params: (payload ?? {}) as CdpEventMessage["params"],
-        };
-        if (cdpSessionId) message.sessionId = cdpSessionId;
-        this.sendEvent(message);
-      }),
-    );
-    this.upstream_event_mirror = {
-      upstream: client.upstream,
-      remove: () => {
-        for (const subscription of upstream_event_subscriptions) subscription.remove();
-        if (this.upstream_event_mirror?.upstream === client.upstream) this.upstream_event_mirror = null;
-      },
-    };
-    return this.upstream_event_mirror;
-  }
-
   /**
    * Run registered handlers for one downstream request.
    *
@@ -106,6 +77,17 @@ abstract class DownstreamTransport {
       this.sendResponse(message, CdpResponseMessageSchema.parse(response));
       return;
     }
+  }
+
+  toJSON() {
+    const { config = {}, ...state } = this.status();
+    return modCDPToJSON(this, {
+      config,
+      state: {
+        ...state,
+        request_handlers: this.request_handlers.size,
+      },
+    });
   }
 }
 

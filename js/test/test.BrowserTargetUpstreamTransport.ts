@@ -25,15 +25,15 @@ test("loopback browser-target upstream routes commands, events, and topology thr
   await owner.connect();
 
   const cdp = new ModCDPClient({
-    launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.upstream_ws_cdp_url },
-    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+    launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
+    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
     injector: {
       injector_mode: "discover",
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
     server_options: {
-      upstream: { upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+      upstream: { upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
       router: { router_routes: { "*.*": "loopback_cdp" } },
     },
   });
@@ -78,8 +78,8 @@ test("chrome.debugger browser-target upstream routes commands, events, and topol
   await owner.connect();
 
   const cdp = new ModCDPClient({
-    launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.upstream_ws_cdp_url },
-    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
+    launcher: { launcher_mode: "remote", launcher_remote_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
+    upstream: { upstream_mode: "ws", upstream_ws_cdp_url: owner.upstream.config.upstream_ws_cdp_url },
     injector: {
       injector_mode: "discover",
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
