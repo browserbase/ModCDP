@@ -132,7 +132,7 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	targetID, _ = created["targetId"].(string)
-	sessionID := waitForString(t, func() string { return router.SessionId_from_targetId[targetID] })
+	sessionID := waitForString(t, func() string { return router.sessionId_from_targetId[targetID] })
 	contextResult := make(chan int, 1)
 	contextError := make(chan error, 1)
 	go func() {
@@ -160,12 +160,12 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	waitForString(t, func() string {
-		if router.SessionId_from_targetId[targetID] == "" {
+		if router.sessionId_from_targetId[targetID] == "" {
 			return "detached"
 		}
 		return ""
 	})
-	for _, context := range router.Contexts {
+	for _, context := range router.contexts {
 		if context["sessionId"] == sessionID {
 			t.Fatal("execution context remained after detach")
 		}
@@ -180,7 +180,7 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal(err)
 	}
 	pendingTargetID, _ = pendingCreated["targetId"].(string)
-	pendingSessionID := waitForString(t, func() string { return router.SessionId_from_targetId[pendingTargetID] })
+	pendingSessionID := waitForString(t, func() string { return router.sessionId_from_targetId[pendingTargetID] })
 	pendingContextError := make(chan error, 1)
 	go func() {
 		_, err := router.WaitForExecutionContext(pendingSessionID, 30000)
@@ -198,12 +198,12 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 		t.Fatal("timed out waiting for detach error")
 	}
 	waitForString(t, func() string {
-		if router.SessionId_from_targetId[pendingTargetID] == "" {
+		if router.sessionId_from_targetId[pendingTargetID] == "" {
 			return "detached"
 		}
 		return ""
 	})
-	for _, context := range router.Contexts {
+	for _, context := range router.contexts {
 		if context["sessionId"] == pendingSessionID {
 			t.Fatal("execution context was recorded for detached pending session")
 		}
