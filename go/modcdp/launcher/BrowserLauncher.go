@@ -117,9 +117,18 @@ func (l *BrowserLauncher) Update(config LauncherConfig) *BrowserLauncher {
 }
 
 func (l BrowserLauncher) ConfigForUpstream() map[string]any {
-	return map[string]any{
-		"upstream_ws_cdp_url": firstString(launchedCDPURL(l.Launched), l.Config.LauncherRemoteCDPURL),
+	config := map[string]any{}
+	upstreamWSCDPURL := firstString(launchedCDPURL(l.Launched), l.Config.LauncherRemoteCDPURL)
+	if upstreamWSCDPURL != "" {
+		config["upstream_ws_cdp_url"] = upstreamWSCDPURL
 	}
+	if l.Launched != nil && l.Launched.PipeRead != nil {
+		config["upstream_pipe_read"] = l.Launched.PipeRead
+	}
+	if l.Launched != nil && l.Launched.PipeWrite != nil {
+		config["upstream_pipe_write"] = l.Launched.PipeWrite
+	}
+	return config
 }
 
 func (l BrowserLauncher) ConfigForServer() map[string]any {

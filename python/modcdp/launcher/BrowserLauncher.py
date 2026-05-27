@@ -83,9 +83,18 @@ class BrowserLauncher:
         return self
 
     def configForUpstream(self) -> dict[str, Any]:
-        return {
-            "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.config.launcher_remote_cdp_url,
-        }
+        config: dict[str, Any] = {}
+        launched = self.launched or {}
+        upstream_ws_cdp_url = launched.get("cdp_url") or self.config.launcher_remote_cdp_url
+        if upstream_ws_cdp_url:
+            config["upstream_ws_cdp_url"] = upstream_ws_cdp_url
+        pipe_read = launched.get("pipe_read")
+        if pipe_read:
+            config["upstream_pipe_read"] = pipe_read
+        pipe_write = launched.get("pipe_write")
+        if pipe_write:
+            config["upstream_pipe_write"] = pipe_write
+        return config
 
     def configForServer(self) -> dict[str, Any]:
         loopback_cdp_url = (self.launched or {}).get("loopback_cdp_url")
