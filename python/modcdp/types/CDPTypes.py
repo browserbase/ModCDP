@@ -749,7 +749,7 @@ class CDPTypes:
             if execution_context_id is not None:
                 runtime_params["contextId"] = execution_context_id
             return {"method": "Runtime.evaluate", "params": runtime_params, "unwrap": "runtime"}
-        runtime_params = {
+        runtime_params: dict[str, object] = {
             "functionDeclaration": (
                 "async function(method, paramsJson, cdpSessionId) { "
                 "return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); "
