@@ -84,6 +84,8 @@ def _json_object(value: object) -> JsonObject:
 def _json_value(value: object) -> JsonValue:
     if value is None or isinstance(value, bool | int | float | str):
         return value
+    if isinstance(value, type) and issubclass(value, BaseModel):
+        return _json_object(value.model_json_schema())
     if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
         return [_json_value(item) for item in value]
     if isinstance(value, Mapping):
