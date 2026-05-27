@@ -336,6 +336,92 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
         finally:
             client.close()
 
+    def test_service_worker_server_validates_registered_custom_command_and_event_schemas(self) -> None:
+        client = ModCDPClient(
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
+            upstream={"upstream_mode": "ws"},
+            injector={
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
+                "injector_trust_service_worker_target": True,
+            },
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+        )
+        seen: Queue[bool] = Queue()
+
+        async def run() -> None:
+            client.connect()
+            self.assertEqual(
+                await client.Mod.addCustomCommand(
+                    "Custom.double",
+                    params_schema={
+                        "type": "object",
+                        "properties": {"value": {"type": "number"}},
+                        "required": ["value"],
+                        "additionalProperties": False,
+                    },
+                    result_schema={
+                        "type": "object",
+                        "properties": {"value": {"type": "number"}},
+                        "required": ["value"],
+                        "additionalProperties": False,
+                    },
+                    expression="async (params) => ({ value: params.value * 2 })",
+                ),
+                {"name": "Custom.double", "registered": True},
+            )
+            self.assertEqual(client.types.parseCommandParams("Custom.double", {"value": 2}), {"value": 2})
+            self.assertEqual(client.types.parseCommandResult("Custom.double", {"value": 4}), {"value": 4})
+            self.assertEqual(await client.send("Custom.double", {"value": 2}), {"value": 4})
+
+            self.assertEqual(
+                await client.Mod.addCustomCommand(
+                    "Custom.badResult",
+                    result_schema={
+                        "type": "object",
+                        "properties": {"ok": {"type": "boolean"}},
+                        "required": ["ok"],
+                        "additionalProperties": False,
+                    },
+                    expression='async () => ({ ok: "yes" })',
+                ),
+                {"name": "Custom.badResult", "registered": True},
+            )
+            with self.assertRaisesRegex(Exception, "boolean"):
+                await client.send("Custom.badResult", {})
+
+            self.assertEqual(
+                await client.Mod.addCustomEvent(
+                    "Custom.ready",
+                    event_schema={
+                        "type": "object",
+                        "properties": {"ok": {"type": "boolean"}},
+                        "required": ["ok"],
+                        "additionalProperties": False,
+                    },
+                ),
+                {"name": "Custom.ready", "registered": True},
+            )
+            self.assertEqual(client.types.parseEventPayload("Custom.ready", {"ok": True}), {"ok": True})
+            with self.assertRaises(ValueError):
+                client.types.parseEventPayload("Custom.ready", {"ok": "yes"})
+            await client.on("Custom.ready", lambda event: seen.put(bool(event["ok"])))
+            await client.Mod.evaluate(
+                expression="async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.ready', data: { ok: true }, cdpSessionId: null }))"
+            )
+
+        try:
+            asyncio.run(run())
+            self.assertEqual(seen.get(timeout=10), True)
+        finally:
+            client.close()
+
     def test_schema_only_custom_commands_register_without_a_websocket(self) -> None:
         client = ModCDPClient(
             launcher={"launcher_mode": "none"},

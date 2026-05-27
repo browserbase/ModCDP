@@ -384,6 +384,129 @@ func TestAssignedTypeRegistryValidatesUpdatedCustomCommandEventAndMiddlewareSche
 	}
 }
 
+func TestServiceWorkerServerValidatesRegisteredCustomCommandAndEventSchemas(t *testing.T) {
+	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdp := New(Config{
+		Launcher: LauncherConfig{
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
+		},
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
+			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
+			InjectorTrustServiceWorkerTarget: true,
+		},
+		Router: RouterConfig{RouterRoutes: map[string]string{
+			"Mod.*":    "service_worker",
+			"Custom.*": "service_worker",
+			"*.*":      "direct_cdp",
+		}},
+		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+	})
+	defer cdp.Close()
+
+	if err := cdp.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := cdp.Mod.AddCustomCommand(CustomCommand{
+		Name: "Custom.double",
+		ParamsSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"value": map[string]any{"type": "number"}},
+			"required":             []any{"value"},
+			"additionalProperties": false,
+		},
+		ResultSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"value": map[string]any{"type": "number"}},
+			"required":             []any{"value"},
+			"additionalProperties": false,
+		},
+		Expression: "async (params) => ({ value: params.value * 2 })",
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.double", "registered")
+	}
+	if _, err := cdp.Types.ParseCommandParams("Custom.double", map[string]any{"value": 2}); err != nil {
+		t.Fatalf("expected Custom.double params to validate: %v", err)
+	}
+	if _, err := cdp.Types.ParseCommandResult("Custom.double", map[string]any{"value": 4}); err != nil {
+		t.Fatalf("expected Custom.double result to validate: %v", err)
+	}
+	result, err := cdp.Send("Custom.double", map[string]any{"value": 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultMap, ok := result.(map[string]any)
+	if !ok || resultMap["value"] != float64(4) {
+		t.Fatalf("Custom.double = %#v", result)
+	}
+
+	if result, err := cdp.Mod.AddCustomCommand(CustomCommand{
+		Name: "Custom.badResult",
+		ResultSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+			"required":             []any{"ok"},
+			"additionalProperties": false,
+		},
+		Expression: `async () => ({ ok: "yes" })`,
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.badResult", "registered")
+	}
+	if _, err := cdp.Send("Custom.badResult", map[string]any{}); err == nil {
+		t.Fatal("expected Custom.badResult result validation error")
+	}
+
+	if result, err := cdp.Mod.AddCustomEvent(CustomEvent{
+		Name: "Custom.ready",
+		EventSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+			"required":             []any{"ok"},
+			"additionalProperties": false,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.ready", "registered")
+	}
+	if _, ok := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": true}); !ok {
+		t.Fatal("expected Custom.ready event to validate")
+	}
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"ok": "yes"}) })
+
+	seen := make(chan bool, 1)
+	cdp.On("Custom.ready", func(data any) {
+		event, _ := data.(map[string]any)
+		if event != nil {
+			seen <- event["ok"] == true
+		}
+	})
+	if _, err := cdp.Mod.Evaluate(map[string]any{
+		"expression": "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.ready', data: { ok: true }, cdpSessionId: null }))",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-seen:
+		if !got {
+			t.Fatal("Custom.ready got false")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for Custom.ready")
+	}
+}
+
 func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
 	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
