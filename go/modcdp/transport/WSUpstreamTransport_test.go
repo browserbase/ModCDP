@@ -102,6 +102,13 @@ func TestWSUpstreamResolvesABareHostPortCDPEndpointToTheBrowserWebsocket(t *test
 	if !strings.HasPrefix(hostPortTransport.URL, "ws://") && !strings.HasPrefix(hostPortTransport.URL, "wss://") {
 		t.Fatalf("hostPortTransport.URL = %q", hostPortTransport.URL)
 	}
+	hostPortResult, err := hostPortTransport.Send("Browser.getVersion", map[string]any{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := hostPortResult["product"].(string); !ok {
+		t.Fatalf("Browser.getVersion host:port result = %#v", hostPortResult)
+	}
 }
 
 func TestWSUpstreamCloseClearsConnectionState(t *testing.T) {

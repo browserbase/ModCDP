@@ -17,7 +17,7 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 from ..launcher.BrowserLauncher import (
     DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
@@ -59,7 +59,7 @@ class LocalBrowserLauncher(BrowserLauncher):
         if not profile_dir:
             temp_profile_dir = tempfile.TemporaryDirectory(prefix="modcdp.")
             profile_dir = temp_profile_dir.name
-        cleanup_profile_dir = str(profile_dir) if merged.launcher_local_cleanup_user_data_dir else None
+        cleanup_profile_dir = str(profile_dir) if merged.launcher_local_user_data_dir and merged.launcher_local_cleanup_user_data_dir else None
         args = [
             "--enable-unsafe-extension-debugging",
             "--remote-allow-origins=*",
@@ -86,7 +86,7 @@ class LocalBrowserLauncher(BrowserLauncher):
         headless = merged.launcher_local_headless if merged.launcher_local_headless is not None else default_headless
         if headless:
             args.append("--headless=new")
-        default_sandbox = not sys.platform.startswith("linux")
+        default_sandbox = not default_headless
         if (merged.launcher_local_sandbox if merged.launcher_local_sandbox is not None else default_sandbox) is False:
             args.append("--no-sandbox")
         args.extend(list(merged.launcher_local_args))
@@ -106,43 +106,42 @@ class LocalBrowserLauncher(BrowserLauncher):
             pipe_write = os.fdopen(parent_write, "wb", buffering=0)
             try:
                 _wait_for_pipe_ready(pipe_read, pipe_write, merged.launcher_local_chrome_ready_timeout_ms)
-                loopback_cdp_url = (
-                    (
-                        _wait_for_browser_selected_cdp_websocket_url(
+                loopback_cdp_url: str | None = None
+                loopback_cdp_port: int | None = port
+                if port is not None:
+                    if port == 0:
+                        loopback_cdp_url, loopback_cdp_port = _wait_for_browser_selected_cdp_websocket_url(
                             str(profile_dir),
                             merged.launcher_local_chrome_ready_timeout_ms,
                             merged.launcher_local_chrome_ready_poll_interval_ms,
                             process,
                         )
-                        if port == 0
-                        else _wait_for_cdp_websocket_url(
+                    else:
+                        loopback_cdp_url = _wait_for_cdp_websocket_url(
                             f"http://127.0.0.1:{port}",
                             merged.launcher_local_chrome_ready_timeout_ms,
                             merged.launcher_local_chrome_ready_poll_interval_ms,
                         )
-                    )
-                    if port is not None
-                    else None
-                )
             except Exception:
                 pipe_read.close()
                 pipe_write.close()
                 _close(process, temp_profile_dir, cleanup_profile_dir=cleanup_profile_dir)
                 raise
-            launched = cast(LaunchedBrowser, {
-                "cdp_url": None,
-                **({"cdp_listen_port": port} if isinstance(port, int) else {}),
-                "profile_dir": profile_dir,
-                "pipe_read": pipe_read,
-                "pipe_write": pipe_write,
-                "close": lambda: _close(
+            launched = LaunchedBrowser(
+                cdp_url=None,
+                profile_dir=profile_dir,
+                pipe_read=pipe_read,
+                pipe_write=pipe_write,
+                close=lambda: _close(
                     process,
                     temp_profile_dir,
                     pipe_read,
                     pipe_write,
                     cleanup_profile_dir=cleanup_profile_dir,
                 ),
-            })
+            )
+            if isinstance(loopback_cdp_port, int):
+                launched["cdp_listen_port"] = loopback_cdp_port
             if loopback_cdp_url:
                 launched["loopback_cdp_url"] = loopback_cdp_url
             self.launched = launched
@@ -360,7 +359,7 @@ def _wait_for_browser_selected_cdp_websocket_url(
     timeout_ms: int,
     poll_interval_ms: int,
     process: _ChromeProcess,
-) -> str:
+) -> tuple[str, int]:
     deadline = time.time() + timeout_ms / 1000
     poll_s = poll_interval_ms / 1000
     last_error: Exception | None = None
@@ -371,7 +370,7 @@ def _wait_for_browser_selected_cdp_websocket_url(
         active_port = _read_devtools_active_port(profile_dir)
         if active_port is not None:
             try:
-                return _wait_for_cdp_websocket_url(f"http://127.0.0.1:{active_port}", poll_interval_ms, poll_interval_ms)
+                return _wait_for_cdp_websocket_url(f"http://127.0.0.1:{active_port}", poll_interval_ms, poll_interval_ms), active_port
             except Exception as err:
                 last_error = err
         time.sleep(poll_s)

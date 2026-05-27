@@ -30,7 +30,7 @@ type AutoSessionRouter struct {
 	TargetId_from_sessionId   map[string]string
 	Targets                   map[string]map[string]any
 	Contexts                  map[string]map[string]any
-	execution_context_waiters map[string][]chan executionContextResult
+	execution_context_waiters map[string][]executionContextWaiter
 	subscription_cleanups     []func()
 	started                   bool
 	mu                        sync.Mutex
@@ -40,6 +40,11 @@ type executionContextResult struct {
 	contextID int
 	context   map[string]any
 	err       error
+}
+
+type executionContextWaiter struct {
+	done    chan executionContextResult
+	matches func(map[string]any) bool
 }
 
 func NewAutoSessionRouter(upstream *transport.UpstreamTransport, protocolTypes ProtocolTypes, config types.ModCDPRouterConfig) *AutoSessionRouter {
@@ -63,7 +68,7 @@ func NewAutoSessionRouter(upstream *transport.UpstreamTransport, protocolTypes P
 		TargetId_from_sessionId:   map[string]string{},
 		Targets:                   map[string]map[string]any{},
 		Contexts:                  map[string]map[string]any{},
-		execution_context_waiters: map[string][]chan executionContextResult{},
+		execution_context_waiters: map[string][]executionContextWaiter{},
 		subscription_cleanups:     []func(){},
 	}
 }
@@ -178,11 +183,10 @@ func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
 	if sessionID != "" {
 		return sessionID
 	}
-	result, err := r.upstream.Send("Target.attachToTarget", map[string]any{"targetId": targetID, "flatten": true}, "")
+	attachedSessionID, err := r.upstream.AttachToTarget(targetID)
 	if err != nil {
 		return ""
 	}
-	attachedSessionID, _ := result["sessionId"].(string)
 	if attachedSessionID != "" {
 		r.mu.Lock()
 		r.recordTargetSession(targetID, attachedSessionID, r.Targets[targetID])
@@ -224,15 +228,10 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 		}
 	}
 	if resolvedTargetID == "" {
-		created, err := r.upstream.Send("Target.createTarget", map[string]any{"url": "about:blank#modcdp"}, "")
+		resolvedTargetID, err = r.upstream.CreateTarget("about:blank#modcdp")
 		if err != nil {
 			return "", "", err
 		}
-		createdTargetID, _ := created["targetId"].(string)
-		if createdTargetID == "" {
-			return "", "", fmt.Errorf("Target.createTarget returned no targetId")
-		}
-		resolvedTargetID = createdTargetID
 	}
 	sessionID := r.AttachToTarget(resolvedTargetID)
 	if sessionID == "" {
@@ -244,37 +243,37 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 
 func (r *AutoSessionRouter) listen() []func() {
 	return []func(){
-		r.upstream.On("Target.attachedToTarget", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Target.attachedToTarget", event, sessionID)
+		r.upstream.On("Target.attachedToTarget", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Target.attachedToTarget", event, targetID, sessionID)
 		}),
-		r.upstream.On("Target.detachedFromTarget", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Target.detachedFromTarget", event, sessionID)
+		r.upstream.On("Target.detachedFromTarget", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Target.detachedFromTarget", event, targetID, sessionID)
 		}),
-		r.upstream.On("Target.targetInfoChanged", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Target.targetInfoChanged", event, sessionID)
+		r.upstream.On("Target.targetInfoChanged", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Target.targetInfoChanged", event, targetID, sessionID)
 		}),
-		r.upstream.On("Target.targetDestroyed", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Target.targetDestroyed", event, sessionID)
+		r.upstream.On("Target.targetDestroyed", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Target.targetDestroyed", event, targetID, sessionID)
 		}),
-		r.upstream.On("Runtime.executionContextCreated", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Runtime.executionContextCreated", event, sessionID)
+		r.upstream.On("Runtime.executionContextCreated", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextCreated", event, targetID, sessionID)
 		}),
-		r.upstream.On("Runtime.executionContextDestroyed", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Runtime.executionContextDestroyed", event, sessionID)
+		r.upstream.On("Runtime.executionContextDestroyed", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextDestroyed", event, targetID, sessionID)
 		}),
-		r.upstream.On("Runtime.executionContextsCleared", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Runtime.executionContextsCleared", event, sessionID)
+		r.upstream.On("Runtime.executionContextsCleared", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Runtime.executionContextsCleared", event, targetID, sessionID)
 		}),
-		r.upstream.On("Page.frameNavigated", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Page.frameNavigated", event, sessionID)
+		r.upstream.On("Page.frameNavigated", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Page.frameNavigated", event, targetID, sessionID)
 		}),
-		r.upstream.On("Page.frameDetached", func(event map[string]any, _ string, sessionID string) {
-			r.recordProtocolEvent("Page.frameDetached", event, sessionID)
+		r.upstream.On("Page.frameDetached", func(event map[string]any, targetID string, sessionID string) {
+			r.recordProtocolEvent("Page.frameDetached", event, targetID, sessionID)
 		}),
 	}
 }
 
-func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, sessionID string) {
+func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, eventTargetID string, sessionID string) {
 	eventData, _ := data.(map[string]any)
 	if eventData == nil {
 		eventData = map[string]any{}
@@ -307,8 +306,8 @@ func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, session
 	case "Runtime.executionContextCreated":
 		context, _ := eventData["context"].(map[string]any)
 		_, ok := intFromAny(context["id"])
-		if sessionID != "" && ok {
-			r.recordExecutionContext("", sessionID, context)
+		if (sessionID != "" || eventTargetID != "") && ok {
+			r.recordExecutionContext(eventTargetID, sessionID, context)
 		}
 	case "Runtime.executionContextDestroyed":
 		contextID, ok := intFromAny(eventData["executionContextId"])
@@ -324,7 +323,10 @@ func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, session
 		frameID, _ := frame["id"].(string)
 		if frameID != "" {
 			r.mu.Lock()
-			targetID := r.TargetId_from_sessionId[sessionID]
+			targetID := eventTargetID
+			if targetID == "" {
+				targetID = r.TargetId_from_sessionId[sessionID]
+			}
 			r.mu.Unlock()
 			r.forgetExecutionContextsForFrame(sessionID, targetID, frameID)
 		}
@@ -332,7 +334,10 @@ func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, session
 		frameID, _ := eventData["frameId"].(string)
 		if frameID != "" {
 			r.mu.Lock()
-			targetID := r.TargetId_from_sessionId[sessionID]
+			targetID := eventTargetID
+			if targetID == "" {
+				targetID = r.TargetId_from_sessionId[sessionID]
+			}
 			r.mu.Unlock()
 			r.forgetExecutionContextsForFrame(sessionID, targetID, frameID)
 		}
@@ -843,10 +848,23 @@ func (r *AutoSessionRouter) recordExecutionContext(eventTargetID string, session
 		waiterKey = targetID
 	}
 	waiters := r.execution_context_waiters[waiterKey]
-	delete(r.execution_context_waiters, waiterKey)
-	r.mu.Unlock()
+	matchedWaiters := []executionContextWaiter{}
+	remainingWaiters := []executionContextWaiter{}
 	for _, waiter := range waiters {
-		waiter <- executionContextResult{contextID: contextID, context: topologyContext}
+		if waiter.matches(topologyContext) {
+			matchedWaiters = append(matchedWaiters, waiter)
+		} else {
+			remainingWaiters = append(remainingWaiters, waiter)
+		}
+	}
+	if len(remainingWaiters) == 0 {
+		delete(r.execution_context_waiters, waiterKey)
+	} else {
+		r.execution_context_waiters[waiterKey] = remainingWaiters
+	}
+	r.mu.Unlock()
+	for _, waiter := range matchedWaiters {
+		waiter.done <- executionContextResult{contextID: contextID, context: topologyContext}
 	}
 }
 
@@ -878,7 +896,7 @@ func (r *AutoSessionRouter) forgetSession(sessionID string) {
 	r.mu.Unlock()
 	err := fmt.Errorf("Runtime execution context wait cancelled because session %s detached.", sessionID)
 	for _, waiter := range waiters {
-		waiter <- executionContextResult{err: err}
+		waiter.done <- executionContextResult{err: err}
 	}
 }
 
@@ -975,18 +993,18 @@ func (r *AutoSessionRouter) waitForExecutionContextMatching(matches func(map[str
 		r.mu.Unlock()
 		return nil, fmt.Errorf("cannot wait for a Runtime execution context without a route")
 	}
-	waiter := make(chan executionContextResult, 1)
+	waiter := executionContextWaiter{done: make(chan executionContextResult, 1), matches: matches}
 	r.execution_context_waiters[waiterKey] = append(r.execution_context_waiters[waiterKey], waiter)
 	r.mu.Unlock()
 	select {
-	case result := <-waiter:
+	case result := <-waiter.done:
 		return result.context, result.err
 	case <-time.After(time.Duration(timeoutMS) * time.Millisecond):
 		r.mu.Lock()
 		waiters := r.execution_context_waiters[waiterKey]
 		filtered := waiters[:0]
 		for _, candidate := range waiters {
-			if candidate != waiter {
+			if candidate.done != waiter.done {
 				filtered = append(filtered, candidate)
 			}
 		}
@@ -1001,24 +1019,19 @@ func (r *AutoSessionRouter) waitForExecutionContextMatching(matches func(map[str
 }
 
 func (r *AutoSessionRouter) resolveTargetID(params map[string]any) (string, error) {
-	explicitTargetID, _ := params["targetId"].(string)
+	explicitTargetID := r.upstream.ResolveTargetID(params)
 	if explicitTargetID != "" {
 		return explicitTargetID, nil
 	}
-	result, err := r.upstream.Send("Target.getTargets", map[string]any{}, "")
+	targetInfos, err := r.upstream.GetTargets()
 	if err != nil {
 		return "", err
 	}
-	targetInfos, _ := result["targetInfos"].([]any)
-	for _, rawTargetInfo := range targetInfos {
-		targetInfo, _ := rawTargetInfo.(map[string]any)
-		if targetInfo != nil {
-			r.recordTarget(targetInfo)
-		}
+	for _, targetInfo := range targetInfos {
+		r.recordTarget(targetInfo)
 	}
-	for _, rawTargetInfo := range targetInfos {
-		targetInfo, _ := rawTargetInfo.(map[string]any)
-		if targetInfo == nil || targetInfo["type"] != "page" {
+	for _, targetInfo := range targetInfos {
+		if targetInfo["type"] != "page" {
 			continue
 		}
 		targetURL, _ := targetInfo["url"].(string)

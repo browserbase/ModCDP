@@ -83,55 +83,55 @@ class AutoSessionRouter:
             self.upstream.on(
                 TargetDomain.attachedToTarget,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    TargetDomain.attachedToTarget.cdp_event_name, event, session_id
+                    TargetDomain.attachedToTarget.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 TargetDomain.detachedFromTarget,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    TargetDomain.detachedFromTarget.cdp_event_name, event, session_id
+                    TargetDomain.detachedFromTarget.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 TargetDomain.targetInfoChanged,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    TargetDomain.targetInfoChanged.cdp_event_name, event, session_id
+                    TargetDomain.targetInfoChanged.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 TargetDomain.targetDestroyed,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    TargetDomain.targetDestroyed.cdp_event_name, event, session_id
+                    TargetDomain.targetDestroyed.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 RuntimeDomain.executionContextCreated,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    RuntimeDomain.executionContextCreated.cdp_event_name, event, session_id
+                    RuntimeDomain.executionContextCreated.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 RuntimeDomain.executionContextDestroyed,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    RuntimeDomain.executionContextDestroyed.cdp_event_name, event, session_id
+                    RuntimeDomain.executionContextDestroyed.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 RuntimeDomain.executionContextsCleared,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    RuntimeDomain.executionContextsCleared.cdp_event_name, event, session_id
+                    RuntimeDomain.executionContextsCleared.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 PageDomain.frameNavigated,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    PageDomain.frameNavigated.cdp_event_name, event, session_id
+                    PageDomain.frameNavigated.cdp_event_name, event, _target_id, session_id
                 ),
             ),
             self.upstream.on(
                 PageDomain.frameDetached,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    PageDomain.frameDetached.cdp_event_name, event, session_id
+                    PageDomain.frameDetached.cdp_event_name, event, _target_id, session_id
                 ),
             ),
         ]
@@ -185,9 +185,8 @@ class AutoSessionRouter:
             session_id = self.sessionId_from_targetId.get(target_id)
         if session_id is not None:
             return session_id
-        result = self.upstream.send("Target.attachToTarget", {"targetId": target_id, "flatten": True}, None)
-        session_id = result.get("sessionId")
-        if isinstance(session_id, str) and session_id:
+        session_id = self.upstream.attachToTarget(target_id)
+        if session_id:
             with self._lock:
                 self._recordTargetSession(target_id, session_id, self.targets.get(target_id))
             return session_id
@@ -209,18 +208,14 @@ class AutoSessionRouter:
             if target and target.get("sessionId") is None:
                 return resolved_target_id, None
         if resolved_target_id is None:
-            created = self.upstream.send("Target.createTarget", {"url": "about:blank#modcdp"}, None)
-            created_target_id = created.get("targetId")
-            if not isinstance(created_target_id, str) or not created_target_id:
-                raise RuntimeError("Target.createTarget returned no targetId")
-            resolved_target_id = created_target_id
+            resolved_target_id = self.upstream.createTarget("about:blank#modcdp")
         session_id = self.attachToTarget(resolved_target_id)
         if session_id is None:
             self._recordTargetSessionlessAttachment(resolved_target_id)
             return resolved_target_id, None
         return resolved_target_id, session_id
 
-    def _recordProtocolEvent(self, method: str, data: object, session_id: str | None) -> None:
+    def _recordProtocolEvent(self, method: str, data: object, event_target_id: str | None, session_id: str | None) -> None:
         event_data = data if _isObjectMap(data) else {}
         if method == "Target.attachedToTarget":
             attached_session_id = event_data.get("sessionId") if isinstance(event_data.get("sessionId"), str) else session_id
@@ -243,8 +238,8 @@ class AutoSessionRouter:
             raw_context = event_data.get("context")
             context = raw_context if _isObjectMap(raw_context) else None
             context_id = context.get("id") if context else None
-            if session_id and isinstance(context_id, int) and context is not None:
-                self._recordExecutionContext(None, session_id, context)
+            if (session_id or event_target_id) and isinstance(context_id, int) and context is not None:
+                self._recordExecutionContext(event_target_id, session_id, context)
         elif method == "Runtime.executionContextDestroyed":
             context_id = event_data.get("executionContextId")
             if session_id and isinstance(context_id, int):
@@ -256,12 +251,12 @@ class AutoSessionRouter:
             raw_frame = event_data.get("frame")
             frame = raw_frame if _isObjectMap(raw_frame) else {}
             frame_id = frame.get("id")
-            target_id = self.targetId_from_sessionId.get(session_id) if session_id else None
+            target_id = event_target_id or (self.targetId_from_sessionId.get(session_id) if session_id else None)
             if isinstance(frame_id, str):
                 self._forgetExecutionContextsForFrame(session_id, target_id, frame_id)
         elif method == "Page.frameDetached":
             frame_id = event_data.get("frameId")
-            target_id = self.targetId_from_sessionId.get(session_id) if session_id else None
+            target_id = event_target_id or (self.targetId_from_sessionId.get(session_id) if session_id else None)
             if isinstance(frame_id, str):
                 self._forgetExecutionContextsForFrame(session_id, target_id, frame_id)
         elif method == "Target.detachedFromTarget":
@@ -684,20 +679,18 @@ class AutoSessionRouter:
         return result["context"]
 
     def _resolveTargetId(self, params: Mapping[str, Any]) -> str | None:
-        explicit_target_id = params.get("targetId")
-        if isinstance(explicit_target_id, str) and explicit_target_id:
+        explicit_target_id = self.upstream.resolveTargetId(dict(params))
+        if explicit_target_id:
             return explicit_target_id
-        target_infos = self.upstream.send("Target.getTargets", {}, None).get("targetInfos")
-        if isinstance(target_infos, list):
-            for raw_target_info in target_infos:
-                if _isObjectMap(raw_target_info):
-                    self._recordTarget(raw_target_info)
-            for raw_target_info in target_infos:
-                if _isObjectMap(raw_target_info) and raw_target_info.get("type") == "page":
-                    url = raw_target_info.get("url")
-                    if isinstance(url, str) and not url.startswith("devtools://"):
-                        target_id = raw_target_info.get("targetId")
-                        return target_id if isinstance(target_id, str) else None
+        target_infos = self.upstream.getTargets()
+        for raw_target_info in target_infos:
+            self._recordTarget(raw_target_info)
+        for raw_target_info in target_infos:
+            if raw_target_info.get("type") == "page":
+                url = raw_target_info.get("url")
+                if isinstance(url, str) and not url.startswith("devtools://"):
+                    target_id = raw_target_info.get("targetId")
+                    return target_id if isinstance(target_id, str) else None
         return None
 
     def _contextKey(self, target_id: str, session_id: str | None, context_id: int, unique_id: object) -> str:

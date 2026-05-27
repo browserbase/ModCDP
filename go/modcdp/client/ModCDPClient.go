@@ -816,13 +816,42 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	}
 	params := map[string]any{}
 	if c.Config.ServerConfig != nil {
-		if c.Config.ServerConfig.Upstream.UpstreamWSCDPURL != "" {
-			hasUpstreamConfig = true
-			upstream["upstream_ws_cdp_url"] = c.Config.ServerConfig.Upstream.UpstreamWSCDPURL
+		serverUpstream := c.Config.ServerConfig.Upstream
+		if serverUpstream.UpstreamMode != "" {
+			upstream["upstream_mode"] = serverUpstream.UpstreamMode
 		}
-		if c.Config.ServerConfig.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
+		if serverUpstream.UpstreamWSCDPURL != "" {
+			upstream["upstream_ws_cdp_url"] = serverUpstream.UpstreamWSCDPURL
+		}
+		if serverUpstream.UpstreamNatsURL != "" {
+			upstream["upstream_nats_url"] = serverUpstream.UpstreamNatsURL
+		}
+		if serverUpstream.UpstreamNatsSubjectPrefix != "" {
+			upstream["upstream_nats_subject_prefix"] = serverUpstream.UpstreamNatsSubjectPrefix
+		}
+		if serverUpstream.UpstreamNatsRole != "" {
+			upstream["upstream_nats_role"] = serverUpstream.UpstreamNatsRole
+		}
+		if serverUpstream.UpstreamNatsWaitTimeoutMS != 0 {
+			upstream["upstream_nats_wait_timeout_ms"] = serverUpstream.UpstreamNatsWaitTimeoutMS
+		}
+		if serverUpstream.UpstreamReverseWSBind != "" {
+			upstream["upstream_reversews_bind"] = serverUpstream.UpstreamReverseWSBind
+		}
+		if serverUpstream.UpstreamReverseWSWaitTimeoutMS != 0 {
+			upstream["upstream_reversews_wait_timeout_ms"] = serverUpstream.UpstreamReverseWSWaitTimeoutMS
+		}
+		if serverUpstream.UpstreamNativeMessagingHostName != "" {
+			upstream["upstream_nativemessaging_host_name"] = serverUpstream.UpstreamNativeMessagingHostName
+		}
+		if serverUpstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
+			upstream["upstream_ws_connect_error_settle_timeout_ms"] = serverUpstream.UpstreamWSConnectErrorSettleTimeoutMS
+		}
+		if serverUpstream.UpstreamCDPSendTimeoutMS != 0 {
+			upstream["upstream_cdp_send_timeout_ms"] = serverUpstream.UpstreamCDPSendTimeoutMS
+		}
+		if len(upstream) > 0 {
 			hasUpstreamConfig = true
-			upstream["upstream_ws_connect_error_settle_timeout_ms"] = c.Config.ServerConfig.Upstream.UpstreamWSConnectErrorSettleTimeoutMS
 		}
 		if c.Config.ServerConfig.Router.RouterRoutes != nil {
 			router["router_routes"] = c.Config.ServerConfig.Router.RouterRoutes
@@ -1067,7 +1096,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 	var result any
 	if command.Target == "direct_cdp" {
 		step := command.Steps[0]
-		result, err = c.Upstream.Send(step.Method, step.Params, step.SessionID)
+		result, err = c.Router.Send(step.Method, step.Params, step.SessionID)
 	} else if command.Target == "service_worker" {
 		if c.Injector == nil || c.Injector.SessionID == "" {
 			return nil, fmt.Errorf("service_worker commands require an injected ModCDP extension target")

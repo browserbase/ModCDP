@@ -67,7 +67,7 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		ownsProfileDir = true
 	}
 	cleanupProfileDir := ownsProfileDir
-	if config.LauncherLocalCleanupUserDataDir != nil {
+	if !ownsProfileDir && config.LauncherLocalCleanupUserDataDir != nil {
 		cleanupProfileDir = *config.LauncherLocalCleanupUserDataDir
 	}
 	args := []string{
@@ -101,7 +101,7 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 	if headless {
 		args = append(args, "--headless=new")
 	}
-	sandbox := runtime.GOOS != "linux"
+	sandbox := !headless
 	if config.LauncherLocalSandbox != nil {
 		sandbox = *config.LauncherLocalSandbox
 	}
@@ -215,9 +215,10 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 			return nil, err
 		}
 		loopbackCDPURL := ""
+		loopbackCDPPort := port
 		if useLoopbackCDP {
 			if port == 0 {
-				loopbackCDPURL, _, err = waitForBrowserSelectedCdpWebSocketURL(profileDir, time.Duration(chromeReadyTimeoutMS)*time.Millisecond, time.Duration(chromeReadyPollIntervalMS)*time.Millisecond)
+				loopbackCDPURL, loopbackCDPPort, err = waitForBrowserSelectedCdpWebSocketURL(profileDir, time.Duration(chromeReadyTimeoutMS)*time.Millisecond, time.Duration(chromeReadyPollIntervalMS)*time.Millisecond)
 			} else {
 				loopbackCDPURL, err = waitForCdpWebSocketURL(fmt.Sprintf("http://127.0.0.1:%d", port), time.Duration(chromeReadyTimeoutMS)*time.Millisecond, time.Duration(chromeReadyPollIntervalMS)*time.Millisecond)
 			}
@@ -228,7 +229,7 @@ func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, 
 		}
 		launched := &LaunchedBrowser{
 			LoopbackCDPURL: loopbackCDPURL,
-			CDPListenPort:  port,
+			CDPListenPort:  loopbackCDPPort,
 			Close:          close,
 			ProfileDir:     profileDir,
 			PipeRead:       pipeRead,

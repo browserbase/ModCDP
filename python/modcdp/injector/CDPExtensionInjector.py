@@ -41,12 +41,11 @@ class CDPExtensionInjector(ExtensionInjector):
                 f"Extensions.loadUnpacked failed for {extension_path}: {error}\n"
                 "If the path is correct and the manifest is valid, load the ModCDP extension manually in chrome://extensions and reconnect."
             ) from error
-        extension_id = load_result.get("id") or load_result.get("extensionId")
+        extension_id = load_result.get("id")
         if not isinstance(extension_id, str) or not extension_id:
             raise RuntimeError(f"Extensions.loadUnpacked returned no extension id (got {load_result})")
         self.extension_id = extension_id
         self.service_worker_extension_id = extension_id
-        self.update({"injector_cdp_extension_id": extension_id, "injector_service_worker_extension_id": extension_id})
 
         sw_url_prefix = f"chrome-extension://{extension_id}/"
         deadline = time.monotonic() + self.config.injector_service_worker_ready_timeout_ms / 1000

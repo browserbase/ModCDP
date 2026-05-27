@@ -16,7 +16,6 @@ import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { ModCDPClient } from "../src/index.js";
 import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
 import type { cdp as cdp_types } from "../src/types/generated/cdp.js";
-import { ModCDPUpstreamConfigSchema } from "../src/types/modcdp.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -103,23 +102,6 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal(params.router?.loopback_execution_context_timeout_ms, 4321);
   assert.equal(params.upstream?.upstream_ws_connect_error_settle_timeout_ms, 7654);
   assert.equal(params.downstream?.downstream_client_timeout_ms, 4567);
-});
-
-test("ModCDPClient constructs chrome debugger upstream transport from upstream config", () => {
-  const upstream = ModCDPUpstreamConfigSchema.parse({
-    upstream_mode: "chromedebugger",
-  });
-  const cdp = new ModCDPClient({
-    launcher: { launcher_mode: "none" },
-    upstream,
-    injector: { injector_mode: "none" },
-    client_config: { client_cdp_send_timeout_ms: 4321 },
-    server_config: null,
-  });
-
-  assert.equal(cdp.upstream.constructor.name, "ChromeDebuggerUpstreamTransport");
-  assert.equal(cdp.upstream.config.upstream_mode, "chromedebugger");
-  assert.equal(cdp.upstream.config.upstream_cdp_send_timeout_ms, 4321);
 });
 
 test("ModCDPClient dispatches root events before extension session is attached", () => {

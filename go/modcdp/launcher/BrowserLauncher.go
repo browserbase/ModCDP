@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -49,20 +48,8 @@ func WebsocketURLFor(endpoint string) (string, error) {
 		return "", fmt.Errorf("GET /json/version: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		parsed, parseErr := url.Parse(httpEndpoint)
-		if parseErr != nil {
-			return "", parseErr
-		}
-		if parsed.Scheme == "https" {
-			parsed.Scheme = "wss"
-		} else {
-			parsed.Scheme = "ws"
-		}
-		parsed.Path = "/devtools/browser"
-		parsed.RawQuery = ""
-		parsed.Fragment = ""
-		return parsed.String(), nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("GET %s/json/version -> %d", httpEndpoint, resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
 	var version map[string]any
@@ -71,7 +58,7 @@ func WebsocketURLFor(endpoint string) (string, error) {
 	}
 	wsURL, _ := version["webSocketDebuggerUrl"].(string)
 	if wsURL == "" {
-		return "", fmt.Errorf("HTTP discovery for %s returned no webSocketDebuggerUrl", endpoint)
+		return "", fmt.Errorf("cdp_url HTTP discovery returned no webSocketDebuggerUrl")
 	}
 	return wsURL, nil
 }

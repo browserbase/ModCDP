@@ -43,22 +43,16 @@ func (i *CDPExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
 	loadResult, err := i.sendWithTimeout("Extensions.loadUnpacked", map[string]any{"path": i.UnpackedExtensionPath}, "", i.Config.InjectorCDPSendTimeoutMS)
 	if err != nil {
 		if strings.Contains(err.Error(), "Method not available") || strings.Contains(err.Error(), "Method not found") || strings.Contains(err.Error(), "wasn't found") {
-			i.LastError = err
 			return nil, nil
 		}
 		return nil, fmt.Errorf("Extensions.loadUnpacked failed for %s: %w", i.UnpackedExtensionPath, err)
 	}
 	extensionID, _ := loadResult["id"].(string)
 	if extensionID == "" {
-		extensionID, _ = loadResult["extensionId"].(string)
-	}
-	if extensionID == "" {
 		return nil, fmt.Errorf("Extensions.loadUnpacked returned no extension id")
 	}
 	i.ExtensionID = extensionID
 	i.ServiceWorkerExtensionID = extensionID
-	i.Config.InjectorCDPExtensionID = extensionID
-	i.Config.InjectorServiceWorkerExtensionID = extensionID
 	swURLPrefix := "chrome-extension://" + extensionID + "/"
 	deadline := time.Now().Add(time.Duration(i.Config.InjectorServiceWorkerReadyTimeoutMS) * time.Millisecond)
 	for time.Now().Before(deadline) {

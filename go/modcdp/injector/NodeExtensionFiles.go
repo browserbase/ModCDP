@@ -53,7 +53,7 @@ func PrepareUnpackedExtension(extensionPath string) (*PreparedExtension, error) 
 			_ = os.RemoveAll(dir)
 			return nil, err
 		}
-		return &PreparedExtension{UnpackedExtensionPath: dir, CleanupPath: dir}, nil
+		return &PreparedExtension{UnpackedExtensionPath: extensionRoot(dir), CleanupPath: dir}, nil
 	}
 	reader, err := zip.OpenReader(extensionPath)
 	if err != nil {

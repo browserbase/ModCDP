@@ -70,10 +70,6 @@ func (i *BBExtensionInjector) ConfigForLauncher() LauncherConfig {
 }
 
 func (i *BBExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
-	extensionID := i.Config.InjectorServiceWorkerExtensionID
-	i.Config.InjectorServiceWorkerExtensionID = ""
-	defer func() { i.Config.InjectorServiceWorkerExtensionID = extensionID }()
-
 	discovered, err := i.waitForReadyServiceWorker(i.Config.InjectorServiceWorkerReadyTimeoutMS, i.Config.InjectorTrustServiceWorkerTarget)
 	if err != nil || discovered == nil {
 		return discovered, err

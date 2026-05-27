@@ -44,7 +44,6 @@ type ExtensionInjector struct {
 	URL                      string
 	SessionID                string
 	UnusableTargetIDs        map[string]bool
-	LastError                error
 	ExtraArgs                []string
 }
 

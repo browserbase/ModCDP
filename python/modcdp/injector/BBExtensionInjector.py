@@ -50,16 +50,11 @@ class BBExtensionInjector(ExtensionInjector):
         }
 
     def inject(self) -> ExtensionInjectionResult | None:
-        extension_id = self.config.injector_service_worker_extension_id
-        self.update({"injector_service_worker_extension_id": None})
-        try:
-            discovered = self._waitForReadyServiceWorker(
-                self.config.injector_service_worker_ready_timeout_ms,
-                matched_only=self.config.injector_trust_service_worker_target,
-            )
-            return {**discovered, "source": "bb"} if discovered else None
-        finally:
-            self.update({"injector_service_worker_extension_id": extension_id})
+        discovered = self._waitForReadyServiceWorker(
+            self.config.injector_service_worker_ready_timeout_ms,
+            matched_only=self.config.injector_trust_service_worker_target,
+        )
+        return {**discovered, "source": "bb"} if discovered else None
 
     def close(self) -> None:
         if self.cleanup_dir:

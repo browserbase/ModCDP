@@ -64,6 +64,9 @@ func TestLaunchesARealBrowserOverAChosenCDPPortAndExplicitProfileDir(t *testing.
 	if chrome.ProfileDir != profileDir {
 		t.Fatalf("ProfileDir = %q, want %q", chrome.ProfileDir, profileDir)
 	}
+	if chrome.CDPListenPort != port {
+		t.Fatalf("CDPListenPort = %d, want %d", chrome.CDPListenPort, port)
+	}
 	transportConfig := launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != chrome.CDPURL {
 		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["upstream_ws_cdp_url"], chrome.CDPURL)
@@ -170,6 +173,9 @@ func TestLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpointOnlyWhenRequested
 	}
 	if !strings.HasPrefix(chrome.LoopbackCDPURL, "ws://127.0.0.1:") {
 		t.Fatalf("LoopbackCDPURL = %q", chrome.LoopbackCDPURL)
+	}
+	if chrome.CDPListenPort <= 0 {
+		t.Fatalf("CDPListenPort = %d", chrome.CDPListenPort)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

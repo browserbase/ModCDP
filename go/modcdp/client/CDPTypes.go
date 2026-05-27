@@ -409,11 +409,12 @@ func (types *CDPTypes) ToJSON() map[string]any {
 	}
 	types.mu.RLock()
 	state := map[string]any{
-		"custom_commands":    len(types.CustomCommands),
-		"custom_events":      len(types.CustomEvents),
-		"custom_middlewares": len(types.CustomMiddlewares),
-		"command_schemas":    len(types.commandSchemas),
-		"event_schemas":      len(types.eventSchemas),
+		"custom_commands":        len(types.CustomCommands),
+		"custom_events":          len(types.CustomEvents),
+		"custom_middlewares":     len(types.CustomMiddlewares),
+		"command_params_schemas": len(types.commandSchemas),
+		"command_result_schemas": len(types.commandSchemas),
+		"event_schemas":          len(types.eventSchemas),
 	}
 	types.mu.RUnlock()
 	return modtypes.ModCDPToJSON(types, modtypes.ModCDPJSONConfig{
