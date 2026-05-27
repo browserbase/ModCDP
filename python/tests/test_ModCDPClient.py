@@ -55,7 +55,8 @@ class ModCDPClientTests(unittest.TestCase):
                 "injector_service_worker_poll_interval_ms": 76,
                 "injector_target_session_poll_interval_ms": 87,
             },
-            router={"router_routes": {"*.*": "direct_cdp"},
+            router={"router_routes": {"*.*": "direct_cdp"}},
+            client_config={
                 "client_hydrate_aliases": False,
                 "client_mirror_upstream_events": False,
                 "client_cdp_send_timeout_ms": 1234,
@@ -78,7 +79,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp.injector.config.injector_service_worker_ready_timeout_ms, 6543)
         self.assertEqual(cdp.injector.config.injector_service_worker_poll_interval_ms, 76)
         self.assertEqual(cdp.injector.config.injector_target_session_poll_interval_ms, 87)
-        self.assertEqual(cdp.config.client_routes["*.*"], "direct_cdp")
+        self.assertEqual(cdp.router.config["router_routes"]["*.*"], "direct_cdp")
         self.assertEqual(cdp.config.client_hydrate_aliases, False)
         self.assertEqual(cdp.config.client_mirror_upstream_events, False)
         self.assertEqual(cdp.config.client_cdp_send_timeout_ms, 1234)
@@ -91,7 +92,7 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertNotIn("service_worker_probe_timeout_ms", cdp.__dict__)
 
         params = cast(dict[str, Any], cdp._server_configure_params())
-        self.assertEqual(params["client_config"]["client_routes"]["*.*"], "direct_cdp")
+        self.assertEqual(params["router"]["router_routes"]["*.*"], "loopback_cdp")
         self.assertEqual(params["server_browser_token"], "token-1")
         self.assertEqual(params["client_config"]["client_cdp_send_timeout_ms"], 9876)
         self.assertEqual(params["router"]["loopback_execution_context_timeout_ms"], 8765)

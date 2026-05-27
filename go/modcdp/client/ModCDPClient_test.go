@@ -56,8 +56,8 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 			InjectorServiceWorkerPollIntervalMS: 76,
 			InjectorTargetSessionPollIntervalMS: 87,
 		},
+		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "direct_cdp"}},
 		ClientConfig: ClientConfig{
-			ClientRoutes:               map[string]string{"*.*": "direct_cdp"},
 			ClientHydrateAliases:       boolPtr(false),
 			ClientMirrorUpstreamEvents: boolPtr(false),
 			ClientCDPSendTimeoutMS:     1234,
@@ -95,8 +95,8 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	if cdp.Config.Injector.InjectorTargetSessionPollIntervalMS != 87 {
 		t.Fatalf("Injector.InjectorTargetSessionPollIntervalMS = %d", cdp.Config.Injector.InjectorTargetSessionPollIntervalMS)
 	}
-	if cdp.Config.ClientConfig.ClientRoutes["*.*"] != "direct_cdp" {
-		t.Fatalf("ClientConfig.ClientRoutes[*.*] = %q", cdp.Config.ClientConfig.ClientRoutes["*.*"])
+	if cdp.Config.Router.RouterRoutes["*.*"] != "direct_cdp" {
+		t.Fatalf("Router.RouterRoutes[*.*] = %q", cdp.Config.Router.RouterRoutes["*.*"])
 	}
 	if cdp.Config.ClientConfig.ClientHydrateAliases == nil || *cdp.Config.ClientConfig.ClientHydrateAliases {
 		t.Fatalf("ClientConfig.ClientHydrateAliases = %#v", cdp.Config.ClientConfig.ClientHydrateAliases)
@@ -115,11 +115,11 @@ func TestModCDPClientNormalizesNestedConfigOwners(t *testing.T) {
 	}
 	params := cdp.serverConfigureParams(nil, nil, nil)
 	clientConfigConfig := params["client_config"].(map[string]any)
-	routes := clientConfigConfig["client_routes"].(map[string]string)
 	routerConfig := params["router"].(map[string]any)
 	upstreamConfig := params["upstream"].(map[string]any)
-	if routes["*.*"] != "direct_cdp" {
-		t.Fatalf("configure client routes = %#v", routes)
+	routes := routerConfig["router_routes"].(map[string]string)
+	if routes["*.*"] != "loopback_cdp" {
+		t.Fatalf("configure router routes = %#v", routes)
 	}
 	if params["server_browser_token"] != "token-1" {
 		t.Fatalf("configure browser_token = %#v", params["server_browser_token"])
@@ -260,8 +260,8 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 			InjectorServiceWorkerReadyExpression: "Boolean(globalThis.ModCDP)",
 			InjectorExecutionContextTimeoutMS:    4_321,
 		},
+		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "service_worker"}},
 		ClientConfig: ClientConfig{
-			ClientRoutes:               map[string]string{"*.*": "service_worker"},
 			ClientHydrateAliases:       boolPtr(false),
 			ClientMirrorUpstreamEvents: boolPtr(false),
 			ClientCDPSendTimeoutMS:     987,
@@ -447,8 +447,8 @@ func TestModCDPClientConnectsWithLocalLaunchAndInjectorChain(t *testing.T) {
 			InjectorTrustServiceWorkerTarget:    true,
 			InjectorServiceWorkerProbeTimeoutMS: 30_000,
 		},
+		Router: RouterConfig{RouterRoutes: map[string]string{"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
 		ClientConfig: ClientConfig{
-			ClientRoutes:             map[string]string{"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"},
 			ClientCDPSendTimeoutMS:   30_000,
 			ClientEventWaitTimeoutMS: 30_000,
 		},
@@ -622,7 +622,7 @@ func TestModCDPClientCloseDoesNotCloseRemoteBrowserItDidNotLaunch(t *testing.T) 
 			InjectorServiceWorkerReadyTimeoutMS: 30_000,
 			InjectorServiceWorkerProbeTimeoutMS: 30_000,
 		},
-		ClientConfig: ClientConfig{ClientRoutes: map[string]string{"*.*": "direct_cdp"}},
+		Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "direct_cdp"}},
 	})
 	if err := cdp.Connect(); err != nil {
 		t.Fatal(err)

@@ -94,13 +94,11 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientConfig: ClientConfig{
-			ClientRoutes: map[string]string{
-				"Target.getTargets":         "service_worker",
-				"Target.createTarget":       "service_worker",
-				"Target.setDiscoverTargets": "service_worker",
-			},
-		},
+		Router: RouterConfig{RouterRoutes: map[string]string{
+			"Target.getTargets":         "service_worker",
+			"Target.createTarget":       "service_worker",
+			"Target.setDiscoverTargets": "service_worker",
+		}},
 		ServerConfig: &ServerConfig{
 			Upstream: UpstreamTransportConfig{UpstreamWSCDPURL: owner.CDPURL},
 			Router:   RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},

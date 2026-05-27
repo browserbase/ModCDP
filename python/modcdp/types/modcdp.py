@@ -150,7 +150,6 @@ class ModCDPRouterConfig(TypedDict, total=False):
 
 
 class ModCDPClientConfig(TypedDict, total=False):
-    client_routes: ModCDPRoutes
     client_hydrate_aliases: bool
     client_mirror_upstream_events: bool
     client_cdp_send_timeout_ms: int

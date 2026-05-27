@@ -38,7 +38,7 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientConfig: ClientConfig{ClientRoutes: map[string]string{
+		Router: RouterConfig{RouterRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
@@ -96,7 +96,7 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		ClientConfig: ClientConfig{ClientRoutes: map[string]string{
+		Router: RouterConfig{RouterRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",

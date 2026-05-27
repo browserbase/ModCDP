@@ -205,18 +205,18 @@ type ServerConfig struct {
 var ServerConfigNone = &ServerConfig{disabled: true}
 
 type ClientConfig struct {
-	ClientRoutes               map[string]string `json:"client_routes,omitempty"`
-	ClientHydrateAliases       *bool             `json:"client_hydrate_aliases,omitempty"`
-	ClientMirrorUpstreamEvents *bool             `json:"client_mirror_upstream_events,omitempty"`
-	ClientCDPSendTimeoutMS     int               `json:"client_cdp_send_timeout_ms,omitempty"`
-	ClientEventWaitTimeoutMS   int               `json:"client_event_wait_timeout_ms,omitempty"`
-	ClientHeartbeatIntervalMS  int               `json:"client_heartbeat_interval_ms,omitempty"`
+	ClientHydrateAliases       *bool `json:"client_hydrate_aliases,omitempty"`
+	ClientMirrorUpstreamEvents *bool `json:"client_mirror_upstream_events,omitempty"`
+	ClientCDPSendTimeoutMS     int   `json:"client_cdp_send_timeout_ms,omitempty"`
+	ClientEventWaitTimeoutMS   int   `json:"client_event_wait_timeout_ms,omitempty"`
+	ClientHeartbeatIntervalMS  int   `json:"client_heartbeat_interval_ms,omitempty"`
 }
 
 type Config struct {
 	Launcher               LauncherConfig          `json:"launcher,omitempty"`
 	Upstream               UpstreamTransportConfig `json:"upstream,omitempty"`
 	Injector               InjectorConfig          `json:"injector,omitempty"`
+	Router                 RouterConfig            `json:"router,omitempty"`
 	ClientConfig           ClientConfig            `json:"client_config,omitempty"`
 	ServerConfig           *ServerConfig           `json:"server_config,omitempty"`
 	CustomCommands         []CustomCommand         `json:"custom_commands,omitempty"`
@@ -336,7 +336,7 @@ type ModCDPClient struct {
 	handlers                 map[string][]handlerEntry
 	cdpHandlers              map[string][]func(CDPEvent)
 	handlersMu               sync.Mutex
-	router                   *AutoSessionRouter
+	Router                   *AutoSessionRouter
 	ExtensionID              string
 	ExtTargetID              string
 	ExtSessionID             string
@@ -395,14 +395,14 @@ func New(opts Config) *ModCDPClient {
 	if opts.Injector.InjectorMode == "" {
 		opts.Injector.InjectorMode = "none"
 	}
-	if opts.ClientConfig.ClientRoutes == nil {
-		opts.ClientConfig.ClientRoutes = translate.DefaultClientRoutes()
+	if opts.Router.RouterRoutes == nil {
+		opts.Router.RouterRoutes = translate.DefaultClientRoutes()
 	} else {
 		merged := translate.DefaultClientRoutes()
-		for k, v := range opts.ClientConfig.ClientRoutes {
+		for k, v := range opts.Router.RouterRoutes {
 			merged[k] = v
 		}
-		opts.ClientConfig.ClientRoutes = merged
+		opts.Router.RouterRoutes = merged
 	}
 	if opts.ClientConfig.ClientHydrateAliases == nil {
 		value := true
@@ -452,7 +452,7 @@ func New(opts Config) *ModCDPClient {
 		cdpHandlers: map[string][]func(CDPEvent){},
 	}
 	client.Mod = ModDomain{client: client}
-	client.router = NewAutoSessionRouter(
+	client.Router = NewAutoSessionRouter(
 		func(method string, params map[string]any, sessionID string) (map[string]any, error) {
 			if client.transport == nil {
 				return nil, fmt.Errorf("ModCDP upstream is not connected")
@@ -525,7 +525,7 @@ func (c *ModCDPClient) Connect() error {
 		c.Close()
 		return err
 	}
-	extExecutionContextID, err := c.router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
+	extExecutionContextID, err := c.Router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
 	if err != nil {
 		c.Close()
 		return err
@@ -747,7 +747,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		"loopback_execution_context_timeout_ms": c.Config.Injector.InjectorExecutionContextTimeoutMS,
 	}
 	clientConfig := map[string]any{
-		"client_routes":              c.Config.ClientConfig.ClientRoutes,
 		"client_cdp_send_timeout_ms": c.Config.ClientConfig.ClientCDPSendTimeoutMS,
 	}
 	downstream := map[string]any{
@@ -766,9 +765,6 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 		}
 		if c.Config.ServerConfig.Router.LoopbackExecutionContextTimeoutMS != 0 {
 			router["loopback_execution_context_timeout_ms"] = c.Config.ServerConfig.Router.LoopbackExecutionContextTimeoutMS
-		}
-		if c.Config.ServerConfig.ClientConfig.ClientRoutes != nil {
-			clientConfig["client_routes"] = c.Config.ServerConfig.ClientConfig.ClientRoutes
 		}
 		if c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS != 0 {
 			clientConfig["client_cdp_send_timeout_ms"] = c.Config.ServerConfig.ClientConfig.ClientCDPSendTimeoutMS
@@ -966,7 +962,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		}
 		return result, nil
 	}
-	command, err := translate.WrapCommandIfNeeded(method, params, c.Config.ClientConfig.ClientRoutes, cdpSessionID)
+	command, err := translate.WrapCommandIfNeeded(method, params, c.Config.Router.RouterRoutes, cdpSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -985,7 +981,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 			if step.Method == "Runtime.callFunctionOn" {
 				if _, exists := stepParams["executionContextId"]; !exists {
 					if c.ExtExecutionContextID == 0 {
-						contextID, contextErr := c.router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
+						contextID, contextErr := c.Router.WaitForExecutionContext(c.ExtSessionID, c.Config.Injector.InjectorExecutionContextTimeoutMS)
 						if contextErr != nil {
 							return nil, contextErr
 						}
@@ -1344,7 +1340,7 @@ func (c *ModCDPClient) handleEventMessage(msg map[string]any) {
 	method, _ := msg["method"].(string)
 	sessionID, _ := msg["sessionId"].(string)
 	params, _ := msg["params"].(map[string]any)
-	c.router.RecordProtocolEvent(method, params, sessionID)
+	c.Router.RecordProtocolEvent(method, params, sessionID)
 	if c.ExtSessionID != "" && sessionID == c.ExtSessionID {
 		bindingName, _ := params["name"].(string)
 		if event, data, ok := translate.UnwrapEventIfNeeded(method, params, sessionID, c.ExtSessionID); ok {
