@@ -23,10 +23,6 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
-func boolPtr(value bool) *bool {
-	return &value
-}
-
 func TestModCDPClientUsesFlatOwnerPrefixedConfig(t *testing.T) {
 	cdp := New(Config{
 		Launcher: LauncherConfig{
@@ -737,6 +733,12 @@ func TestModCDPClientCloseClearsTopLevelConnectionState(t *testing.T) {
 	if launcher, ok := cdp.Launcher.(*LocalBrowserLauncher); !ok || launcher.Launched != nil {
 		t.Fatalf("Close left launcher launched state set: %T", cdp.Launcher)
 	}
+}
+
+// MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+// Keep setup semantics 1:1 with TS; this only selects a real browser for real --load-extension runs.
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func reverseWSTestBrowserPath(t *testing.T) string {

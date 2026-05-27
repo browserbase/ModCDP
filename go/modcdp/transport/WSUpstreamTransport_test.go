@@ -37,8 +37,9 @@ func TestWSUpstreamTransportConstructorUpdateServerConfigAndUnconnectedErrorsMat
 }
 
 func TestWSUpstreamTransportLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
+	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
-		LauncherLocalHeadless: boolPtr(true),
+		LauncherLocalHeadless: &headless,
 	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
@@ -64,8 +65,9 @@ func TestWSUpstreamTransportLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
 }
 
 func TestWSUpstreamTransportResolvesABareHostPortCDPEndpointToTheBrowserWebsocket(t *testing.T) {
+	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
-		LauncherLocalHeadless: boolPtr(true),
+		LauncherLocalHeadless: &headless,
 	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
@@ -103,8 +105,9 @@ func TestWSUpstreamTransportResolvesABareHostPortCDPEndpointToTheBrowserWebsocke
 }
 
 func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
+	headless := true
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
-		LauncherLocalHeadless: boolPtr(true),
+		LauncherLocalHeadless: &headless,
 	}).Launch(modcdp.LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
