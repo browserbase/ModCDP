@@ -4,7 +4,7 @@
 // - ./go/modcdp/client/ModCDPClient.go
 // ModCDPClient (JS): importable, no CLI, no demo code.
 //
-// Constructor option groups mirror the owning runtime components:
+// Constructor config groups mirror the owning runtime components:
 //   launcher          browser/session creation and cleanup
 //   upstream          message transport to either raw CDP or a ModCDP server
 //   injector          raw-CDP extension discovery/injection/borrowing
