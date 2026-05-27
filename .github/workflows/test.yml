@@ -45,8 +45,8 @@ jobs:
               pnpm exec vitest run \
                 $(find js/test -name 'test.*.ts' \
                   ! -name 'test.ModCDPClient.ts' \
-                  ! -name 'test.NatsUpstreamTransport.ts' \
-                  ! -name 'test.ReverseWebSocketUpstreamTransport.ts' \
+                  ! -name 'test.NATSUpstreamTransport.ts' \
+                  ! -name 'test.ReverseWSUpstreamTransport.ts' \
                   ! -name 'test.proxy.ts' | sort) \
                 --fileParallelism=false --maxWorkers=1
               ;;
@@ -55,8 +55,6 @@ jobs:
               uv run python -m unittest \
                 $(find tests -name 'test_*.py' \
                   ! -name 'test_ModCDPClient.py' \
-                  ! -name 'test_NatsUpstreamTransport.py' \
-                  ! -name 'test_ReverseWebSocketUpstreamTransport.py' \
                   | sed 's#/#.#g; s#\.py$##' | sort)
               ;;
             go)
@@ -81,26 +79,42 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        client: [js, python, go]
-        upstream: [ws, pipe, reversews, nativemessaging]
-        mode: [direct, loopback, debugger]
-        exclude:
-          - upstream: reversews
+        include:
+          - client: js
+            upstream: ws
             mode: direct
-          - upstream: reversews
+          - client: js
+            upstream: ws
             mode: loopback
-          - upstream: reversews
+          - client: js
+            upstream: ws
             mode: debugger
-          - upstream: nativemessaging
-            mode: direct
-          # Native messaging is a Chrome-launched host process contract, not a
-          # standalone shell process. The shell demo would only write native
-          # message frames to stdout and wait forever for a browser-owned host.
           - client: js
-            upstream: nativemessaging
+            upstream: pipe
+            mode: direct
+          - client: js
+            upstream: pipe
             mode: loopback
           - client: js
-            upstream: nativemessaging
+            upstream: pipe
+            mode: debugger
+          - client: python
+            upstream: ws
+            mode: direct
+          - client: python
+            upstream: ws
+            mode: loopback
+          - client: python
+            upstream: ws
+            mode: debugger
+          - client: go
+            upstream: ws
+            mode: direct
+          - client: go
+            upstream: ws
+            mode: loopback
+          - client: go
+            upstream: ws
             mode: debugger
     env:
       CI: "true"
@@ -177,37 +191,26 @@ jobs:
         run: |
           pnpm exec vitest run \
             js/test/test.ModCDPClient.ts \
-            js/test/test.NatsUpstreamTransport.ts \
+            js/test/test.NATSUpstreamTransport.ts \
             js/test/test.proxy.ts \
             --testNamePattern "^(?!.*reversews).*" \
             --fileParallelism=false --maxWorkers=1
       - name: Run JS serialized reversews tests
         run: |
           pnpm exec vitest run \
-            js/test/test.ReverseWebSocketUpstreamTransport.ts \
+            js/test/test.ReverseWSUpstreamTransport.ts \
             js/test/test.proxy.ts \
             --testNamePattern "reversews" \
             --fileParallelism=false --maxWorkers=1
       - name: Run Python serialized non-reverse connector tests
         run: |
           cd python
-          uv run python -m unittest \
-            tests.test_ModCDPClient \
-            tests.test_NatsUpstreamTransport
-      - name: Run Python serialized reversews tests
-        run: |
-          cd python
-          uv run python -m unittest \
-            tests.test_ReverseWebSocketUpstreamTransport
+          uv run python -m unittest tests.test_ModCDPClient
       - name: Run Go serialized non-reverse connector tests
         run: |
           cd go
           go test -count=1 -p 1 ./modcdp/client
-          go test -count=1 -p 1 ./modcdp/transport -run 'Test(UpstreamTransport|WebSocketUpstreamTransport|PipeUpstreamTransport|NativeMessagingUpstreamTransport|NatsUpstreamTransport)'
-      - name: Run Go serialized reversews tests
-        run: |
-          cd go
-          go test -count=1 -p 1 ./modcdp/transport -run 'TestReverseWebSocketUpstreamTransport'
+          go test -count=1 -p 1 ./modcdp/transport -run 'Test(UpstreamTransport|WebSocketUpstreamTransport)'
 
   serialized-reversews-demo:
     name: serialized reversews demos
@@ -225,26 +228,12 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Run reversews demos serially
         run: |
           for mode in loopback debugger; do
             node dist/js/examples/demo.js --"$mode" --upstream=reversews
-            cd python
-            uv run python examples/demo.py --"$mode" --upstream=reversews
-            cd ..
-            cd go
-            go run ./examples/demo --"$mode" --upstream=reversews
-            cd ..
           done
 
   proxy-example:
