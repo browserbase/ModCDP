@@ -11,11 +11,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
+from ..transport.UpstreamTransport import UpstreamTransport
 from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
-
-SendCDP = Callable[[str, ProtocolParams, str | None], ProtocolResult]
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
 browserLevelDomains = {"Browser", "Target", "SystemInfo"}
 DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
@@ -29,7 +28,7 @@ class RouterConfig(BaseModel):
 
 
 class AutoSessionRouter:
-    def __init__(self, send: SendCDP, config: RouterConfig | Mapping[str, Any] | None = None) -> None:
+    def __init__(self, upstream: UpstreamTransport, config: RouterConfig | Mapping[str, Any] | None = None) -> None:
         raw_config = dict(config.model_dump() if isinstance(config, RouterConfig) else config or {})
         self.config = RouterConfig.model_validate(
             {
@@ -40,25 +39,92 @@ class AutoSessionRouter:
                 },
             }
         )
-        self._send = send
+        self.upstream = upstream
         self.sessionId_from_targetId: dict[str, str] = {}
         self.targetId_from_sessionId: dict[str, str] = {}
         self.targets: dict[str, dict[str, Any]] = {}
         self.contexts: dict[str, dict[str, Any]] = {}
         self._execution_context_waiters: dict[str, list[tuple[threading.Event, dict[str, Any], Callable[[dict[str, Any]], bool]]]] = {}
         self._lock = threading.RLock()
+        self._subscription_cleanups: list[Callable[[], None]] = []
         self._started = False
 
     def start(self) -> None:
         if self._started:
             return None
-        self._send("Target.setAutoAttach", targetAutoAttachParams, None)
-        self._send("Target.setDiscoverTargets", {"discover": True}, None)
+        self._subscription_cleanups = self._listen()
+        try:
+            self.upstream.send("Target.setAutoAttach", targetAutoAttachParams, None)
+            self.upstream.send("Target.setDiscoverTargets", {"discover": True}, None)
+        except Exception:
+            for cleanup in self._subscription_cleanups:
+                cleanup()
+            self._subscription_cleanups = []
+            raise
         self._started = True
 
     def stop(self) -> None:
+        for cleanup in self._subscription_cleanups:
+            cleanup()
+        self._subscription_cleanups = []
         self._started = False
         return None
+
+    def _listen(self) -> list[Callable[[], None]]:
+        return [
+            self.upstream.on(
+                "Target.attachedToTarget",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Target.attachedToTarget", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Target.detachedFromTarget",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Target.detachedFromTarget", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Target.targetInfoChanged",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Target.targetInfoChanged", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Target.targetDestroyed",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Target.targetDestroyed", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Runtime.executionContextCreated",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Runtime.executionContextCreated", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Runtime.executionContextDestroyed",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Runtime.executionContextDestroyed", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Runtime.executionContextsCleared",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Runtime.executionContextsCleared", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Page.frameNavigated",
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    "Page.frameNavigated", event, session_id
+                ),
+            ),
+            self.upstream.on(
+                "Page.frameDetached",
+                lambda event, _target_id, session_id: self._recordProtocolEvent("Page.frameDetached", event, session_id),
+            ),
+        ]
 
     def toJSON(self) -> dict[str, object]:
         return modCDPToJSON(
@@ -90,9 +156,9 @@ class AutoSessionRouter:
                 if method == "Runtime.callFunctionOn"
                 else command_params
             )
-            return self._send(method, routed_params, requested_session_id)
+            return self.upstream.send(method, routed_params, requested_session_id)
         if domain in browserLevelDomains:
-            return self._send(method, command_params, None)
+            return self.upstream.send(method, command_params, None)
         target_id = self._resolveTargetId(command_params)
         target_id, session_id = self.ensureRouteForTarget(target_id)
         routed_params = (
@@ -100,14 +166,14 @@ class AutoSessionRouter:
             if method == "Runtime.callFunctionOn"
             else command_params
         )
-        return self._send(method, routed_params, session_id)
+        return self.upstream.send(method, routed_params, session_id)
 
     def attachToTarget(self, target_id: str) -> str | None:
         with self._lock:
             session_id = self.sessionId_from_targetId.get(target_id)
         if session_id is not None:
             return session_id
-        result = self._send("Target.attachToTarget", {"targetId": target_id, "flatten": True}, None)
+        result = self.upstream.send("Target.attachToTarget", {"targetId": target_id, "flatten": True}, None)
         session_id = result.get("sessionId")
         if isinstance(session_id, str) and session_id:
             with self._lock:
@@ -131,7 +197,7 @@ class AutoSessionRouter:
             if target and target.get("sessionId") is None:
                 return resolved_target_id, None
         if resolved_target_id is None:
-            created = self._send("Target.createTarget", {"url": "about:blank#modcdp"}, None)
+            created = self.upstream.send("Target.createTarget", {"url": "about:blank#modcdp"}, None)
             created_target_id = created.get("targetId")
             if not isinstance(created_target_id, str) or not created_target_id:
                 raise RuntimeError("Target.createTarget returned no targetId")
@@ -142,7 +208,7 @@ class AutoSessionRouter:
             return resolved_target_id, None
         return resolved_target_id, session_id
 
-    def recordProtocolEvent(self, method: str, data: object, session_id: str | None) -> None:
+    def _recordProtocolEvent(self, method: str, data: object, session_id: str | None) -> None:
         event_data = data if _isObjectMap(data) else {}
         if method == "Target.attachedToTarget":
             attached_session_id = event_data.get("sessionId") if isinstance(event_data.get("sessionId"), str) else session_id
@@ -204,9 +270,9 @@ class AutoSessionRouter:
         existing = self._findExecutionContext(route_target_id, session_id, frame_id, selected)
         if existing is not None:
             return existing
-        self._send("Runtime.enable", {}, session_id)
+        self.upstream.send("Runtime.enable", {}, session_id)
         if selected["world"] in ("isolated", "piercer"):
-            created = self._send(
+            created = self.upstream.send(
                 "Page.createIsolatedWorld",
                 {
                     "frameId": frame_id,
@@ -241,7 +307,7 @@ class AutoSessionRouter:
 
     def getTopology(self, params: Mapping[str, Any] | None = None) -> dict[str, Any]:
         object_group = f"modcdp-topology-{int(time.time() * 1000)}"
-        raw_target_infos = self._send("Target.getTargets", {}, None).get("targetInfos")
+        raw_target_infos = self.upstream.send("Target.getTargets", {}, None).get("targetInfos")
         target_infos = [target for target in raw_target_infos if _isObjectMap(target)] if isinstance(raw_target_infos, list) else []
         for target_info in target_infos:
             self._recordTarget(target_info)
@@ -251,7 +317,7 @@ class AutoSessionRouter:
         frames: dict[str, dict[str, Any]] = {}
         root_target_id = str(root_target["targetId"])
         _root_route_target_id, root_session_id = self._enableTarget(root_target_id)
-        root_tree = self._send("Page.getFrameTree", {}, root_session_id).get("frameTree")
+        root_tree = self.upstream.send("Page.getFrameTree", {}, root_session_id).get("frameTree")
         if not _isObjectMap(root_tree):
             raise RuntimeError("Page.getFrameTree returned no frameTree.")
         root_frame_id = self._recordFrameTree(root_tree, root_target_id, None, frames)
@@ -264,7 +330,7 @@ class AutoSessionRouter:
         for target in oopif_targets:
             target_id = str(target["targetId"])
             _route_target_id, session_id = self._enableTarget(target_id)
-            frame_tree = self._send("Page.getFrameTree", {}, session_id).get("frameTree")
+            frame_tree = self.upstream.send("Page.getFrameTree", {}, session_id).get("frameTree")
             if _isObjectMap(frame_tree):
                 self._recordFrameTree(frame_tree, target_id, str(target.get("parentFrameId")), frames)
 
@@ -276,7 +342,7 @@ class AutoSessionRouter:
             if parent is None:
                 continue
             _parent_target_id, parent_session_id = self.ensureRouteForTarget(str(parent["targetId"]))
-            owner = self._send("DOM.getFrameOwner", {"frameId": frame_id}, parent_session_id)
+            owner = self.upstream.send("DOM.getFrameOwner", {"frameId": frame_id}, parent_session_id)
             backend_node_id = owner.get("backendNodeId")
             if isinstance(backend_node_id, int):
                 frame["outerBackendNodeId"] = backend_node_id
@@ -291,14 +357,14 @@ class AutoSessionRouter:
                 evaluate_params["uniqueContextId"] = context["uniqueId"]
             else:
                 evaluate_params["contextId"] = context["id"]
-            root_object = self._send("Runtime.evaluate", evaluate_params, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
+            root_object = self.upstream.send("Runtime.evaluate", evaluate_params, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
             result = root_object.get("result")
             if not _isObjectMap(result):
                 raise RuntimeError("Runtime.evaluate returned no remote object result.")
             object_id = result.get("objectId")
             if not isinstance(object_id, str) or not object_id:
                 raise RuntimeError(f"Mod.getTopology could not resolve document root for frameId={frame_id}.")
-            described = self._send("DOM.describeNode", {"objectId": object_id}, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
+            described = self.upstream.send("DOM.describeNode", {"objectId": object_id}, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
             node = described.get("node")
             if not _isObjectMap(node):
                 raise RuntimeError("DOM.describeNode returned no node.")
@@ -313,7 +379,7 @@ class AutoSessionRouter:
 
         for target_id in {str(frame["targetId"]) for frame in frames.values()}:
             _route_target_id, session_id = self.ensureRouteForTarget(target_id)
-            document = self._send("DOM.getDocument", {"depth": -1, "pierce": True}, session_id)
+            document = self.upstream.send("DOM.getDocument", {"depth": -1, "pierce": True}, session_id)
             root = document.get("root")
             if _isObjectMap(root):
                 self._recordShadowRoots(root, frames, roots, object_group)
@@ -463,7 +529,7 @@ class AutoSessionRouter:
             ("Target.setAutoAttach", targetAutoAttachParams),
         ):
             try:
-                self._send(method, params, session_id)
+                self.upstream.send(method, params, session_id)
             except Exception:
                 if method != "Target.setAutoAttach":
                     raise
@@ -510,7 +576,7 @@ class AutoSessionRouter:
                     frame = frames.get(current_frame_id)
                     context = self._findExecutionContext(str(frame["targetId"]), None, current_frame_id, {"world": "piercer"}) if frame else None
                     if frame and context and isinstance(shadow_root.get("backendNodeId"), int):
-                        resolved = self._send(
+                        resolved = self.upstream.send(
                             "DOM.resolveNode",
                             {"backendNodeId": shadow_root["backendNodeId"], "executionContextId": context["id"], "objectGroup": object_group},
                             context.get("sessionId") if isinstance(context.get("sessionId"), str) else None,
@@ -609,7 +675,7 @@ class AutoSessionRouter:
         explicit_target_id = params.get("targetId")
         if isinstance(explicit_target_id, str) and explicit_target_id:
             return explicit_target_id
-        target_infos = self._send("Target.getTargets", {}, None).get("targetInfos")
+        target_infos = self.upstream.send("Target.getTargets", {}, None).get("targetInfos")
         if isinstance(target_infos, list):
             for raw_target_info in target_infos:
                 if _isObjectMap(raw_target_info):

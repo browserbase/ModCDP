@@ -23,9 +23,19 @@ func ModCDPToJSON(instance any, config ModCDPJSONConfig) map[string]any {
 			children[key] = child.ToJSON()
 		}
 	}
+	jsonConfig := config.Config
+	if jsonConfig == nil {
+		value := reflect.Indirect(reflect.ValueOf(instance))
+		if value.IsValid() && value.Kind() == reflect.Struct {
+			field := value.FieldByName("Config")
+			if field.IsValid() && field.CanInterface() {
+				jsonConfig = field.Interface()
+			}
+		}
+	}
 	result := map[string]any{
 		"type":   reflect.Indirect(reflect.ValueOf(instance)).Type().Name(),
-		"config": config.Config,
+		"config": jsonConfig,
 		"state":  mergeSimpleState(simpleState(instance), simpleState(config.State)),
 	}
 	if result["config"] == nil {

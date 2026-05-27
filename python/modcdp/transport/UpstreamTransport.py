@@ -8,7 +8,7 @@ import json
 import threading
 from collections.abc import Callable, Mapping
 from queue import Empty, Queue
-from typing import Any, Literal
+from typing import Any, Literal, overload
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict
@@ -63,6 +63,26 @@ class UpstreamTransport:
 
     def close(self) -> None:
         return None
+
+    @overload
+    def send(
+        self,
+        command: str,
+        params: ProtocolPayload | None = None,
+        session_id: str | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> ProtocolResult: ...
+
+    @overload
+    def send(
+        self,
+        command: dict[str, Any],
+        params: ProtocolPayload | None = None,
+        session_id: str | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> None: ...
 
     def send(
         self,

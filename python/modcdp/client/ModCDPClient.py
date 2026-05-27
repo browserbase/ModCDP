@@ -265,10 +265,7 @@ class ModCDPClient(CDPSurfaceMixin):
 
         self._handlers: dict[str, list[Handler]] = {}
         self._handler_wrappers: dict[tuple[str, Handler], Handler] = {}
-        self.router = AutoSessionRouter(
-            lambda method, params=None, session_id=None: self.upstream.send(method, dict(params or {}), session_id) or {},
-            parsed_router_config.model_dump(),
-        )
+        self.router = AutoSessionRouter(self.upstream, parsed_router_config.model_dump())
         if self.config.client_hydrate_aliases:
             install_cdp_surface(self)
         self.Mod = _ModDomain(self)
@@ -282,7 +279,7 @@ class ModCDPClient(CDPSurfaceMixin):
             {
                 "config": {
                     "client_config": self.config,
-                    "server_config": self.server_config or {},
+                    "server_config": self.server_config,
                 },
                 "state": {
                     "event_wait_cleanups": len(self._handlers),
@@ -724,9 +721,6 @@ class ModCDPClient(CDPSurfaceMixin):
         method = msg.get("method")
         raw_params = msg.get("params")
         params = raw_params if isinstance(raw_params, Mapping) else {}
-        if isinstance(method, str):
-            session_id = msg.get("sessionId")
-            self.router.recordProtocolEvent(method, params, session_id if isinstance(session_id, str) else None)
         if method and self.ext_session_id is not None and msg.get("sessionId") == self.ext_session_id:
             session_id = msg.get("sessionId")
             u = unwrap_event_if_needed(

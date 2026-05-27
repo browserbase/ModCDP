@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import Any
+from typing import Any, overload
 
 from websocket import create_connection
 
@@ -44,6 +44,26 @@ class WSUpstreamTransport(UpstreamTransport):
         self.ws = create_connection(self.url, timeout=10)
         self._reader_thread = threading.Thread(target=lambda: self._read_loop(generation), daemon=True)
         self._reader_thread.start()
+
+    @overload
+    def send(
+        self,
+        command: str,
+        params: ProtocolPayload | None = None,
+        session_id: str | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> ProtocolResult: ...
+
+    @overload
+    def send(
+        self,
+        command: dict[str, Any],
+        params: ProtocolPayload | None = None,
+        session_id: str | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> None: ...
 
     def send(
         self,
