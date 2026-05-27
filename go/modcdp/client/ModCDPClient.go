@@ -185,13 +185,7 @@ type ServerConfig struct {
 
 var ServerConfigNone = &ServerConfig{disabled: true}
 
-type ClientConfig struct {
-	ClientHydrateAliases       *bool `json:"client_hydrate_aliases,omitempty"`
-	ClientMirrorUpstreamEvents *bool `json:"client_mirror_upstream_events,omitempty"`
-	ClientCDPSendTimeoutMS     int   `json:"client_cdp_send_timeout_ms,omitempty"`
-	ClientEventWaitTimeoutMS   int   `json:"client_event_wait_timeout_ms,omitempty"`
-	ClientHeartbeatIntervalMS  int   `json:"client_heartbeat_interval_ms,omitempty"`
-}
+type ClientConfig = types.ModCDPClientConfig
 
 type Config struct {
 	Launcher               LauncherConfig          `json:"launcher,omitempty"`
