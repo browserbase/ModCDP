@@ -27,12 +27,12 @@ func (i *CDPExtensionInjector) Prepare() error {
 	if i.UnpackedExtensionPath != "" {
 		return nil
 	}
-	unpackedPath, cleanupPath, err := prepareUnpackedExtension(extensionPath)
+	prepared, err := PrepareUnpackedExtension(extensionPath)
 	if err != nil {
 		return err
 	}
-	i.UnpackedExtensionPath = unpackedPath
-	i.CleanupPath = cleanupPath
+	i.UnpackedExtensionPath = prepared.UnpackedExtensionPath
+	i.CleanupPath = prepared.CleanupPath
 	return nil
 }
 

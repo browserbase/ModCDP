@@ -9,6 +9,8 @@ import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from ..types.toJSON import modCDPToJSON
+
 
 SendCDP = Callable[[str, Mapping[str, Any], str | None], dict[str, Any]]
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
@@ -37,6 +39,24 @@ class AutoSessionRouter:
 
     def stop(self) -> None:
         return None
+
+    def toJSON(self) -> dict[str, object]:
+        return modCDPToJSON(
+            self,
+            {
+                "config": {
+                    "router_routes": self.config["router_routes"],
+                    "loopback_execution_context_timeout_ms": self.config["loopback_execution_context_timeout_ms"],
+                },
+                "state": {
+                    "started": False,
+                    "sessions": len(self.sessionId_from_targetId),
+                    "targets": len(self.targets),
+                    "contexts": len(self.contexts),
+                    "execution_context_waiters": len(self._execution_context_waiters),
+                },
+            },
+        )
 
     def send(self, method: str, params: Mapping[str, Any] | None = None, requested_session_id: str | None = None) -> dict[str, Any]:
         command_params = dict(params or {})

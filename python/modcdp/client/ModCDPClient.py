@@ -66,6 +66,7 @@ from ..types.modcdp import (
     ProtocolPayload,
     ProtocolResult,
 )
+from ..types.toJSON import modCDPToJSON
 
 
 def _defaulted(value: Any, fallback: Any) -> Any:
@@ -292,6 +293,30 @@ class ModCDPClient(CDPSurfaceMixin):
         self._closed = False
         self._heartbeat_stop: threading.Event | None = None
         self._heartbeat_thread: threading.Thread | None = None
+
+    def toJSON(self) -> dict[str, object]:
+        return modCDPToJSON(
+            self,
+            {
+                "config": {
+                    "client_config": self.config,
+                    "server_config": self.server_config or {},
+                },
+                "state": {
+                    "event_wait_cleanups": len(self._handlers),
+                    "heartbeat_timer": self._heartbeat_thread is not None,
+                    "latency": self.latency.get("round_trip_ms") if self.latency else None,
+                    "connected": self.connect_timing is not None,
+                },
+                "children": {
+                    "launcher": self.launcher,
+                    "upstream": self.upstream,
+                    "injector": self.injector,
+                    "router": self.router,
+                    "types": self.types,
+                },
+            },
+        )
 
     def connect(self) -> "ModCDPClient":
         connect_started_at = int(time.time() * 1000)

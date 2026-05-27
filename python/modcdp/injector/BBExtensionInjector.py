@@ -14,7 +14,8 @@ import zipfile
 from pathlib import Path
 
 from ..launcher.BrowserLauncher import LauncherConfig
-from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig, defaultModCDPExtensionPath
+from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig
+from ..injector.NodeExtensionFiles import defaultModCDPExtensionPath
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
 

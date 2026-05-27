@@ -4,23 +4,17 @@
 # - ./go/modcdp/injector/ExtensionInjector.go
 from __future__ import annotations
 
-import base64
-import hashlib
-import json
 import re
-import shutil
-import tempfile
 import threading
 import time
-import zipfile
 from collections.abc import Callable, Mapping
-from pathlib import Path
 from queue import Empty, Queue
 from typing import Any, Literal, TypedDict, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..launcher.BrowserLauncher import LauncherConfig
 from ..types.modcdp import ProtocolParams, ProtocolResult, TargetInfo
+from ..types.toJSON import modCDPToJSON
 
 EXT_ID_FROM_URL_RE = re.compile(r"^chrome-extension://([a-z]+)/")
 DEFAULT_MODCDP_EXTENSION_ID = "mdedooklbnfejodmnhmkdpkaedafkehf"
@@ -67,56 +61,6 @@ class InjectorConfig(BaseModel):
     injector_bb_base_url: str = "https://api.browserbase.com"
 
 
-def defaultModCDPExtensionPath() -> str | None:
-    bundled_extension = Path(__file__).resolve().parent.parent / "extension.zip"
-    return str(bundled_extension) if bundled_extension.exists() else None
-
-
-def prepareUnpackedExtension(extension_path: str) -> tuple[str, tempfile.TemporaryDirectory[str]]:
-    cleanup_dir = tempfile.TemporaryDirectory(prefix="modcdp-extension-")
-    try:
-        if extension_path.endswith(".zip"):
-            with zipfile.ZipFile(extension_path) as archive:
-                _extract_zip(archive, cleanup_dir.name)
-        else:
-            shutil.copytree(extension_path, cleanup_dir.name, dirs_exist_ok=True)
-        return _extension_root(cleanup_dir.name), cleanup_dir
-    except BaseException:
-        cleanup_dir.cleanup()
-        raise
-
-
-def extensionIdFromManifestKey(extension_path: str) -> str | None:
-    manifest_path = Path(extension_path) / "manifest.json"
-    if not manifest_path.exists():
-        return None
-    manifest = json.loads(manifest_path.read_text())
-    key = manifest.get("key") if isinstance(manifest, dict) else None
-    if not isinstance(key, str) or not key.strip():
-        return None
-    digest = hashlib.sha256(base64.b64decode(key)).digest()[:16]
-    alphabet = "abcdefghijklmnop"
-    return "".join(alphabet[byte >> 4] + alphabet[byte & 0x0F] for byte in digest)
-
-
-def _extension_root(unpacked_path: str) -> str:
-    if (Path(unpacked_path) / "manifest.json").exists():
-        return unpacked_path
-    nested = Path(unpacked_path) / "extension"
-    if (nested / "manifest.json").exists():
-        return str(nested)
-    return unpacked_path
-
-
-def _extract_zip(archive: zipfile.ZipFile, destination: str) -> None:
-    root = Path(destination).resolve()
-    for member in archive.infolist():
-        target = (root / member.filename).resolve()
-        if target != root and root not in target.parents:
-            raise RuntimeError(f'zip entry "{member.filename}" escapes extension extraction directory')
-    archive.extractall(destination)
-
-
 def _defaulted(value: Any, fallback: int) -> int:
     return fallback if value is None else int(value)
 
@@ -153,6 +97,11 @@ class ExtensionInjector:
 
     def configForUpstream(self) -> dict[str, Any]:
         return {}
+
+    def toJSON(self) -> dict[str, object]:
+        config = self.config.model_dump()
+        config.pop("send", None)
+        return modCDPToJSON(self, {"config": config})
 
     def prepare(self) -> None:
         return None

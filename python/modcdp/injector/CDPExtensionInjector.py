@@ -4,10 +4,11 @@
 # - ./go/modcdp/injector/CDPExtensionInjector.go
 from __future__ import annotations
 
-import tempfile
 import time
+from collections.abc import Callable
 
-from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig, defaultModCDPExtensionPath, prepareUnpackedExtension
+from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig
+from ..injector.NodeExtensionFiles import defaultModCDPExtensionPath, prepareUnpackedExtension
 
 
 class CDPExtensionInjector(ExtensionInjector):
@@ -15,15 +16,16 @@ class CDPExtensionInjector(ExtensionInjector):
         config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
         super().__init__({**config, "injector_mode": "cdp"})
         self.unpacked_extension_path: str | None = None
-        self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
+        self.cleanup: Callable[[], None] | None = None
 
     def prepare(self) -> None:
         extension_path = self.config.injector_cdp_extension_path or defaultModCDPExtensionPath()
         if not extension_path or self.unpacked_extension_path:
             super().prepare()
             return
-        self.update({"injector_cdp_extension_path": extension_path})
-        self.unpacked_extension_path, self.cleanup_dir = prepareUnpackedExtension(extension_path)
+        prepared = prepareUnpackedExtension(extension_path)
+        self.unpacked_extension_path = prepared.unpacked_extension_path
+        self.cleanup = prepared.cleanup
         super().prepare()
 
     def inject(self) -> ExtensionInjectionResult | None:
@@ -62,6 +64,6 @@ class CDPExtensionInjector(ExtensionInjector):
 
     def close(self) -> None:
         super().close()
-        if self.cleanup_dir:
-            self.cleanup_dir.cleanup()
-            self.cleanup_dir = None
+        if self.cleanup:
+            self.cleanup()
+            self.cleanup = None

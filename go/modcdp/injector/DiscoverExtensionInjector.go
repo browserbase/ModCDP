@@ -25,14 +25,14 @@ func (i *DiscoverExtensionInjector) Prepare() error {
 	if i.Config.InjectorServiceWorkerExtensionID == "" && extensionPath != "" {
 		manifestPath := extensionPath
 		if strings.HasSuffix(extensionPath, ".zip") {
-			unpackedPath, cleanupPath, err := prepareUnpackedExtension(extensionPath)
+			prepared, err := PrepareUnpackedExtension(extensionPath)
 			if err != nil {
 				return err
 			}
-			manifestPath = unpackedPath
-			i.CleanupPath = cleanupPath
+			manifestPath = prepared.UnpackedExtensionPath
+			i.CleanupPath = prepared.CleanupPath
 		}
-		extensionID, err := extensionIDFromManifestKey(manifestPath)
+		extensionID, err := ExtensionIDFromManifestKey(manifestPath)
 		if err != nil {
 			return err
 		}

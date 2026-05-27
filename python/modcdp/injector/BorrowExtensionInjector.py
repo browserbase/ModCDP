@@ -4,8 +4,8 @@
 # - ./go/modcdp/injector/BorrowExtensionInjector.go
 from __future__ import annotations
 
-import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Mapping, cast
 
@@ -15,6 +15,8 @@ from ..injector.ExtensionInjector import (
     ExtensionInjectionResult,
     ExtensionInjector,
     InjectorConfig,
+)
+from ..injector.NodeExtensionFiles import (
     defaultModCDPExtensionPath,
     prepareUnpackedExtension,
 )
@@ -34,7 +36,7 @@ class BorrowExtensionInjector(ExtensionInjector):
         config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
         super().__init__({**config, "injector_mode": "borrow"})
         self.unpacked_extension_path: str | None = None
-        self.cleanup: tempfile.TemporaryDirectory[str] | None = None
+        self.cleanup: Callable[[], None] | None = None
         self.bootstrap_modcdp_server_expression: str | None = None
 
     def prepare(self) -> None:
@@ -44,11 +46,13 @@ class BorrowExtensionInjector(ExtensionInjector):
         extension_path = self.config.injector_borrow_extension_path or defaultModCDPExtensionPath()
         if not extension_path:
             raise FileNotFoundError("Unable to locate bundled ModCDP extension for borrow injector.")
-        self.unpacked_extension_path, self.cleanup = prepareUnpackedExtension(extension_path)
+        prepared = prepareUnpackedExtension(extension_path)
+        self.unpacked_extension_path = prepared.unpacked_extension_path
+        self.cleanup = prepared.cleanup
         try:
             source = (Path(self.unpacked_extension_path) / "modcdp" / "service_worker.js").read_text()
         except BaseException:
-            self.cleanup.cleanup()
+            self.cleanup()
             self.cleanup = None
             self.unpacked_extension_path = None
             raise
@@ -71,7 +75,7 @@ class BorrowExtensionInjector(ExtensionInjector):
     def close(self) -> None:
         super().close()
         if self.cleanup is not None:
-            self.cleanup.cleanup()
+            self.cleanup()
             self.cleanup = None
 
     def inject(self) -> ExtensionInjectionResult | None:

@@ -130,6 +130,20 @@ func (l BrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error)
 	return nil, fmt.Errorf("%T.Launch is not implemented", l)
 }
 
+func (l BrowserLauncher) ToJSON() map[string]any {
+	state := map[string]any{"launched": l.Launched != nil}
+	if l.Launched != nil {
+		state["cdp_url"] = l.Launched.CDPURL
+		state["loopback_cdp_url"] = l.Launched.LoopbackCDPURL
+		state["cdp_listen_port"] = l.Launched.CDPListenPort
+		state["profile_dir"] = l.Launched.ProfileDir
+		state["browserbase_session_id"] = l.Launched.BrowserbaseSessionID
+		state["browserbase_session_url"] = l.Launched.BrowserbaseSessionURL
+		state["browserbase_debug_url"] = l.Launched.BrowserbaseDebugURL
+	}
+	return types.ModCDPToJSON(l, types.ModCDPJSONConfig{State: state})
+}
+
 func mergeLaunchConfig(existing LauncherConfig, incoming LauncherConfig) LauncherConfig {
 	merged := existing
 	if incoming.LauncherLocalExecutablePath != "" {

@@ -15,6 +15,7 @@
 from .BBExtensionInjector import BBExtensionInjector
 from .BorrowExtensionInjector import BorrowExtensionInjector
 from .DiscoverExtensionInjector import DiscoverExtensionInjector
-from .ExtensionInjector import ExtensionInjector, defaultModCDPExtensionPath
+from .ExtensionInjector import ExtensionInjector
+from .NodeExtensionFiles import PreparedExtension, defaultModCDPExtensionPath, extensionIdFromManifestKey, prepareUnpackedExtension
 from .CDPExtensionInjector import CDPExtensionInjector
 from .CLIExtensionInjector import CLIExtensionInjector

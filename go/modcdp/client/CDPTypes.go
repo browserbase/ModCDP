@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	abxjsonschema "github.com/ArchiveBox/abxbus/abxbus-go/v2/jsonschema"
+	modtypes "github.com/browserbase/modcdp/go/modcdp/types"
 )
 
 type CommandPreparation struct {
@@ -60,6 +61,40 @@ func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, cus
 		_, _ = types.AddCustomMiddleware(middleware)
 	}
 	return types
+}
+
+func (types *CDPTypes) ToJSON() map[string]any {
+	customCommands := []map[string]any{}
+	for _, command := range types.CustomCommandWireRegistrations(false) {
+		delete(command, "expression")
+		customCommands = append(customCommands, command)
+	}
+	customMiddlewares := []map[string]any{}
+	for _, middleware := range types.CustomMiddlewareWireRegistrations() {
+		registration := map[string]any{"phase": middleware.Phase}
+		if middleware.Name != "" {
+			registration["name"] = middleware.Name
+		}
+		customMiddlewares = append(customMiddlewares, registration)
+	}
+	types.mu.RLock()
+	state := map[string]any{
+		"custom_commands":        len(types.CustomCommands),
+		"custom_events":          len(types.CustomEvents),
+		"custom_middlewares":     len(types.CustomMiddlewares),
+		"command_params_schemas": len(types.commandParamsSchemas),
+		"command_result_schemas": len(types.commandResultSchemas),
+		"event_schemas":          len(types.eventSchemas),
+	}
+	types.mu.RUnlock()
+	return modtypes.ModCDPToJSON(types, modtypes.ModCDPJSONConfig{
+		Config: map[string]any{
+			"custom_commands":    customCommands,
+			"custom_events":      types.CustomEventWireRegistrations(),
+			"custom_middlewares": customMiddlewares,
+		},
+		State: state,
+	})
 }
 
 func (types *CDPTypes) PrepareCommand(method string, params map[string]any, canRegisterLocally bool) (CommandPreparation, error) {

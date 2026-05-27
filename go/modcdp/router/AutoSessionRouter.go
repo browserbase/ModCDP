@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/browserbase/modcdp/go/modcdp/types"
 )
 
 type AutoSessionRouterSend func(method string, params map[string]any, sessionID string) (map[string]any, error)
@@ -54,6 +56,29 @@ func (r *AutoSessionRouter) Start() error {
 }
 
 func (r *AutoSessionRouter) Stop() {}
+
+func (r *AutoSessionRouter) ToJSON() map[string]any {
+	r.mu.Lock()
+	sessions := len(r.sessionId_from_targetId)
+	targets := len(r.targets)
+	contexts := len(r.contexts)
+	waiters := len(r.execution_context_waiters)
+	timeoutMS := r.defaultExecutionContextTimeoutMS()
+	r.mu.Unlock()
+	return types.ModCDPToJSON(r, types.ModCDPJSONConfig{
+		Config: map[string]any{
+			"router_routes":                         map[string]string{},
+			"loopback_execution_context_timeout_ms": timeoutMS,
+		},
+		State: map[string]any{
+			"started":                   false,
+			"sessions":                  sessions,
+			"targets":                   targets,
+			"contexts":                  contexts,
+			"execution_context_waiters": waiters,
+		},
+	})
+}
 
 func (r *AutoSessionRouter) Send(method string, params map[string]any, requestedSessionID string) (map[string]any, error) {
 	domain := method

@@ -4,12 +4,13 @@
 # - ./go/modcdp/injector/DiscoverExtensionInjector.go
 from __future__ import annotations
 
-import tempfile
-
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
     InjectorConfig,
+)
+from ..injector.NodeExtensionFiles import (
+    PreparedExtension,
     extensionIdFromManifestKey,
     prepareUnpackedExtension,
 )
@@ -19,14 +20,15 @@ class DiscoverExtensionInjector(ExtensionInjector):
     def __init__(self, config: InjectorConfig | dict | None = None) -> None:
         config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
         super().__init__({**config, "injector_mode": "discover"})
-        self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
+        self.prepared_extension: PreparedExtension | None = None
 
     def prepare(self) -> None:
         extension_path = self.config.injector_discover_extension_path
         if not self.config.injector_service_worker_extension_id and extension_path:
             manifest_path = extension_path
             if extension_path.endswith(".zip"):
-                manifest_path, self.cleanup_dir = prepareUnpackedExtension(extension_path)
+                self.prepared_extension = prepareUnpackedExtension(extension_path)
+                manifest_path = self.prepared_extension.unpacked_extension_path
             self.update({"injector_service_worker_extension_id": extensionIdFromManifestKey(manifest_path)})
         super().prepare()
 
@@ -59,6 +61,6 @@ class DiscoverExtensionInjector(ExtensionInjector):
 
     def close(self) -> None:
         super().close()
-        if self.cleanup_dir:
-            self.cleanup_dir.cleanup()
-            self.cleanup_dir = None
+        if self.prepared_extension:
+            self.prepared_extension.cleanup()
+            self.prepared_extension = None

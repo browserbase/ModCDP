@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict
 from ..types.modcdp import ProtocolPayload, ProtocolResult
+from ..types.toJSON import modCDPToJSON
 
 
 UpstreamMode = Literal["ws"]
@@ -154,6 +155,19 @@ class UpstreamTransport:
 
     def waitForPeer(self, config: dict[str, Any] | None = None) -> None:
         return None
+
+    def toJSON(self) -> dict[str, object]:
+        return modCDPToJSON(
+            self,
+            {
+                "state": {
+                    "pending": len(self._pending),
+                    "recv_listeners": len(self._recv_listeners),
+                    "close_listeners": len(self._close_listeners),
+                    "event_listeners": 0,
+                }
+            },
+        )
 
     def _emit_recv(self, message: dict[str, Any]) -> None:
         for listener in list(self._recv_listeners):

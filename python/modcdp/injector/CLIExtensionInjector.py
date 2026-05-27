@@ -4,12 +4,14 @@
 # - ./go/modcdp/injector/CLIExtensionInjector.go
 from __future__ import annotations
 
-import tempfile
+from collections.abc import Callable
 
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
     InjectorConfig,
+)
+from ..injector.NodeExtensionFiles import (
     defaultModCDPExtensionPath,
     extensionIdFromManifestKey,
     prepareUnpackedExtension,
@@ -22,15 +24,16 @@ class CLIExtensionInjector(ExtensionInjector):
         super().__init__({**config, "injector_mode": "cli"})
         self.unpacked_extension_path: str | None = None
         self.extension_id: str | None = None
-        self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
+        self.cleanup: Callable[[], None] | None = None
 
     def prepare(self) -> None:
         extension_path = self.config.injector_cli_extension_path or defaultModCDPExtensionPath()
         if not extension_path or self.unpacked_extension_path:
             super().prepare()
             return
-        self.update({"injector_cli_extension_path": extension_path})
-        self.unpacked_extension_path, self.cleanup_dir = prepareUnpackedExtension(extension_path)
+        prepared = prepareUnpackedExtension(extension_path)
+        self.unpacked_extension_path = prepared.unpacked_extension_path
+        self.cleanup = prepared.cleanup
         self._resolveExtensionId()
         super().prepare()
 
@@ -43,9 +46,9 @@ class CLIExtensionInjector(ExtensionInjector):
 
     def close(self) -> None:
         super().close()
-        if self.cleanup_dir:
-            self.cleanup_dir.cleanup()
-            self.cleanup_dir = None
+        if self.cleanup:
+            self.cleanup()
+            self.cleanup = None
 
     def _resolveExtensionId(self) -> str | None:
         if self.extension_id:

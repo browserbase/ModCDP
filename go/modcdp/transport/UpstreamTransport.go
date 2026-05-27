@@ -312,6 +312,25 @@ func (e *UpstreamTransport) PeerGeneration() int64 {
 	return 0
 }
 
+func (e *UpstreamTransport) ToJSON() map[string]any {
+	e.pendingMu.Lock()
+	pending := len(e.pending)
+	e.pendingMu.Unlock()
+	e.listenerMu.Lock()
+	recvListeners := len(e.recvListeners)
+	closeListeners := len(e.closeListeners)
+	e.listenerMu.Unlock()
+	return types.ModCDPToJSON(e, types.ModCDPJSONConfig{
+		Config: e.Config,
+		State: map[string]any{
+			"pending":         pending,
+			"recv_listeners":  recvListeners,
+			"close_listeners": closeListeners,
+			"event_listeners": 0,
+		},
+	})
+}
+
 func ParseHostPort(value string, defaultHost string, defaultPort int) (HostPort, error) {
 	parseValue := value
 	if !strings.Contains(value, "://") {

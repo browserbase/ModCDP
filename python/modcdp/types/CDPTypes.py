@@ -27,6 +27,7 @@ from ..types.modcdp import (
     ProtocolPayload,
     ProtocolResult,
 )
+from ..types.toJSON import modCDPToJSON
 
 JsonSchema: TypeAlias = dict[str, JsonValue]
 
@@ -129,6 +130,36 @@ class CDPTypes:
             self.addCustomEvent({"name": event} if isinstance(event, str) else event)
         for middleware in custom_middlewares or []:
             self.addCustomMiddleware(middleware)
+
+    def toJSON(self) -> dict[str, object]:
+        custom_commands = []
+        for command in self.customCommandWireRegistrations():
+            command = dict(command)
+            command.pop("expression", None)
+            custom_commands.append(command)
+        custom_middlewares = []
+        for middleware in self.customMiddlewareWireRegistrations():
+            middleware = dict(middleware)
+            middleware.pop("expression", None)
+            custom_middlewares.append(middleware)
+        return modCDPToJSON(
+            self,
+            {
+                "config": {
+                    "custom_commands": custom_commands,
+                    "custom_events": self.customEventWireRegistrations(),
+                    "custom_middlewares": custom_middlewares,
+                },
+                "state": {
+                    "custom_commands": len(self.custom_commands),
+                    "custom_events": len(self.custom_events),
+                    "custom_middlewares": len(self.custom_middlewares),
+                    "command_params_schemas": len(self.command_params_schemas),
+                    "command_result_schemas": len(self.command_result_schemas),
+                    "event_schemas": len(self.event_schemas),
+                },
+            },
+        )
 
     def hydrateNativeProtocolSchemas(self) -> None:
         with self._lock:

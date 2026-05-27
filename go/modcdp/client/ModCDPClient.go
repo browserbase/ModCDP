@@ -461,6 +461,36 @@ func New(config Config) *ModCDPClient {
 	return client
 }
 
+func (c *ModCDPClient) ToJSON() map[string]any {
+	children := map[string]types.ModCDPJSONChild{}
+	if child, ok := c.transport.(types.ModCDPJSONChild); ok {
+		children["upstream"] = child
+	}
+	if child, ok := any(c.Router).(types.ModCDPJSONChild); ok {
+		children["router"] = child
+	}
+	if child, ok := any(c.Types).(types.ModCDPJSONChild); ok {
+		children["types"] = child
+	}
+	latency := any(nil)
+	if c.Latency != nil {
+		latency = c.Latency["round_trip_ms"]
+	}
+	return types.ModCDPToJSON(c, types.ModCDPJSONConfig{
+		Config: map[string]any{
+			"client_config": c.Config.ClientConfig,
+			"server_config": c.Config.ServerConfig,
+		},
+		State: map[string]any{
+			"event_wait_cleanups": len(c.handlers),
+			"heartbeat_timer":     c.heartbeatStop != nil,
+			"latency":             latency,
+			"connected":           c.ConnectTiming != nil,
+		},
+		Children: children,
+	})
+}
+
 func (c *ModCDPClient) Configure(config Config) *ModCDPClient {
 	if config.ClientConfig.ClientHydrateAliases != nil {
 		c.Config.ClientConfig.ClientHydrateAliases = config.ClientConfig.ClientHydrateAliases

@@ -42,12 +42,12 @@ func (i *BorrowExtensionInjector) Prepare() error {
 	if i.BootstrapModCDPServerExpression != "" {
 		return nil
 	}
-	unpackedPath, cleanupPath, err := prepareUnpackedExtension(i.Config.InjectorBorrowExtensionPath)
+	prepared, err := PrepareUnpackedExtension(i.Config.InjectorBorrowExtensionPath)
 	if err != nil {
 		return err
 	}
-	i.UnpackedExtensionPath = unpackedPath
-	i.CleanupPath = cleanupPath
+	i.UnpackedExtensionPath = prepared.UnpackedExtensionPath
+	i.CleanupPath = prepared.CleanupPath
 	body, err := os.ReadFile(filepath.Join(i.UnpackedExtensionPath, "modcdp", "service_worker.js"))
 	if err != nil {
 		_ = os.RemoveAll(i.CleanupPath)

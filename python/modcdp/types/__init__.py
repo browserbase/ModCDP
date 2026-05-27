@@ -7,3 +7,4 @@
 # - ./go/modcdp/types/codegen.go
 from .modcdp import *
 from .CDPTypes import CDPTypes
+from .toJSON import modCDPToJSON

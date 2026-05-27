@@ -25,12 +25,12 @@ func (i *CLIExtensionInjector) Prepare() error {
 	if i.UnpackedExtensionPath != "" {
 		return nil
 	}
-	unpackedPath, cleanupPath, err := prepareUnpackedExtension(extensionPath)
+	prepared, err := PrepareUnpackedExtension(extensionPath)
 	if err != nil {
 		return err
 	}
-	i.UnpackedExtensionPath = unpackedPath
-	i.CleanupPath = cleanupPath
+	i.UnpackedExtensionPath = prepared.UnpackedExtensionPath
+	i.CleanupPath = prepared.CleanupPath
 	_, err = i.resolveExtensionID()
 	return err
 }
@@ -59,7 +59,7 @@ func (i *CLIExtensionInjector) resolveExtensionID() (string, error) {
 	if i.Config.InjectorCLIExtensionID != "" {
 		i.ExtensionID = i.Config.InjectorCLIExtensionID
 	} else if i.UnpackedExtensionPath != "" {
-		extensionID, err := extensionIDFromManifestKey(i.UnpackedExtensionPath)
+		extensionID, err := ExtensionIDFromManifestKey(i.UnpackedExtensionPath)
 		if err != nil {
 			return "", err
 		}

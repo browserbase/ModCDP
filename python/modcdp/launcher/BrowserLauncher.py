@@ -12,6 +12,7 @@ from typing import Any, Literal, TypedDict, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired
+from ..types.toJSON import modCDPToJSON
 
 
 class LauncherConfig(BaseModel):
@@ -98,6 +99,24 @@ class BrowserLauncher:
         self.launched = None
         if launched is not None:
             launched["close"]()
+
+    def toJSON(self) -> dict[str, object]:
+        launched = self.launched or {}
+        return modCDPToJSON(
+            self,
+            {
+                "state": {
+                    "launched": self.launched is not None,
+                    "cdp_url": launched.get("cdp_url"),
+                    "loopback_cdp_url": launched.get("loopback_cdp_url"),
+                    "cdp_listen_port": launched.get("cdp_listen_port"),
+                    "profile_dir": launched.get("profile_dir"),
+                    "browserbase_session_id": launched.get("browserbase_session_id"),
+                    "browserbase_session_url": launched.get("browserbase_session_url"),
+                    "browserbase_debug_url": launched.get("browserbase_debug_url"),
+                }
+            },
+        )
 
 
 def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | None = None) -> list[str]:
