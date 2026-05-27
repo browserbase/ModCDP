@@ -75,11 +75,14 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(cdp.launcher.config.launcher_local_executable_path, "/tmp/chrome")
         self.assertEqual(cdp.launcher.config.launcher_local_user_data_dir, "/tmp/profile")
         self.assertEqual(cdp.upstream.config.upstream_ws_connect_error_settle_timeout_ms, 321)
-        self.assertEqual(cdp.injector.config.injector_execution_context_timeout_ms, 4321)
-        self.assertEqual(cdp.injector.config.injector_service_worker_probe_timeout_ms, 5432)
-        self.assertEqual(cdp.injector.config.injector_service_worker_ready_timeout_ms, 6543)
-        self.assertEqual(cdp.injector.config.injector_service_worker_poll_interval_ms, 76)
-        self.assertEqual(cdp.injector.config.injector_target_session_poll_interval_ms, 87)
+        self.assertIsNotNone(cdp.injector)
+        injector = cdp.injector
+        assert injector is not None
+        self.assertEqual(injector.config.injector_execution_context_timeout_ms, 4321)
+        self.assertEqual(injector.config.injector_service_worker_probe_timeout_ms, 5432)
+        self.assertEqual(injector.config.injector_service_worker_ready_timeout_ms, 6543)
+        self.assertEqual(injector.config.injector_service_worker_poll_interval_ms, 76)
+        self.assertEqual(injector.config.injector_target_session_poll_interval_ms, 87)
         self.assertEqual(cdp.router.config["router_routes"]["*.*"], "direct_cdp")
         self.assertEqual(cdp.config.client_hydrate_aliases, False)
         self.assertEqual(cdp.config.client_mirror_upstream_events, False)
@@ -93,52 +96,78 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertNotIn("cdp_send_timeout_ms", cdp.__dict__)
         self.assertNotIn("service_worker_probe_timeout_ms", cdp.__dict__)
 
-        params = cast(dict[str, Any], cdp._server_configure_params())
-        self.assertEqual(params["router"]["router_routes"]["*.*"], "loopback_cdp")
-        self.assertEqual(params["server_browser_token"], "token-1")
-        self.assertEqual(params["client_config"]["client_cdp_send_timeout_ms"], 9876)
-        self.assertEqual(params["router"]["loopback_execution_context_timeout_ms"], 4321)
-        self.assertEqual(params["upstream"]["upstream_ws_connect_error_settle_timeout_ms"], 7654)
-        self.assertEqual(params["downstream"]["downstream_client_timeout_ms"], 4567)
+        params = cdp._server_configure_params()
+        router_config = params.get("router")
+        client_config = params.get("client_config")
+        upstream_config = params.get("upstream")
+        downstream_config = params.get("downstream")
+        self.assertIsInstance(router_config, dict)
+        self.assertIsInstance(client_config, dict)
+        self.assertIsInstance(upstream_config, dict)
+        self.assertIsInstance(downstream_config, dict)
+        assert isinstance(router_config, dict)
+        assert isinstance(client_config, dict)
+        assert isinstance(upstream_config, dict)
+        assert isinstance(downstream_config, dict)
+        self.assertEqual(router_config.get("router_routes", {}).get("*.*"), "loopback_cdp")
+        self.assertEqual(params.get("server_browser_token"), "token-1")
+        self.assertEqual(client_config.get("client_cdp_send_timeout_ms"), 9876)
+        self.assertEqual(router_config.get("loopback_execution_context_timeout_ms"), 4321)
+        self.assertEqual(upstream_config.get("upstream_ws_connect_error_settle_timeout_ms"), 7654)
+        self.assertEqual(downstream_config.get("downstream_client_timeout_ms"), 4567)
 
     def test_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
 
-        self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, [])
+        self.assertIsNotNone(cdp.injector)
+        injector = cdp.injector
+        assert injector is not None
+        self.assertEqual(injector.config.injector_service_worker_url_suffixes, [])
 
     def test_defaults_service_worker_suffix_config_to_modcdp_worker(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "discover"})
 
-        self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
+        self.assertIsNotNone(cdp.injector)
+        injector = cdp.injector
+        assert injector is not None
+        self.assertEqual(injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
 
     def test_preserves_explicit_none_server_config(self) -> None:
         cdp = ModCDPClient(server_config=None)
 
         self.assertIsNone(cdp.server_config)
 
-    def test_orders_local_auto_injection_as_launch_flag_then_cdp_fallback(self) -> None:
+    def test_selects_exactly_one_injector_from_explicit_injector_mode(self) -> None:
         cdp = ModCDPClient(
             launcher={"launcher_mode": "local"},
             injector={"injector_mode": "cli"},
         )
 
+        self.assertEqual(type(cdp.injector).__name__, "CLIExtensionInjector")
         self.assertEqual(
-            [type(injector).__name__ for injector in cdp._extension_injectors_for_config()],
-            [
-                "CLIExtensionInjector",
-                "CDPExtensionInjector",
-                "DiscoverExtensionInjector",
-                "BorrowExtensionInjector",
-            ],
+            type(ModCDPClient(launcher={"launcher_mode": "remote"}, injector={"injector_mode": "cdp"}).injector).__name__,
+            "CDPExtensionInjector",
+        )
+        self.assertEqual(
+            type(ModCDPClient(launcher={"launcher_mode": "bb"}, injector={"injector_mode": "bb"}).injector).__name__,
+            "BBExtensionInjector",
+        )
+        self.assertEqual(
+            type(ModCDPClient(launcher={"launcher_mode": "remote"}, injector={"injector_mode": "discover"}).injector).__name__,
+            "DiscoverExtensionInjector",
+        )
+        self.assertEqual(
+            type(ModCDPClient(launcher={"launcher_mode": "remote"}, injector={"injector_mode": "borrow"}).injector).__name__,
+            "BorrowExtensionInjector",
         )
 
     def test_rejects_unknown_component_modes_at_their_owning_factory_boundary(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, r"unknown upstream\.upstream_mode=bogus"):
-            ModCDPClient(upstream={"upstream_mode": "bogus"})._upstream_transport()
-        with self.assertRaisesRegex(RuntimeError, r"unknown launcher\.launcher_mode=bogus"):
-            ModCDPClient(launcher={"launcher_mode": "bogus"})._browser_launcher()
-        with self.assertRaisesRegex(RuntimeError, r"unknown injector\.injector_mode=bogus"):
-            ModCDPClient(injector={"injector_mode": "bogus"})._extension_injectors_for_config()
+        with self.assertRaisesRegex(Exception, r"unknown upstream\.upstream_mode=bogus"):
+            ModCDPClient(upstream={"upstream_mode": "bogus"})
+        with self.assertRaisesRegex(Exception, r"Input should be"):
+            ModCDPClient(launcher={"launcher_mode": "bogus"})
+        with self.assertRaisesRegex(Exception, r"Input should be"):
+            ModCDPClient(injector={"injector_mode": "bogus"})
 
     def test_connects_with_cli_injector_chain(self) -> None:
         cdp = ModCDPClient(
@@ -273,16 +302,14 @@ class ModCDPClientTests(unittest.TestCase):
 
         try:
             cdp.connect()
-            injector = next(
-                candidate
-                for candidate in cdp._extension_injectors
-                if type(candidate).__name__ == "CLIExtensionInjector"
-            )
+            self.assertIsNotNone(cdp.injector)
+            injector = cdp.injector
+            assert injector is not None
             unpacked_extension_path = getattr(injector, "unpacked_extension_path")
             self.assertIsInstance(unpacked_extension_path, str)
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
 
-            launched = cdp._launched_browser
+            launched = cdp.launcher.launched
             if launched is None:
                 self.fail("expected launched browser")
             original_close = launched["close"]
@@ -302,9 +329,7 @@ class ModCDPClientTests(unittest.TestCase):
         finally:
             cdp.close()
 
-        self.assertIsNone(cdp.transport)
-        self.assertIsNone(cdp._launched_browser)
-        self.assertEqual(cdp._extension_injectors, [])
+        self.assertIsNone(cdp.launcher.launched)
 
     def test_close_clears_top_level_connection_state(self) -> None:
         cdp = ModCDPClient(
@@ -318,10 +343,10 @@ class ModCDPClientTests(unittest.TestCase):
         )
 
         cdp.connect()
-        self.assertIsNotNone(cdp.transport)
+        self.assertIsNotNone(cdp.launcher.launched)
         cdp.close()
 
-        self.assertIsNone(cdp.transport)
+        self.assertIsNone(cdp.launcher.launched)
 
     def test_generated_cdp_surface_exposes_direct_domain_commands(self) -> None:
         client = ModCDPClient(

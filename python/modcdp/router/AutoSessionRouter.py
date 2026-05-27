@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 
-SendCDP = Callable[[str, dict[str, Any], str | None], dict[str, Any]]
+SendCDP = Callable[[str, Mapping[str, Any], str | None], dict[str, Any]]
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
 browserLevelDomains = {"Browser", "Target", "SystemInfo"}
 
@@ -38,7 +38,7 @@ class AutoSessionRouter:
     def stop(self) -> None:
         return None
 
-    def send(self, method: str, params: dict[str, Any] | None = None, requested_session_id: str | None = None) -> dict[str, Any]:
+    def send(self, method: str, params: Mapping[str, Any] | None = None, requested_session_id: str | None = None) -> dict[str, Any]:
         command_params = dict(params or {})
         domain = method.split(".", 1)[0]
         if requested_session_id is not None:
@@ -177,6 +177,8 @@ class AutoSessionRouter:
             )
             created_context = self._findExecutionContext(route_target_id, session_id, frame_id, selected)
             execution_context_id = created.get("executionContextId")
+            if not isinstance(execution_context_id, int):
+                raise RuntimeError("Page.createIsolatedWorld returned no executionContextId.")
             if created_context and created_context.get("id") == execution_context_id:
                 return created_context
             context = {
@@ -187,7 +189,7 @@ class AutoSessionRouter:
                 "world": "piercer" if selected["world"] == "piercer" else selected.get("worldName") or "isolated",
                 "name": selected.get("worldName"),
             }
-            self.contexts[self._contextKey(route_target_id, session_id, int(execution_context_id), None)] = context
+            self.contexts[self._contextKey(route_target_id, session_id, execution_context_id, None)] = context
             return context
         return self._waitForExecutionContextMatching(
             lambda context: context.get("targetId") == route_target_id
@@ -250,12 +252,16 @@ class AutoSessionRouter:
             else:
                 evaluate_params["contextId"] = context["id"]
             root_object = self._send("Runtime.evaluate", evaluate_params, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
-            result = root_object.get("result") if isinstance(root_object.get("result"), Mapping) else {}
+            result = root_object.get("result")
+            if not isinstance(result, Mapping):
+                raise RuntimeError("Runtime.evaluate returned no remote object result.")
             object_id = result.get("objectId")
             if not isinstance(object_id, str) or not object_id:
                 raise RuntimeError(f"Mod.getTopology could not resolve document root for frameId={frame_id}.")
             described = self._send("DOM.describeNode", {"objectId": object_id}, context.get("sessionId") if isinstance(context.get("sessionId"), str) else None)
-            node = described.get("node") if isinstance(described.get("node"), Mapping) else {}
+            node = described.get("node")
+            if not isinstance(node, Mapping):
+                raise RuntimeError("DOM.describeNode returned no node.")
             roots[object_id] = {
                 "kind": "document",
                 "frameId": frame_id,
@@ -317,7 +323,8 @@ class AutoSessionRouter:
             if target_id is None:
                 return
             context_id = int(context["id"])
-            aux_data = context.get("auxData") if isinstance(context.get("auxData"), Mapping) else {}
+            raw_aux_data = context.get("auxData")
+            aux_data: Mapping[str, Any] = raw_aux_data if isinstance(raw_aux_data, Mapping) else {}
             frame_id = aux_data.get("frameId") if isinstance(aux_data.get("frameId"), str) else None
             context_name = context.get("name") if isinstance(context.get("name"), str) else ""
             aux_type = aux_data.get("type")
@@ -463,7 +470,9 @@ class AutoSessionRouter:
                             {"backendNodeId": shadow_root["backendNodeId"], "executionContextId": context["id"], "objectGroup": object_group},
                             context.get("sessionId") if isinstance(context.get("sessionId"), str) else None,
                         )
-                        remote_object = resolved.get("object") if isinstance(resolved.get("object"), Mapping) else {}
+                        remote_object = resolved.get("object")
+                        if not isinstance(remote_object, Mapping):
+                            raise RuntimeError("DOM.resolveNode returned no remote object.")
                         object_id = remote_object.get("objectId")
                         if isinstance(object_id, str):
                             roots[object_id] = {

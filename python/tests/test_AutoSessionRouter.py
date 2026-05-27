@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from collections.abc import Mapping
 from queue import Queue
 from typing import Any
 
@@ -27,7 +28,7 @@ class AutoSessionRouterTests(unittest.TestCase):
         pending: dict[int, Queue[dict[str, Any]]] = {}
         closed = False
 
-        def send(method: str, params: dict[str, Any] | None = None, session_id: str | None = None) -> dict[str, Any]:
+        def send(method: str, params: Mapping[str, Any] | None = None, session_id: str | None = None) -> dict[str, Any]:
             nonlocal next_id
             with lock:
                 next_id += 1

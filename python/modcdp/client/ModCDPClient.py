@@ -280,7 +280,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self._handlers: dict[str, list[Handler]] = {}
         self._handler_wrappers: dict[tuple[str, Handler], Handler] = {}
         self.router = AutoSessionRouter(
-            lambda method, params=None, session_id=None: cast(ProtocolResult, self.upstream.send(method, params or {}, session_id)),
+            lambda method, params=None, session_id=None: self.upstream.send(method, dict(params or {}), session_id) or {},
             lambda: self.injector.config.injector_execution_context_timeout_ms
             if self.injector is not None
             else DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
@@ -373,8 +373,11 @@ class ModCDPClient(CDPSurfaceMixin):
         )
         if command["target"] == "direct_cdp":
             step = command["steps"][0]
-            result = self.router.send(step["method"], step.get("params") or {}, step.get("sessionId"))
+            step_params = step.get("params")
+            result = self.router.send(step["method"], step_params if isinstance(step_params, Mapping) else {}, step.get("sessionId"))
         elif command["target"] == "service_worker":
+            if self.injector is None:
+                raise RuntimeError("injector.injector_mode='none' cannot route commands through the service worker.")
             result = {}
             unwrap: str | None = None
             for step in command["steps"]:
@@ -401,7 +404,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "completed_at": completed_at,
             "duration_ms": completed_at - started_at,
         }
-        return AwaitableDict(result) if isinstance(result, dict) else AwaitableValue(result)
+        return AwaitableDict(dict(result)) if isinstance(result, Mapping) else AwaitableValue(result)
 
     def send(
         self,
@@ -414,7 +417,7 @@ class ModCDPClient(CDPSurfaceMixin):
             return result
         if isinstance(result, AwaitableValue):
             return result
-        return AwaitableDict(result) if isinstance(result, dict) else AwaitableValue(result)
+        return AwaitableDict(dict(result)) if isinstance(result, Mapping) else AwaitableValue(result)
 
     def on(self, event: str | type[CDPEvent], handler: Handler) -> "ModCDPClient":
         event_name = cdp_event_name(event) if not isinstance(event, str) else event
@@ -474,7 +477,8 @@ class ModCDPClient(CDPSurfaceMixin):
         if upstream is not None:
             self.upstream.update(dict(upstream))
         if router is not None:
-            current_routes = dict(self.router.config.get("router_routes") or {})
+            raw_current_routes = self.router.config.get("router_routes")
+            current_routes = dict(raw_current_routes) if isinstance(raw_current_routes, Mapping) else {}
             incoming_routes = dict(cast(Mapping[str, str], router.get("router_routes") or {}))
             self.router.config = RouterConfig.model_validate(
                 {
@@ -613,13 +617,10 @@ class ModCDPClient(CDPSurfaceMixin):
             transport.update(launcher.configForUpstream())
             if self.injector is not None:
                 transport.update(self.injector.configForUpstream())
-        launched_cdp_url = cast(str | None, launcher.launched.get("cdp_url")) if launcher.launched else None
+        launched_cdp_url = launcher.launched.get("cdp_url") if launcher.launched else None
         transport.connect()
 
-        self.cdp_url = cast(
-            str | None,
-            transport.url or launched_cdp_url,
-        )
+        self.cdp_url = transport.url or launched_cdp_url
         if transport.upstream_mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream.config = UpstreamTransportConfig.model_validate({**self.upstream.config.model_dump(), "upstream_ws_cdp_url": transport.url})

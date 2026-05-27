@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from queue import Empty, Queue
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -131,7 +131,7 @@ class UpstreamTransport:
     def getTargets(self) -> list[dict[str, Any]]:
         result = self.send("Target.getTargets", {})
         target_infos = result.get("targetInfos") if isinstance(result, dict) else None
-        return [dict(target) for target in target_infos] if isinstance(target_infos, list) else []
+        return [dict(target) for target in target_infos if isinstance(target, Mapping)] if isinstance(target_infos, list) else []
 
     def resolveTargetId(self, params: dict[str, Any] | None = None) -> str | None:
         target_id = (params or {}).get("targetId")

@@ -8,7 +8,7 @@ import re
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from pydantic_core import to_jsonable_python
@@ -50,7 +50,7 @@ class _ModCDPAddCustomEvent(BaseModel):
 class _ModCDPAddMiddleware(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    phase: str
+    phase: Literal["request", "response", "event"]
     expression: str
     name: str | None = None
 
@@ -160,30 +160,33 @@ class CDPTypes:
     def prepareCommand(self, method: str, params: object = None, can_register_locally: bool = False) -> CommandPreparation:
         if method == "Mod.addCustomCommand":
             parsed = _ModCDPAddCustomCommand.model_validate(params or {})
-            registration: ModCDPAddCustomCommandParams = {"name": parsed.name}
+            command_registration: ModCDPAddCustomCommandParams = {"name": parsed.name}
             if parsed.expression is not None:
-                registration["expression"] = parsed.expression
+                command_registration["expression"] = parsed.expression
             if parsed.params_schema is not None:
-                registration["params_schema"] = parsed.params_schema
+                command_registration["params_schema"] = _json_value(parsed.params_schema)
             if parsed.result_schema is not None:
-                registration["result_schema"] = parsed.result_schema
-            name = self.addCustomCommand(registration)
+                command_registration["result_schema"] = _json_value(parsed.result_schema)
+            name = self.addCustomCommand(command_registration)
             if not parsed.expression and can_register_locally:
                 return CommandPreparation(params={"name": name}, local_result={"name": name, "registered": True}, custom_command_name=name)
             return CommandPreparation(params=self.customCommandWireRegistration(name), custom_command_name=name)
         if method == "Mod.addCustomEvent":
             parsed = _ModCDPAddCustomEvent.model_validate(params or {})
-            registration: ModCDPAddCustomEventObjectParams = {"name": parsed.name}
+            event_registration: ModCDPAddCustomEventObjectParams = {"name": parsed.name}
             if parsed.event_schema is not None:
-                registration["event_schema"] = parsed.event_schema
-            name = self.addCustomEvent(registration)
+                event_registration["event_schema"] = _json_value(parsed.event_schema)
+            name = self.addCustomEvent(event_registration)
             if can_register_locally:
                 return CommandPreparation(params={"name": name}, local_result={"name": name, "registered": True})
             return CommandPreparation(params=self.customEventWireRegistration(name))
         command_params = self.parseCommandParams(method, params or {})
         if method == "Mod.addMiddleware":
             parsed = _ModCDPAddMiddleware.model_validate(command_params)
-            name = self.addCustomMiddleware(parsed.model_dump(mode="json", exclude_none=True))
+            middleware_registration: ModCDPAddMiddlewareParams = {"phase": parsed.phase, "expression": parsed.expression}
+            if parsed.name is not None:
+                middleware_registration["name"] = parsed.name
+            name = self.addCustomMiddleware(middleware_registration)
             if can_register_locally:
                 return CommandPreparation(params=command_params, local_result={"name": name, "phase": parsed.phase, "registered": True})
         return CommandPreparation(params=command_params)
@@ -244,12 +247,14 @@ class CDPTypes:
                 self.command_params_schemas[name] = params_schema.adapter
             if result_schema.adapter is not None:
                 self.command_result_schemas[name] = result_schema.adapter
-            self.custom_commands[name] = {
-                "name": name,
-                **({"expression": parsed.expression} if parsed.expression else {}),
-                **({"params_schema": params_schema.json_schema} if params_schema.json_schema else {}),
-                **({"result_schema": result_schema.json_schema} if result_schema.json_schema else {}),
-            }
+            command: ModCDPAddCustomCommandParams = {"name": name}
+            if parsed.expression:
+                command["expression"] = parsed.expression
+            if params_schema.json_schema:
+                command["params_schema"] = params_schema.json_schema
+            if result_schema.json_schema:
+                command["result_schema"] = result_schema.json_schema
+            self.custom_commands[name] = command
         return name
 
     def customCommandWireRegistration(self, name: str) -> ProtocolParams:
@@ -267,7 +272,7 @@ class CDPTypes:
             if expression_required and not expression:
                 continue
             name = normalizeModCDPName(command["name"])
-            wire: ProtocolParams = {"name": name}
+            wire: dict[str, JsonValue] = {"name": name}
             if expression is not None:
                 wire["expression"] = expression
             params_schema = command.get("params_schema")
@@ -288,17 +293,17 @@ class CDPTypes:
         with self._lock:
             if event_schema.adapter is not None:
                 self.event_schemas[name] = event_schema.adapter
-            self.custom_events[name] = {
-                "name": name,
-                **({"event_schema": event_schema.json_schema} if event_schema.json_schema else {}),
-            }
+            event: ModCDPAddCustomEventObjectParams = {"name": name}
+            if event_schema.json_schema:
+                event["event_schema"] = event_schema.json_schema
+            self.custom_events[name] = event
         return name
 
     def customEventWireRegistration(self, name: str) -> ProtocolParams:
         event = self.custom_events.get(name)
         if event is None:
             return {"name": name}
-        wire: ProtocolParams = {"name": name}
+        wire: dict[str, JsonValue] = {"name": name}
         event_schema = event.get("event_schema")
         if isinstance(event_schema, dict):
             wire["event_schema"] = event_schema
