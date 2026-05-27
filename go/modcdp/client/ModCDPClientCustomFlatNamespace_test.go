@@ -28,8 +28,9 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 	}
 	cdp := New(Config{
 		Launcher: LauncherConfig{
-			LauncherMode:          "local",
-			LauncherLocalHeadless: boolPtr(true),
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: InjectorConfig{
@@ -87,8 +88,9 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 	}
 	cdp := New(Config{
 		Launcher: LauncherConfig{
-			LauncherMode:          "local",
-			LauncherLocalHeadless: boolPtr(true),
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
 		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: InjectorConfig{
@@ -139,6 +141,246 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for Custom.someEvent")
+	}
+}
+
+func TestDynamicCustomCommandEventAndMiddlewareRegistrationValidatesThroughRealServiceWorker(t *testing.T) {
+	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdp := New(Config{
+		Launcher: LauncherConfig{
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
+		},
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
+			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
+			InjectorTrustServiceWorkerTarget: true,
+		},
+		Router: RouterConfig{RouterRoutes: map[string]string{
+			"Mod.*":    "service_worker",
+			"Custom.*": "service_worker",
+			"*.*":      "direct_cdp",
+		}},
+		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+	})
+	defer cdp.Close()
+
+	if err := cdp.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := cdp.Mod.AddCustomCommand(CustomCommand{
+		Name: "Custom.dynamic",
+		ParamsSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"text": map[string]any{"type": "string", "minLength": 1}},
+			"required":             []any{"text"},
+			"additionalProperties": false,
+		},
+		ResultSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+			"required":             []any{"ok"},
+			"additionalProperties": false,
+		},
+		Expression: "async ({ text }) => ({ ok: text === 'live-dynamic' })",
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.dynamic", "registered")
+	}
+	if result, err := cdp.Mod.AddCustomCommand(CustomCommand{
+		Name: "Custom.dynamicBadResult",
+		ParamsSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"text": map[string]any{"type": "string"}},
+			"required":             []any{"text"},
+			"additionalProperties": false,
+		},
+		ResultSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+			"required":             []any{"ok"},
+			"additionalProperties": false,
+		},
+		Expression: "async () => ({ ok: 'yes' })",
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.dynamicBadResult", "registered")
+	}
+	if result, err := cdp.Mod.AddCustomEvent(CustomEvent{
+		Name: "Custom.dynamicReady",
+		EventSchema: map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{"id": map[string]any{"type": "string", "format": "uuid"}},
+			"required":             []any{"id"},
+			"additionalProperties": false,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.dynamicReady", "registered")
+	}
+	if result, err := cdp.Mod.AddMiddleware(CustomMiddleware{
+		Name:       "Custom.dynamic",
+		Phase:      "request",
+		Expression: "async (payload, next) => next({ ...payload, text: `${payload.text}-dynamic` })",
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		assertRegistration(t, result, "Custom.dynamic", "request")
+	}
+
+	result, err := cdp.Send("Custom.dynamic", map[string]any{"text": "live"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultMap, ok := result.(map[string]any)
+	if !ok || resultMap["ok"] != true {
+		t.Fatalf("Custom.dynamic = %#v", result)
+	}
+	if _, err := cdp.Send("Custom.dynamic", map[string]any{"text": ""}); err == nil {
+		t.Fatal("expected Custom.dynamic empty text validation error")
+	}
+	if _, err := cdp.Send("Custom.dynamicBadResult", map[string]any{"text": "live"}); err == nil {
+		t.Fatal("expected Custom.dynamicBadResult result validation error")
+	}
+	if _, err := cdp.Mod.AddMiddleware(CustomMiddleware{Name: "Custom.dynamic", Phase: "after", Expression: "async (payload, next) => next(payload)"}); err == nil {
+		t.Fatal("expected invalid middleware phase validation error")
+	}
+
+	seen := make(chan string, 1)
+	cdp.On("Custom.dynamicReady", func(any) { seen <- "ready" })
+	if _, err := cdp.Mod.Evaluate(map[string]any{
+		"expression": "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.dynamicReady', data: { id: '550e8400-e29b-41d4-a716-446655440000' }, cdpSessionId: null }))",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-seen:
+		if got != "ready" {
+			t.Fatalf("Custom.dynamicReady = %q", got)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for Custom.dynamicReady")
+	}
+}
+
+func TestAssignedTypeRegistryValidatesUpdatedCustomCommandEventAndMiddlewareSchemasThroughRealServiceWorker(t *testing.T) {
+	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cdp := New(Config{
+		Launcher: LauncherConfig{
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       boolPtr(true),
+			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
+		},
+		Upstream: UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: InjectorConfig{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
+			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
+			InjectorTrustServiceWorkerTarget: true,
+		},
+		Router: RouterConfig{RouterRoutes: map[string]string{
+			"Mod.*":    "service_worker",
+			"Custom.*": "service_worker",
+			"*.*":      "direct_cdp",
+		}},
+		ServerConfig: &ServerConfig{Router: RouterConfig{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
+	})
+	cdp.Types = cdp.Types.Update(CDPTypesConfig{
+		CustomCommands: []CustomCommand{
+			{
+				Name: "Custom.updated",
+				ParamsSchema: map[string]any{
+					"type":                 "object",
+					"properties":           map[string]any{"count": map[string]any{"type": "integer", "minimum": 0}},
+					"required":             []any{"count"},
+					"additionalProperties": false,
+				},
+				ResultSchema: map[string]any{
+					"type":                 "object",
+					"properties":           map[string]any{"done": map[string]any{"type": "boolean"}},
+					"required":             []any{"done"},
+					"additionalProperties": false,
+				},
+				Expression: "async ({ count }) => ({ done: count === 2 })",
+			},
+			{
+				Name: "Custom.updatedBadResult",
+				ParamsSchema: map[string]any{
+					"type":                 "object",
+					"properties":           map[string]any{"count": map[string]any{"type": "number"}},
+					"required":             []any{"count"},
+					"additionalProperties": false,
+				},
+				ResultSchema: map[string]any{
+					"type":                 "object",
+					"properties":           map[string]any{"done": map[string]any{"type": "boolean"}},
+					"required":             []any{"done"},
+					"additionalProperties": false,
+				},
+				Expression: "async () => ({ done: 'yes' })",
+			},
+		},
+		CustomEvents: []CustomEvent{{
+			Name: "Custom.updatedReady",
+			EventSchema: map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{"ready": map[string]any{"type": "boolean"}},
+				"required":             []any{"ready"},
+				"additionalProperties": false,
+			},
+		}},
+		CustomMiddlewares: []CustomMiddleware{{
+			Name:       "Custom.updated",
+			Phase:      "request",
+			Expression: "async (payload, next) => next({ ...payload, count: payload.count + 1 })",
+		}},
+	})
+	defer cdp.Close()
+
+	if err := cdp.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := cdp.Send("Custom.updated", map[string]any{"count": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultMap, ok := result.(map[string]any)
+	if !ok || resultMap["done"] != true {
+		t.Fatalf("Custom.updated = %#v", result)
+	}
+	if _, err := cdp.Send("Custom.updated", map[string]any{"count": -1}); err == nil {
+		t.Fatal("expected Custom.updated count validation error")
+	}
+	if _, err := cdp.Send("Custom.updatedBadResult", map[string]any{"count": 1}); err == nil {
+		t.Fatal("expected Custom.updatedBadResult result validation error")
+	}
+
+	seen := make(chan bool, 1)
+	cdp.On("Custom.updatedReady", func(any) { seen <- true })
+	if _, err := cdp.Mod.Evaluate(map[string]any{
+		"expression": "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.updatedReady', data: { ready: true }, cdpSessionId: null }))",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-seen:
+		if !got {
+			t.Fatal("Custom.updatedReady got false")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for Custom.updatedReady")
 	}
 }
 
@@ -310,4 +552,15 @@ func expectPanic(t *testing.T, fn func()) {
 		}
 	}()
 	fn()
+}
+
+func assertRegistration(t *testing.T, result any, name string, phase string) {
+	t.Helper()
+	registration, ok := result.(map[string]any)
+	if !ok || registration["name"] != name || registration["registered"] != true {
+		t.Fatalf("unexpected registration result: %#v", result)
+	}
+	if phase != "registered" && registration["phase"] != phase {
+		t.Fatalf("unexpected registration phase: %#v", result)
+	}
 }

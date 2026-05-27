@@ -7,7 +7,11 @@
 from __future__ import annotations
 
 import asyncio
+import glob
+import os
+import re
 from queue import Queue
+import sys
 import unittest
 from pathlib import Path
 
@@ -16,8 +20,43 @@ from pydantic import BaseModel
 from modcdp import ModCDPClient
 
 
+# MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+# Keep the setup semantics below 1:1 with translated tests; helpers here only select real browsers for real --load-extension runs.
+def load_extension_test_browser_path() -> str:
+    for candidate in (os.environ.get("CHROME_PATH"), "/usr/bin/chromium" if sys.platform.startswith("linux") else None):
+        if candidate and Path(candidate).exists():
+            return candidate
+    home = Path.home()
+    if sys.platform == "darwin":
+        patterns = [
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+            str(home / "Library/Caches/ms-playwright/chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium"),
+            str(home / "Library/Caches/puppeteer/chrome/mac*-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        ]
+    elif sys.platform.startswith("win"):
+        local_app_data = Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local")
+        patterns = [
+            str(local_app_data / "ms-playwright/chromium-*/chrome-win*/chrome.exe"),
+            str(home / ".cache/puppeteer/chrome/win*-*/chrome-win*/chrome.exe"),
+        ]
+    else:
+        patterns = [
+            str(home / ".cache/ms-playwright/chromium-*/chrome-linux*/chrome"),
+            "/opt/pw-browsers/chromium-*/chrome-linux*/chrome",
+            str(home / ".cache/puppeteer/chrome/linux-*/chrome-linux*/chrome"),
+        ]
+    candidates = sorted(
+        dict.fromkeys(match for pattern in patterns for match in glob.glob(pattern)),
+        key=lambda path: (-max([int(part) for part in re.findall(r"\d+", path)] or [0]), -Path(path).stat().st_mtime, path),
+    )
+    if candidates:
+        return candidates[0]
+    raise RuntimeError("No browser found for --load-extension tests. Install Chrome for Testing or set CHROME_PATH.")
+
+
 ROOT = Path(__file__).resolve().parents[2]
 EXTENSION_PATH = ROOT / "dist" / "extension"
+LOAD_EXTENSION_TEST_BROWSER_PATH = load_extension_test_browser_path()
 
 
 class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
@@ -32,6 +71,7 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
             launcher={
                 "launcher_mode": "local",
                 "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
             },
             upstream={"upstream_mode": "ws"},
             injector={
@@ -73,6 +113,7 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
             launcher={
                 "launcher_mode": "local",
                 "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
             },
             upstream={"upstream_mode": "ws"},
             injector={
@@ -100,6 +141,198 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
         try:
             asyncio.run(run())
             self.assertEqual(seen.get(timeout=10), "ok")
+        finally:
+            client.close()
+
+    def test_dynamic_custom_command_event_and_middleware_registration_validates_through_real_service_worker(self) -> None:
+        client = ModCDPClient(
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
+            upstream={"upstream_mode": "ws"},
+            injector={
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
+                "injector_trust_service_worker_target": True,
+            },
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+        )
+        seen: Queue[str] = Queue()
+
+        async def run() -> None:
+            client.connect()
+            self.assertEqual(
+                await client.Mod.addCustomCommand(
+                    "Custom.dynamic",
+                    params_schema={
+                        "type": "object",
+                        "properties": {"text": {"type": "string", "minLength": 1}},
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                    result_schema={
+                        "type": "object",
+                        "properties": {"ok": {"type": "boolean"}},
+                        "required": ["ok"],
+                        "additionalProperties": False,
+                    },
+                    expression="async ({ text }) => ({ ok: text === 'live-dynamic' })",
+                ),
+                {"name": "Custom.dynamic", "registered": True},
+            )
+            self.assertEqual(
+                await client.Mod.addCustomCommand(
+                    "Custom.dynamicBadResult",
+                    params_schema={
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                    result_schema={
+                        "type": "object",
+                        "properties": {"ok": {"type": "boolean"}},
+                        "required": ["ok"],
+                        "additionalProperties": False,
+                    },
+                    expression="async () => ({ ok: 'yes' })",
+                ),
+                {"name": "Custom.dynamicBadResult", "registered": True},
+            )
+            self.assertEqual(
+                await client.Mod.addCustomEvent(
+                    "Custom.dynamicReady",
+                    event_schema={
+                        "type": "object",
+                        "properties": {"id": {"type": "string", "format": "uuid"}},
+                        "required": ["id"],
+                        "additionalProperties": False,
+                    },
+                ),
+                {"name": "Custom.dynamicReady", "registered": True},
+            )
+            self.assertEqual(
+                await client.Mod.addMiddleware(
+                    name="Custom.dynamic",
+                    phase="request",
+                    expression="async (payload, next) => next({ ...payload, text: `${payload.text}-dynamic` })",
+                ),
+                {"name": "Custom.dynamic", "phase": "request", "registered": True},
+            )
+
+            self.assertEqual(await client.send("Custom.dynamic", {"text": "live"}), {"ok": True})
+            with self.assertRaises(ValueError):
+                await client.send("Custom.dynamic", {"text": ""})
+            with self.assertRaisesRegex(Exception, "boolean"):
+                await client.send("Custom.dynamicBadResult", {"text": "live"})
+            with self.assertRaises(ValueError):
+                await client.Mod.addMiddleware(
+                    name="Custom.dynamic",
+                    phase="after",
+                    expression="async (payload, next) => next(payload)",
+                )
+
+            await client.on("Custom.dynamicReady", lambda _event: seen.put("ready"))
+            await client.Mod.evaluate(
+                expression="async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.dynamicReady', data: { id: '550e8400-e29b-41d4-a716-446655440000' }, cdpSessionId: null }))"
+            )
+
+        try:
+            asyncio.run(run())
+            self.assertEqual(seen.get(timeout=10), "ready")
+        finally:
+            client.close()
+
+    def test_assigned_type_registry_validates_updated_custom_command_event_and_middleware_schemas_through_real_service_worker(self) -> None:
+        client = ModCDPClient(
+            launcher={
+                "launcher_mode": "local",
+                "launcher_local_headless": True,
+                "launcher_local_executable_path": LOAD_EXTENSION_TEST_BROWSER_PATH,
+            },
+            upstream={"upstream_mode": "ws"},
+            injector={
+                "injector_mode": "cli",
+                "injector_cli_extension_path": str(EXTENSION_PATH),
+                "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
+                "injector_trust_service_worker_target": True,
+            },
+            router={"router_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_config={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
+        )
+        client.types = client.types.update(
+            custom_commands={
+                "Custom.updated": {
+                    "params_schema": {
+                        "type": "object",
+                        "properties": {"count": {"type": "integer", "minimum": 0}},
+                        "required": ["count"],
+                        "additionalProperties": False,
+                    },
+                    "result_schema": {
+                        "type": "object",
+                        "properties": {"done": {"type": "boolean"}},
+                        "required": ["done"],
+                        "additionalProperties": False,
+                    },
+                    "expression": "async ({ count }) => ({ done: count === 2 })",
+                },
+                "Custom.updatedBadResult": {
+                    "params_schema": {
+                        "type": "object",
+                        "properties": {"count": {"type": "number"}},
+                        "required": ["count"],
+                        "additionalProperties": False,
+                    },
+                    "result_schema": {
+                        "type": "object",
+                        "properties": {"done": {"type": "boolean"}},
+                        "required": ["done"],
+                        "additionalProperties": False,
+                    },
+                    "expression": "async () => ({ done: 'yes' })",
+                },
+            },
+            custom_events={
+                "Custom.updatedReady": {
+                    "event_schema": {
+                        "type": "object",
+                        "properties": {"ready": {"type": "boolean"}},
+                        "required": ["ready"],
+                        "additionalProperties": False,
+                    }
+                }
+            },
+            custom_middlewares=[
+                {
+                    "name": "Custom.updated",
+                    "phase": "request",
+                    "expression": "async (payload, next) => next({ ...payload, count: payload.count + 1 })",
+                }
+            ],
+        )
+        seen: Queue[bool] = Queue()
+
+        async def run() -> None:
+            client.connect()
+            self.assertEqual(await client.send("Custom.updated", {"count": 1}), {"done": True})
+            with self.assertRaises(ValueError):
+                await client.send("Custom.updated", {"count": -1})
+            with self.assertRaisesRegex(Exception, "boolean"):
+                await client.send("Custom.updatedBadResult", {"count": 1})
+
+            await client.on("Custom.updatedReady", lambda _event: seen.put(True))
+            await client.Mod.evaluate(
+                expression="async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.updatedReady', data: { ready: true }, cdpSessionId: null }))"
+            )
+
+        try:
+            asyncio.run(run())
+            self.assertEqual(seen.get(timeout=10), True)
         finally:
             client.close()
 
