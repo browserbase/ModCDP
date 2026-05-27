@@ -59,7 +59,7 @@ def _optional_string(params: ProtocolParams, name: str) -> str | None:
     return value
 
 
-def _object_or_empty(value: JsonValue | None) -> JsonObject:
+def _object_or_empty(value: object | None) -> JsonObject:
     return value if isinstance(value, dict) else {}
 
 
@@ -118,7 +118,7 @@ def wrap_command_if_needed(
     raise RuntimeError(f"Unsupported client route '{route}' for {method}")
 
 
-def _unwrap_evaluate_response(result: ProtocolResult) -> JsonValue:
+def _unwrap_evaluate_response(result: ProtocolResult) -> object:
     if result.get("exceptionDetails"):
         ex = _object_or_empty(result.get("exceptionDetails"))
         exception = _object_or_empty(ex.get("exception"))
@@ -136,7 +136,7 @@ def _unwrap_evaluate_response(result: ProtocolResult) -> JsonValue:
     return inner.get("value")
 
 
-def unwrap_response_if_needed(result: ProtocolResult, unwrap: str | None = None) -> JsonValue:
+def unwrap_response_if_needed(result: ProtocolResult, unwrap: str | None = None) -> object:
     if unwrap == "runtime_json":
         value = _unwrap_evaluate_response(result)
         return cast(JsonValue, json.loads(value)) if isinstance(value, str) else value

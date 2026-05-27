@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, ValidationError
 from pydantic_core import to_jsonable_python
 
 from ..types.generated import cdp as generated_cdp
@@ -34,8 +34,8 @@ JsonSchema: TypeAlias = dict[str, JsonValue]
 CustomCommandConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomEventConfig: TypeAlias = Mapping[str, ModCDPPayloadSchemaSpec | str | None]
 CustomMiddlewareConfig: TypeAlias = Mapping[str, object]
-CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | dict[str, CustomCommandConfig]
-CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | dict[str, CustomEventConfig]
+CustomCommandRegistrations: TypeAlias = Sequence[ModCDPAddCustomCommandParams] | dict[str, object]
+CustomEventRegistrations: TypeAlias = Sequence[ModCDPAddCustomEventParams] | dict[str, object]
 CustomMiddlewareRegistrations: TypeAlias = Sequence[ModCDPAddMiddlewareParams | CustomMiddlewareConfig]
 
 
@@ -55,6 +55,28 @@ class _ModCDPAddCustomEvent(BaseModel):
     event_schema: object = None
 
 
+class _CustomCommandConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expression: str | None = None
+    params_schema: object = None
+    result_schema: object = None
+
+
+class _CustomCommandConfigMap(RootModel[dict[str, _CustomCommandConfig]]):
+    pass
+
+
+class _CustomEventConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_schema: object = None
+
+
+class _CustomEventConfigMap(RootModel[dict[str, _CustomEventConfig]]):
+    pass
+
+
 class _ModCDPAddMiddleware(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -71,7 +93,7 @@ class _AdapterRegistration:
 
 @dataclass(frozen=True)
 class CommandPreparation:
-    params: ProtocolParams
+    params: Mapping[str, object]
     local_result: ProtocolResult | None = None
     custom_command_name: str | None = None
 
@@ -523,14 +545,14 @@ class CDPTypes:
             self.custom_commands[name] = command
         return name
 
-    def customCommandWireRegistration(self, name: str) -> ProtocolParams:
+    def customCommandWireRegistration(self, name: str) -> dict[str, object]:
         for registration in self.customCommandWireRegistrations():
             if registration["name"] == name:
                 return registration
         return {"name": name}
 
-    def customCommandWireRegistrations(self, expression_required: bool = False) -> list[ProtocolParams]:
-        registrations: list[ProtocolParams] = []
+    def customCommandWireRegistrations(self, expression_required: bool = False) -> list[dict[str, object]]:
+        registrations: list[dict[str, object]] = []
         with self._lock:
             commands = list(self.custom_commands.values())
         for command in commands:
@@ -538,7 +560,7 @@ class CDPTypes:
             if expression_required and not expression:
                 continue
             name = normalizeModCDPName(command["name"])
-            wire: dict[str, JsonValue] = {"name": name}
+            wire: dict[str, object] = {"name": name}
             if expression is not None:
                 wire["expression"] = expression
             params_schema = command.get("params_schema")
@@ -565,17 +587,17 @@ class CDPTypes:
             self.custom_events[name] = event
         return name
 
-    def customEventWireRegistration(self, name: str) -> ProtocolParams:
+    def customEventWireRegistration(self, name: str) -> dict[str, object]:
         event = self.custom_events.get(name)
         if event is None:
             return {"name": name}
-        wire: dict[str, JsonValue] = {"name": name}
+        wire: dict[str, object] = {"name": name}
         event_schema = event.get("event_schema")
         if isinstance(event_schema, dict):
             wire["event_schema"] = event_schema
         return wire
 
-    def customEventWireRegistrations(self) -> list[ProtocolParams]:
+    def customEventWireRegistrations(self) -> list[dict[str, object]]:
         return [self.customEventWireRegistration(name) for name in self.custom_events]
 
     def addCustomMiddleware(self, registration: ModCDPAddMiddlewareParams | CustomMiddlewareConfig) -> str:
@@ -617,17 +639,14 @@ def _custom_command_entries(
         return []
     if isinstance(custom_commands, dict):
         entries: list[ModCDPAddCustomCommandParams] = []
-        for name, command in custom_commands.items():
+        for name, command in _CustomCommandConfigMap.model_validate(custom_commands).root.items():
             entry: ModCDPAddCustomCommandParams = {"name": name}
-            expression = command.get("expression")
-            if expression is not None:
-                if not isinstance(expression, str):
-                    raise TypeError("expression must be a string")
-                entry["expression"] = expression
-            if "params_schema" in command:
-                entry["params_schema"] = command["params_schema"]
-            if "result_schema" in command:
-                entry["result_schema"] = command["result_schema"]
+            if command.expression is not None:
+                entry["expression"] = command.expression
+            if command.params_schema is not None:
+                entry["params_schema"] = command.params_schema
+            if command.result_schema is not None:
+                entry["result_schema"] = command.result_schema
             entries.append(entry)
         return entries
     return list(custom_commands)
@@ -640,10 +659,10 @@ def _custom_event_entries(
         return []
     if isinstance(custom_events, dict):
         entries: list[ModCDPAddCustomEventParams] = []
-        for name, event in custom_events.items():
+        for name, event in _CustomEventConfigMap.model_validate(custom_events).root.items():
             entry: ModCDPAddCustomEventObjectParams = {"name": name}
-            if "event_schema" in event:
-                entry["event_schema"] = event["event_schema"]
+            if event.event_schema is not None:
+                entry["event_schema"] = event.event_schema
             entries.append(entry)
         return entries
     return list(custom_events)

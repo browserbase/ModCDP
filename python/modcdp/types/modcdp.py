@@ -15,13 +15,13 @@ JsonValue: TypeAlias = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"
 JsonObject: TypeAlias = dict[str, JsonValue]
 ModCDPPayloadSchemaSpec: TypeAlias = object
 
-CdpCommandParams: TypeAlias = dict[str, JsonValue]
-CdpCommandResult: TypeAlias = dict[str, JsonValue]
-CdpEventParams: TypeAlias = dict[str, JsonValue]
+CdpCommandParams: TypeAlias = dict[str, object]
+CdpCommandResult: TypeAlias = dict[str, object]
+CdpEventParams: TypeAlias = dict[str, object]
 
-ProtocolParams: TypeAlias = Mapping[str, JsonValue]
-ProtocolResult: TypeAlias = dict[str, JsonValue]
-ProtocolPayload: TypeAlias = dict[str, JsonValue]
+ProtocolParams: TypeAlias = Mapping[str, object]
+ProtocolResult: TypeAlias = Mapping[str, object]
+ProtocolPayload: TypeAlias = Mapping[str, object]
 MessageParams: TypeAlias = Mapping[str, object]
 ModCDPRoutes: TypeAlias = dict[str, str]
 
@@ -248,7 +248,7 @@ class ModCDPAddMiddlewareResponse(TypedDict):
     registered: bool
 
 
-ModCDPConfigureResponse: TypeAlias = dict[str, JsonValue]
+ModCDPConfigureResponse: TypeAlias = Mapping[str, object]
 ModCDPPingResponse: TypeAlias = ModCDPOkResponse
 
 
@@ -258,7 +258,7 @@ class ModCDPBindingPayload(TypedDict, total=False):
     cdpSessionId: str | None
 
 
-RuntimeCallFunctionOnParams: TypeAlias = dict[str, JsonValue]
+RuntimeCallFunctionOnParams: TypeAlias = dict[str, object]
 
 
 class CdpDebuggeeCommandParams(TypedDict, total=False):
@@ -318,7 +318,7 @@ class ExtensionInfo(ExtensionProbe):
 
 class UnwrappedModCDPEvent(TypedDict):
     event: str
-    data: ProtocolPayload | JsonValue
+    data: ProtocolPayload | object
     sessionId: str | None
 
 

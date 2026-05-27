@@ -11,11 +11,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
-from ..types.modcdp import ModCDPRoutes
+from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult
 from ..types.toJSON import modCDPToJSON
 
 
-SendCDP = Callable[[str, Mapping[str, Any], str | None], dict[str, Any]]
+SendCDP = Callable[[str, ProtocolParams, str | None], ProtocolResult]
 targetAutoAttachParams = {"autoAttach": True, "waitForDebuggerOnStart": False, "flatten": True}
 browserLevelDomains = {"Browser", "Target", "SystemInfo"}
 DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000
@@ -78,7 +78,7 @@ class AutoSessionRouter:
             },
         )
 
-    def send(self, method: str, params: Mapping[str, Any] | None = None, requested_session_id: str | None = None) -> dict[str, Any]:
+    def send(self, method: str, params: ProtocolParams | None = None, requested_session_id: str | None = None) -> ProtocolResult:
         command_params = dict(params or {})
         domain = method.split(".", 1)[0]
         if requested_session_id is not None:

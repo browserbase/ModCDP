@@ -12,6 +12,7 @@ from websocket import create_connection
 
 from ..launcher.BrowserLauncher import resolveCdpWebSocketUrl
 from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportConfig
+from ..types.modcdp import ProtocolPayload, ProtocolResult
 
 
 class WSUpstreamTransport(UpstreamTransport):
@@ -47,11 +48,11 @@ class WSUpstreamTransport(UpstreamTransport):
     def send(
         self,
         command: dict[str, Any] | str,
-        params: dict[str, Any] | None = None,
+        params: ProtocolPayload | None = None,
         session_id: str | None = None,
         *,
         timeout_ms: int | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> ProtocolResult | None:
         if isinstance(command, str):
             if self.ws is None:
                 self.connect()
