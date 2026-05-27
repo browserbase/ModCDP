@@ -14,7 +14,7 @@ from modcdp.transport.WSUpstreamTransport import WSUpstreamTransport
 
 
 class WSUpstreamTransportTests(unittest.TestCase):
-    def test_constructor_update_and_server_config_match_ts_shape(self) -> None:
+    def test_ws_upstream_constructor_update_server_config_and_unconnected_errors_match_the_transport_surface(self) -> None:
         transport = WSUpstreamTransport()
         self.assertEqual(transport.url, "")
         self.assertIs(transport.update({"upstream_ws_cdp_url": "ws://127.0.0.1:1/devtools/browser/test"}), transport)
@@ -33,7 +33,7 @@ class WSUpstreamTransportTests(unittest.TestCase):
                 connected = value
         self.assertIs(connected, False)
 
-    def test_launches_real_browser_and_speaks_raw_cdp(self) -> None:
+    def test_ws_upstream_launches_a_real_browser_and_speaks_raw_cdp(self) -> None:
         chrome = LocalBrowserLauncher({"launcher_local_headless": True}).launch()
         transport = WSUpstreamTransport({"upstream_ws_cdp_url": chrome["cdp_url"]})
         received: Queue[dict] = Queue()
@@ -49,7 +49,7 @@ class WSUpstreamTransportTests(unittest.TestCase):
             transport.close()
             chrome["close"]()
 
-    def test_resolves_real_host_port_cdp_endpoint_to_browser_websocket(self) -> None:
+    def test_ws_upstream_resolves_a_bare_host_port_cdp_endpoint_to_the_browser_websocket(self) -> None:
         port = LocalBrowserLauncher.freePort()
         chrome = LocalBrowserLauncher({"launcher_local_cdp_listen_port": port, "launcher_local_headless": True}).launch()
         transport = WSUpstreamTransport({"upstream_ws_cdp_url": f"127.0.0.1:{port}"})
@@ -66,7 +66,7 @@ class WSUpstreamTransportTests(unittest.TestCase):
             transport.close()
             chrome["close"]()
 
-    def test_close_clears_connection_state(self) -> None:
+    def test_ws_upstream_close_clears_connection_state(self) -> None:
         chrome = LocalBrowserLauncher({"launcher_local_headless": True}).launch()
         transport = WSUpstreamTransport({"upstream_ws_cdp_url": chrome["cdp_url"]})
 

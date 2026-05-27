@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func TestCLIExtensionInjectorRejectsZipEntriesOutsideExtractionDir(t *testing.T) {
+func TestCLIExtensionInjectorRejectsZipEntriesOutsideExtractionDirectory(t *testing.T) {
 	tempDir := t.TempDir()
 	zipPath := filepath.Join(tempDir, "extension.zip")
 	file, err := os.Create(zipPath)

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestBrowserLauncherMergesLaunchConfigAndExposesUpstreamConfig(t *testing.T) {
+func TestBrowserLauncherMergesConfigAndExposesUpstreamConfig(t *testing.T) {
 	launcher := NewBrowserLauncher(LauncherConfig{
 		LauncherRemoteCDPURL:     "ws://127.0.0.1:9222/devtools/browser/initial",
 		LauncherLocalUserDataDir: "/tmp/modcdp-browser-launcher",

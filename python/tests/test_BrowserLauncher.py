@@ -12,7 +12,7 @@ from modcdp.launcher.BrowserLauncher import BrowserLauncher
 
 
 class BrowserLauncherTests(unittest.TestCase):
-    def test_merges_launch_config_and_exposes_upstream_config(self) -> None:
+    def test_merges_config_and_exposes_upstream_config(self) -> None:
         launcher = BrowserLauncher(
             {
                 "launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial",

@@ -17,7 +17,7 @@ from modcdp.launcher.LocalBrowserLauncher import LocalBrowserLauncher
 
 
 class LocalBrowserLauncherTests(unittest.TestCase):
-    def test_class_helpers_match_ts_surface(self) -> None:
+    def test_class_helpers_match_the_local_launcher_surface(self) -> None:
         self.assertIsInstance(LocalBrowserLauncher.findChromeBinary(), str)
         self.assertIsInstance(LocalBrowserLauncher.freePort(), int)
 
@@ -44,7 +44,7 @@ class LocalBrowserLauncherTests(unittest.TestCase):
 
             self.assertTrue(Path(user_data_dir).exists())
 
-    def test_launches_real_browser_over_remote_debugging_pipe(self) -> None:
+    def test_launches_a_real_browser_over_remote_debugging_pipe_and_speaks_cdp_over_the_returned_pipes(self) -> None:
         chrome = LocalBrowserLauncher(
             {
                 "launcher_local_headless": True,
@@ -64,7 +64,7 @@ class LocalBrowserLauncherTests(unittest.TestCase):
         finally:
             chrome["close"]()
 
-    def test_launches_pipe_browser_with_auxiliary_loopback_only_when_requested(self) -> None:
+    def test_launches_a_pipe_browser_with_an_auxiliary_loopback_cdp_endpoint_only_when_requested(self) -> None:
         chrome = LocalBrowserLauncher(
             {
                 "launcher_local_headless": True,

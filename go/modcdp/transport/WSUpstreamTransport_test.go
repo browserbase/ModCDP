@@ -15,7 +15,7 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/transport"
 )
 
-func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *testing.T) {
+func TestWSUpstreamTransportConstructorUpdateServerConfigAndUnconnectedErrorsMatchTheTransportSurface(t *testing.T) {
 	transport := NewWSUpstreamTransport(UpstreamTransportConfig{})
 	if transport.URL != "" {
 		t.Fatalf("URL = %q", transport.URL)
@@ -36,7 +36,7 @@ func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *test
 	}
 }
 
-func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
+func TestWSUpstreamTransportLaunchesARealBrowserAndSpeaksRawCDP(t *testing.T) {
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: boolPtr(true),
 	}).Launch(modcdp.LauncherConfig{})
@@ -63,7 +63,7 @@ func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
 	}
 }
 
-func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *testing.T) {
+func TestWSUpstreamTransportResolvesABareHostPortCDPEndpointToTheBrowserWebsocket(t *testing.T) {
 	chrome, err := modcdp.NewLocalBrowserLauncher(modcdp.LauncherConfig{
 		LauncherLocalHeadless: boolPtr(true),
 	}).Launch(modcdp.LauncherConfig{})

@@ -19,7 +19,7 @@ class TestTransport(UpstreamTransport):
 
 
 class UpstreamTransportTests(unittest.TestCase):
-    def test_shared_transport_config_and_recv_callbacks(self) -> None:
+    def test_owns_shared_transport_config_and_recv_callbacks(self) -> None:
         transport = UpstreamTransport()
         received = []
         stop = transport.onRecv(lambda message: received.append(message))

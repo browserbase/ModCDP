@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
 from ..transport.UpstreamTransport import UpstreamTransport
 from ..types.CDPTypes import CDPTypes
+from ..types.generated.cdp import PageDomain, RuntimeDomain, TargetDomain
 from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
@@ -80,56 +81,58 @@ class AutoSessionRouter:
     def _listen(self) -> list[Callable[[], None]]:
         return [
             self.upstream.on(
-                "Target.attachedToTarget",
+                TargetDomain.attachedToTarget,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Target.attachedToTarget", event, session_id
+                    TargetDomain.attachedToTarget.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Target.detachedFromTarget",
+                TargetDomain.detachedFromTarget,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Target.detachedFromTarget", event, session_id
+                    TargetDomain.detachedFromTarget.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Target.targetInfoChanged",
+                TargetDomain.targetInfoChanged,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Target.targetInfoChanged", event, session_id
+                    TargetDomain.targetInfoChanged.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Target.targetDestroyed",
+                TargetDomain.targetDestroyed,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Target.targetDestroyed", event, session_id
+                    TargetDomain.targetDestroyed.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Runtime.executionContextCreated",
+                RuntimeDomain.executionContextCreated,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Runtime.executionContextCreated", event, session_id
+                    RuntimeDomain.executionContextCreated.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Runtime.executionContextDestroyed",
+                RuntimeDomain.executionContextDestroyed,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Runtime.executionContextDestroyed", event, session_id
+                    RuntimeDomain.executionContextDestroyed.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Runtime.executionContextsCleared",
+                RuntimeDomain.executionContextsCleared,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Runtime.executionContextsCleared", event, session_id
+                    RuntimeDomain.executionContextsCleared.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Page.frameNavigated",
+                PageDomain.frameNavigated,
                 lambda event, _target_id, session_id: self._recordProtocolEvent(
-                    "Page.frameNavigated", event, session_id
+                    PageDomain.frameNavigated.cdp_event_name, event, session_id
                 ),
             ),
             self.upstream.on(
-                "Page.frameDetached",
-                lambda event, _target_id, session_id: self._recordProtocolEvent("Page.frameDetached", event, session_id),
+                PageDomain.frameDetached,
+                lambda event, _target_id, session_id: self._recordProtocolEvent(
+                    PageDomain.frameDetached.cdp_event_name, event, session_id
+                ),
             ),
         ]
 

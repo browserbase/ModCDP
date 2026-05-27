@@ -21,7 +21,7 @@ func (t *testUpstreamTransport) emit(message map[string]any) {
 	t.EmitRecv(message)
 }
 
-func TestUpstreamTransportSharedConfigAndRecvCallbacks(t *testing.T) {
+func TestUpstreamTransportOwnsSharedTransportConfigAndRecvCallbacks(t *testing.T) {
 	transport := NewUpstreamTransport(UpstreamTransportConfig{})
 	received := []map[string]any{}
 	stop := transport.OnRecv(func(message map[string]any) { received = append(received, message) })

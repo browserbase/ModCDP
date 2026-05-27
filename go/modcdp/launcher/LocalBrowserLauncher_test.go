@@ -104,7 +104,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndExplicitProf
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *testing.T) {
+func TestLocalBrowserLauncherLaunchesARealBrowserOverRemoteDebuggingPipeAndSpeaksCDPOverTheReturnedPipes(t *testing.T) {
 	headless := true
 	launcher := NewLocalBrowserLauncher(LauncherConfig{
 		LauncherLocalHeadless:             &headless,
@@ -154,7 +154,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *tes
 	}
 }
 
-func TestLocalBrowserLauncherLaunchesPipeBrowserWithAuxiliaryLoopbackOnlyWhenRequested(t *testing.T) {
+func TestLocalBrowserLauncherLaunchesAPipeBrowserWithAnAuxiliaryLoopbackCDPEndpointOnlyWhenRequested(t *testing.T) {
 	headless := true
 	loopbackCDP := true
 	chrome, err := NewLocalBrowserLauncher(LauncherConfig{
@@ -194,7 +194,7 @@ func TestLocalBrowserLauncherLaunchesPipeBrowserWithAuxiliaryLoopbackOnlyWhenReq
 	}
 }
 
-func TestLocalBrowserLauncherCleansExplicitUserDataDirWhenRequested(t *testing.T) {
+func TestLocalBrowserLauncherRemovesAnExplicitUserDataDirWhenCleanupUserDataDirIsSet(t *testing.T) {
 	headless := true
 	cleanupUserDataDir := true
 	profileDir, err := os.MkdirTemp("", "modcdp-go-local-profile-")
