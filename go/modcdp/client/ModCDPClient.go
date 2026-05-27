@@ -379,69 +379,69 @@ type upstreamTransportClient interface {
 	PeerGeneration() int64
 }
 
-func New(opts Config) *ModCDPClient {
-	if opts.Upstream.UpstreamMode == "" {
-		opts.Upstream.UpstreamMode = "ws"
+func New(config Config) *ModCDPClient {
+	if config.Upstream.UpstreamMode == "" {
+		config.Upstream.UpstreamMode = "ws"
 	}
-	if opts.Launcher.LauncherMode == "" {
-		opts.Launcher.LauncherMode = "none"
+	if config.Launcher.LauncherMode == "" {
+		config.Launcher.LauncherMode = "none"
 	}
-	if opts.Injector.InjectorMode == "" {
-		opts.Injector.InjectorMode = "none"
+	if config.Injector.InjectorMode == "" {
+		config.Injector.InjectorMode = "none"
 	}
-	if opts.Router.RouterRoutes == nil {
-		opts.Router.RouterRoutes = translate.DefaultClientRoutes()
+	if config.Router.RouterRoutes == nil {
+		config.Router.RouterRoutes = translate.DefaultClientRoutes()
 	} else {
 		merged := translate.DefaultClientRoutes()
-		for k, v := range opts.Router.RouterRoutes {
+		for k, v := range config.Router.RouterRoutes {
 			merged[k] = v
 		}
-		opts.Router.RouterRoutes = merged
+		config.Router.RouterRoutes = merged
 	}
-	if opts.ClientConfig.ClientHydrateAliases == nil {
+	if config.ClientConfig.ClientHydrateAliases == nil {
 		value := true
-		opts.ClientConfig.ClientHydrateAliases = &value
+		config.ClientConfig.ClientHydrateAliases = &value
 	}
-	if opts.ServerConfig != nil && opts.ServerConfig.disabled {
-		opts.ServerConfig = nil
-		opts.serverConfigConfigured = true
+	if config.ServerConfig != nil && config.ServerConfig.disabled {
+		config.ServerConfig = nil
+		config.serverConfigConfigured = true
 	}
-	if opts.ServerConfig == nil && !opts.serverConfigConfigured {
-		opts.ServerConfig = &ServerConfig{}
+	if config.ServerConfig == nil && !config.serverConfigConfigured {
+		config.ServerConfig = &ServerConfig{}
 	}
-	if opts.Injector.InjectorServiceWorkerURLSuffixes == nil {
-		opts.Injector.InjectorServiceWorkerURLSuffixes = append([]string{}, DefaultModCDPServiceWorkerURLSuffixes...)
+	if config.Injector.InjectorServiceWorkerURLSuffixes == nil {
+		config.Injector.InjectorServiceWorkerURLSuffixes = append([]string{}, DefaultModCDPServiceWorkerURLSuffixes...)
 	}
-	if opts.ClientConfig.ClientCDPSendTimeoutMS == 0 {
-		opts.ClientConfig.ClientCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
+	if config.ClientConfig.ClientCDPSendTimeoutMS == 0 {
+		config.ClientConfig.ClientCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
 	}
-	if opts.ClientConfig.ClientEventWaitTimeoutMS == 0 {
-		opts.ClientConfig.ClientEventWaitTimeoutMS = DefaultEventWaitTimeoutMS
+	if config.ClientConfig.ClientEventWaitTimeoutMS == 0 {
+		config.ClientConfig.ClientEventWaitTimeoutMS = DefaultEventWaitTimeoutMS
 	}
-	if opts.ClientConfig.ClientHeartbeatIntervalMS == 0 {
-		opts.ClientConfig.ClientHeartbeatIntervalMS = DefaultClientHeartbeatIntervalMS
+	if config.ClientConfig.ClientHeartbeatIntervalMS == 0 {
+		config.ClientConfig.ClientHeartbeatIntervalMS = DefaultClientHeartbeatIntervalMS
 	}
-	if opts.Injector.InjectorExecutionContextTimeoutMS == 0 {
-		opts.Injector.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
+	if config.Injector.InjectorExecutionContextTimeoutMS == 0 {
+		config.Injector.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
 	}
-	if opts.Injector.InjectorServiceWorkerProbeTimeoutMS == 0 {
-		opts.Injector.InjectorServiceWorkerProbeTimeoutMS = DefaultServiceWorkerProbeTimeoutMS
+	if config.Injector.InjectorServiceWorkerProbeTimeoutMS == 0 {
+		config.Injector.InjectorServiceWorkerProbeTimeoutMS = DefaultServiceWorkerProbeTimeoutMS
 	}
-	if opts.Injector.InjectorServiceWorkerReadyTimeoutMS == 0 {
-		opts.Injector.InjectorServiceWorkerReadyTimeoutMS = DefaultServiceWorkerReadyTimeoutMS
+	if config.Injector.InjectorServiceWorkerReadyTimeoutMS == 0 {
+		config.Injector.InjectorServiceWorkerReadyTimeoutMS = DefaultServiceWorkerReadyTimeoutMS
 	}
-	if opts.Injector.InjectorServiceWorkerPollIntervalMS == 0 {
-		opts.Injector.InjectorServiceWorkerPollIntervalMS = DefaultServiceWorkerPollIntervalMS
+	if config.Injector.InjectorServiceWorkerPollIntervalMS == 0 {
+		config.Injector.InjectorServiceWorkerPollIntervalMS = DefaultServiceWorkerPollIntervalMS
 	}
-	if opts.Injector.InjectorTargetSessionPollIntervalMS == 0 {
-		opts.Injector.InjectorTargetSessionPollIntervalMS = DefaultTargetSessionPollIntervalMS
+	if config.Injector.InjectorTargetSessionPollIntervalMS == 0 {
+		config.Injector.InjectorTargetSessionPollIntervalMS = DefaultTargetSessionPollIntervalMS
 	}
-	if opts.Upstream.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
-		opts.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = DefaultWSConnectErrorSettleTimeoutMS
+	if config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
+		config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = DefaultWSConnectErrorSettleTimeoutMS
 	}
 	client := &ModCDPClient{
-		Config:      opts,
-		Types:       NewCDPTypes(opts.CustomCommands, opts.CustomEvents, opts.CustomMiddlewares),
+		Config:      config,
+		Types:       NewCDPTypes(config.CustomCommands, config.CustomEvents, config.CustomMiddlewares),
 		handlers:    map[string][]handlerEntry{},
 		cdpHandlers: map[string][]func(CDPEvent){},
 	}
