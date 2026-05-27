@@ -39,6 +39,37 @@ class CDPTypesPayloadSchemaNormalizationTests(unittest.TestCase):
             {"value": "ok", "extra": True},
         )
 
+    def test_cdp_types_serializes_builtin_mod_command_schemas_through_the_same_wire_path(self) -> None:
+        types = CDPTypes()
+
+        for name in ["Mod.configure", "Mod.addCustomCommand", "Mod.addCustomEvent"]:
+            registration = next(command for command in types.customCommandWireRegistrations() if command["name"] == name)
+            self.assertIsInstance(registration.get("params_schema"), dict)
+            self.assertIsInstance(registration.get("result_schema"), dict)
+
+        parsed_configure_params = types.parseCommandParams(
+            "Mod.configure",
+            {
+                "client_config": {"client_hydrate_aliases": False},
+                "downstream": {
+                    "downstream_client_timeout_ms": 1234,
+                    "downstream_close_browser_on_disconnect": True,
+                },
+            },
+        )
+        self.assertEqual(parsed_configure_params["client_config"]["client_hydrate_aliases"], False)
+        self.assertEqual(parsed_configure_params["downstream"]["downstream_client_timeout_ms"], 1234)
+        self.assertEqual(parsed_configure_params["downstream"]["downstream_close_browser_on_disconnect"], True)
+        with self.assertRaisesRegex(ValueError, "closeBrowser"):
+            types.parseCommandParams(
+                "Mod.configure",
+                {
+                    "downstream": {
+                        "closeBrowser": "not allowed over the wire",
+                    },
+                },
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

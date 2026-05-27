@@ -29,6 +29,230 @@ type CDPTypes struct {
 	mu                   sync.RWMutex
 }
 
+var jsonSchemaObject = map[string]any{"type": "object"}
+
+var modAddCustomCommandParamsSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":          map[string]any{"type": "string"},
+		"expression":    map[string]any{"type": "string"},
+		"params_schema": jsonSchemaObject,
+		"result_schema": jsonSchemaObject,
+	},
+	"required":             []any{"name"},
+	"additionalProperties": false,
+}
+
+var modAddCustomEventParamsSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":         map[string]any{"type": "string"},
+		"event_schema": jsonSchemaObject,
+	},
+	"required":             []any{"name"},
+	"additionalProperties": false,
+}
+
+var modAddMiddlewareParamsSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":       map[string]any{"type": "string"},
+		"phase":      map[string]any{"enum": []any{"request", "response", "event"}},
+		"expression": map[string]any{"type": "string"},
+	},
+	"required":             []any{"phase", "expression"},
+	"additionalProperties": false,
+}
+
+var modCommandRegistrationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":          map[string]any{"type": "string"},
+		"expression":    map[string]any{"type": "string"},
+		"params_schema": jsonSchemaObject,
+		"result_schema": jsonSchemaObject,
+	},
+	"required":             []any{"name"},
+	"additionalProperties": false,
+}
+
+var modEventRegistrationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":         map[string]any{"type": "string"},
+		"event_schema": jsonSchemaObject,
+	},
+	"required":             []any{"name"},
+	"additionalProperties": false,
+}
+
+var modMiddlewareRegistrationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":       map[string]any{"type": "string"},
+		"phase":      map[string]any{"enum": []any{"request", "response", "event"}},
+		"expression": map[string]any{"type": "string"},
+	},
+	"required":             []any{"phase", "expression"},
+	"additionalProperties": false,
+}
+
+var modConfigureParamsSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"upstream": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"upstream_mode":                               map[string]any{"enum": []any{"ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"}},
+				"upstream_ws_cdp_url":                         map[string]any{"type": "string"},
+				"upstream_nats_url":                           map[string]any{"type": "string"},
+				"upstream_nats_subject_prefix":                map[string]any{"type": "string"},
+				"upstream_nats_role":                          map[string]any{"enum": []any{"client", "browser"}},
+				"upstream_nats_wait_timeout_ms":               map[string]any{"type": "number"},
+				"upstream_reversews_bind":                     map[string]any{"type": "string"},
+				"upstream_reversews_wait_timeout_ms":          map[string]any{"type": "number"},
+				"upstream_nativemessaging_host_name":          map[string]any{"type": "string"},
+				"upstream_ws_connect_error_settle_timeout_ms": map[string]any{"type": "number"},
+				"upstream_cdp_send_timeout_ms":                map[string]any{"type": "number"},
+			},
+			"additionalProperties": false,
+		},
+		"router": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"router_routes":                         map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}},
+				"loopback_execution_context_timeout_ms": map[string]any{"type": "number"},
+			},
+			"additionalProperties": false,
+		},
+		"client_config": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"client_hydrate_aliases":        map[string]any{"type": "boolean"},
+				"client_mirror_upstream_events": map[string]any{"type": "boolean"},
+				"client_cdp_send_timeout_ms":    map[string]any{"type": "number"},
+				"client_event_wait_timeout_ms":  map[string]any{"type": "number"},
+				"client_heartbeat_interval_ms":  map[string]any{"type": "number"},
+			},
+			"additionalProperties": false,
+		},
+		"downstream": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"downstream_client_timeout_ms":           map[string]any{"type": "number"},
+				"downstream_close_browser_on_disconnect": map[string]any{"type": "boolean"},
+			},
+			"additionalProperties": false,
+		},
+		"server_browser_token": map[string]any{"type": "string"},
+		"custom_commands":      map[string]any{"type": "array", "items": modCommandRegistrationSchema},
+		"custom_events":        map[string]any{"type": "array", "items": modEventRegistrationSchema},
+		"custom_middlewares":   map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
+	},
+	"additionalProperties": false,
+}
+
+var modTopologyParamsSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"rootTargetId": map[string]any{"type": "string"},
+		"targetId":     map[string]any{"type": "string"},
+		"active":       map[string]any{"type": "boolean"},
+	},
+	"additionalProperties": false,
+}
+
+var defaultBuiltinCommands = []CustomCommand{
+	{
+		Name:         "Mod.ping",
+		ParamsSchema: map[string]any{"type": "object", "properties": map[string]any{"sent_at": map[string]any{"type": "number"}}, "additionalProperties": false},
+		ResultSchema: map[string]any{"type": "object", "properties": map[string]any{"ok": map[string]any{"type": "boolean"}}, "required": []any{"ok"}, "additionalProperties": false},
+		Expression: `
+      async (params) => {
+        const received_at = Date.now();
+        const message = {
+          method: "Mod.pong",
+          params: {
+            sent_at:
+              typeof params.sent_at === "number"
+                ? params.sent_at
+                : received_at,
+            received_at,
+            from: "extension-service-worker",
+          },
+        };
+        if (cdpSessionId) message.sessionId = cdpSessionId;
+        downstream.sendEvent(message);
+        return { ok: true };
+      }
+      `,
+	},
+	{
+		Name:         "Mod.configure",
+		ParamsSchema: modConfigureParamsSchema,
+		ResultSchema: jsonSchemaObject,
+		Expression:   "async (params) => { await ModCDP.configure(params); return params; }",
+	},
+	{
+		Name: "Mod.evaluate",
+		ParamsSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"expression":   map[string]any{"type": "string"},
+				"params":       jsonSchemaObject,
+				"cdpSessionId": map[string]any{"type": "string"},
+			},
+			"required":             []any{"expression"},
+			"additionalProperties": false,
+		},
+		ResultSchema: map[string]any{},
+		Expression: `
+      async ({ expression, params = {}, cdpSessionId = null }) =>
+        ModCDP.evaluateInServiceWorker({ expression, params, cdpSessionId })
+      `,
+	},
+	{
+		Name:         "Mod.getTopology",
+		ParamsSchema: modTopologyParamsSchema,
+		ResultSchema: jsonSchemaObject,
+		Expression:   "async (params) => ModCDP.client.router.getTopology(params)",
+	},
+	{
+		Name:         "Mod.addCustomCommand",
+		ParamsSchema: modAddCustomCommandParamsSchema,
+		ResultSchema: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "registered": map[string]any{"type": "boolean"}}, "required": []any{"name", "registered"}, "additionalProperties": false},
+		Expression:   "async (params) => ModCDP.addCustomCommand(params)",
+	},
+	{
+		Name:         "Mod.addCustomEvent",
+		ParamsSchema: modAddCustomEventParamsSchema,
+		ResultSchema: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "registered": map[string]any{"type": "boolean"}}, "required": []any{"name", "registered"}, "additionalProperties": false},
+		Expression:   "async (params) => ModCDP.addCustomEvent(params)",
+	},
+	{
+		Name:         "Mod.addMiddleware",
+		ParamsSchema: modAddMiddlewareParamsSchema,
+		ResultSchema: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "phase": map[string]any{"enum": []any{"request", "response", "event"}}, "registered": map[string]any{"type": "boolean"}}, "required": []any{"name", "phase", "registered"}, "additionalProperties": false},
+		Expression:   "async (params) => ModCDP.addMiddleware(params)",
+	},
+}
+
+var defaultBuiltinEvents = []CustomEvent{
+	{
+		Name: "Mod.pong",
+		EventSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"sent_at":     map[string]any{"type": "number"},
+				"received_at": map[string]any{"type": "number"},
+				"from":        map[string]any{"type": "string"},
+			},
+			"required":             []any{"sent_at", "received_at", "from"},
+			"additionalProperties": false,
+		},
+	},
+}
+
 func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, customMiddlewares []CustomMiddleware) *CDPTypes {
 	types := &CDPTypes{
 		CustomCommands:       map[string]CustomCommand{},
@@ -39,18 +263,12 @@ func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, cus
 		eventSchemas:         map[string]map[string]any{},
 	}
 	types.hydrateNativeProtocolSchemas()
-	for _, command := range []CustomCommand{
-		{Name: "Mod.ping"},
-		{Name: "Mod.configure"},
-		{Name: "Mod.evaluate"},
-		{Name: "Mod.getTopology"},
-		{Name: "Mod.addCustomCommand"},
-		{Name: "Mod.addCustomEvent"},
-		{Name: "Mod.addMiddleware"},
-	} {
+	for _, command := range defaultBuiltinCommands {
 		_, _, _ = types.AddCustomCommand(command)
 	}
-	_, _ = types.AddCustomEvent(CustomEvent{Name: "Mod.pong"})
+	for _, event := range defaultBuiltinEvents {
+		_, _ = types.AddCustomEvent(event)
+	}
 	for _, command := range customCommands {
 		_, _, _ = types.AddCustomCommand(command)
 	}

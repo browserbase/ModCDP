@@ -36,6 +36,20 @@ class BrowserLauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(NotImplementedError, "BrowserLauncher.launch is not implemented"):
             launcher.launch()
 
+    def test_carries_remote_cdp_config_separately_from_launch_args(self) -> None:
+        launcher = BrowserLauncher(
+            {
+                "launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial",
+            }
+        )
+        launcher.update(
+            {
+                "launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
+            }
+        )
+
+        self.assertEqual(launcher.config.launcher_remote_cdp_url, "ws://127.0.0.1:9222/devtools/browser/updated")
+
 
 if __name__ == "__main__":
     unittest.main()

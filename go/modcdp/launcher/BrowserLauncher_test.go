@@ -28,3 +28,16 @@ func TestBrowserLauncherMergesLaunchConfigAndExposesUpstreamConfig(t *testing.T)
 		t.Fatalf("Launch error = %v", err)
 	}
 }
+
+func TestBrowserLauncherCarriesRemoteCDPConfigSeparatelyFromLaunchArgs(t *testing.T) {
+	launcher := NewBrowserLauncher(LauncherConfig{
+		LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/initial",
+	})
+	launcher.Update(LauncherConfig{
+		LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/updated",
+	})
+
+	if launcher.Config.LauncherRemoteCDPURL != "ws://127.0.0.1:9222/devtools/browser/updated" {
+		t.Fatalf("LauncherRemoteCDPURL = %q", launcher.Config.LauncherRemoteCDPURL)
+	}
+}

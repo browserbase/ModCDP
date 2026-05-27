@@ -69,6 +69,222 @@ class CommandPreparation:
     custom_command_name: str | None = None
 
 
+JSON_SCHEMA_OBJECT: JsonSchema = {"type": "object"}
+JSON_SCHEMA_ANY: JsonSchema = {}
+MOD_ADD_CUSTOM_COMMAND_PARAMS_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "expression": {"type": "string"},
+        "params_schema": JSON_SCHEMA_OBJECT,
+        "result_schema": JSON_SCHEMA_OBJECT,
+    },
+    "required": ["name"],
+    "additionalProperties": False,
+}
+MOD_ADD_CUSTOM_EVENT_PARAMS_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "event_schema": JSON_SCHEMA_OBJECT,
+    },
+    "required": ["name"],
+    "additionalProperties": False,
+}
+MOD_ADD_MIDDLEWARE_PARAMS_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "phase": {"enum": ["request", "response", "event"]},
+        "expression": {"type": "string"},
+    },
+    "required": ["phase", "expression"],
+    "additionalProperties": False,
+}
+MOD_COMMAND_REGISTRATION_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "expression": {"type": "string"},
+        "params_schema": JSON_SCHEMA_OBJECT,
+        "result_schema": JSON_SCHEMA_OBJECT,
+    },
+    "required": ["name"],
+    "additionalProperties": False,
+}
+MOD_EVENT_REGISTRATION_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "event_schema": JSON_SCHEMA_OBJECT,
+    },
+    "required": ["name"],
+    "additionalProperties": False,
+}
+MOD_MIDDLEWARE_REGISTRATION_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "phase": {"enum": ["request", "response", "event"]},
+        "expression": {"type": "string"},
+    },
+    "required": ["phase", "expression"],
+    "additionalProperties": False,
+}
+MOD_CONFIGURE_PARAMS_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "upstream": {
+            "type": "object",
+            "properties": {
+                "upstream_mode": {"enum": ["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]},
+                "upstream_ws_cdp_url": {"type": "string"},
+                "upstream_nats_url": {"type": "string"},
+                "upstream_nats_subject_prefix": {"type": "string"},
+                "upstream_nats_role": {"enum": ["client", "browser"]},
+                "upstream_nats_wait_timeout_ms": {"type": "number"},
+                "upstream_reversews_bind": {"type": "string"},
+                "upstream_reversews_wait_timeout_ms": {"type": "number"},
+                "upstream_nativemessaging_host_name": {"type": "string"},
+                "upstream_ws_connect_error_settle_timeout_ms": {"type": "number"},
+                "upstream_cdp_send_timeout_ms": {"type": "number"},
+            },
+            "additionalProperties": False,
+        },
+        "router": {
+            "type": "object",
+            "properties": {
+                "router_routes": {"type": "object", "additionalProperties": {"type": "string"}},
+                "loopback_execution_context_timeout_ms": {"type": "number"},
+            },
+            "additionalProperties": False,
+        },
+        "client_config": {
+            "type": "object",
+            "properties": {
+                "client_hydrate_aliases": {"type": "boolean"},
+                "client_mirror_upstream_events": {"type": "boolean"},
+                "client_cdp_send_timeout_ms": {"type": "number"},
+                "client_event_wait_timeout_ms": {"type": "number"},
+                "client_heartbeat_interval_ms": {"type": "number"},
+            },
+            "additionalProperties": False,
+        },
+        "downstream": {
+            "type": "object",
+            "properties": {
+                "downstream_client_timeout_ms": {"type": "number"},
+                "downstream_close_browser_on_disconnect": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "server_browser_token": {"type": "string"},
+        "custom_commands": {"type": "array", "items": MOD_COMMAND_REGISTRATION_SCHEMA},
+        "custom_events": {"type": "array", "items": MOD_EVENT_REGISTRATION_SCHEMA},
+        "custom_middlewares": {"type": "array", "items": MOD_MIDDLEWARE_REGISTRATION_SCHEMA},
+    },
+    "additionalProperties": False,
+}
+MOD_TOPOLOGY_PARAMS_SCHEMA: JsonSchema = {
+    "type": "object",
+    "properties": {
+        "rootTargetId": {"type": "string"},
+        "targetId": {"type": "string"},
+        "active": {"type": "boolean"},
+    },
+    "additionalProperties": False,
+}
+DEFAULT_BUILTIN_COMMANDS: tuple[ModCDPAddCustomCommandParams, ...] = (
+    {
+        "name": "Mod.ping",
+        "params_schema": {"type": "object", "properties": {"sent_at": {"type": "number"}}, "additionalProperties": False},
+        "result_schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"], "additionalProperties": False},
+        "expression": """
+      async (params) => {
+        const received_at = Date.now();
+        const message = {
+          method: "Mod.pong",
+          params: {
+            sent_at:
+              typeof params.sent_at === "number"
+                ? params.sent_at
+                : received_at,
+            received_at,
+            from: "extension-service-worker",
+          },
+        };
+        if (cdpSessionId) message.sessionId = cdpSessionId;
+        downstream.sendEvent(message);
+        return { ok: true };
+      }
+      """,
+    },
+    {
+        "name": "Mod.configure",
+        "params_schema": MOD_CONFIGURE_PARAMS_SCHEMA,
+        "result_schema": JSON_SCHEMA_OBJECT,
+        "expression": "async (params) => { await ModCDP.configure(params); return params; }",
+    },
+    {
+        "name": "Mod.evaluate",
+        "params_schema": {
+            "type": "object",
+            "properties": {
+                "expression": {"type": "string"},
+                "params": JSON_SCHEMA_OBJECT,
+                "cdpSessionId": {"type": "string"},
+            },
+            "required": ["expression"],
+            "additionalProperties": False,
+        },
+        "result_schema": JSON_SCHEMA_ANY,
+        "expression": """
+      async ({ expression, params = {}, cdpSessionId = null }) =>
+        ModCDP.evaluateInServiceWorker({ expression, params, cdpSessionId })
+      """,
+    },
+    {
+        "name": "Mod.getTopology",
+        "params_schema": MOD_TOPOLOGY_PARAMS_SCHEMA,
+        "result_schema": JSON_SCHEMA_OBJECT,
+        "expression": "async (params) => ModCDP.client.router.getTopology(params)",
+    },
+    {
+        "name": "Mod.addCustomCommand",
+        "params_schema": MOD_ADD_CUSTOM_COMMAND_PARAMS_SCHEMA,
+        "result_schema": {"type": "object", "properties": {"name": {"type": "string"}, "registered": {"type": "boolean"}}, "required": ["name", "registered"], "additionalProperties": False},
+        "expression": "async (params) => ModCDP.addCustomCommand(params)",
+    },
+    {
+        "name": "Mod.addCustomEvent",
+        "params_schema": MOD_ADD_CUSTOM_EVENT_PARAMS_SCHEMA,
+        "result_schema": {"type": "object", "properties": {"name": {"type": "string"}, "registered": {"type": "boolean"}}, "required": ["name", "registered"], "additionalProperties": False},
+        "expression": "async (params) => ModCDP.addCustomEvent(params)",
+    },
+    {
+        "name": "Mod.addMiddleware",
+        "params_schema": MOD_ADD_MIDDLEWARE_PARAMS_SCHEMA,
+        "result_schema": {"type": "object", "properties": {"name": {"type": "string"}, "phase": {"enum": ["request", "response", "event"]}, "registered": {"type": "boolean"}}, "required": ["name", "phase", "registered"], "additionalProperties": False},
+        "expression": "async (params) => ModCDP.addMiddleware(params)",
+    },
+)
+DEFAULT_BUILTIN_EVENTS: tuple[ModCDPAddCustomEventObjectParams, ...] = (
+    {
+        "name": "Mod.pong",
+        "event_schema": {
+            "type": "object",
+            "properties": {
+                "sent_at": {"type": "number"},
+                "received_at": {"type": "number"},
+                "from": {"type": "string"},
+            },
+            "required": ["sent_at", "received_at", "from"],
+            "additionalProperties": False,
+        },
+    },
+)
+
+
 def normalizeModCDPName(value: str) -> str:
     name = value.strip()
     if not name or name.count(".") != 1:
@@ -116,14 +332,10 @@ class CDPTypes:
         self.event_classes: dict[str, type[CDPEvent]] = {}
         self._lock = threading.RLock()
         self.hydrateNativeProtocolSchemas()
-        self.addCustomCommand({"name": "Mod.ping"})
-        self.addCustomCommand({"name": "Mod.configure"})
-        self.addCustomCommand({"name": "Mod.evaluate"})
-        self.addCustomCommand({"name": "Mod.getTopology"})
-        self.addCustomCommand({"name": "Mod.addCustomCommand"})
-        self.addCustomCommand({"name": "Mod.addCustomEvent"})
-        self.addCustomCommand({"name": "Mod.addMiddleware"})
-        self.addCustomEvent({"name": "Mod.pong"})
+        for command in DEFAULT_BUILTIN_COMMANDS:
+            self.addCustomCommand(command)
+        for event in DEFAULT_BUILTIN_EVENTS:
+            self.addCustomEvent(event)
         for command in custom_commands or []:
             self.addCustomCommand(command)
         for event in custom_events or []:
