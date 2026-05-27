@@ -1,14 +1,38 @@
+import {
+  browser_launcher_constructors,
+  extension_injector_constructors,
+  upstream_transport_constructors,
+} from "./client/ModCDPClient.js";
+import { BBBrowserLauncher } from "./launcher/BBBrowserLauncher.js";
+import { LocalBrowserLauncher } from "./launcher/LocalBrowserLauncher.js";
+import { RemoteBrowserLauncher } from "./launcher/RemoteBrowserLauncher.js";
+import { BBExtensionInjector } from "./injector/BBExtensionInjector.js";
+import { BorrowExtensionInjector } from "./injector/BorrowExtensionInjector.js";
+import { CDPExtensionInjector } from "./injector/CDPExtensionInjector.js";
+import { CLIExtensionInjector } from "./injector/CLIExtensionInjector.js";
+import { DiscoverExtensionInjector } from "./injector/DiscoverExtensionInjector.js";
+import { NATSUpstreamTransport } from "./transport/NATSUpstreamTransport.js";
+import { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUpstreamTransport.js";
+import { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
+import { ReverseWSUpstreamTransport } from "./transport/ReverseWSUpstreamTransport.js";
+
+browser_launcher_constructors.set("local", LocalBrowserLauncher);
+browser_launcher_constructors.set("remote", RemoteBrowserLauncher);
+browser_launcher_constructors.set("bb", BBBrowserLauncher);
+extension_injector_constructors.set("cli", CLIExtensionInjector);
+extension_injector_constructors.set("cdp", CDPExtensionInjector);
+extension_injector_constructors.set("bb", BBExtensionInjector);
+extension_injector_constructors.set("discover", DiscoverExtensionInjector);
+extension_injector_constructors.set("borrow", BorrowExtensionInjector);
+upstream_transport_constructors.set("pipe", PipeUpstreamTransport);
+upstream_transport_constructors.set("reversews", ReverseWSUpstreamTransport);
+upstream_transport_constructors.set("nativemessaging", NativeMessagingUpstreamTransport);
+upstream_transport_constructors.set("nats", NATSUpstreamTransport);
+
 export * from "./client/ModCDPClient.js";
 export { ModCDPServer } from "./server/ModCDPServer.js";
-export {
-  BrowserLauncher,
-  resolveCdpWebSocketUrl,
-} from "./launcher/BrowserLauncher.js";
-export type {
-  LauncherOptions,
-  LaunchedBrowser,
-  LauncherMode,
-} from "./launcher/BrowserLauncher.js";
+export { BrowserLauncher, resolveCdpWebSocketUrl } from "./launcher/BrowserLauncher.js";
+export type { LauncherOptions, LaunchedBrowser, LauncherMode } from "./launcher/BrowserLauncher.js";
 export { LocalBrowserLauncher } from "./launcher/LocalBrowserLauncher.js";
 export { RemoteBrowserLauncher } from "./launcher/RemoteBrowserLauncher.js";
 export { BBBrowserLauncher } from "./launcher/BBBrowserLauncher.js";
@@ -17,8 +41,13 @@ export {
   DEFAULT_MODCDP_EXTENSION_ID,
   DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES,
   ExtensionInjector,
-  defaultModCDPExtensionPath,
 } from "./injector/ExtensionInjector.js";
+export {
+  defaultModCDPExtensionPath,
+  extensionIdFromManifestKey,
+  prepareUnpackedExtension,
+} from "./injector/NodeExtensionFiles.js";
+export type { PreparedExtension } from "./injector/NodeExtensionFiles.js";
 export type {
   ExtensionInjectionResult,
   InjectorOptions,
@@ -31,25 +60,16 @@ export { CDPExtensionInjector } from "./injector/CDPExtensionInjector.js";
 export { DiscoverExtensionInjector } from "./injector/DiscoverExtensionInjector.js";
 export { BorrowExtensionInjector } from "./injector/BorrowExtensionInjector.js";
 export { BBExtensionInjector } from "./injector/BBExtensionInjector.js";
-export {
-  UpstreamTransport,
-  parseHostPort,
-} from "./transport/UpstreamTransport.js";
-export type {
-  UpstreamMode,
-  UpstreamOptions,
-} from "./transport/UpstreamTransport.js";
+export { UpstreamTransport, parseHostPort } from "./transport/UpstreamTransport.js";
+export type { UpstreamMode, UpstreamTransportOptions } from "./transport/UpstreamTransport.js";
 export { DownstreamTransport } from "./transport/DownstreamTransport.js";
-export { DownstreamTransportCollection } from "./transport/DownstreamTransportCollection.js";
+export { DownstreamTransportSet } from "./transport/DownstreamTransportSet.js";
 export type {
   DownstreamRequestHandler,
   DownstreamTransportName,
   DownstreamTransportStatus,
 } from "./transport/DownstreamTransport.js";
-export type {
-  TargetRoute,
-  UpstreamEventListener,
-} from "./transport/UpstreamTransport.js";
+export type { TargetRoute, UpstreamEventListener } from "./transport/UpstreamTransport.js";
 export { WSUpstreamTransport } from "./transport/WSUpstreamTransport.js";
 export { ReverseWSUpstreamTransport } from "./transport/ReverseWSUpstreamTransport.js";
 export { NativeMessagingUpstreamTransport } from "./transport/NativeMessagingUpstreamTransport.js";
@@ -57,7 +77,7 @@ export { NATSUpstreamTransport } from "./transport/NATSUpstreamTransport.js";
 export { PipeUpstreamTransport } from "./transport/PipeUpstreamTransport.js";
 export { ChromeDebuggerUpstreamTransport } from "./transport/ChromeDebuggerUpstreamTransport.js";
 export { ReverseWSDownstreamTransport } from "./transport/ReverseWSDownstreamTransport.js";
-export { NativeHostDownstreamTransport } from "./transport/NativeHostDownstreamTransport.js";
+export { NativeMessagingDownstreamTransport } from "./transport/NativeMessagingDownstreamTransport.js";
 export { NATSDownstreamTransport } from "./transport/NATSDownstreamTransport.js";
 export { AutoSessionRouter } from "./router/AutoSessionRouter.js";
 export { CDPTypes } from "./types/CDPTypes.js";
@@ -69,11 +89,7 @@ export type {
   CDPEventSpec,
   CDPTypesOptions,
 } from "./types/CDPTypes.js";
-export {
-  wrapCommandIfNeeded,
-  unwrapResponseIfNeeded,
-  unwrapEventIfNeeded,
-} from "./translate/translate.js";
+export { wrapCommandIfNeeded, unwrapResponseIfNeeded, unwrapEventIfNeeded } from "./translate/translate.js";
 export * as server from "./server/ModCDPServer.js";
 export * as launcher from "./launcher/BrowserLauncher.js";
 export * as localBrowserLauncher from "./launcher/LocalBrowserLauncher.js";
@@ -88,7 +104,7 @@ export * as borrowExtensionInjector from "./injector/BorrowExtensionInjector.js"
 export * as bbExtensionInjector from "./injector/BBExtensionInjector.js";
 export * as upstreamTransport from "./transport/UpstreamTransport.js";
 export * as downstreamTransport from "./transport/DownstreamTransport.js";
-export * as downstreamTransportCollection from "./transport/DownstreamTransportCollection.js";
+export * as downstreamTransportSet from "./transport/DownstreamTransportSet.js";
 export * as wsUpstreamTransport from "./transport/WSUpstreamTransport.js";
 export * as reverseWSUpstreamTransport from "./transport/ReverseWSUpstreamTransport.js";
 export * as nativeMessagingUpstreamTransport from "./transport/NativeMessagingUpstreamTransport.js";
@@ -96,7 +112,7 @@ export * as natsUpstreamTransport from "./transport/NATSUpstreamTransport.js";
 export * as pipeUpstreamTransport from "./transport/PipeUpstreamTransport.js";
 export * as chromeDebuggerUpstreamTransport from "./transport/ChromeDebuggerUpstreamTransport.js";
 export * as reverseWSDownstreamTransport from "./transport/ReverseWSDownstreamTransport.js";
-export * as nativeHostDownstreamTransport from "./transport/NativeHostDownstreamTransport.js";
+export * as nativeMessagingDownstreamTransport from "./transport/NativeMessagingDownstreamTransport.js";
 export * as natsDownstreamTransport from "./transport/NATSDownstreamTransport.js";
 export * as router from "./router/AutoSessionRouter.js";
 export * as translate from "./translate/translate.js";

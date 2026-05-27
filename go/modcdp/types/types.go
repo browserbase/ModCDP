@@ -1,5 +1,7 @@
 package types
 
+import "os"
+
 type LaunchOptions struct {
 	LauncherMode                           string         `json:"launcher_mode,omitempty"`
 	LauncherLocalExecutablePath            string         `json:"launcher_local_executable_path,omitempty"`
@@ -26,6 +28,22 @@ type LaunchOptions struct {
 	LauncherBBBrowserSettings              map[string]any `json:"launcher_bb_browser_settings,omitempty"`
 	LauncherBBUserMetadata                 map[string]any `json:"launcher_bb_user_metadata,omitempty"`
 	LauncherBBSessionCreateParams          map[string]any `json:"launcher_bb_session_create_params,omitempty"`
+}
+
+type UpstreamTransportOptions struct {
+	UpstreamMode                          string   `json:"upstream_mode,omitempty"`
+	UpstreamWSCDPURL                      string   `json:"upstream_ws_cdp_url,omitempty"`
+	UpstreamPipeRead                      *os.File `json:"-"`
+	UpstreamPipeWrite                     *os.File `json:"-"`
+	UpstreamNATSURL                       string   `json:"upstream_nats_url,omitempty"`
+	UpstreamNATSSubjectPrefix             string   `json:"upstream_nats_subject_prefix,omitempty"`
+	UpstreamNATSRole                      string   `json:"upstream_nats_role,omitempty"`
+	UpstreamNATSWaitTimeoutMS             int      `json:"upstream_nats_wait_timeout_ms,omitempty"`
+	UpstreamReverseWSBind                 string   `json:"upstream_reversews_bind,omitempty"`
+	UpstreamReverseWSWaitTimeoutMS        int      `json:"upstream_reversews_wait_timeout_ms,omitempty"`
+	UpstreamNativeMessagingHostName       string   `json:"upstream_nativemessaging_host_name,omitempty"`
+	UpstreamWSConnectErrorSettleTimeoutMS int      `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
+	UpstreamCDPSendTimeoutMS              int      `json:"upstream_cdp_send_timeout_ms,omitempty"`
 }
 
 type SendCDP func(method string, params map[string]any, sessionID string) (map[string]any, error)

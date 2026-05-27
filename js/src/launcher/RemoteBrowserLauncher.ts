@@ -5,7 +5,7 @@ import {
   type LaunchedBrowser,
 } from "./BrowserLauncher.js";
 
-export class RemoteBrowserLauncher extends BrowserLauncher {
+class RemoteBrowserLauncher extends BrowserLauncher {
   constructor(options: LauncherOptions = {}) {
     super(options);
     this.launcher_mode = "remote";
@@ -20,3 +20,5 @@ export class RemoteBrowserLauncher extends BrowserLauncher {
     return this.launched;
   }
 }
+
+export { RemoteBrowserLauncher };

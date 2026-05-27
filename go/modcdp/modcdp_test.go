@@ -24,23 +24,26 @@ func TestRootExportsConcreteLaunchersInjectorsAndTransports(t *testing.T) {
 	borrowedInjector := NewBorrowExtensionInjector(InjectorOptions{})
 	_ = []any{extensionInjector, discoveredInjector, bbInjector, localLaunchInjector, loadUnpackedInjector, borrowedInjector}
 
-	if NewWSUpstreamTransport(WSUpstreamTransportOptions{}) == nil {
+	if NewUpstreamTransport(UpstreamTransportOptions{}).Options.UpstreamMode != "" {
+		t.Fatal("NewUpstreamTransport returned non-empty mode")
+	}
+	if NewWSUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewWSUpstreamTransport returned nil")
 	}
-	if NewPipeUpstreamTransport(PipeUpstreamTransportOptions{}) == nil {
+	if NewPipeUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewPipeUpstreamTransport returned nil")
 	}
-	if NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{}) == nil {
+	if NewReverseWSUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewReverseWSUpstreamTransport returned nil")
 	}
-	if NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{}) == nil {
+	if NewNativeMessagingUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewNativeMessagingUpstreamTransport returned nil")
 	}
-	if NewNATSUpstreamTransport(NATSUpstreamTransportOptions{}) == nil {
+	if NewNATSUpstreamTransport(UpstreamTransportOptions{}) == nil {
 		t.Fatal("NewNATSUpstreamTransport returned nil")
 	}
 
-	if UpstreamModeWS != "ws" || UpstreamModePipe != "pipe" || UpstreamModeNativeMessaging != "nativemessaging" || UpstreamModeReverseWS != "reversews" || UpstreamModeNATS != "nats" {
+	if UpstreamModeWS != "ws" || UpstreamModePipe != "pipe" || UpstreamModeNativeMessaging != "nativemessaging" || UpstreamModeReverseWS != "reversews" || UpstreamModeNATS != "nats" || UpstreamModeChromeDebugger != "chromedebugger" {
 		t.Fatal("upstream mode constants drifted")
 	}
 }

@@ -34,7 +34,7 @@ class TranslateTests(unittest.TestCase):
 
         configured = wrap_command_if_needed(
             "Mod.configure",
-            {"server": {"server_routes": {"*.*": "loopback_cdp"}}},
+            {"router": {"router_routes": {"*.*": "loopback_cdp"}}},
             cdp_session_id="session-1",
         )
         self.assertEqual(configured["steps"][0].get("unwrap"), "runtime_json")

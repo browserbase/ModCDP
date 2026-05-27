@@ -14,7 +14,7 @@ class AutoSessionRouter:
         self.defaultExecutionContextTimeoutMs = defaultExecutionContextTimeoutMs
         self.sessionId_from_targetId: dict[str, str] = {}
         self.targetId_from_sessionId: dict[str, str] = {}
-        self.execution_contexts: dict[str, int] = {}
+        self.contexts: dict[str, dict[str, Any]] = {}
         self._execution_context_waiters: dict[str, list[tuple[threading.Event, dict[str, Any]]]] = {}
         self._lock = threading.RLock()
 
@@ -43,7 +43,7 @@ class AutoSessionRouter:
             context = raw_context if isinstance(raw_context, Mapping) else None
             context_id = context.get("id") if context else None
             if session_id and isinstance(context_id, int):
-                self._recordExecutionContext(session_id, context_id)
+                self._recordExecutionContext(session_id, context)
         elif method == "Target.detachedFromTarget":
             detached_session_id = event_data.get("sessionId") if isinstance(event_data.get("sessionId"), str) else session_id
             if isinstance(detached_session_id, str):
@@ -54,9 +54,9 @@ class AutoSessionRouter:
         if not session_id:
             raise RuntimeError("Cannot wait for a Runtime execution context without a session.")
         with self._lock:
-            existing = self.execution_contexts.get(session_id)
-            if existing is not None:
-                return existing
+            for context in self.contexts.values():
+                if context.get("sessionId") == session_id and isinstance(context.get("id"), int):
+                    return int(context["id"])
             event = threading.Event()
             result: dict[str, int] = {}
             self._execution_context_waiters.setdefault(session_id, []).append((event, result))
@@ -72,11 +72,12 @@ class AutoSessionRouter:
             raise error
         return result["context_id"]
 
-    def _recordExecutionContext(self, session_id: str, context_id: int) -> None:
+    def _recordExecutionContext(self, session_id: str, context: Mapping[str, Any]) -> None:
         with self._lock:
             if session_id not in self.targetId_from_sessionId:
                 return
-            self.execution_contexts[session_id] = context_id
+            context_id = int(context["id"])
+            self.contexts[f"{session_id}:{context_id}"] = {**dict(context), "sessionId": session_id}
             waiters = self._execution_context_waiters.pop(session_id, [])
         for event, result in waiters:
             result["context_id"] = context_id
@@ -87,7 +88,9 @@ class AutoSessionRouter:
             target_id = self.targetId_from_sessionId.pop(session_id, None)
             if target_id is not None:
                 self.sessionId_from_targetId.pop(target_id, None)
-            self.execution_contexts.pop(session_id, None)
+            for context_key, context in list(self.contexts.items()):
+                if context.get("sessionId") == session_id:
+                    self.contexts.pop(context_key, None)
             waiters = self._execution_context_waiters.pop(session_id, [])
         error = RuntimeError(f"Runtime execution context wait cancelled because session {session_id} detached.")
         for event, result in waiters:

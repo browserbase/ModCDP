@@ -5,8 +5,8 @@
 //	Launcher       browser/session creation and cleanup.
 //	Upstream       message transport to raw CDP or a ModCDP server.
 //	Injector       raw-CDP extension discovery/injection/borrowing.
-//	Server         ModCDPServer.configure params.
-//	Client        client routing and client-owned send/event timings.
+//	ServerOptions         ModCDPServer.configure params.
+//	ClientOptions client routing and client-owned send/event timings.
 //	Upstream      upstream transport options and upstream-owned timings.
 //
 // Public methods: Connect, Send(method, params), SendRaw, On, OnRaw, Close.
@@ -77,17 +77,13 @@ type CLIExtensionInjector = injector.CLIExtensionInjector
 type CDPExtensionInjector = injector.CDPExtensionInjector
 type BorrowExtensionInjector = injector.BorrowExtensionInjector
 type UpstreamMode = transportpkg.UpstreamMode
+type UpstreamTransportOptions = types.UpstreamTransportOptions
 type UpstreamTransport = transportpkg.UpstreamTransport
 type WSUpstreamTransport = transportpkg.WSUpstreamTransport
-type WSUpstreamTransportOptions = transportpkg.WSUpstreamTransportOptions
 type PipeUpstreamTransport = transportpkg.PipeUpstreamTransport
-type PipeUpstreamTransportOptions = transportpkg.PipeUpstreamTransportOptions
 type ReverseWSUpstreamTransport = transportpkg.ReverseWSUpstreamTransport
-type ReverseWSUpstreamTransportOptions = transportpkg.ReverseWSUpstreamTransportOptions
 type NativeMessagingUpstreamTransport = transportpkg.NativeMessagingUpstreamTransport
-type NativeMessagingUpstreamTransportOptions = transportpkg.NativeMessagingUpstreamTransportOptions
 type NATSUpstreamTransport = transportpkg.NATSUpstreamTransport
-type NATSUpstreamTransportOptions = transportpkg.NATSUpstreamTransportOptions
 type AutoSessionRouter = router.AutoSessionRouter
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
@@ -173,20 +169,15 @@ func freePort() (int, error) {
 
 // --- public types --------------------------------------------------------
 
-type ServerConfig struct {
-	ServerLoopbackCDPURL                     string            `json:"server_loopback_cdp_url,omitempty"`
-	ServerRoutes                             map[string]string `json:"server_routes,omitempty"`
-	ServerBrowserToken                       string            `json:"server_browser_token,omitempty"`
-	ServerCDPSendTimeoutMS                   int               `json:"server_cdp_send_timeout_ms,omitempty"`
-	ServerLoopbackExecutionContextTimeoutMS  int               `json:"server_loopback_execution_context_timeout_ms,omitempty"`
-	ServerWSConnectErrorSettleTimeoutMS      int               `json:"server_ws_connect_error_settle_timeout_ms,omitempty"`
-	ServerDownstreamClientTimeoutMS          int               `json:"server_downstream_client_timeout_ms,omitempty"`
-	ServerCloseBrowserOnDownstreamDisconnect *bool             `json:"server_close_browser_on_downstream_disconnect,omitempty"`
-	Options                                  map[string]any    `json:"-"`
-	disabled                                 bool
+type RouterOptions struct {
+	RouterRoutes                      map[string]string `json:"router_routes,omitempty"`
+	LoopbackExecutionContextTimeoutMS int               `json:"loopback_execution_context_timeout_ms,omitempty"`
 }
 
-var ServerNone = &ServerConfig{disabled: true}
+type DownstreamOptions struct {
+	DownstreamClientTimeoutMS          int   `json:"downstream_client_timeout_ms,omitempty"`
+	DownstreamCloseBrowserOnDisconnect *bool `json:"downstream_close_browser_on_disconnect,omitempty"`
+}
 
 type CustomEvent struct {
 	Name        string         `json:"name"`
@@ -206,21 +197,22 @@ type CustomMiddleware struct {
 	Expression string `json:"expression"`
 }
 
-type LauncherConfig = LaunchOptions
-
-type UpstreamConfig struct {
-	UpstreamMode                          string `json:"upstream_mode,omitempty"`
-	UpstreamWSCDPURL                      string `json:"upstream_ws_cdp_url,omitempty"`
-	UpstreamNATSURL                       string `json:"upstream_nats_url,omitempty"`
-	UpstreamNATSSubjectPrefix             string `json:"upstream_nats_subject_prefix,omitempty"`
-	UpstreamNATSWaitTimeoutMS             int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
-	UpstreamReverseWSBind                 string `json:"upstream_reversews_bind,omitempty"`
-	UpstreamReverseWSWaitTimeoutMS        int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
-	UpstreamNativeMessagingHostName       string `json:"upstream_nativemessaging_host_name,omitempty"`
-	UpstreamWSConnectErrorSettleTimeoutMS int    `json:"upstream_ws_connect_error_settle_timeout_ms,omitempty"`
+type ServerConfig struct {
+	Upstream           UpstreamTransportOptions `json:"upstream,omitempty"`
+	Router             RouterOptions            `json:"router,omitempty"`
+	ClientOptions      ClientOptions            `json:"client_options,omitempty"`
+	Downstream         DownstreamOptions        `json:"downstream,omitempty"`
+	ServerBrowserToken string                   `json:"server_browser_token,omitempty"`
+	CustomCommands     []CustomCommand          `json:"custom_commands,omitempty"`
+	CustomEvents       []CustomEvent            `json:"custom_events,omitempty"`
+	CustomMiddlewares  []CustomMiddleware       `json:"custom_middlewares,omitempty"`
+	Options            map[string]any           `json:"-"`
+	disabled           bool
 }
 
-type ClientConfig struct {
+var ServerOptionsNone = &ServerConfig{disabled: true}
+
+type ClientOptions struct {
 	ClientRoutes               map[string]string `json:"client_routes,omitempty"`
 	ClientHydrateAliases       *bool             `json:"client_hydrate_aliases,omitempty"`
 	ClientMirrorUpstreamEvents *bool             `json:"client_mirror_upstream_events,omitempty"`
@@ -230,15 +222,15 @@ type ClientConfig struct {
 }
 
 type Options struct {
-	Launcher          LauncherConfig     `json:"launcher,omitempty"`
-	Upstream          UpstreamConfig     `json:"upstream,omitempty"`
-	Injector          InjectorOptions    `json:"injector,omitempty"`
-	Client            ClientConfig       `json:"client,omitempty"`
-	Server            *ServerConfig      `json:"server,omitempty"`
-	CustomCommands    []CustomCommand    `json:"custom_commands,omitempty"`
-	CustomEvents      []CustomEvent      `json:"custom_events,omitempty"`
-	CustomMiddlewares []CustomMiddleware `json:"custom_middlewares,omitempty"`
-	serverConfigured  bool
+	Launcher                LaunchOptions            `json:"launcher,omitempty"`
+	Upstream                UpstreamTransportOptions `json:"upstream,omitempty"`
+	Injector                InjectorOptions          `json:"injector,omitempty"`
+	ClientOptions           ClientOptions            `json:"client_options,omitempty"`
+	ServerOptions           *ServerConfig            `json:"server_options,omitempty"`
+	CustomCommands          []CustomCommand          `json:"custom_commands,omitempty"`
+	CustomEvents            []CustomEvent            `json:"custom_events,omitempty"`
+	CustomMiddlewares       []CustomMiddleware       `json:"custom_middlewares,omitempty"`
+	serverOptionsConfigured bool
 }
 
 func (o *Options) UnmarshalJSON(data []byte) error {
@@ -253,20 +245,20 @@ func (o *Options) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	rawServer, hasServer := raw["server"]
-	if !hasServer {
+	rawServerOptions, hasServerOptions := raw["server_options"]
+	if !hasServerOptions {
 		return nil
 	}
-	o.serverConfigured = true
-	if strings.TrimSpace(string(rawServer)) == "null" {
-		o.Server = nil
+	o.serverOptionsConfigured = true
+	if strings.TrimSpace(string(rawServerOptions)) == "null" {
+		o.ServerOptions = nil
 		return nil
 	}
 	var server ServerConfig
-	if err := json.Unmarshal(rawServer, &server); err != nil {
+	if err := json.Unmarshal(rawServerOptions, &server); err != nil {
 		return err
 	}
-	o.Server = &server
+	o.ServerOptions = &server
 	return nil
 }
 
@@ -345,11 +337,11 @@ type ModCDPClient struct {
 	WebAuthn             WebAuthnDomain
 	Mod                  ModDomain
 
-	Launcher                 LauncherConfig
-	Upstream                 UpstreamConfig
+	Launcher                 LaunchOptions
+	Upstream                 UpstreamTransportOptions
 	Injector                 InjectorOptions
-	Client                   ClientConfig
-	Server                   *ServerConfig
+	ClientOptions            ClientOptions
+	ServerOptions            *ServerConfig
 	CustomCommands           []CustomCommand
 	CustomEvents             []CustomEvent
 	CustomMiddlewares        []CustomMiddleware
@@ -383,8 +375,8 @@ type ModCDPClient struct {
 
 type extensionInjector interface {
 	Update(InjectorOptions) *ExtensionInjector
-	GetLauncherConfig() LaunchOptions
-	GetTransportConfig() map[string]any
+	ConfigForLauncher() LaunchOptions
+	ConfigForUpstream() map[string]any
 	Prepare() error
 	Inject() (*ExtensionInjectionResult, error)
 	Close() error
@@ -392,9 +384,9 @@ type extensionInjector interface {
 
 type browserLauncherClient interface {
 	Update(LaunchOptions) *BrowserLauncher
-	GetInjectorConfig() InjectorOptions
-	GetTransportConfig() map[string]any
-	GetServerConfig() map[string]any
+	ConfigForInjector() InjectorOptions
+	ConfigForUpstream() map[string]any
+	ConfigForServer() map[string]any
 	Launch(LaunchOptions) (*LaunchedBrowser, error)
 }
 
@@ -403,9 +395,9 @@ type upstreamTransportClient interface {
 	Connect() error
 	Close() error
 	Send(map[string]any) error
-	GetLauncherConfig() LaunchOptions
-	GetInjectorConfig() InjectorOptions
-	GetServerConfig() map[string]any
+	ConfigForLauncher() LaunchOptions
+	ConfigForInjector() InjectorOptions
+	ConfigForServer() map[string]any
 	OnRecv(func(map[string]any)) func()
 	OnClose(func(error)) func()
 	WaitForPeer() error
@@ -428,40 +420,40 @@ func New(opts Options) *ModCDPClient {
 	if opts.Injector.InjectorMode == "" {
 		opts.Injector.InjectorMode = "none"
 	}
-	if opts.Client.ClientRoutes == nil {
-		opts.Client.ClientRoutes = translate.DefaultClientRoutes()
+	if opts.ClientOptions.ClientRoutes == nil {
+		opts.ClientOptions.ClientRoutes = translate.DefaultClientRoutes()
 	} else {
 		merged := translate.DefaultClientRoutes()
-		for k, v := range opts.Client.ClientRoutes {
+		for k, v := range opts.ClientOptions.ClientRoutes {
 			merged[k] = v
 		}
-		opts.Client.ClientRoutes = merged
+		opts.ClientOptions.ClientRoutes = merged
 	}
-	if opts.Client.ClientHydrateAliases == nil {
+	if opts.ClientOptions.ClientHydrateAliases == nil {
 		value := true
-		opts.Client.ClientHydrateAliases = &value
+		opts.ClientOptions.ClientHydrateAliases = &value
 	}
-	if opts.Server != nil && opts.Server.disabled {
-		opts.Server = nil
-		opts.serverConfigured = true
+	if opts.ServerOptions != nil && opts.ServerOptions.disabled {
+		opts.ServerOptions = nil
+		opts.serverOptionsConfigured = true
 	}
-	if opts.Server == nil && !opts.serverConfigured {
-		opts.Server = &ServerConfig{}
+	if opts.ServerOptions == nil && !opts.serverOptionsConfigured {
+		opts.ServerOptions = &ServerConfig{}
 	}
-	if opts.Upstream.UpstreamMode != "ws" && opts.Upstream.UpstreamMode != "pipe" && opts.Server != nil && opts.Server.ServerRoutes == nil {
-		opts.Server.ServerRoutes = map[string]string{"*.*": "chrome_debugger"}
+	if opts.Upstream.UpstreamMode != "ws" && opts.Upstream.UpstreamMode != "pipe" && opts.ServerOptions != nil && opts.ServerOptions.Router.RouterRoutes == nil {
+		opts.ServerOptions.Router.RouterRoutes = map[string]string{"*.*": "chromedebugger"}
 	}
 	if opts.Injector.InjectorServiceWorkerURLSuffixes == nil {
 		opts.Injector.InjectorServiceWorkerURLSuffixes = append([]string{}, DefaultModCDPServiceWorkerURLSuffixes...)
 	}
-	if opts.Client.ClientCDPSendTimeoutMS == 0 {
-		opts.Client.ClientCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
+	if opts.ClientOptions.ClientCDPSendTimeoutMS == 0 {
+		opts.ClientOptions.ClientCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
 	}
-	if opts.Client.ClientEventWaitTimeoutMS == 0 {
-		opts.Client.ClientEventWaitTimeoutMS = DefaultEventWaitTimeoutMS
+	if opts.ClientOptions.ClientEventWaitTimeoutMS == 0 {
+		opts.ClientOptions.ClientEventWaitTimeoutMS = DefaultEventWaitTimeoutMS
 	}
-	if opts.Client.ClientHeartbeatIntervalMS == 0 {
-		opts.Client.ClientHeartbeatIntervalMS = DefaultClientHeartbeatIntervalMS
+	if opts.ClientOptions.ClientHeartbeatIntervalMS == 0 {
+		opts.ClientOptions.ClientHeartbeatIntervalMS = DefaultClientHeartbeatIntervalMS
 	}
 	if opts.Injector.InjectorExecutionContextTimeoutMS == 0 {
 		opts.Injector.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
@@ -494,8 +486,8 @@ func New(opts Options) *ModCDPClient {
 		Launcher:                opts.Launcher,
 		Upstream:                opts.Upstream,
 		Injector:                opts.Injector,
-		Client:                  opts.Client,
-		Server:                  opts.Server,
+		ClientOptions:           opts.ClientOptions,
+		ServerOptions:           opts.ServerOptions,
 		CustomCommands:          opts.CustomCommands,
 		CustomEvents:            opts.CustomEvents,
 		CustomMiddlewares:       opts.CustomMiddlewares,
@@ -514,7 +506,7 @@ func New(opts Options) *ModCDPClient {
 		},
 		func() int { return client.Injector.InjectorExecutionContextTimeoutMS },
 	)
-	if *client.Client.ClientHydrateAliases {
+	if *client.ClientOptions.ClientHydrateAliases {
 		initCDPSurface(client)
 	}
 	client.hydrateNativeProtocolSchemas()
@@ -542,7 +534,7 @@ func (c *ModCDPClient) Connect() error {
 			c.Close()
 			return err
 		}
-		if c.Server != nil {
+		if c.ServerOptions != nil {
 			if _, err := c.sendMessage("Mod.configure", c.serverConfigureParams(nil, nil, nil), ""); err != nil {
 				c.Close()
 				return err
@@ -592,8 +584,8 @@ func (c *ModCDPClient) Connect() error {
 		return err
 	}
 	mirrorUpstreamEvents := true
-	if c.Client.ClientMirrorUpstreamEvents != nil {
-		mirrorUpstreamEvents = *c.Client.ClientMirrorUpstreamEvents
+	if c.ClientOptions.ClientMirrorUpstreamEvents != nil {
+		mirrorUpstreamEvents = *c.ClientOptions.ClientMirrorUpstreamEvents
 	}
 	if mirrorUpstreamEvents {
 		if _, err := c.sendMessage("Runtime.addBinding", map[string]any{"name": translate.UpstreamEventBindingName}, c.ExtSessionID); err != nil {
@@ -602,7 +594,7 @@ func (c *ModCDPClient) Connect() error {
 		}
 	}
 
-	if c.Server != nil {
+	if c.ServerOptions != nil {
 		customCommands := make([]map[string]any, 0, len(c.CustomCommands))
 		for _, command := range c.CustomCommands {
 			if command.Expression == "" {
@@ -634,7 +626,7 @@ func (c *ModCDPClient) Connect() error {
 			customMiddlewares = append(customMiddlewares, item)
 		}
 		configureParams := c.serverConfigureParams(customCommands, customEvents, customMiddlewares)
-		command, err := translate.WrapCommandIfNeeded("Mod.configure", configureParams, c.Client.ClientRoutes, c.ExtSessionID)
+		command, err := translate.WrapCommandIfNeeded("Mod.configure", configureParams, c.ClientOptions.ClientRoutes, c.ExtSessionID)
 		if err != nil {
 			c.Close()
 			return fmt.Errorf("Mod.configure: %w", err)
@@ -688,10 +680,10 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		injector.Update(c.baseInjectorOptions(nil))
 	}
 	for _, injector := range injectors {
-		injector.Update(launcher.GetInjectorConfig())
+		injector.Update(launcher.ConfigForInjector())
 	}
 	for _, injector := range injectors {
-		injector.Update(transport.GetInjectorConfig())
+		injector.Update(transport.ConfigForInjector())
 	}
 	for _, injector := range injectors {
 		if err := injector.Prepare(); err != nil {
@@ -699,14 +691,14 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 		}
 	}
 	for _, injector := range injectors {
-		launcher.Update(injector.GetLauncherConfig())
+		launcher.Update(injector.ConfigForLauncher())
 	}
 	for _, injector := range injectors {
-		transport.Update(injector.GetTransportConfig())
+		transport.Update(injector.ConfigForUpstream())
 	}
-	launcher.Update(transport.GetLauncherConfig())
+	launcher.Update(transport.ConfigForLauncher())
 	launcher.Update(LaunchOptions{LauncherLocalLoopbackCDP: boolPointer(c.serverNeedsLoopbackCDP())})
-	transport.Update(launcher.GetTransportConfig())
+	transport.Update(launcher.ConfigForUpstream())
 
 	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" {
 		if err := transport.Connect(); err != nil {
@@ -720,12 +712,12 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 			return err
 		}
 		c.launchedBrowser = launched
-		transport.Update(launcher.GetTransportConfig())
+		transport.Update(launcher.ConfigForUpstream())
 		for _, injector := range injectors {
-			injector.Update(launcher.GetInjectorConfig())
+			injector.Update(launcher.ConfigForInjector())
 		}
 		for _, injector := range injectors {
-			transport.Update(injector.GetTransportConfig())
+			transport.Update(injector.ConfigForUpstream())
 		}
 	}
 	launchedCDPURL := ""
@@ -752,21 +744,23 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 
 	serverConfig := map[string]any{}
 	if c.Upstream.UpstreamMode != "ws" && c.Upstream.UpstreamMode != "pipe" && launchedCDPURL != "" {
-		serverConfig["server_loopback_cdp_url"] = launchedCDPURL
+		serverConfig["upstream"] = map[string]any{"upstream_ws_cdp_url": launchedCDPURL}
 	}
-	for key, value := range launcher.GetServerConfig() {
+	for key, value := range launcher.ConfigForServer() {
 		serverConfig[key] = value
 	}
-	for key, value := range transport.GetServerConfig() {
+	for key, value := range transport.ConfigForServer() {
 		serverConfig[key] = value
 	}
-	if c.Server != nil {
-		if loopbackCDPURL, _ := serverConfig["server_loopback_cdp_url"].(string); loopbackCDPURL != "" {
+	if c.ServerOptions != nil {
+		if upstreamConfig, _ := serverConfig["upstream"].(map[string]any); upstreamConfig != nil {
+			loopbackCDPURL, _ := upstreamConfig["upstream_ws_cdp_url"].(string)
 			initialCDPURL, _ := initialTransportConfig["upstream_ws_cdp_url"].(string)
-			if c.Server.ServerLoopbackCDPURL == "" ||
-				c.Server.ServerLoopbackCDPURL == initialCDPURL ||
-				c.Server.ServerLoopbackCDPURL == launchedCDPURL {
-				c.Server.ServerLoopbackCDPURL = loopbackCDPURL
+			if loopbackCDPURL != "" &&
+				(c.ServerOptions.Upstream.UpstreamWSCDPURL == "" ||
+					c.ServerOptions.Upstream.UpstreamWSCDPURL == initialCDPURL ||
+					c.ServerOptions.Upstream.UpstreamWSCDPURL == launchedCDPURL) {
+				c.ServerOptions.Upstream.UpstreamWSCDPURL = loopbackCDPURL
 			}
 		}
 	}
@@ -774,14 +768,14 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 }
 
 func (c *ModCDPClient) serverNeedsLoopbackCDP() bool {
-	if c.Server == nil || c.Server.ServerLoopbackCDPURL != "" {
+	if c.ServerOptions == nil || c.ServerOptions.Upstream.UpstreamWSCDPURL != "" {
 		return false
 	}
-	return c.Server.ServerRoutes["*.*"] == "loopback_cdp"
+	return c.ServerOptions.Router.RouterRoutes["*.*"] == "loopback_cdp"
 }
 
 func (c *ModCDPClient) ensureModCDPServerConfigured() error {
-	if c.Server == nil || c.transport == nil {
+	if c.ServerOptions == nil || c.transport == nil {
 		return nil
 	}
 	if err := c.transport.WaitForPeer(); err != nil {
@@ -844,54 +838,60 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	if customMiddlewares == nil {
 		customMiddlewares = []map[string]any{}
 	}
-	server := map[string]any{
-		"server_cdp_send_timeout_ms":                   c.Client.ClientCDPSendTimeoutMS,
-		"server_loopback_execution_context_timeout_ms": c.Injector.InjectorExecutionContextTimeoutMS,
-		"server_ws_connect_error_settle_timeout_ms":    c.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
-		"server_downstream_client_timeout_ms":          maxInt(c.Client.ClientHeartbeatIntervalMS*4, 1_000),
+	upstream := map[string]any{
+		"upstream_ws_connect_error_settle_timeout_ms": c.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
 	}
-	if c.Server != nil {
-		server["server_loopback_cdp_url"] = c.Server.ServerLoopbackCDPURL
-		server["server_routes"] = c.Server.ServerRoutes
-		if c.Server.ServerBrowserToken != "" {
-			server["server_browser_token"] = c.Server.ServerBrowserToken
+	router := map[string]any{
+		"loopback_execution_context_timeout_ms": c.Injector.InjectorExecutionContextTimeoutMS,
+	}
+	clientOptions := map[string]any{
+		"client_routes":              c.ClientOptions.ClientRoutes,
+		"client_cdp_send_timeout_ms": c.ClientOptions.ClientCDPSendTimeoutMS,
+	}
+	downstream := map[string]any{
+		"downstream_client_timeout_ms": maxInt(c.ClientOptions.ClientHeartbeatIntervalMS*4, 1_000),
+	}
+	params := map[string]any{}
+	if c.ServerOptions != nil {
+		if c.ServerOptions.Upstream.UpstreamWSCDPURL != "" {
+			upstream["upstream_ws_cdp_url"] = c.ServerOptions.Upstream.UpstreamWSCDPURL
 		}
-		if c.Server.ServerCDPSendTimeoutMS != 0 {
-			server["server_cdp_send_timeout_ms"] = c.Server.ServerCDPSendTimeoutMS
+		if c.ServerOptions.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
+			upstream["upstream_ws_connect_error_settle_timeout_ms"] = c.ServerOptions.Upstream.UpstreamWSConnectErrorSettleTimeoutMS
 		}
-		if c.Server.ServerLoopbackExecutionContextTimeoutMS != 0 {
-			server["server_loopback_execution_context_timeout_ms"] = c.Server.ServerLoopbackExecutionContextTimeoutMS
+		if c.ServerOptions.Router.RouterRoutes != nil {
+			router["router_routes"] = c.ServerOptions.Router.RouterRoutes
 		}
-		if c.Server.ServerWSConnectErrorSettleTimeoutMS != 0 {
-			server["server_ws_connect_error_settle_timeout_ms"] = c.Server.ServerWSConnectErrorSettleTimeoutMS
+		if c.ServerOptions.Router.LoopbackExecutionContextTimeoutMS != 0 {
+			router["loopback_execution_context_timeout_ms"] = c.ServerOptions.Router.LoopbackExecutionContextTimeoutMS
 		}
-		if c.Server.ServerDownstreamClientTimeoutMS != 0 {
-			server["server_downstream_client_timeout_ms"] = c.Server.ServerDownstreamClientTimeoutMS
+		if c.ServerOptions.ClientOptions.ClientRoutes != nil {
+			clientOptions["client_routes"] = c.ServerOptions.ClientOptions.ClientRoutes
 		}
-		if c.Server.ServerCloseBrowserOnDownstreamDisconnect != nil {
-			server["server_close_browser_on_downstream_disconnect"] = *c.Server.ServerCloseBrowserOnDownstreamDisconnect
+		if c.ServerOptions.ClientOptions.ClientCDPSendTimeoutMS != 0 {
+			clientOptions["client_cdp_send_timeout_ms"] = c.ServerOptions.ClientOptions.ClientCDPSendTimeoutMS
 		}
-		for key, value := range c.Server.Options {
-			server[key] = value
+		if c.ServerOptions.Downstream.DownstreamClientTimeoutMS != 0 {
+			downstream["downstream_client_timeout_ms"] = c.ServerOptions.Downstream.DownstreamClientTimeoutMS
+		}
+		if c.ServerOptions.Downstream.DownstreamCloseBrowserOnDisconnect != nil {
+			downstream["downstream_close_browser_on_disconnect"] = *c.ServerOptions.Downstream.DownstreamCloseBrowserOnDisconnect
+		}
+		if c.ServerOptions.ServerBrowserToken != "" {
+			params["server_browser_token"] = c.ServerOptions.ServerBrowserToken
+		}
+		for key, value := range c.ServerOptions.Options {
+			params[key] = value
 		}
 	}
-	upstream := map[string]any{"upstream_mode": c.Upstream.UpstreamMode}
-	if c.Upstream.UpstreamNATSURL != "" {
-		upstream["upstream_nats_url"] = c.Upstream.UpstreamNATSURL
-	}
-	if c.Upstream.UpstreamNATSSubjectPrefix != "" {
-		upstream["upstream_nats_subject_prefix"] = c.Upstream.UpstreamNATSSubjectPrefix
-	}
-	return map[string]any{
-		"upstream": upstream,
-		"client": map[string]any{
-			"client_routes": c.Client.ClientRoutes,
-		},
-		"server":             server,
-		"custom_commands":    customCommands,
-		"custom_events":      customEvents,
-		"custom_middlewares": customMiddlewares,
-	}
+	params["upstream"] = upstream
+	params["router"] = router
+	params["client_options"] = clientOptions
+	params["downstream"] = downstream
+	params["custom_commands"] = customCommands
+	params["custom_events"] = customEvents
+	params["custom_middlewares"] = customMiddlewares
+	return params
 }
 
 func normalizeModCDPName(name string) (string, error) {
@@ -1264,7 +1264,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 		}
 		return result, nil
 	}
-	command, err := translate.WrapCommandIfNeeded(method, params, c.Client.ClientRoutes, cdpSessionID)
+	command, err := translate.WrapCommandIfNeeded(method, params, c.ClientOptions.ClientRoutes, cdpSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -1411,21 +1411,15 @@ func (c *ModCDPClient) browserLauncher() browserLauncherClient {
 func (c *ModCDPClient) upstreamTransport() upstreamTransportClient {
 	switch c.Upstream.UpstreamMode {
 	case "ws":
-		return NewWSUpstreamTransport(WSUpstreamTransportOptions{})
+		return NewWSUpstreamTransport(c.Upstream)
 	case "pipe":
-		return NewPipeUpstreamTransport(PipeUpstreamTransportOptions{})
+		return NewPipeUpstreamTransport(c.Upstream)
 	case "reversews":
-		return NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{})
+		return NewReverseWSUpstreamTransport(c.Upstream)
 	case "nativemessaging":
-		return NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{
-			UpstreamNativeMessagingHostName: c.Upstream.UpstreamNativeMessagingHostName,
-		})
+		return NewNativeMessagingUpstreamTransport(c.Upstream)
 	case "nats":
-		return NewNATSUpstreamTransport(NATSUpstreamTransportOptions{
-			UpstreamNATSURL:           c.Upstream.UpstreamNATSURL,
-			UpstreamNATSSubjectPrefix: c.Upstream.UpstreamNATSSubjectPrefix,
-			UpstreamNATSWaitTimeoutMS: c.Upstream.UpstreamNATSWaitTimeoutMS,
-		})
+		return NewNATSUpstreamTransport(c.Upstream)
 	default:
 		return nil
 	}
@@ -1463,7 +1457,7 @@ func isKnownLaunchMode(mode string) bool {
 }
 
 func isKnownUpstreamMode(mode string) bool {
-	return mode == "ws" || mode == "pipe" || mode == "nativemessaging" || mode == "reversews" || mode == "nats"
+	return mode == "ws" || mode == "pipe" || mode == "nativemessaging" || mode == "reversews" || mode == "nats" || mode == "chromedebugger"
 }
 
 func isKnownExtensionMode(mode string) bool {
@@ -1488,7 +1482,7 @@ func (c *ModCDPClient) baseInjectorOptions(send SendCDP) InjectorOptions {
 		InjectorTrustServiceWorkerTarget:     trustMatchedServiceWorker,
 		InjectorRequireServiceWorkerTarget:   c.Injector.InjectorRequireServiceWorkerTarget || c.Injector.InjectorMode == "discover",
 		InjectorServiceWorkerReadyExpression: c.Injector.InjectorServiceWorkerReadyExpression,
-		InjectorCDPSendTimeoutMS:             c.Client.ClientCDPSendTimeoutMS,
+		InjectorCDPSendTimeoutMS:             c.ClientOptions.ClientCDPSendTimeoutMS,
 		InjectorExecutionContextTimeoutMS:    c.Injector.InjectorExecutionContextTimeoutMS,
 		InjectorServiceWorkerProbeTimeoutMS:  c.Injector.InjectorServiceWorkerProbeTimeoutMS,
 		InjectorServiceWorkerReadyTimeoutMS:  c.Injector.InjectorServiceWorkerReadyTimeoutMS,
@@ -1502,7 +1496,7 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 		return nil, fmt.Errorf("injector.injector_mode='none' cannot be used with a raw_cdp upstream")
 	}
 	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-		return c.sendMessageTimeout(method, params, sessionID, time.Duration(c.Client.ClientCDPSendTimeoutMS)*time.Millisecond)
+		return c.sendMessageTimeout(method, params, sessionID, time.Duration(c.ClientOptions.ClientCDPSendTimeoutMS)*time.Millisecond)
 	}
 	var errors []string
 	for _, injector := range injectors {
@@ -1609,7 +1603,7 @@ func (c *ModCDPClient) measurePingLatency() error {
 		}
 		c.Latency = latency
 		return nil
-	case <-time.After(time.Duration(c.Client.ClientEventWaitTimeoutMS) * time.Millisecond):
+	case <-time.After(time.Duration(c.ClientOptions.ClientEventWaitTimeoutMS) * time.Millisecond):
 		return fmt.Errorf("Mod.pong timed out")
 	}
 }
@@ -1622,10 +1616,10 @@ func (c *ModCDPClient) startPingLatencyMeasurement() {
 
 func (c *ModCDPClient) startHeartbeat() {
 	c.stopHeartbeat()
-	if c.Server == nil || c.Server.ServerCloseBrowserOnDownstreamDisconnect == nil || !*c.Server.ServerCloseBrowserOnDownstreamDisconnect {
+	if c.ServerOptions == nil || c.ServerOptions.Downstream.DownstreamCloseBrowserOnDisconnect == nil || !*c.ServerOptions.Downstream.DownstreamCloseBrowserOnDisconnect {
 		return
 	}
-	interval := c.Client.ClientHeartbeatIntervalMS
+	interval := c.ClientOptions.ClientHeartbeatIntervalMS
 	if interval <= 0 {
 		return
 	}
@@ -1676,7 +1670,7 @@ func numberAsInt64(value any) (int64, bool) {
 }
 
 func (c *ModCDPClient) sendMessage(method string, params map[string]any, sessionID string) (map[string]any, error) {
-	return c.sendMessageTimeout(method, params, sessionID, time.Duration(c.Client.ClientCDPSendTimeoutMS)*time.Millisecond)
+	return c.sendMessageTimeout(method, params, sessionID, time.Duration(c.ClientOptions.ClientCDPSendTimeoutMS)*time.Millisecond)
 }
 
 func (c *ModCDPClient) sendMessageTimeout(method string, params map[string]any, sessionID string, timeout time.Duration) (map[string]any, error) {

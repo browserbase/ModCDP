@@ -65,11 +65,11 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner := New(Options{
-		Launcher: LauncherConfig{
+		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: &headless,
 		},
-		Upstream: UpstreamConfig{UpstreamMode: "ws"},
+		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
@@ -81,23 +81,23 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
-		Upstream: UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
+		Launcher: LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
+		Upstream: UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
 		Injector: InjectorOptions{
 			InjectorMode:                     "discover",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		Client: ClientConfig{
+		ClientOptions: ClientOptions{
 			ClientRoutes: map[string]string{
 				"Target.getTargets":         "service_worker",
 				"Target.createTarget":       "service_worker",
 				"Target.setDiscoverTargets": "service_worker",
 			},
 		},
-		Server: &ServerConfig{
-			ServerLoopbackCDPURL: owner.CDPURL,
-			ServerRoutes:         map[string]string{"*.*": "loopback_cdp"},
+		ServerOptions: &ServerConfig{
+			Upstream: UpstreamTransportOptions{UpstreamWSCDPURL: owner.CDPURL},
+			Router:   RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}},
 		},
 	})
 	defer owner.Close()
@@ -109,8 +109,8 @@ func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
 	if cdp.CDPURL != owner.CDPURL {
 		t.Fatalf("CDPURL = %q, expected %q", cdp.CDPURL, owner.CDPURL)
 	}
-	if cdp.Server.ServerLoopbackCDPURL != owner.CDPURL {
-		t.Fatalf("ServerLoopbackCDPURL = %q, expected %q", cdp.Server.ServerLoopbackCDPURL, owner.CDPURL)
+	if cdp.ServerOptions.Upstream.UpstreamWSCDPURL != owner.CDPURL {
+		t.Fatalf("server_options upstream cdp url = %q, expected %q", cdp.ServerOptions.Upstream.UpstreamWSCDPURL, owner.CDPURL)
 	}
 
 	rawTargets, err := cdp.Send("Target.getTargets", nil)

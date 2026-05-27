@@ -7,7 +7,8 @@ import { test } from "vitest";
 import { z } from "zod";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
+import { ModCDPUpstreamOptionsSchema } from "../src/types/modcdp.js";
 import { CdpSocket } from "./helpers.BrowserLauncher.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -48,20 +49,19 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
     router: {
       router_routes: { "*.*": "direct_cdp" },
     },
-    client: {
+    client_options: {
       client_hydrate_aliases: false,
       client_mirror_upstream_events: false,
       client_cdp_send_timeout_ms: 1234,
       client_event_wait_timeout_ms: 2345,
       client_heartbeat_interval_ms: 3456,
     },
-    server: {
+    server_options: {
       router: { router_routes: { "*.*": "loopback_cdp" } },
+      client_options: { client_cdp_send_timeout_ms: 9876 },
+      upstream: { upstream_ws_connect_error_settle_timeout_ms: 7654 },
+      downstream: { downstream_client_timeout_ms: 4567 },
       server_browser_token: "token-1",
-      server_cdp_send_timeout_ms: 9876,
-      server_loopback_execution_context_timeout_ms: 8765,
-      server_ws_connect_error_settle_timeout_ms: 7654,
-      server_downstream_client_timeout_ms: 4567,
     },
   });
 
@@ -75,11 +75,11 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal(cdp.injector.injector_service_worker_poll_interval_ms, 76);
   assert.equal(cdp.injector.injector_target_session_poll_interval_ms, 87);
   assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
-  assert.equal(cdp.client.client_hydrate_aliases, false);
-  assert.equal(cdp.client.client_mirror_upstream_events, false);
-  assert.equal(cdp.client.client_cdp_send_timeout_ms, 1234);
-  assert.equal(cdp.client.client_event_wait_timeout_ms, 2345);
-  assert.equal(cdp.client.client_heartbeat_interval_ms, 3456);
+  assert.equal(cdp.client_options.client_hydrate_aliases, false);
+  assert.equal(cdp.client_options.client_mirror_upstream_events, false);
+  assert.equal(cdp.client_options.client_cdp_send_timeout_ms, 1234);
+  assert.equal(cdp.client_options.client_event_wait_timeout_ms, 2345);
+  assert.equal(cdp.client_options.client_heartbeat_interval_ms, 3456);
   assert.equal("routes" in cdp, false);
   assert.equal("cdp_send_timeout_ms" in cdp, false);
   assert.equal("service_worker_probe_timeout_ms" in cdp, false);
@@ -89,13 +89,29 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal("user_data_dir" in cdp.launcher, false);
 
   const params = cdp._serverConfigureParams();
-  assert.equal(params.client, undefined);
-  assert.equal(params.server.router?.router_routes?.["*.*"], "loopback_cdp");
-  assert.equal(params.server.server_browser_token, "token-1");
-  assert.equal(params.server.server_cdp_send_timeout_ms, 9876);
-  assert.equal(params.server.server_loopback_execution_context_timeout_ms, 8765);
-  assert.equal(params.server.server_ws_connect_error_settle_timeout_ms, 7654);
-  assert.equal(params.server.server_downstream_client_timeout_ms, 4567);
+  assert.equal(params.router?.router_routes?.["*.*"], "loopback_cdp");
+  assert.equal(params.server_browser_token, "token-1");
+  assert.equal(params.client_options?.client_cdp_send_timeout_ms, 9876);
+  assert.equal(params.router?.loopback_execution_context_timeout_ms, 4321);
+  assert.equal(params.upstream?.upstream_ws_connect_error_settle_timeout_ms, 7654);
+  assert.equal(params.downstream?.downstream_client_timeout_ms, 4567);
+});
+
+test("ModCDPClient constructs chrome debugger upstream transport from upstream options", () => {
+  const upstream = ModCDPUpstreamOptionsSchema.parse({
+    upstream_mode: "chromedebugger",
+  });
+  const cdp = new ModCDPClient({
+    launcher: { launcher_mode: "none" },
+    upstream,
+    injector: { injector_mode: "none" },
+    client_options: { client_cdp_send_timeout_ms: 4321 },
+    server_options: null,
+  });
+
+  assert.equal(cdp.upstream.constructor.name, "ChromeDebuggerUpstreamTransport");
+  assert.equal(cdp.upstream.upstream_mode, "chromedebugger");
+  assert.equal(cdp.upstream.upstream_cdp_send_timeout_ms, 4321);
 });
 
 test("ModCDPClient dispatches root events before extension session is attached", () => {
@@ -207,17 +223,19 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
         "*.*": "direct_cdp",
       },
     },
-    client: {
+    client_options: {
       client_hydrate_aliases: true,
       client_mirror_upstream_events: true,
       client_cdp_send_timeout_ms: 10_000,
       client_event_wait_timeout_ms: 10_000,
     },
-    server: {
-      router: { router_routes: { "*.*": "loopback_cdp" } },
-      server_cdp_send_timeout_ms: 10_000,
-      server_loopback_execution_context_timeout_ms: 10_000,
-      server_ws_connect_error_settle_timeout_ms: 250,
+    server_options: {
+      client_options: { client_cdp_send_timeout_ms: 10_000 },
+      router: {
+        router_routes: { "*.*": "loopback_cdp" },
+        loopback_execution_context_timeout_ms: 10_000,
+      },
+      upstream: { upstream_ws_connect_error_settle_timeout_ms: 250 },
     },
   });
 
@@ -227,12 +245,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
     assert.equal(cdp.launcher.launcher_mode, "local");
     assert.equal(cdp.upstream.upstream_mode, "ws");
     assert.equal(cdp.injector?.injector_mode, "cli");
-    assert.equal(
-      ["discover", "cli", "cdp", "borrow"].includes(
-        String(cdp.connect_timing?.injector_source),
-      ),
-      true,
-    );
+    assert.equal(["discover", "cli", "cdp", "borrow"].includes(String(cdp.connect_timing?.injector_source)), true);
     assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
     assert.match(cdp.upstream.upstream_ws_cdp_url ?? "", /^ws:\/\//);
     const service_worker_url = await cdp.Mod.evaluate({
@@ -393,9 +406,9 @@ test("ModCDPClient defaults service worker suffix config to the ModCDP worker", 
 });
 
 test("ModCDPClient preserves explicit null server config", () => {
-  const cdp = new ModCDPClient({ server: null });
+  const cdp = new ModCDPClient({ server_options: null });
 
-  assert.equal(cdp.server, null);
+  assert.equal(cdp.server_options, null);
 });
 
 test("ModCDPClient uses no injector unless injector_mode is explicit", () => {
@@ -530,7 +543,7 @@ test("ModCDPClient.close keeps injector files until after launched browser shutd
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server: {
+    server_options: {
       router: { router_routes: { "*.*": "loopback_cdp" } },
     },
   });

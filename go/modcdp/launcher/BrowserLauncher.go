@@ -109,7 +109,7 @@ func (l *BrowserLauncher) Update(config LaunchOptions) *BrowserLauncher {
 	return l
 }
 
-func (l BrowserLauncher) GetTransportConfig() map[string]any {
+func (l BrowserLauncher) ConfigForUpstream() map[string]any {
 	return map[string]any{
 		"upstream_ws_cdp_url": firstString(launchedCDPURL(l.Launched), l.Options.LauncherRemoteCDPURL),
 		"upstream_pipe_read":  launchedPipeRead(l.Launched),
@@ -117,14 +117,14 @@ func (l BrowserLauncher) GetTransportConfig() map[string]any {
 	}
 }
 
-func (l BrowserLauncher) GetServerConfig() map[string]any {
+func (l BrowserLauncher) ConfigForServer() map[string]any {
 	if l.Launched != nil && l.Launched.LoopbackCDPURL != "" {
-		return map[string]any{"server_loopback_cdp_url": l.Launched.LoopbackCDPURL}
+		return map[string]any{"upstream": map[string]any{"upstream_ws_cdp_url": l.Launched.LoopbackCDPURL}}
 	}
 	return map[string]any{}
 }
 
-func (l BrowserLauncher) GetInjectorConfig() InjectorOptions {
+func (l BrowserLauncher) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{
 		InjectorBBAPIKey:      l.Options.LauncherBBAPIKey,
 		InjectorBBBaseURL:     l.Options.LauncherBBBaseURL,

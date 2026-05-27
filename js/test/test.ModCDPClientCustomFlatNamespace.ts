@@ -4,18 +4,8 @@ import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 import { z } from "zod";
 
-import {
-  ModCDPClient,
-  type ModCDPClientInstance,
-} from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 import { ModCDPServer } from "../src/server/ModCDPServer.js";
-import type {
-  ModCDPCustomCommandRegistration,
-  ModCDPCustomEventRegistration,
-  ProtocolParams,
-  ProtocolPayload,
-  ProtocolResult,
-} from "../src/types/modcdp.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -42,7 +32,7 @@ test("custom commands install flat namespace methods through a real service work
         "*.*": "direct_cdp",
       },
     },
-    server: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
     types: {
       custom_commands: {
         "Custom.doSomething": {
@@ -58,9 +48,7 @@ test("custom commands install flat namespace methods through a real service work
     await cdp.connect();
 
     const success: boolean = await cdp.Custom.doSomething({ id: "abc" });
-    const rawSuccess: boolean = Boolean(
-      await cdp.send("Custom.doSomething", { id: "abc" }),
-    );
+    const rawSuccess: boolean = Boolean(await cdp.send("Custom.doSomething", { id: "abc" }));
 
     assert.equal(success, true);
     assert.equal(rawSuccess, true);
@@ -92,7 +80,7 @@ test("custom events validate raw string handlers through a real service worker",
         "*.*": "direct_cdp",
       },
     },
-    server: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
     types: {
       custom_events: {
         "Custom.someEvent": { event_schema: EventSchema },
@@ -112,7 +100,7 @@ test("custom events validate raw string handlers through a real service worker",
 
     await cdp.Mod.evaluate({
       expression:
-        "async () => await globalThis.ModCDP.emit('Custom.someEvent', { data: 'ok' })",
+        "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.someEvent', data: { data: 'ok' }, cdpSessionId: null }))",
     });
     await received;
     assert.deepEqual(seen, ["ok"]);
@@ -126,7 +114,7 @@ test("schema-only custom commands register without a websocket", async () => {
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
 
   const result = await cdp.send("Mod.addCustomCommand", {
@@ -148,25 +136,11 @@ test("schema-only custom commands register without a websocket", async () => {
   assert.deepEqual(result, { name: "Custom.echo", registered: true });
   const command_params_schemas = cdp.types.command_params_schemas;
   const command_result_schemas = cdp.types.command_result_schemas;
-  assert.deepEqual(
-    command_params_schemas.get("Custom.echo")?.parse({ text: "ok" }),
-    { text: "ok" },
-  );
-  assert.throws(() =>
-    command_params_schemas.get("Custom.echo")?.parse({ text: "" }),
-  );
-  assert.throws(() =>
-    command_params_schemas
-      .get("Custom.echo")
-      ?.parse({ text: "ok", extra: true }),
-  );
-  assert.deepEqual(
-    command_result_schemas.get("Custom.echo")?.parse({ text: "ok" }),
-    { text: "ok" },
-  );
-  assert.throws(() =>
-    command_result_schemas.get("Custom.echo")?.parse({ text: 123 }),
-  );
+  assert.deepEqual(command_params_schemas.get("Custom.echo")?.parse({ text: "ok" }), { text: "ok" });
+  assert.throws(() => command_params_schemas.get("Custom.echo")?.parse({ text: "" }));
+  assert.throws(() => command_params_schemas.get("Custom.echo")?.parse({ text: "ok", extra: true }));
+  assert.deepEqual(command_result_schemas.get("Custom.echo")?.parse({ text: "ok" }), { text: "ok" });
+  assert.throws(() => command_result_schemas.get("Custom.echo")?.parse({ text: 123 }));
 });
 
 test("constructor custom command and event schemas validate nested payloads", () => {
@@ -174,7 +148,7 @@ test("constructor custom command and event schemas validate nested payloads", ()
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
     types: {
       custom_commands: [
         {
@@ -222,32 +196,14 @@ test("constructor custom command and event schemas validate nested payloads", ()
   const event_schemas = cdp.types.event_schemas;
 
   const valid_params = { items: [{ id: "a", count: 1 }] };
-  assert.deepEqual(
-    command_params_schemas.get("Custom.collect")?.parse(valid_params),
-    valid_params,
-  );
-  assert.throws(() =>
-    command_params_schemas
-      .get("Custom.collect")
-      ?.parse({ items: [{ id: "a", count: 0 }] }),
-  );
-  assert.throws(() =>
-    command_params_schemas.get("Custom.collect")?.parse({ items: [] }),
-  );
-  assert.deepEqual(
-    event_schemas
-      .get("Custom.ready")
-      ?.parse({ url: "https://example.com", ready: true }),
-    {
-      url: "https://example.com",
-      ready: true,
-    },
-  );
-  assert.throws(() =>
-    event_schemas
-      .get("Custom.ready")
-      ?.parse({ url: "http://example.com", ready: true }),
-  );
+  assert.deepEqual(command_params_schemas.get("Custom.collect")?.parse(valid_params), valid_params);
+  assert.throws(() => command_params_schemas.get("Custom.collect")?.parse({ items: [{ id: "a", count: 0 }] }));
+  assert.throws(() => command_params_schemas.get("Custom.collect")?.parse({ items: [] }));
+  assert.deepEqual(event_schemas.get("Custom.ready")?.parse({ url: "https://example.com", ready: true }), {
+    url: "https://example.com",
+    ready: true,
+  });
+  assert.throws(() => event_schemas.get("Custom.ready")?.parse({ url: "http://example.com", ready: true }));
   assert.deepEqual(event_schemas.get("Custom.count")?.parse({ value: 3 }), {
     value: 3,
   });
@@ -259,7 +215,7 @@ test("assigned type registry updates runtime validation and aliases", () => {
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
 
   cdp.types = cdp.types.update({
@@ -274,72 +230,61 @@ test("assigned type registry updates runtime validation and aliases", () => {
     },
   });
 
-  assert.equal(
-    typeof (cdp as unknown as { Custom: { later: unknown } }).Custom.later,
-    "function",
-  );
-  assert.deepEqual(
-    cdp.types.command_params_schemas.get("Custom.later")?.parse({ value: 1 }),
-    { value: 1 },
-  );
-  assert.equal(
-    cdp.types.parseCommandResult("Custom.later", { ok: true }),
-    true,
-  );
-  assert.deepEqual(
-    cdp.types.parseEventPayload("Custom.laterReady", { value: "ok" }),
-    { value: "ok" },
-  );
+  assert.equal(typeof (cdp as unknown as { Custom: { later: unknown } }).Custom.later, "function");
+  assert.deepEqual(cdp.types.command_params_schemas.get("Custom.later")?.parse({ value: 1 }), { value: 1 });
+  assert.equal(cdp.types.parseCommandResult("Custom.later", { ok: true }), true);
+  assert.deepEqual(cdp.types.parseEventPayload("Custom.laterReady", { value: "ok" }), { value: "ok" });
 });
 
 test("service worker server validates registered custom command and event schemas", async () => {
-  const scope = {} as typeof globalThis;
-  const server = await new ModCDPServer({ global_scope: scope }).start();
+  const modcdp_global = globalThis as typeof globalThis & {
+    ModCDP?: ModCDPServer;
+  };
+  const previous_modcdp = modcdp_global.ModCDP;
+  const server = new ModCDPServer();
+  modcdp_global.ModCDP = server;
 
-  await server.configure({
-    server: { router: { router_routes: { "*.*": "chrome_debugger" } } },
-  });
+  try {
+    await server.configure({
+      server_options: { router: { router_routes: { "*.*": "chromedebugger" } } },
+    });
 
-  server.addCustomCommand({
-    name: "Custom.double",
-    params_schema: z.object({ value: z.number() }),
-    result_schema: z.object({ value: z.number() }),
-    handler: async (params: { value: number }) => ({ value: params.value * 2 }),
-  });
-  assert.deepEqual(
-    server.client?.types.command_params_schemas
-      .get("Custom.double")
-      ?.parse({ value: 2 }),
-    { value: 2 },
-  );
-  assert.deepEqual(
-    server.client?.types.command_result_schemas
-      .get("Custom.double")
-      ?.parse({ value: 4 }),
-    { value: 4 },
-  );
-  assert.deepEqual(
-    await server.handleCommand("Custom.double", { value: 2 }),
-    4,
-  );
-  await assert.rejects(() =>
-    server.handleCommand("Custom.double", { value: "2" }),
-  );
+    server.addCustomCommand({
+      name: "Custom.double",
+      params_schema: z.object({ value: z.number() }),
+      result_schema: z.object({ value: z.number() }),
+      expression: "async (params) => ({ value: params.value * 2 })",
+    });
+    assert.deepEqual(server.client?.types.command_params_schemas.get("Custom.double")?.parse({ value: 2 }), {
+      value: 2,
+    });
+    assert.deepEqual(server.client?.types.command_result_schemas.get("Custom.double")?.parse({ value: 4 }), {
+      value: 4,
+    });
+    assert.equal(
+      server.client?.types.custom_commands.get("Custom.double")?.expression,
+      "async (params) => ({ value: params.value * 2 })",
+    );
 
-  server.addCustomCommand({
-    name: "Custom.badResult",
-    result_schema: z.object({ ok: z.boolean() }),
-    handler: async () => ({ ok: "yes" }),
-  });
-  await assert.rejects(() => server.handleCommand("Custom.badResult", {}));
+    server.addCustomCommand({
+      name: "Custom.badResult",
+      result_schema: z.object({ ok: z.boolean() }),
+      expression: 'async () => ({ ok: "yes" })',
+    });
+    assert.equal(
+      server.client?.types.custom_commands.get("Custom.badResult")?.expression,
+      'async () => ({ ok: "yes" })',
+    );
 
-  server.addCustomEvent({
-    name: "Custom.ready",
-    event_schema: z.object({ ok: z.boolean() }),
-  });
-  assert.deepEqual(
-    server.client?.types.event_schemas.get("Custom.ready")?.parse({ ok: true }),
-    { ok: true },
-  );
-  await assert.rejects(() => server.emit("Custom.ready", { ok: "yes" }));
+    server.addCustomEvent({
+      name: "Custom.ready",
+      event_schema: z.object({ ok: z.boolean() }),
+    });
+    assert.deepEqual(server.client?.types.event_schemas.get("Custom.ready")?.parse({ ok: true }), { ok: true });
+    assert.throws(() => server.client?.types.parseEventPayload("Custom.ready", { ok: "yes" }));
+  } finally {
+    server.downstream.stop("test complete");
+    if (previous_modcdp) modcdp_global.ModCDP = previous_modcdp;
+    else delete modcdp_global.ModCDP;
+  }
 });

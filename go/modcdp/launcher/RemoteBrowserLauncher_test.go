@@ -34,7 +34,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	if httpLauncher.Launched != fromHTTP {
 		t.Fatal("expected launcher to retain launched browser")
 	}
-	httpTransportConfig := httpLauncher.GetTransportConfig()
+	httpTransportConfig := httpLauncher.ConfigForUpstream()
 	if httpTransportConfig["upstream_ws_cdp_url"] != local.CDPURL {
 		t.Fatalf("http transport cdp_url = %v, want %s", httpTransportConfig["upstream_ws_cdp_url"], local.CDPURL)
 	}
@@ -74,7 +74,7 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	if wsLauncher.Launched != fromWS {
 		t.Fatal("expected ws launcher to retain launched browser")
 	}
-	wsTransportConfig := wsLauncher.GetTransportConfig()
+	wsTransportConfig := wsLauncher.ConfigForUpstream()
 	if wsTransportConfig["upstream_ws_cdp_url"] != local.CDPURL {
 		t.Fatalf("ws transport cdp_url = %v, want %s", wsTransportConfig["upstream_ws_cdp_url"], local.CDPURL)
 	}

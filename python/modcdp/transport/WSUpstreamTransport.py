@@ -7,14 +7,14 @@ from typing import Any
 from websocket import create_connection
 
 from ..launcher.BrowserLauncher import resolveCdpWebSocketUrl
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 
 
 class WSUpstreamTransport(UpstreamTransport):
-    mode = "ws"
+    upstream_mode = "ws"
 
-    def __init__(self, options: dict[str, Any] | None = None) -> None:
-        super().__init__()
+    def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
+        super().__init__(options)
         options = options or {}
         self.url = str(options.get("upstream_ws_cdp_url") or "")
         self.ws: Any | None = None

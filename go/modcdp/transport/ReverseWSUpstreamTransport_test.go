@@ -22,19 +22,19 @@ import (
 )
 
 func TestReverseWSUpstreamTransportConfigOwnsBindUpdatesAndWaitTimeout(t *testing.T) {
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: "127.0.0.1:29292", UpstreamReverseWSWaitTimeoutMS: 10})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: "127.0.0.1:29292", UpstreamReverseWSWaitTimeoutMS: 10})
 	if transport.URL != "ws://127.0.0.1:29292" {
 		t.Fatalf("URL = %q", transport.URL)
 	}
-	if !reflect.DeepEqual(transport.GetInjectorConfig(), InjectorOptions{}) {
-		t.Fatalf("injector config = %#v", transport.GetInjectorConfig())
+	if !reflect.DeepEqual(transport.ConfigForInjector(), InjectorOptions{}) {
+		t.Fatalf("injector config = %#v", transport.ConfigForInjector())
 	}
 	transport.Update(map[string]any{"upstream_reversews_bind": "127.0.0.1:29293", "upstream_reversews_wait_timeout_ms": 5})
 	if transport.URL != "ws://127.0.0.1:29293" {
 		t.Fatalf("URL after update = %q", transport.URL)
 	}
-	if !reflect.DeepEqual(transport.GetInjectorConfig(), InjectorOptions{}) {
-		t.Fatalf("injector config after update = %#v", transport.GetInjectorConfig())
+	if !reflect.DeepEqual(transport.ConfigForInjector(), InjectorOptions{}) {
+		t.Fatalf("injector config after update = %#v", transport.ConfigForInjector())
 	}
 	transport.Update(map[string]any{"upstream_reversews_bind": "http://127.0.0.1:29294"})
 	if transport.URL != "ws://127.0.0.1:29294" {
@@ -46,7 +46,7 @@ func TestReverseWSUpstreamTransportConfigOwnsBindUpdatesAndWaitTimeout(t *testin
 }
 
 func TestReverseWSUpstreamTransportSendBeforePeerErrorsImmediately(t *testing.T) {
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: "127.0.0.1:29292", UpstreamReverseWSWaitTimeoutMS: 5_000})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: "127.0.0.1:29292", UpstreamReverseWSWaitTimeoutMS: 5_000})
 	started := time.Now()
 	err := transport.Send(map[string]any{"id": 1, "method": "Browser.getVersion"})
 	if err == nil || !strings.Contains(err.Error(), "no reverse ModCDP extension peer is connected at ws://127.0.0.1:29292") {
@@ -62,7 +62,7 @@ func TestReverseWSUpstreamTransportCloseResetsPeerWaitState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestReverseWSUpstreamTransportWaitsAgainAfterPeerDisconnects(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestReverseWSUpstreamTransportAcceptsReplacementPeerAfterDisconnect(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 500})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 500})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestReverseWSUpstreamTransportCloseRejectsPendingPeerWaits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := NewReverseWSUpstreamTransport(ReverseWSUpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5_000})
+	transport := NewReverseWSUpstreamTransport(UpstreamTransportOptions{UpstreamReverseWSBind: fmt.Sprintf("127.0.0.1:%d", port), UpstreamReverseWSWaitTimeoutMS: 5_000})
 	done := make(chan error, 1)
 	go func() {
 		done <- transport.WaitForPeer()
@@ -226,7 +226,7 @@ func TestReverseWSUpstreamTransportAcceptsRealExtensionReverseConnectionAndRoute
 	}
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
 	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{
+		Launcher: modcdp.LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(headless),
 			// Reversews is browser -> client only. After explicit CHROME_PATH and
@@ -234,7 +234,7 @@ func TestReverseWSUpstreamTransportAcceptsRealExtensionReverseConnectionAndRoute
 			// Canary rejects --load-extension in this local test path.
 			LauncherLocalExecutablePath: reverseWSTestBrowserPath(t),
 		},
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "reversews"},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "reversews"},
 		Injector: modcdp.InjectorOptions{
 			InjectorCLIExtensionPath:            extensionPath,
 			InjectorMode:                        "cli",

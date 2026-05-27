@@ -3,10 +3,7 @@ import * as DOM from "../types/generated/zod/DOM.js";
 import * as Page from "../types/generated/zod/Page.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
-import type {
-  TargetRoute,
-  UpstreamTransport,
-} from "../transport/UpstreamTransport.js";
+import type { TargetRoute, UpstreamTransport } from "../transport/UpstreamTransport.js";
 import type { CDPTypes } from "../types/CDPTypes.js";
 import {
   CdpDebuggeeCommandParamsSchema,
@@ -36,7 +33,7 @@ type ExecutionContextWaiter = {
   timeout: ReturnType<typeof setTimeout>;
   matches: (context: ModCDPTopologyExecutionContext) => boolean;
 };
-export type AutoSessionRouterOptions = ModCDPRouterOptions & {
+type AutoSessionRouterOptions = ModCDPRouterOptions & {
   upstream: UpstreamTransport;
   types: CDPTypes;
   loopback_execution_context_timeout_ms: number;
@@ -44,7 +41,7 @@ export type AutoSessionRouterOptions = ModCDPRouterOptions & {
 
 const topologyConcurrency = 8;
 const piercerWorldName = "__modcdp_piercer__";
-export const DEFAULT_CLIENT_ROUTER_ROUTES = {
+const DEFAULT_CLIENT_ROUTER_ROUTES = {
   "Mod.*": "service_worker",
   "Custom.*": "service_worker",
   "*.*": "service_worker",
@@ -74,49 +71,30 @@ const targetAutoAttachParams = {
  * 4. Frame detach, navigation, target detach, and target destroy events remove
  *    only the state affected by the browser event.
  */
-export class AutoSessionRouter {
+class AutoSessionRouter {
   readonly router_routes: ModCDPRoutes;
 
   // TargetID -> native flattened Target.SessionID. Updated by ensureRouteForTarget
   // and Target.attachedToTarget events; read by routing, injectors, and topology.
-  readonly sessionId_from_targetId = new Map<
-    cdp.types.ts.Target.TargetID,
-    cdp.types.ts.Target.SessionID
-  >();
+  readonly sessionId_from_targetId = new Map<cdp.types.ts.Target.TargetID, cdp.types.ts.Target.SessionID>();
 
   // Native flattened Target.SessionID -> TargetID. Updated with
   // sessionId_from_targetId; read when events arrive with only a session id.
-  readonly targetId_from_sessionId = new Map<
-    cdp.types.ts.Target.SessionID,
-    cdp.types.ts.Target.TargetID
-  >();
+  readonly targetId_from_sessionId = new Map<cdp.types.ts.Target.SessionID, cdp.types.ts.Target.TargetID>();
 
   // TargetID -> latest target metadata plus router-owned session metadata.
   // Updated from target discovery/events; read by topology and target selection.
-  readonly targets = new Map<
-    cdp.types.ts.Target.TargetID,
-    ModCDPTopologyTarget
-  >();
+  readonly targets = new Map<cdp.types.ts.Target.TargetID, ModCDPTopologyTarget>();
 
   // Context key -> execution context. The key is Chrome's uniqueId when present,
   // otherwise target/session plus context id. Updated by Runtime events and by
   // Page.createIsolatedWorld; read by waits, DOM root resolution, and topology.
   readonly contexts = new Map<string, ModCDPTopologyExecutionContext>();
 
-  // SessionID -> first Runtime execution context id observed for that session.
-  // Updated by Runtime.executionContextCreated; read by ModCDPClient injectors.
-  readonly execution_contexts = new Map<
-    cdp.types.ts.Target.SessionID,
-    cdp.types.ts.Runtime.ExecutionContextId
-  >();
-
   // Context waiters keyed by native session id or by target id for sessionless
   // upstreams. Added by waitForExecutionContextMatching and resolved/rejected by
   // recordExecutionContext and invalidation methods.
-  private readonly execution_context_waiters = new Map<
-    string,
-    Set<ExecutionContextWaiter>
-  >();
+  private readonly execution_context_waiters = new Map<string, Set<ExecutionContextWaiter>>();
 
   // Semantic upstream selected by the owner. The router calls methods on this
   // object but never mutates transport-owned private state.
@@ -131,7 +109,6 @@ export class AutoSessionRouter {
   // execution-context waiter.
   readonly loopback_execution_context_timeout_ms: number;
   private subscription_cleanup: (() => void) | null = null;
-  private initialized = false;
 
   constructor({
     upstream,
@@ -142,25 +119,31 @@ export class AutoSessionRouter {
     this.upstream = upstream;
     this.types = types;
     this.router_routes = { ...router_routes };
-    this.loopback_execution_context_timeout_ms =
-      loopback_execution_context_timeout_ms;
+    this.loopback_execution_context_timeout_ms = loopback_execution_context_timeout_ms;
   }
 
   /** Install routing event listeners and enable browser-side target discovery. */
   async start() {
-    if (this.initialized) return;
-    this.subscription_cleanup = this.listen();
-    await Promise.all([
-      this.upstream.send(Target.SetAutoAttachCommand, targetAutoAttachParams),
-      this.upstream.send(Target.SetDiscoverTargetsCommand, { discover: true }),
-    ]);
-    this.initialized = true;
+    if (this.subscription_cleanup) return;
+    const subscription_cleanup = this.listen();
+    this.subscription_cleanup = subscription_cleanup;
+    try {
+      await Promise.all([
+        this.upstream.send(Target.SetAutoAttachCommand, targetAutoAttachParams),
+        this.upstream.send(Target.SetDiscoverTargetsCommand, { discover: true }),
+      ]);
+    } catch (error) {
+      if (this.subscription_cleanup === subscription_cleanup) {
+        subscription_cleanup();
+        this.subscription_cleanup = null;
+      }
+      throw error;
+    }
   }
 
   stop() {
     this.subscription_cleanup?.();
     this.subscription_cleanup = null;
-    this.initialized = false;
   }
 
   /** Route a CDP command using router-owned target/session policy. */
@@ -170,19 +153,13 @@ export class AutoSessionRouter {
     requestedSessionId: cdp.types.ts.Target.SessionID | null = null,
   ): Promise<ProtocolResult> {
     const command = this.types.nativeCommandSchema(method);
-    if (!command)
-      throw new Error(
-        `AutoSessionRouter cannot route unknown CDP command ${method}.`,
-      );
+    if (!command) throw new Error(`AutoSessionRouter cannot route unknown CDP command ${method}.`);
     const domain = command.id.split(".")[0] ?? "";
     if (domain === "Browser" || domain === "Target" || domain === "SystemInfo")
       return await this.upstream.send(command, params);
     if (requestedSessionId != null) {
       const targetId = this.targetId_from_sessionId.get(requestedSessionId);
-      if (!targetId)
-        throw new Error(
-          `No target is recorded for sessionId=${requestedSessionId}.`,
-        );
+      if (!targetId) throw new Error(`No target is recorded for sessionId=${requestedSessionId}.`);
       const route = {
         targetId,
         sessionId: requestedSessionId,
@@ -197,121 +174,63 @@ export class AutoSessionRouter {
       await this.resolveTargetId(CdpDebuggeeCommandParamsSchema.parse(params)),
     );
     const routed_params =
-      command.id === Runtime.CallFunctionOnCommand.id
-        ? await this.callFunctionOnParamsForRoute(params, route)
-        : params;
+      command.id === Runtime.CallFunctionOnCommand.id ? await this.callFunctionOnParamsForRoute(params, route) : params;
     return await this.upstream.send(command, routed_params, route);
   }
 
   /** Ensure a target has a real native flattened CDP session id. */
-  async ensureSessionForTarget(
-    targetId: cdp.types.ts.Target.TargetID,
-  ): Promise<cdp.types.ts.Target.SessionID> {
+  async ensureSessionForTarget(targetId: cdp.types.ts.Target.TargetID): Promise<cdp.types.ts.Target.SessionID> {
     const route = await this.ensureRouteForTarget(targetId);
-    if (route.sessionId == null)
-      throw new Error(
-        `Upstream attached targetId=${targetId} without a CDP session id.`,
-      );
+    if (route.sessionId == null) throw new Error(`Upstream attached targetId=${targetId} without a CDP session id.`);
     return route.sessionId;
   }
 
   /** Ensure a target is addressable by the selected upstream. */
-  async ensureRouteForTarget(
-    targetId: cdp.types.ts.Target.TargetID | null,
-  ): Promise<TargetRoute> {
-    targetId ??= await this.resolveTargetId(
-      CdpDebuggeeCommandParamsSchema.parse({}),
-    );
-    const sessionId = targetId
-      ? this.sessionId_from_targetId.get(targetId)
-      : null;
+  async ensureRouteForTarget(targetId: cdp.types.ts.Target.TargetID | null): Promise<TargetRoute> {
+    targetId ??= await this.resolveTargetId(CdpDebuggeeCommandParamsSchema.parse({}));
+    const sessionId = targetId ? this.sessionId_from_targetId.get(targetId) : null;
     if (targetId && sessionId != null) return { targetId, sessionId };
     const target = targetId ? this.targets.get(targetId) : null;
-    if (targetId && target?.sessionId === null)
-      return { targetId, sessionId: null };
+    if (targetId && target?.sessionId === null) return { targetId, sessionId: null };
     targetId ??= await this.upstream.createTarget("about:blank#modcdp");
     const attachedSessionId = await this.upstream.attachToTarget(targetId);
     if (attachedSessionId == null) {
       this.recordTargetSessionlessAttachment(targetId);
       return { targetId, sessionId: null };
     }
-    this.recordTargetSession(
-      targetId,
-      attachedSessionId,
-      this.targets.get(targetId),
-    );
+    this.recordTargetSession(targetId, attachedSessionId, this.targets.get(targetId));
     return { targetId, sessionId: attachedSessionId };
   }
 
   private listen() {
     const subscriptions = [
       this.upstream.on(Target.AttachedToTargetEvent, (event) =>
-        this.recordTargetSession(
-          event.targetInfo.targetId,
-          event.sessionId,
-          event.targetInfo,
-        ),
+        this.recordTargetSession(event.targetInfo.targetId, event.sessionId, event.targetInfo),
       ),
-      this.upstream.on(Target.DetachedFromTargetEvent, (event) =>
-        this.forgetSession(event.sessionId),
-      ),
-      this.upstream.on(Target.TargetInfoChangedEvent, (event) =>
-        this.recordTarget(event.targetInfo),
-      ),
-      this.upstream.on(Target.TargetDestroyedEvent, (event) =>
-        this.forgetTarget(event.targetId),
-      ),
-      this.upstream.on(
-        Runtime.ExecutionContextCreatedEvent,
-        (event, targetId, sessionId) => {
-          this.recordExecutionContext(targetId, sessionId, event.context);
-        },
-      ),
-      this.upstream.on(
-        Runtime.ExecutionContextDestroyedEvent,
-        (event, _targetId, sessionId) => {
-          if (sessionId)
-            this.forgetExecutionContextById(
-              sessionId,
-              event.executionContextId,
-            );
-        },
-      ),
-      this.upstream.on(
-        Runtime.ExecutionContextsClearedEvent,
-        (_event, _targetId, sessionId) => {
-          if (sessionId) this.forgetExecutionContextsForRoute(sessionId);
-        },
-      ),
-      this.upstream.on(
-        Page.FrameNavigatedEvent,
-        (event, targetId, sessionId) => {
-          this.forgetExecutionContextsForFrame(
-            sessionId,
-            targetId,
-            event.frame.id,
-          );
-        },
-      ),
-      this.upstream.on(
-        Page.FrameDetachedEvent,
-        (event, targetId, sessionId) => {
-          this.forgetExecutionContextsForFrame(
-            sessionId,
-            targetId,
-            event.frameId,
-          );
-        },
-      ),
+      this.upstream.on(Target.DetachedFromTargetEvent, (event) => this.forgetSession(event.sessionId)),
+      this.upstream.on(Target.TargetInfoChangedEvent, (event) => this.recordTarget(event.targetInfo)),
+      this.upstream.on(Target.TargetDestroyedEvent, (event) => this.forgetTarget(event.targetId)),
+      this.upstream.on(Runtime.ExecutionContextCreatedEvent, (event, targetId, sessionId) => {
+        this.recordExecutionContext(targetId, sessionId, event.context);
+      }),
+      this.upstream.on(Runtime.ExecutionContextDestroyedEvent, (event, _targetId, sessionId) => {
+        if (sessionId) this.forgetExecutionContextById(sessionId, event.executionContextId);
+      }),
+      this.upstream.on(Runtime.ExecutionContextsClearedEvent, (_event, _targetId, sessionId) => {
+        if (sessionId) this.forgetExecutionContextsForRoute(sessionId);
+      }),
+      this.upstream.on(Page.FrameNavigatedEvent, (event, targetId, sessionId) => {
+        this.forgetExecutionContextsForFrame(sessionId, targetId, event.frame.id);
+      }),
+      this.upstream.on(Page.FrameDetachedEvent, (event, targetId, sessionId) => {
+        this.forgetExecutionContextsForFrame(sessionId, targetId, event.frameId);
+      }),
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
   }
 
   /** Wait for the first execution context associated with a real session id. */
-  waitForExecutionContext(
-    sessionId: string | null,
-    { timeout_ms }: { timeout_ms?: number } = {},
-  ): Promise<number> {
+  waitForExecutionContext(sessionId: string | null, { timeout_ms }: { timeout_ms?: number } = {}): Promise<number> {
     return this.waitForExecutionContextMatching(
       (context) => context.sessionId === sessionId,
       sessionId,
@@ -319,25 +238,17 @@ export class AutoSessionRouter {
     ).then((context) => context.id);
   }
 
-  private async callFunctionOnParamsForRoute(
-    params: ProtocolParams,
-    route: TargetRoute,
-  ): Promise<ProtocolParams> {
+  private async callFunctionOnParamsForRoute(params: ProtocolParams, route: TargetRoute): Promise<ProtocolParams> {
     const call_params = Runtime.CallFunctionOnCommand.params.parse(params);
     // objectId and uniqueContextId already pin the call to a browser-owned
     // context. Only inject executionContextId for global calls that need the
     // route's current Runtime context.
-    if (
-      call_params.executionContextId != null ||
-      call_params.uniqueContextId != null ||
-      call_params.objectId != null
-    )
+    if (call_params.executionContextId != null || call_params.uniqueContextId != null || call_params.objectId != null)
       return call_params;
     const context = await this.waitForExecutionContextMatching(
       (current_context) =>
         current_context.targetId === route.targetId &&
-        (route.sessionId == null ||
-          current_context.sessionId === route.sessionId),
+        (route.sessionId == null || current_context.sessionId === route.sessionId),
       route.sessionId ?? route.targetId,
     );
     return {
@@ -355,12 +266,7 @@ export class AutoSessionRouter {
     selector: ContextSelector = { world: "main" },
   ): Promise<ModCDPTopologyExecutionContext> {
     const route = await this.ensureRouteForTarget(frame.targetId);
-    const existing = this.findExecutionContext(
-      route.targetId,
-      route.sessionId,
-      frame.frameId,
-      selector,
-    );
+    const existing = this.findExecutionContext(route.targetId, route.sessionId, frame.frameId, selector);
     if (existing) return existing;
 
     await this.upstream.send(Runtime.EnableCommand, {}, route);
@@ -369,41 +275,22 @@ export class AutoSessionRouter {
         Page.CreateIsolatedWorldCommand,
         {
           frameId: frame.frameId,
-          worldName:
-            selector.worldName ??
-            (selector.world === "piercer" ? piercerWorldName : undefined),
+          worldName: selector.worldName ?? (selector.world === "piercer" ? piercerWorldName : undefined),
           grantUniveralAccess: true,
         },
         route,
       );
-      const createdContext = this.findExecutionContext(
-        route.targetId,
-        route.sessionId,
-        frame.frameId,
-        selector,
-      );
-      if (createdContext?.id === created.executionContextId)
-        return createdContext;
+      const createdContext = this.findExecutionContext(route.targetId, route.sessionId, frame.frameId, selector);
+      if (createdContext?.id === created.executionContextId) return createdContext;
       const context: ModCDPTopologyExecutionContext = {
         id: created.executionContextId,
         sessionId: route.sessionId,
         targetId: route.targetId,
         frameId: frame.frameId,
-        world:
-          selector.world === "piercer"
-            ? "piercer"
-            : selector.worldName || "isolated",
+        world: selector.world === "piercer" ? "piercer" : selector.worldName || "isolated",
         name: selector.worldName,
       };
-      this.contexts.set(
-        this.contextKey(
-          route.targetId,
-          route.sessionId,
-          context.id,
-          context.uniqueId,
-        ),
-        context,
-      );
+      this.contexts.set(this.contextKey(route.targetId, route.sessionId, context.id, context.uniqueId), context);
       return context;
     }
 
@@ -418,41 +305,26 @@ export class AutoSessionRouter {
   }
 
   /** Build the current target/frame/DOM-root/execution-context topology. */
-  async getTopology(
-    params: ModCDPGetTopologyParams = {},
-  ): Promise<ModCDPTopology> {
+  async getTopology(params: ModCDPGetTopologyParams = {}): Promise<ModCDPTopology> {
     const objectGroup = `modcdp-topology-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const targetInfos = await this.upstream.getTargets();
     for (const targetInfo of targetInfos) this.recordTarget(targetInfo);
 
     const rootTarget = this.resolveRootTarget(params, targetInfos);
-    if (rootTarget == null)
-      throw new Error("Mod.getTopology could not resolve a page target.");
+    if (rootTarget == null) throw new Error("Mod.getTopology could not resolve a page target.");
     const frames = new Map<cdp.types.ts.Page.FrameId, ModCDPTopologyFrame>();
     const rootRoute = await this.enableTarget(rootTarget.targetId);
-    const rootTree = (
-      await this.upstream.send(Page.GetFrameTreeCommand, {}, rootRoute)
-    ).frameTree;
+    const rootTree = (await this.upstream.send(Page.GetFrameTreeCommand, {}, rootRoute)).frameTree;
     const rootFrameId = rootTree.frame.id;
     this.recordFrameTree(rootTree, rootTarget.targetId, null, frames);
 
     const oopifTargets = targetInfos.filter(
-      (target) =>
-        target.type === "iframe" &&
-        target.parentFrameId &&
-        !frames.has(target.targetId),
+      (target) => target.type === "iframe" && target.parentFrameId && !frames.has(target.targetId),
     );
     await runTopologyQueue(oopifTargets, async (target) => {
       const route = await this.enableTarget(target.targetId);
-      const frameTree = (
-        await this.upstream.send(Page.GetFrameTreeCommand, {}, route)
-      ).frameTree;
-      this.recordFrameTree(
-        frameTree,
-        target.targetId,
-        target.parentFrameId ?? null,
-        frames,
-      );
+      const frameTree = (await this.upstream.send(Page.GetFrameTreeCommand, {}, route)).frameTree;
+      this.recordFrameTree(frameTree, target.targetId, target.parentFrameId ?? null, frames);
     });
 
     await runTopologyQueue([...frames.entries()], async ([frameId, frame]) => {
@@ -460,50 +332,26 @@ export class AutoSessionRouter {
       const parent = frames.get(frame.parentFrameId);
       if (!parent) return;
       const parentRoute = await this.ensureRouteForTarget(parent.targetId);
-      const owner = await this.upstream.send(
-        DOM.GetFrameOwnerCommand,
-        { frameId },
-        parentRoute,
-      );
-      if (owner.backendNodeId != null)
-        frame.outerBackendNodeId = owner.backendNodeId;
+      const owner = await this.upstream.send(DOM.GetFrameOwnerCommand, { frameId }, parentRoute);
+      if (owner.backendNodeId != null) frame.outerBackendNodeId = owner.backendNodeId;
     });
 
     const contexts = new Map<string, ModCDPTopologyExecutionContext>();
-    const roots = new Map<
-      cdp.types.ts.Runtime.RemoteObjectId,
-      ModCDPTopologyDomRoot
-    >();
+    const roots = new Map<cdp.types.ts.Runtime.RemoteObjectId, ModCDPTopologyDomRoot>();
     await runTopologyQueue([...frames.entries()], async ([frameId, frame]) => {
-      const context = await this.ensureExecutionContext(
-        { frameId, targetId: frame.targetId },
-        { world: "piercer" },
-      );
-      contexts.set(
-        this.contextKey(
-          context.targetId,
-          context.sessionId ?? null,
-          context.id,
-          context.uniqueId,
-        ),
-        context,
-      );
+      const context = await this.ensureExecutionContext({ frameId, targetId: frame.targetId }, { world: "piercer" });
+      contexts.set(this.contextKey(context.targetId, context.sessionId ?? null, context.id, context.uniqueId), context);
       const rootObject = await this.upstream.send(
         Runtime.EvaluateCommand,
         {
           expression: "document.documentElement",
           objectGroup,
-          ...(context.uniqueId
-            ? { uniqueContextId: context.uniqueId }
-            : { contextId: context.id }),
+          ...(context.uniqueId ? { uniqueContextId: context.uniqueId } : { contextId: context.id }),
         },
         context,
       );
       const objectId = rootObject.result.objectId;
-      if (!objectId)
-        throw new Error(
-          `Mod.getTopology could not resolve document root for frameId=${frameId}.`,
-        );
+      if (!objectId) throw new Error(`Mod.getTopology could not resolve document root for frameId=${frameId}.`);
       const node = (
         await this.upstream.send(
           DOM.DescribeNodeCommand,
@@ -523,35 +371,23 @@ export class AutoSessionRouter {
       });
     });
 
-    await runTopologyQueue(
-      [...new Set([...frames.values()].map((frame) => frame.targetId))],
-      async (targetId) => {
-        const route = await this.ensureRouteForTarget(targetId);
-        const document = await this.upstream.send(
-          DOM.GetDocumentCommand,
-          {
-            depth: -1,
-            pierce: true,
-          },
-          route,
-        );
-        await this.recordShadowRoots(document.root, frames, roots, objectGroup);
-      },
-    );
+    await runTopologyQueue([...new Set([...frames.values()].map((frame) => frame.targetId))], async (targetId) => {
+      const route = await this.ensureRouteForTarget(targetId);
+      const document = await this.upstream.send(
+        DOM.GetDocumentCommand,
+        {
+          depth: -1,
+          pierce: true,
+        },
+        route,
+      );
+      await this.recordShadowRoots(document.root, frames, roots, objectGroup);
+    });
 
     for (const context of this.contexts.values()) {
-      if (
-        [...frames.values()].some(
-          (frame) => frame.targetId === context.targetId,
-        )
-      ) {
+      if ([...frames.values()].some((frame) => frame.targetId === context.targetId)) {
         contexts.set(
-          this.contextKey(
-            context.targetId,
-            context.sessionId ?? null,
-            context.id,
-            context.uniqueId,
-          ),
+          this.contextKey(context.targetId, context.sessionId ?? null, context.id, context.uniqueId),
           context,
         );
       }
@@ -563,35 +399,19 @@ export class AutoSessionRouter {
       frames: Object.fromEntries(frames),
       roots: Object.fromEntries(roots),
       targets: Object.fromEntries(
-        [...this.targets].filter(([targetId]) =>
-          targetInfos.some((target) => target.targetId === targetId),
-        ),
+        [...this.targets].filter(([targetId]) => targetInfos.some((target) => target.targetId === targetId)),
       ),
       contexts: Object.fromEntries(contexts),
     };
   }
 
-  private resolveRootTarget(
-    params: ModCDPGetTopologyParams,
-    targetInfos: TargetInfo[],
-  ): TargetInfo | null {
+  private resolveRootTarget(params: ModCDPGetTopologyParams, targetInfos: TargetInfo[]): TargetInfo | null {
     const requestedTargetId = params.rootTargetId ?? params.targetId ?? null;
-    if (requestedTargetId)
-      return (
-        targetInfos.find((target) => target.targetId === requestedTargetId) ??
-        null
-      );
-    return (
-      targetInfos.find(
-        (target) =>
-          target.type === "page" && !target.url.startsWith("devtools://"),
-      ) ?? null
-    );
+    if (requestedTargetId) return targetInfos.find((target) => target.targetId === requestedTargetId) ?? null;
+    return targetInfos.find((target) => target.type === "page" && !target.url.startsWith("devtools://")) ?? null;
   }
 
-  private async resolveTargetId(
-    params: CdpDebuggeeCommandParams,
-  ): Promise<cdp.types.ts.Target.TargetID | null> {
+  private async resolveTargetId(params: CdpDebuggeeCommandParams): Promise<cdp.types.ts.Target.TargetID | null> {
     const explicitTargetId = await this.upstream.resolveTargetId(params);
     if (explicitTargetId) return explicitTargetId;
     const targetInfos = await this.upstream.getTargets();
@@ -601,31 +421,22 @@ export class AutoSessionRouter {
       const tab = await globalThis.chrome.tabs.get(tabId);
       const tabUrl = tab.url || tab.pendingUrl || null;
       if (tabUrl) {
-        const targetId = targetInfos.find(
-          (target) => target.type === "page" && target.url === tabUrl,
-        )?.targetId;
+        const targetId = targetInfos.find((target) => target.type === "page" && target.url === tabUrl)?.targetId;
         if (targetId) return targetId;
       }
     }
     return (
-      targetInfos.find(
-        (target) =>
-          target.type === "page" && !target.url.startsWith("devtools://"),
-      )?.targetId ?? null
+      targetInfos.find((target) => target.type === "page" && !target.url.startsWith("devtools://"))?.targetId ?? null
     );
   }
 
-  private async enableTarget(
-    targetId: cdp.types.ts.Target.TargetID,
-  ): Promise<TargetRoute> {
+  private async enableTarget(targetId: cdp.types.ts.Target.TargetID): Promise<TargetRoute> {
     const route = await this.ensureRouteForTarget(targetId);
     await Promise.all([
       this.upstream.send(Page.EnableCommand, {}, route),
       this.upstream.send(DOM.EnableCommand, {}, route),
       this.upstream.send(Runtime.EnableCommand, {}, route),
-      this.upstream
-        .send(Target.SetAutoAttachCommand, targetAutoAttachParams, route)
-        .catch(() => ({})),
+      this.upstream.send(Target.SetAutoAttachCommand, targetAutoAttachParams, route).catch(() => ({})),
     ]);
     return route;
   }
@@ -642,8 +453,7 @@ export class AutoSessionRouter {
       url: tree.frame.url ?? null,
       parentFrameId: tree.frame.parentId ?? parentFrameId ?? null,
     });
-    for (const child of tree.childFrames ?? [])
-      this.recordFrameTree(child, targetId, frameId, frames);
+    for (const child of tree.childFrames ?? []) this.recordFrameTree(child, targetId, frameId, frames);
   }
 
   private async recordShadowRoots(
@@ -679,36 +489,19 @@ export class AutoSessionRouter {
             roots.set(objectId, {
               kind: "shadow",
               frameId: currentFrameId,
-              outerBackendNodeId:
-                hostBackendNodeId ?? node.backendNodeId ?? null,
+              outerBackendNodeId: hostBackendNodeId ?? node.backendNodeId ?? null,
               innerBackendNodeId: shadowRoot.backendNodeId ?? null,
               mode: shadowRoot.shadowRootType,
               executionContextId: context.id,
-              ...(context.uniqueId
-                ? { uniqueContextId: context.uniqueId }
-                : {}),
+              ...(context.uniqueId ? { uniqueContextId: context.uniqueId } : {}),
             });
           }
         }
       }
-      await this.recordShadowRoots(
-        shadowRoot,
-        frames,
-        roots,
-        objectGroup,
-        currentFrameId,
-        node.backendNodeId ?? null,
-      );
+      await this.recordShadowRoots(shadowRoot, frames, roots, objectGroup, currentFrameId, node.backendNodeId ?? null);
     }
     for (const child of node.children ?? []) {
-      await this.recordShadowRoots(
-        child,
-        frames,
-        roots,
-        objectGroup,
-        currentFrameId,
-        hostBackendNodeId,
-      );
+      await this.recordShadowRoots(child, frames, roots, objectGroup, currentFrameId, hostBackendNodeId);
     }
     if (node.contentDocument) {
       await this.recordShadowRoots(
@@ -752,15 +545,11 @@ export class AutoSessionRouter {
     this.targets.set(targetId, target);
   }
 
-  private recordTargetSessionlessAttachment(
-    targetId: cdp.types.ts.Target.TargetID,
-  ): void {
+  private recordTargetSessionlessAttachment(targetId: cdp.types.ts.Target.TargetID): void {
     const existing = this.targets.get(targetId);
     this.targets.set(
       targetId,
-      existing
-        ? { ...existing, sessionId: null }
-        : { targetId, type: "page", sessionId: null },
+      existing ? { ...existing, sessionId: null } : { targetId, type: "page", sessionId: null },
     );
   }
 
@@ -769,20 +558,10 @@ export class AutoSessionRouter {
     sessionId: cdp.types.ts.Target.SessionID | null,
     context: cdp.types.ts.Runtime.ExecutionContextDescription,
   ): void {
-    const targetId =
-      eventTargetId ??
-      (sessionId
-        ? (this.targetId_from_sessionId.get(sessionId) ?? null)
-        : null);
+    const targetId = eventTargetId ?? (sessionId ? (this.targetId_from_sessionId.get(sessionId) ?? null) : null);
     if (!targetId) return;
-    if (sessionId && !this.execution_contexts.has(sessionId))
-      this.execution_contexts.set(sessionId, context.id);
-    const auxData =
-      context.auxData && typeof context.auxData === "object"
-        ? context.auxData
-        : {};
-    const frameId =
-      typeof auxData.frameId === "string" ? auxData.frameId : null;
+    const auxData = context.auxData && typeof context.auxData === "object" ? context.auxData : {};
+    const frameId = typeof auxData.frameId === "string" ? auxData.frameId : null;
     const topologyContext: ModCDPTopologyExecutionContext = {
       ...context,
       id: context.id,
@@ -796,10 +575,7 @@ export class AutoSessionRouter {
             ? "main"
             : context.name || String(auxData.type ?? "isolated"),
     };
-    this.contexts.set(
-      this.contextKey(targetId, sessionId, context.id, context.uniqueId),
-      topologyContext,
-    );
+    this.contexts.set(this.contextKey(targetId, sessionId, context.id, context.uniqueId), topologyContext);
     const waiterKey = sessionId ?? targetId;
     const waiters = this.execution_context_waiters.get(waiterKey);
     if (!waiters) return;
@@ -819,13 +595,10 @@ export class AutoSessionRouter {
     selector: ContextSelector,
   ): ModCDPTopologyExecutionContext | null {
     for (const context of this.contexts.values()) {
-      if (context.targetId !== targetId || context.frameId !== frameId)
-        continue;
+      if (context.targetId !== targetId || context.frameId !== frameId) continue;
       if (sessionId != null && context.sessionId !== sessionId) continue;
-      if (selector.world === "piercer" && context.world === "piercer")
-        return context;
-      if (selector.world === "isolated" && context.name === selector.worldName)
-        return context;
+      if (selector.world === "piercer" && context.world === "piercer") return context;
+      if (selector.world === "isolated" && context.name === selector.worldName) return context;
       if (selector.world === "main" && context.world === "main") return context;
       if (context.world === selector.world) return context;
     }
@@ -840,12 +613,7 @@ export class AutoSessionRouter {
     for (const context of this.contexts.values()) {
       if (matches(context)) return Promise.resolve(context);
     }
-    if (!waiterKey)
-      return Promise.reject(
-        new Error(
-          "Cannot wait for a Runtime execution context without a route.",
-        ),
-      );
+    if (!waiterKey) return Promise.reject(new Error("Cannot wait for a Runtime execution context without a route."));
     return new Promise<ModCDPTopologyExecutionContext>((resolve, reject) => {
       const waiter: ExecutionContextWaiter = {
         resolve,
@@ -854,13 +622,8 @@ export class AutoSessionRouter {
         timeout: setTimeout(() => {
           const waiters = this.execution_context_waiters.get(waiterKey);
           waiters?.delete(waiter);
-          if (waiters?.size === 0)
-            this.execution_context_waiters.delete(waiterKey);
-          reject(
-            new Error(
-              `Timed out waiting for Runtime.executionContextCreated for route ${waiterKey}.`,
-            ),
-          );
+          if (waiters?.size === 0) this.execution_context_waiters.delete(waiterKey);
+          reject(new Error(`Timed out waiting for Runtime.executionContextCreated for route ${waiterKey}.`));
         }, timeoutMs),
       };
       const waiters = this.execution_context_waiters.get(waiterKey);
@@ -884,9 +647,7 @@ export class AutoSessionRouter {
     const waiters = this.execution_context_waiters.get(sessionId);
     if (!waiters) return;
     this.execution_context_waiters.delete(sessionId);
-    const error = new Error(
-      `Runtime execution context wait cancelled because session ${sessionId} detached.`,
-    );
+    const error = new Error(`Runtime execution context wait cancelled because session ${sessionId} detached.`);
     for (const waiter of waiters) {
       clearTimeout(waiter.timeout);
       waiter.reject(error);
@@ -898,23 +659,16 @@ export class AutoSessionRouter {
     executionContextId: cdp.types.ts.Runtime.ExecutionContextId,
   ): void {
     for (const [contextKey, context] of this.contexts) {
-      if (
-        (context.sessionId === routeKey || context.targetId === routeKey) &&
-        context.id === executionContextId
-      ) {
+      if ((context.sessionId === routeKey || context.targetId === routeKey) && context.id === executionContextId) {
         this.contexts.delete(contextKey);
       }
     }
-    if (this.execution_contexts.get(routeKey) === executionContextId)
-      this.execution_contexts.delete(routeKey);
   }
 
   private forgetExecutionContextsForRoute(routeKey: string): void {
     for (const [contextKey, context] of this.contexts) {
-      if (context.sessionId === routeKey || context.targetId === routeKey)
-        this.contexts.delete(contextKey);
+      if (context.sessionId === routeKey || context.targetId === routeKey) this.contexts.delete(contextKey);
     }
-    this.execution_contexts.delete(routeKey);
   }
 
   private forgetExecutionContextsForFrame(
@@ -924,10 +678,8 @@ export class AutoSessionRouter {
   ): void {
     for (const [contextKey, context] of this.contexts) {
       if (context.frameId !== frameId) continue;
-      if (sessionId != null && context.sessionId === sessionId)
-        this.contexts.delete(contextKey);
-      else if (targetId != null && context.targetId === targetId)
-        this.contexts.delete(contextKey);
+      if (sessionId != null && context.sessionId === sessionId) this.contexts.delete(contextKey);
+      else if (targetId != null && context.targetId === targetId) this.contexts.delete(contextKey);
     }
   }
 
@@ -941,20 +693,17 @@ export class AutoSessionRouter {
   }
 }
 
-async function runTopologyQueue<T>(
-  items: Iterable<T>,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
+async function runTopologyQueue<T>(items: Iterable<T>, worker: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
-  const workers = Array.from(
-    { length: Math.min(topologyConcurrency, queue.length) },
-    async () => {
-      for (;;) {
-        const item = queue.shift();
-        if (item == null) return;
-        await worker(item);
-      }
-    },
-  );
+  const workers = Array.from({ length: Math.min(topologyConcurrency, queue.length) }, async () => {
+    for (;;) {
+      const item = queue.shift();
+      if (item == null) return;
+      await worker(item);
+    }
+  });
   await Promise.all(workers);
 }
+
+export { DEFAULT_CLIENT_ROUTER_ROUTES, AutoSessionRouter };
+export type { AutoSessionRouterOptions };

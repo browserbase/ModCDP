@@ -31,12 +31,7 @@ type ReverseWSUpstreamTransport struct {
 	generation    int64
 }
 
-type ReverseWSUpstreamTransportOptions struct {
-	UpstreamReverseWSBind          string `json:"upstream_reversews_bind,omitempty"`
-	UpstreamReverseWSWaitTimeoutMS int    `json:"upstream_reversews_wait_timeout_ms,omitempty"`
-}
-
-func NewReverseWSUpstreamTransport(options ReverseWSUpstreamTransportOptions) *ReverseWSUpstreamTransport {
+func NewReverseWSUpstreamTransport(options UpstreamTransportOptions) *ReverseWSUpstreamTransport {
 	reverseWSBind := options.UpstreamReverseWSBind
 	if reverseWSBind == "" {
 		reverseWSBind = DefaultUpstreamReverseWSBind
@@ -45,7 +40,7 @@ func NewReverseWSUpstreamTransport(options ReverseWSUpstreamTransportOptions) *R
 	if reverseWSWaitTimeoutMS == 0 {
 		reverseWSWaitTimeoutMS = DefaultUpstreamReverseWSWaitTimeoutMS
 	}
-	t := &ReverseWSUpstreamTransport{WaitTimeoutMS: reverseWSWaitTimeoutMS, peerCh: make(chan struct{}), closeCh: make(chan struct{})}
+	t := &ReverseWSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(options), WaitTimeoutMS: reverseWSWaitTimeoutMS, peerCh: make(chan struct{}), closeCh: make(chan struct{})}
 	t.setBind(reverseWSBind)
 	return t
 }
@@ -71,6 +66,7 @@ func (t *ReverseWSUpstreamTransport) setBind(bind string) {
 }
 
 func (t *ReverseWSUpstreamTransport) Update(config map[string]any) {
+	t.UpstreamTransport.Update(config)
 	if config == nil {
 		return
 	}
@@ -113,7 +109,7 @@ func (t *ReverseWSUpstreamTransport) Send(message map[string]any) error {
 	return wsutil.WriteServerText(conn, body)
 }
 
-func (t *ReverseWSUpstreamTransport) GetInjectorConfig() InjectorOptions {
+func (t *ReverseWSUpstreamTransport) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{}
 }
 

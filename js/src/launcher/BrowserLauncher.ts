@@ -1,8 +1,8 @@
-import type { UpstreamTransport, UpstreamOptions } from "../transport/UpstreamTransport.js";
+import type { UpstreamTransport, UpstreamTransportOptions } from "../transport/UpstreamTransport.js";
 import type { ModCDPServerOptions } from "../types/modcdp.js";
 
-export type LauncherMode = "local" | "remote" | "bb" | "none";
-export type LauncherOptions = {
+type LauncherMode = "local" | "remote" | "bb" | "none";
+type LauncherOptions = {
   launcher_mode?: LauncherMode;
   launcher_local_executable_path?: string | null;
   launcher_local_user_data_dir?: string | null;
@@ -30,7 +30,7 @@ export type LauncherOptions = {
   launcher_bb_session_create_params?: Record<string, unknown> | null;
 };
 
-export type LaunchedBrowser = {
+type LaunchedBrowser = {
   proc?: unknown;
   cdp_listen_port?: number;
   // Browser websocket CDP endpoint when one exists. Pipe transports expose pipe handles instead.
@@ -46,8 +46,8 @@ export type LaunchedBrowser = {
   close: () => Promise<void> | void;
 };
 
-export const DEFAULT_CHROME_READY_TIMEOUT_MS = 45_000;
-export const DEFAULT_CHROME_READY_POLL_INTERVAL_MS = 100;
+const DEFAULT_CHROME_READY_TIMEOUT_MS = 45_000;
+const DEFAULT_CHROME_READY_POLL_INTERVAL_MS = 100;
 
 function mergeChromeArgs(existing: string[] = [], incoming: string[] = []) {
   const args = [...existing, ...incoming];
@@ -71,7 +71,7 @@ function mergeChromeArgs(existing: string[] = [], incoming: string[] = []) {
   return merged;
 }
 
-export class BrowserLauncher {
+class BrowserLauncher {
   // setup options
   launcher_mode: LauncherMode;
   launcher_local_executable_path: string | null;
@@ -140,9 +140,13 @@ export class BrowserLauncher {
     this.launcher_local_cdp_listen_port = config.launcher_local_cdp_listen_port ?? this.launcher_local_cdp_listen_port;
     this.launcher_local_headless = config.launcher_local_headless ?? this.launcher_local_headless;
     this.launcher_local_sandbox = config.launcher_local_sandbox ?? this.launcher_local_sandbox;
-    if (config.launcher_local_args) this.launcher_local_args = mergeChromeArgs(this.launcher_local_args, config.launcher_local_args);
+    if (config.launcher_local_args)
+      this.launcher_local_args = mergeChromeArgs(this.launcher_local_args, config.launcher_local_args);
     if (config.launcher_local_extra_args)
-      this.launcher_local_extra_args = mergeChromeArgs(this.launcher_local_extra_args, config.launcher_local_extra_args);
+      this.launcher_local_extra_args = mergeChromeArgs(
+        this.launcher_local_extra_args,
+        config.launcher_local_extra_args,
+      );
     this.launcher_local_cdp_transport = config.launcher_local_cdp_transport ?? this.launcher_local_cdp_transport;
     this.launcher_local_loopback_cdp = config.launcher_local_loopback_cdp ?? this.launcher_local_loopback_cdp;
     this.launcher_local_cleanup_user_data_dir =
@@ -153,20 +157,15 @@ export class BrowserLauncher {
       config.launcher_local_chrome_ready_poll_interval_ms ?? this.launcher_local_chrome_ready_poll_interval_ms;
     this.launcher_bb_api_key = config.launcher_bb_api_key ?? this.launcher_bb_api_key;
     this.launcher_bb_base_url = config.launcher_bb_base_url ?? this.launcher_bb_base_url;
-    this.launcher_bb_session_id =
-      config.launcher_bb_session_id ?? this.launcher_bb_session_id;
-    this.launcher_bb_keep_alive =
-      config.launcher_bb_keep_alive ?? this.launcher_bb_keep_alive;
+    this.launcher_bb_session_id = config.launcher_bb_session_id ?? this.launcher_bb_session_id;
+    this.launcher_bb_keep_alive = config.launcher_bb_keep_alive ?? this.launcher_bb_keep_alive;
     this.launcher_bb_close_session_on_close =
       config.launcher_bb_close_session_on_close ?? this.launcher_bb_close_session_on_close;
     this.launcher_bb_region = config.launcher_bb_region ?? this.launcher_bb_region;
     this.launcher_bb_timeout = config.launcher_bb_timeout ?? this.launcher_bb_timeout;
-    this.launcher_bb_extension_id =
-      config.launcher_bb_extension_id ?? this.launcher_bb_extension_id;
-    this.launcher_bb_browser_settings =
-      config.launcher_bb_browser_settings ?? this.launcher_bb_browser_settings;
-    this.launcher_bb_user_metadata =
-      config.launcher_bb_user_metadata ?? this.launcher_bb_user_metadata;
+    this.launcher_bb_extension_id = config.launcher_bb_extension_id ?? this.launcher_bb_extension_id;
+    this.launcher_bb_browser_settings = config.launcher_bb_browser_settings ?? this.launcher_bb_browser_settings;
+    this.launcher_bb_user_metadata = config.launcher_bb_user_metadata ?? this.launcher_bb_user_metadata;
     this.launcher_bb_session_create_params =
       config.launcher_bb_session_create_params ?? this.launcher_bb_session_create_params;
     return this;
@@ -176,7 +175,7 @@ export class BrowserLauncher {
     throw new Error(`${this.constructor.name}.launch is not implemented.`);
   }
 
-  configForUpstream(): UpstreamOptions {
+  configForUpstream(): UpstreamTransportOptions {
     return {
       upstream_ws_cdp_url: this.launched?.cdp_url ?? this.launcher_remote_cdp_url,
       upstream_pipe_read: this.launched?.pipe_read,
@@ -192,7 +191,9 @@ export class BrowserLauncher {
         : upstream.upstream_mode !== "ws" && upstream.upstream_mode !== "pipe" && this.launched?.cdp_url
           ? this.launched.cdp_url
           : null);
-    return launcher_local_loopback_cdp_url ? { server_loopback_cdp_url: launcher_local_loopback_cdp_url } : {};
+    return launcher_local_loopback_cdp_url
+      ? { upstream: { upstream_ws_cdp_url: launcher_local_loopback_cdp_url } }
+      : {};
   }
 
   async close() {
@@ -202,7 +203,7 @@ export class BrowserLauncher {
   }
 }
 
-export async function resolveCdpWebSocketUrl(endpoint: string, name = "cdp_url") {
+async function resolveCdpWebSocketUrl(endpoint: string, name = "cdp_url") {
   if (/^wss?:\/\//i.test(endpoint)) return endpoint;
   const httpEndpoint = /^[a-z][a-z\d+\-.]*:\/\//i.test(endpoint) ? endpoint : `http://${endpoint}`;
   const response = await fetch(`${httpEndpoint.replace(/\/$/, "")}/json/version`);
@@ -211,3 +212,11 @@ export async function resolveCdpWebSocketUrl(endpoint: string, name = "cdp_url")
   if (!version.webSocketDebuggerUrl) throw new Error(`${name} HTTP discovery returned no webSocketDebuggerUrl`);
   return version.webSocketDebuggerUrl as string;
 }
+
+export {
+  DEFAULT_CHROME_READY_TIMEOUT_MS,
+  DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
+  BrowserLauncher,
+  resolveCdpWebSocketUrl,
+};
+export type { LauncherMode, LauncherOptions, LaunchedBrowser };

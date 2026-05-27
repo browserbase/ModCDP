@@ -30,7 +30,7 @@ class ReverseWSUpstreamTransportTests(unittest.TestCase):
             "upstream_reversews_wait_timeout_ms": 10,
         })
         self.assertEqual(transport.url, "ws://127.0.0.1:29292")
-        self.assertEqual(transport.getInjectorConfig(), {})
+        self.assertEqual(transport.configForInjector(), {})
         self.assertIs(
             transport.update({
                 "upstream_reversews_bind": "127.0.0.1:29293",
@@ -39,7 +39,7 @@ class ReverseWSUpstreamTransportTests(unittest.TestCase):
             transport,
         )
         self.assertEqual(transport.url, "ws://127.0.0.1:29293")
-        self.assertEqual(transport.getInjectorConfig(), {})
+        self.assertEqual(transport.configForInjector(), {})
         with self.assertRaisesRegex(RuntimeError, "Timed out waiting 5ms"):
             transport.waitForPeer()
 
@@ -141,7 +141,7 @@ class ReverseWSUpstreamTransportTests(unittest.TestCase):
             first_peer.close()
             transport.close()
 
-    def test_accepts_real_extension_reverse_connection_and_routes_cdp_through_chrome_debugger(self) -> None:
+    def test_accepts_real_extension_reverse_connection_and_routes_cdp_through_chromedebugger(self) -> None:
         cdp = ModCDPClient(
             launcher={
                 "launcher_mode": "local",
@@ -163,7 +163,7 @@ class ReverseWSUpstreamTransportTests(unittest.TestCase):
 
         try:
             cdp.connect()
-            self.assertEqual(cdp.transport.mode if cdp.transport else None, "reversews")
+            self.assertEqual(cdp.transport.upstream_mode if cdp.transport else None, "reversews")
             self.assertIsInstance(cdp.transport, ReverseWSUpstreamTransport)
             transport = cast(ReverseWSUpstreamTransport, cdp.transport)
             self.assertEqual(transport.url, "ws://127.0.0.1:29292")

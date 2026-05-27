@@ -10,14 +10,14 @@ class NoneBrowserLauncherTests(unittest.TestCase):
         launcher = NoneBrowserLauncher({"launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/initial"})
         self.assertEqual(launcher.options.get("launcher_remote_cdp_url"), "ws://127.0.0.1:9222/devtools/browser/initial")
         self.assertEqual(
-            launcher.getTransportConfig().get("upstream_ws_cdp_url"),
+            launcher.configForUpstream().get("upstream_ws_cdp_url"),
             "ws://127.0.0.1:9222/devtools/browser/initial",
         )
 
         launched = launcher.launch({"launcher_remote_cdp_url": "ws://127.0.0.1:9222/devtools/browser/call"})
         self.assertIs(launcher.launched, launched)
         self.assertIsNone(launched["cdp_url"])
-        self.assertEqual(launcher.getServerConfig(), {})
+        self.assertEqual(launcher.configForServer(), {})
         launched["close"]()
 
 

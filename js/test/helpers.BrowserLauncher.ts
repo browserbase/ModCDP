@@ -9,7 +9,7 @@ type Pending = {
   reject: (error: Error) => void;
 };
 
-export class CdpSocket {
+class CdpSocket {
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private events = new Map<string, Record<string, unknown>[]>();
@@ -62,7 +62,7 @@ export class CdpSocket {
   }
 }
 
-export class PipeCdpSocket {
+class PipeCdpSocket {
   private nextId = 100;
   private pending = new Map<number, Pending>();
   private buffer = "";
@@ -97,7 +97,7 @@ export class PipeCdpSocket {
   }
 }
 
-export async function expectCdpBrowserSurface(cdp: Pick<CdpSocket, "send">) {
+async function expectCdpBrowserSurface(cdp: Pick<CdpSocket, "send">) {
   const version = await cdp.send("Browser.getVersion");
   expect(version.product).toEqual(expect.stringMatching(/Chrome|Chromium/));
   expect(version.protocolVersion).toEqual(expect.any(String));
@@ -122,7 +122,7 @@ export async function expectCdpBrowserSurface(cdp: Pick<CdpSocket, "send">) {
   }
 }
 
-export async function expectHttpEndpointDown(url: string) {
+async function expectHttpEndpointDown(url: string) {
   await expect
     .poll(
       async () => {
@@ -137,3 +137,5 @@ export async function expectHttpEndpointDown(url: string) {
     )
     .toBe(true);
 }
+
+export { CdpSocket, PipeCdpSocket, expectCdpBrowserSurface, expectHttpEndpointDown };

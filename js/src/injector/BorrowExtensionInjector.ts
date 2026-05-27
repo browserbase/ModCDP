@@ -1,6 +1,8 @@
-import { installModCDPServer } from "../server/ModCDPServer.js";
+import fs from "node:fs";
+import path from "node:path";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import * as Target from "../types/generated/zod/Target.js";
+import { defaultModCDPExtensionPath, prepareUnpackedExtension } from "./NodeExtensionFiles.js";
 import {
   ExtensionInjector,
   type ExtensionInjectionResult,
@@ -9,40 +11,68 @@ import {
 } from "./ExtensionInjector.js";
 
 const EXT_ID_FROM_URL = /^chrome-extension:\/\/([a-z]+)\//;
-const MODCDP_READY_EXPRESSION =
-  "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
-const bootstrap_modcdp_server_expression = `
-  function() {
-    const __name = (fn) => fn;
-    const installModCDPServer = ${installModCDPServer.toString()};
-    const ModCDP = installModCDPServer(globalThis);
-    return {
-      ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),
-      extension_id: globalThis.chrome?.runtime?.id ?? null,
-      has_tabs: Boolean(globalThis.chrome?.tabs?.query),
-      has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
-    };
-  }
+const MODCDP_READY_EXPRESSION = "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
+const BORROW_BOOTSTRAP_STATUS_EXPRESSION = `
+  (() => ({
+    ok: Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent),
+    extension_id: globalThis.chrome?.runtime?.id ?? null,
+    has_tabs: Boolean(globalThis.chrome?.tabs?.query),
+    has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
+  }))()
 `;
 
-export class BorrowExtensionInjector extends ExtensionInjector {
+class BorrowExtensionInjector extends ExtensionInjector {
+  private unpacked_extension_path: string | null = null;
+  private cleanup: (() => Promise<void>) | null = null;
+  private bootstrap_modcdp_server_expression: string | null = null;
+
   constructor(options: InjectorOptions = {}) {
     super(options);
     this.injector_mode = "borrow";
   }
 
+  async prepare() {
+    if (this.bootstrap_modcdp_server_expression) {
+      await super.prepare();
+      return;
+    }
+    const extension_path = this.injector_borrow_extension_path ?? defaultModCDPExtensionPath();
+    const prepared = await prepareUnpackedExtension(extension_path);
+    this.unpacked_extension_path = prepared.unpacked_extension_path;
+    this.cleanup = prepared.cleanup;
+    const service_worker_path = path.join(this.unpacked_extension_path, "modcdp", "service_worker.js");
+    let service_worker_source: string;
+    try {
+      service_worker_source = fs.readFileSync(service_worker_path, "utf8");
+    } catch (error) {
+      await this.cleanup();
+      this.cleanup = null;
+      this.unpacked_extension_path = null;
+      throw error;
+    }
+    this.bootstrap_modcdp_server_expression = `
+      async function() {
+        if (!globalThis.ModCDP) {
+          ${service_worker_source}
+        }
+        const ModCDP = globalThis.ModCDP;
+        return {
+          ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),
+          extension_id: globalThis.chrome?.runtime?.id ?? null,
+          has_tabs: Boolean(globalThis.chrome?.tabs?.query),
+          has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
+        };
+      }
+    `;
+    await super.prepare();
+  }
+
   async inject() {
-    const deadline =
-      Date.now() + (this.injector_service_worker_ready_timeout_ms ?? 60_000);
+    const deadline = Date.now() + (this.injector_service_worker_ready_timeout_ms ?? 60_000);
     do {
       const borrowed = await this.borrowVisibleServiceWorkers();
       if (borrowed) return borrowed;
-      await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          this.injector_service_worker_poll_interval_ms ?? 100,
-        ),
-      );
+      await new Promise((resolve) => setTimeout(resolve, this.injector_service_worker_poll_interval_ms ?? 100));
     } while (Date.now() < deadline);
     return null;
   }
@@ -53,23 +83,16 @@ export class BorrowExtensionInjector extends ExtensionInjector {
       has_tabs: boolean;
       has_debugger: boolean;
     }> = [];
-    const visible_service_workers = (await this.targetInfos()).filter(
-      (target) => {
-        const target_url = target.url ?? "";
-        return (
-          target.type === "service_worker" &&
-          target_url.startsWith("chrome-extension://")
-        );
-      },
-    );
+    const visible_service_workers = (await this.targetInfos()).filter((target) => {
+      const target_url = target.url ?? "";
+      return target.type === "service_worker" && target_url.startsWith("chrome-extension://");
+    });
     const has_configured_matcher =
       Boolean(this.injector_service_worker_extension_id) ||
       (this.injector_service_worker_url_includes?.length ?? 0) > 0 ||
       (this.injector_service_worker_url_suffixes?.length ?? 0) > 0;
     const candidates = has_configured_matcher
-      ? visible_service_workers.filter((target) =>
-          this.serviceWorkerTargetMatches(target),
-        )
+      ? visible_service_workers.filter((target) => this.serviceWorkerTargetMatches(target))
       : visible_service_workers;
     for (const target of candidates) {
       try {
@@ -77,11 +100,7 @@ export class BorrowExtensionInjector extends ExtensionInjector {
         if (bootstrapped) borrowed.push(bootstrapped);
       } catch {}
     }
-    borrowed.sort(
-      (a, b) =>
-        Number(b.has_debugger) - Number(a.has_debugger) ||
-        Number(b.has_tabs) - Number(a.has_tabs),
-    );
+    borrowed.sort((a, b) => Number(b.has_debugger) - Number(a.has_debugger) || Number(b.has_tabs) - Number(a.has_tabs));
     return borrowed[0]?.result ?? null;
   }
 
@@ -97,16 +116,36 @@ export class BorrowExtensionInjector extends ExtensionInjector {
     const session_id = attach_result.sessionId;
     try {
       await this.send(Runtime.EnableCommand, {}, session_id).catch(() => {});
-      const bootstrap = await this.send(
+      const status = await this.send(
         Runtime.EvaluateCommand,
         {
-          expression: `(${bootstrap_modcdp_server_expression})()`,
-          awaitPromise: true,
+          expression: BORROW_BOOTSTRAP_STATUS_EXPRESSION,
           returnByValue: true,
         },
         session_id,
       );
-      const value = bootstrap.result?.value || {};
+      let value = status.result?.value || {};
+      if (!value.has_tabs || !value.has_debugger) {
+        await this.send(Target.DetachFromTargetCommand, {
+          sessionId: session_id,
+        }).catch(() => {});
+        return null;
+      }
+      if (!value.ok) {
+        if (!this.bootstrap_modcdp_server_expression) {
+          throw new Error("BorrowExtensionInjector requires prepare before inject.");
+        }
+        const bootstrap = await this.send(
+          Runtime.EvaluateCommand,
+          {
+            expression: `(${this.bootstrap_modcdp_server_expression})()`,
+            awaitPromise: true,
+            returnByValue: true,
+          },
+          session_id,
+        );
+        value = bootstrap.result?.value || {};
+      }
       if (!value.has_tabs || !value.has_debugger) {
         await this.send(Target.DetachFromTargetCommand, {
           sessionId: session_id,
@@ -134,10 +173,7 @@ export class BorrowExtensionInjector extends ExtensionInjector {
       return {
         result: {
           source: "borrow",
-          extension_id:
-            value.extension_id ||
-            target.url?.match(EXT_ID_FROM_URL)?.[1] ||
-            null,
+          extension_id: value.extension_id || target.url?.match(EXT_ID_FROM_URL)?.[1] || null,
           target_id: target.targetId,
           url: target.url,
           session_id,
@@ -152,4 +188,12 @@ export class BorrowExtensionInjector extends ExtensionInjector {
       throw error;
     }
   }
+
+  async close() {
+    await super.close();
+    await this.cleanup?.();
+    this.cleanup = null;
+  }
 }
+
+export { BorrowExtensionInjector };

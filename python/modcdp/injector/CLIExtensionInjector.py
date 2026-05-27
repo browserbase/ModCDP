@@ -29,7 +29,7 @@ class CLIExtensionInjector(ExtensionInjector):
         self._resolveExtensionId()
         super().prepare()
 
-    def getLauncherConfig(self) -> LauncherOptions:
+    def configForLauncher(self) -> LauncherOptions:
         if not self.unpacked_extension_path:
             return {}
         return {"launcher_local_extra_args": [f"--load-extension={self.unpacked_extension_path}"]}

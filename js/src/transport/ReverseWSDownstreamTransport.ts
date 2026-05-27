@@ -6,7 +6,7 @@ import {
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
-export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 
 /**
  * Owns the reverse WebSocket downstream connection from the extension service
@@ -29,11 +29,8 @@ export const DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  *    while an endpoint is still configured.
  * 5. `stop()` clears the endpoint and reconnect timer, then closes the socket.
  */
-export class ReverseWSDownstreamTransport extends DownstreamTransport {
-  readonly name = "reversews";
-
-  // Server-owned keepalive hook. Called after the reverse socket opens.
-  private readonly ensureOffscreenKeepAlive: () => unknown;
+class ReverseWSDownstreamTransport extends DownstreamTransport {
+  readonly name = "reversews" as const;
 
   // Configured reversews endpoint. Set by start, cleared by stop, read by
   // reconnect scheduling.
@@ -54,11 +51,6 @@ export class ReverseWSDownstreamTransport extends DownstreamTransport {
   // Request object -> WebSocket that sent it. Written by handleMessage and read
   // by sendResponse so responses go only to the originating downstream client.
   private readonly socket_from_request = new WeakMap<CdpCommandMessage, WebSocket>();
-
-  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
-    super();
-    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
-  }
 
   /** True when the reversews socket is currently open and can receive events. */
   get connected() {
@@ -89,8 +81,8 @@ export class ReverseWSDownstreamTransport extends DownstreamTransport {
     };
   }
 
-  /** Start the default reversews listener configured into the shipped extension. */
-  startDefault() {
+  /** Start polling for reversews clients using the shipped extension default. */
+  startPollingForClients() {
     return this.start("ws://127.0.0.1:29292", { reconnect_interval_ms: DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS });
   }
 
@@ -157,7 +149,6 @@ export class ReverseWSDownstreamTransport extends DownstreamTransport {
     const ws = new WebSocket(endpoint);
     this.socket = ws;
     ws.addEventListener("open", () => {
-      void this.ensureOffscreenKeepAlive();
       ws.send(
         JSON.stringify({
           type: "modcdp.reverse.hello",
@@ -187,3 +178,5 @@ export class ReverseWSDownstreamTransport extends DownstreamTransport {
     await this.handleRequest(message);
   }
 }
+
+export { DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS, ReverseWSDownstreamTransport };

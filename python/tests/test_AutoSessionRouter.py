@@ -83,11 +83,16 @@ class AutoSessionRouterTests(unittest.TestCase):
             if isinstance(context_id, BaseException):
                 raise context_id
             self.assertIsInstance(context_id, int)
-            self.assertEqual(router.execution_contexts[session_id], context_id)
+            self.assertTrue(
+                any(
+                    context.get("sessionId") == session_id and context.get("id") == context_id
+                    for context in router.contexts.values()
+                )
+            )
 
             send("Target.detachFromTarget", {"sessionId": session_id})
             _wait_for(lambda: None if router.sessionId_from_targetId.get(created_target_id) else "detached")
-            self.assertNotIn(session_id, router.execution_contexts)
+            self.assertFalse(any(context.get("sessionId") == session_id for context in router.contexts.values()))
             send("Target.closeTarget", {"targetId": created_target_id})
             target_id = None
 
@@ -111,7 +116,7 @@ class AutoSessionRouterTests(unittest.TestCase):
                 str(pending_error),
             )
             _wait_for(lambda: None if router.sessionId_from_targetId.get(created_pending_target_id) else "detached")
-            self.assertNotIn(pending_session_id, router.execution_contexts)
+            self.assertFalse(any(context.get("sessionId") == pending_session_id for context in router.contexts.values()))
             send("Target.closeTarget", {"targetId": created_pending_target_id})
             pending_target_id = None
         finally:

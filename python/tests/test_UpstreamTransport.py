@@ -6,7 +6,7 @@ from modcdp.transport.UpstreamTransport import UpstreamTransport
 
 
 class TestTransport(UpstreamTransport):
-    mode = "ws"
+    upstream_mode = "ws"
 
     def emit(self, value: str) -> None:
         self._parse_and_emit_recv(value)
@@ -19,9 +19,9 @@ class UpstreamTransportTests(unittest.TestCase):
         stop = transport.onRecv(lambda message: received.append(message))
 
         self.assertIs(transport.update(), transport)
-        self.assertEqual(transport.getLauncherConfig(), {})
-        self.assertEqual(transport.getInjectorConfig(), {})
-        self.assertEqual(transport.getServerConfig(), {})
+        self.assertEqual(transport.configForLauncher(), {})
+        self.assertEqual(transport.configForInjector(), {})
+        self.assertEqual(transport.configForServer(), {})
         self.assertIsNone(transport.close())
 
         parsed = []

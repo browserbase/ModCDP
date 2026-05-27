@@ -5,7 +5,7 @@ import { test } from "vitest";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { WSUpstreamTransport } from "../src/transport/WSUpstreamTransport.js";
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");

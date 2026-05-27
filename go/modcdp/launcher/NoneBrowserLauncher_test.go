@@ -7,7 +7,7 @@ func TestNoneBrowserLauncherConstructorLaunchAndConfigMatchTSShape(t *testing.T)
 	if launcher.Options.LauncherRemoteCDPURL != "ws://127.0.0.1:9222/devtools/browser/initial" {
 		t.Fatalf("Options.LauncherRemoteCDPURL = %q", launcher.Options.LauncherRemoteCDPURL)
 	}
-	if transportConfig := launcher.GetTransportConfig(); transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/initial" {
+	if transportConfig := launcher.ConfigForUpstream(); transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/initial" {
 		t.Fatalf("transport config before launch = %#v", transportConfig)
 	}
 	launched, err := launcher.Launch(LaunchOptions{LauncherRemoteCDPURL: "ws://127.0.0.1:9222/devtools/browser/call"})
@@ -20,8 +20,8 @@ func TestNoneBrowserLauncherConstructorLaunchAndConfigMatchTSShape(t *testing.T)
 	if launched.CDPURL != "" {
 		t.Fatalf("launched.CDPURL = %q", launched.CDPURL)
 	}
-	if len(launcher.GetServerConfig()) != 0 {
-		t.Fatalf("server config after launch = %#v", launcher.GetServerConfig())
+	if len(launcher.ConfigForServer()) != 0 {
+		t.Fatalf("server config after launch = %#v", launcher.ConfigForServer())
 	}
 	launched.Close()
 }

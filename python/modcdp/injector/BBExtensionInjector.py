@@ -41,7 +41,7 @@ class BBExtensionInjector(ExtensionInjector):
             self.close()
             raise
 
-    def getLauncherConfig(self) -> LauncherOptions:
+    def configForLauncher(self) -> LauncherOptions:
         if not self.extension_id:
             return {}
         return {"launcher_bb_extension_id": self.extension_id}

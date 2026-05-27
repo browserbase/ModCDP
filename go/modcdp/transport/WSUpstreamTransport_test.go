@@ -10,7 +10,7 @@ import (
 )
 
 func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *testing.T) {
-	transport := NewWSUpstreamTransport(WSUpstreamTransportOptions{})
+	transport := NewWSUpstreamTransport(UpstreamTransportOptions{})
 	if transport.URL != "" {
 		t.Fatalf("URL = %q", transport.URL)
 	}
@@ -18,21 +18,21 @@ func TestWSUpstreamTransportConstructorUpdateAndServerConfigMatchTSShape(t *test
 	if transport.URL != "ws://127.0.0.1:1/devtools/browser/test" {
 		t.Fatalf("URL = %q", transport.URL)
 	}
-	if err := NewWSUpstreamTransport(WSUpstreamTransportOptions{}).Connect(); err == nil || !strings.Contains(err.Error(), "WSUpstreamTransport requires") {
+	if err := NewWSUpstreamTransport(UpstreamTransportOptions{}).Connect(); err == nil || !strings.Contains(err.Error(), "WSUpstreamTransport requires") {
 		t.Fatalf("connect error = %v", err)
 	}
-	if err := NewWSUpstreamTransport(WSUpstreamTransportOptions{}).Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
+	if err := NewWSUpstreamTransport(UpstreamTransportOptions{}).Send(map[string]any{"id": 1, "method": "Browser.getVersion"}); err == nil || !strings.Contains(err.Error(), "CDP websocket is not connected") {
 		t.Fatalf("send error = %v", err)
 	}
 }
 
 func TestWSUpstreamTransportLaunchesRealBrowserAndSpeaksRawCDP(t *testing.T) {
 	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{
+		Launcher: modcdp.LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "ws"},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
@@ -110,7 +110,7 @@ func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *tes
 	}
 	defer chrome.Close()
 
-	transport := NewWSUpstreamTransport(WSUpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestWSUpstreamTransportResolvesRealHTTPCDPEndpointToBrowserWebSocket(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostPortTransport := NewWSUpstreamTransport(WSUpstreamTransportOptions{UpstreamWSCDPURL: parsedCDPURL.Host})
+	hostPortTransport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: parsedCDPURL.Host})
 	if err := hostPortTransport.Connect(); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestWSUpstreamTransportCloseClearsConnectionState(t *testing.T) {
 	}
 	defer chrome.Close()
 
-	transport := NewWSUpstreamTransport(WSUpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
+	transport := NewWSUpstreamTransport(UpstreamTransportOptions{UpstreamWSCDPURL: chrome.CDPURL})
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)
 	}

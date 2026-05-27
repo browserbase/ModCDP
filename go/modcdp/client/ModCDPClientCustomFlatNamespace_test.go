@@ -21,23 +21,23 @@ func TestCustomCommandsInstallFlatNamespaceThroughRealServiceWorker(t *testing.T
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{
+		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: UpstreamConfig{UpstreamMode: "ws"},
+		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		Client: ClientConfig{ClientRoutes: map[string]string{
+		ClientOptions: ClientOptions{ClientRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		Server: &ServerConfig{ServerRoutes: map[string]string{"*.*": "loopback_cdp"}},
+		ServerOptions: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 
@@ -79,23 +79,23 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 		t.Fatal(err)
 	}
 	cdp := New(Options{
-		Launcher: LauncherConfig{
+		Launcher: LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: UpstreamConfig{UpstreamMode: "ws"},
+		Upstream: UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		Client: ClientConfig{ClientRoutes: map[string]string{
+		ClientOptions: ClientOptions{ClientRoutes: map[string]string{
 			"Mod.*":    "service_worker",
 			"Custom.*": "service_worker",
 			"*.*":      "direct_cdp",
 		}},
-		Server: &ServerConfig{ServerRoutes: map[string]string{"*.*": "loopback_cdp"}},
+		ServerOptions: &ServerConfig{Router: RouterOptions{RouterRoutes: map[string]string{"*.*": "loopback_cdp"}}},
 	})
 	defer cdp.Close()
 

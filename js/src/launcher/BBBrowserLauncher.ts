@@ -89,7 +89,7 @@ async function closeBrowserCDP(cdp_url: string | undefined) {
   });
 }
 
-export class BBBrowserLauncher extends BrowserLauncher {
+class BBBrowserLauncher extends BrowserLauncher {
   constructor(options: LauncherOptions = {}) {
     super(options);
     this.launcher_mode = "bb";
@@ -102,9 +102,7 @@ export class BBBrowserLauncher extends BrowserLauncher {
       process.env.BROWSERBASE_API_KEY,
     );
     if (!browserbase_api_key) {
-      throw new Error(
-        "launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.",
-      );
+      throw new Error("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.");
     }
 
     const base_url =
@@ -113,8 +111,7 @@ export class BBBrowserLauncher extends BrowserLauncher {
     const resume_session_id = firstString(options.launcher_bb_session_id, this.launcher_bb_session_id);
     const keep_alive = firstBoolean(options.launcher_bb_keep_alive, this.launcher_bb_keep_alive) ?? false;
     const close_session_on_close =
-      firstBoolean(options.launcher_bb_close_session_on_close, this.launcher_bb_close_session_on_close) ??
-      !keep_alive;
+      firstBoolean(options.launcher_bb_close_session_on_close, this.launcher_bb_close_session_on_close) ?? !keep_alive;
 
     let created_session = false;
     let session: BrowserbaseSession;
@@ -148,11 +145,7 @@ export class BBBrowserLauncher extends BrowserLauncher {
         ...(keep_alive ? { keepAlive: true } : {}),
         ...(firstString(options.launcher_bb_region, this.launcher_bb_region, session_create_params.region)
           ? {
-              region: firstString(
-                options.launcher_bb_region,
-                this.launcher_bb_region,
-                session_create_params.region,
-              ),
+              region: firstString(options.launcher_bb_region, this.launcher_bb_region, session_create_params.region),
             }
           : {}),
         ...(typeof (options.launcher_bb_timeout ?? this.launcher_bb_timeout) === "number"
@@ -211,3 +204,5 @@ export class BBBrowserLauncher extends BrowserLauncher {
     return this.launched;
   }
 }
+
+export { BBBrowserLauncher };

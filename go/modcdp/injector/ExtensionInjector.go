@@ -145,15 +145,15 @@ func (i *ExtensionInjector) Update(config InjectorOptions) *ExtensionInjector {
 	return i
 }
 
-func (i ExtensionInjector) GetInjectorConfig() InjectorOptions {
+func (i ExtensionInjector) ConfigForInjector() InjectorOptions {
 	return i.Options
 }
 
-func (i ExtensionInjector) GetLauncherConfig() LaunchOptions {
+func (i ExtensionInjector) ConfigForLauncher() LaunchOptions {
 	return LaunchOptions{}
 }
 
-func (i ExtensionInjector) GetTransportConfig() map[string]any {
+func (i ExtensionInjector) ConfigForUpstream() map[string]any {
 	return map[string]any{}
 }
 

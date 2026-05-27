@@ -17,40 +17,39 @@ type NativeMessagingUpstreamTransport struct {
 	UpstreamNativeMessagingHostName string
 	writeMu                         sync.Mutex
 	stateMu                         sync.Mutex
-	connected                       bool
+	closeCh                         chan struct{}
 }
 
-type NativeMessagingUpstreamTransportOptions struct {
-	UpstreamNativeMessagingHostName string `json:"upstream_nativemessaging_host_name,omitempty"`
-}
-
-func NewNativeMessagingUpstreamTransport(options NativeMessagingUpstreamTransportOptions) *NativeMessagingUpstreamTransport {
-	nativeHostName := firstNonEmptyString(options.UpstreamNativeMessagingHostName, DefaultUpstreamNativeMessagingHostName)
+func NewNativeMessagingUpstreamTransport(options UpstreamTransportOptions) *NativeMessagingUpstreamTransport {
+	nativemessagingHostName := firstNonEmptyString(options.UpstreamNativeMessagingHostName, DefaultUpstreamNativeMessagingHostName)
 	return &NativeMessagingUpstreamTransport{
-		UpstreamNativeMessagingHostName: nativeHostName,
+		UpstreamTransport:               NewUpstreamTransport(options),
+		UpstreamNativeMessagingHostName: nativemessagingHostName,
 	}
 }
 
 func (t *NativeMessagingUpstreamTransport) Update(config map[string]any) {
+	t.UpstreamTransport.Update(config)
 }
 
-func (t *NativeMessagingUpstreamTransport) GetServerConfig() map[string]any {
+func (t *NativeMessagingUpstreamTransport) ConfigForServer() map[string]any {
 	return map[string]any{}
 }
 
-func (t *NativeMessagingUpstreamTransport) GetInjectorConfig() InjectorOptions {
+func (t *NativeMessagingUpstreamTransport) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{}
 }
 
 func (t *NativeMessagingUpstreamTransport) Connect() error {
 	t.stateMu.Lock()
-	if t.connected {
+	if t.closeCh != nil {
 		t.stateMu.Unlock()
 		return nil
 	}
-	t.connected = true
+	closeCh := make(chan struct{})
+	t.closeCh = closeCh
 	t.stateMu.Unlock()
-	go t.readLoop()
+	go t.readLoop(closeCh)
 	return nil
 }
 
@@ -58,9 +57,9 @@ func (t *NativeMessagingUpstreamTransport) Send(message map[string]any) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 	t.stateMu.Lock()
-	connected := t.connected
+	closeCh := t.closeCh
 	t.stateMu.Unlock()
-	if !connected {
+	if closeCh == nil {
 		return fmt.Errorf("native messaging stdio is not connected for %s", t.UpstreamNativeMessagingHostName)
 	}
 	return writeLengthPrefixedJSON(os.Stdout, message)
@@ -68,9 +67,9 @@ func (t *NativeMessagingUpstreamTransport) Send(message map[string]any) error {
 
 func (t *NativeMessagingUpstreamTransport) WaitForPeer() error {
 	t.stateMu.Lock()
-	connected := t.connected
+	closeCh := t.closeCh
 	t.stateMu.Unlock()
-	if !connected {
+	if closeCh == nil {
 		return fmt.Errorf("native messaging stdio is not connected for %s", t.UpstreamNativeMessagingHostName)
 	}
 	return nil
@@ -78,23 +77,35 @@ func (t *NativeMessagingUpstreamTransport) WaitForPeer() error {
 
 func (t *NativeMessagingUpstreamTransport) Close() error {
 	t.stateMu.Lock()
-	t.connected = false
+	closeCh := t.closeCh
+	t.closeCh = nil
 	t.stateMu.Unlock()
+	if closeCh != nil {
+		close(closeCh)
+	}
 	return nil
 }
 
-func (t *NativeMessagingUpstreamTransport) readLoop() {
+func (t *NativeMessagingUpstreamTransport) readLoop(closeCh chan struct{}) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		message, err := readLengthPrefixedJSON(reader)
 		if err != nil {
 			t.stateMu.Lock()
-			connected := t.connected
+			active := t.closeCh == closeCh
+			if active {
+				t.closeCh = nil
+			}
 			t.stateMu.Unlock()
-			if connected {
+			if active {
 				t.emitClose(err)
 			}
 			return
+		}
+		select {
+		case <-closeCh:
+			return
+		default:
 		}
 		t.emitRecv(message)
 	}

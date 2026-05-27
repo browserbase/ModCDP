@@ -2,5 +2,5 @@ from .NativeMessagingUpstreamTransport import NativeMessagingUpstreamTransport
 from .NATSUpstreamTransport import NATSUpstreamTransport
 from .PipeUpstreamTransport import PipeUpstreamTransport
 from .ReverseWSUpstreamTransport import ReverseWSUpstreamTransport
-from .UpstreamTransport import UpstreamTransport
+from .UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 from .WSUpstreamTransport import WSUpstreamTransport

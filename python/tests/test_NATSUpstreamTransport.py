@@ -23,7 +23,7 @@ class NATSUpstreamTransportTests(unittest.TestCase):
         self.assertEqual(transport.url, "ws://127.0.0.1:4223/")
         self.assertEqual(transport.upstream_nats_subject_prefix, "modcdp.one")
         self.assertEqual(
-            transport.getInjectorConfig(),
+            transport.configForInjector(),
             {"upstream_nats_url": "ws://127.0.0.1:4223/", "upstream_nats_subject_prefix": "modcdp.one"},
         )
         self.assertIs(
@@ -86,11 +86,12 @@ class NATSUpstreamTransportTests(unittest.TestCase):
 
         try:
             transport.connect()
-            self.assertTrue(transport.connected)
+            transport.send({"id": 1, "method": "Browser.getVersion"})
             transport.close()
-            self.assertFalse(transport.connected)
+            with self.assertRaisesRegex(RuntimeError, "NATS transport is not connected"):
+                transport.send({"id": 2, "method": "Browser.getVersion"})
             transport.connect()
-            self.assertTrue(transport.connected)
+            transport.send({"id": 3, "method": "Browser.getVersion"})
         finally:
             transport.close()
             nats["close"]()

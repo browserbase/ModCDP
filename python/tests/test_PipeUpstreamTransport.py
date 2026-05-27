@@ -14,9 +14,9 @@ EXTENSION_PATH = ROOT / "dist" / "extension"
 class PipeUpstreamTransportTests(unittest.TestCase):
     def test_constructor_update_launcher_config_and_unconnected_errors_match_transport_surface(self) -> None:
         transport = PipeUpstreamTransport()
-        self.assertEqual(transport.mode, "pipe")
+        self.assertEqual(transport.upstream_mode, "pipe")
         self.assertIsNone(transport.url)
-        self.assertEqual(transport.getLauncherConfig(), {"launcher_local_cdp_transport": "pipe"})
+        self.assertEqual(transport.configForLauncher(), {"launcher_local_cdp_transport": "pipe"})
         self.assertIs(transport.update({"upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"}), transport)
         self.assertIsNone(transport.url)
         with self.assertRaisesRegex(RuntimeError, r"upstream\.upstream_mode=pipe requires"):
@@ -56,12 +56,12 @@ class PipeUpstreamTransportTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            server={"server_routes": {"*.*": "chrome_debugger"}},
+            server_options={"router": {"router_routes": {"*.*": "chromedebugger"}}},
         )
 
         try:
             cdp.connect()
-            self.assertEqual(cdp.transport.mode if cdp.transport else None, "pipe")
+            self.assertEqual(cdp.transport.upstream_mode if cdp.transport else None, "pipe")
             self.assertIsNone(cdp.cdp_url)
             self.assertIsNone(cdp.transport.url if cdp.transport else None)
             cdp.Mod.addCustomCommand(

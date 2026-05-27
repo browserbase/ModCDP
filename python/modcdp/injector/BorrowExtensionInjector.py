@@ -1,13 +1,77 @@
 from __future__ import annotations
 
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Mapping, cast
 
-from ..injector.ExtensionInjector import DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS, DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS, DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS, EXT_ID_FROM_URL_RE, ExtensionInjector, ExtensionInjectionResult, MODCDP_READY_EXPRESSION
+from ..injector.ExtensionInjector import (
+    DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
+    DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
+    DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
+    EXT_ID_FROM_URL_RE,
+    MODCDP_READY_EXPRESSION,
+    ExtensionInjectionResult,
+    ExtensionInjector,
+    InjectorOptions,
+    defaultModCDPExtensionPath,
+    prepareUnpackedExtension,
+)
+
+BORROW_BOOTSTRAP_STATUS_EXPRESSION = """
+(() => ({
+  ok: Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent),
+  extension_id: globalThis.chrome?.runtime?.id ?? null,
+  has_tabs: Boolean(globalThis.chrome?.tabs?.query),
+  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
+}))()
+"""
 
 
 class BorrowExtensionInjector(ExtensionInjector):
+    def __init__(self, options: InjectorOptions | None = None) -> None:
+        super().__init__(options)
+        self.unpacked_extension_path: str | None = None
+        self.cleanup: tempfile.TemporaryDirectory[str] | None = None
+        self.bootstrap_modcdp_server_expression: str | None = None
+
+    def prepare(self) -> None:
+        if self.bootstrap_modcdp_server_expression is not None:
+            super().prepare()
+            return
+        extension_path = self.options.get("injector_borrow_extension_path") or defaultModCDPExtensionPath()
+        if not extension_path:
+            raise FileNotFoundError("Unable to locate bundled ModCDP extension for borrow injector.")
+        self.unpacked_extension_path, self.cleanup = prepareUnpackedExtension(extension_path)
+        try:
+            source = (Path(self.unpacked_extension_path) / "modcdp" / "service_worker.js").read_text()
+        except BaseException:
+            self.cleanup.cleanup()
+            self.cleanup = None
+            self.unpacked_extension_path = None
+            raise
+        self.bootstrap_modcdp_server_expression = (
+            "async function() {\n"
+            "if (!globalThis.ModCDP) {\n"
+            f"{source}\n"
+            "}\n"
+            "const ModCDP = globalThis.ModCDP;\n"
+            "return {\n"
+            "  ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),\n"
+            "  extension_id: globalThis.chrome?.runtime?.id ?? null,\n"
+            "  has_tabs: Boolean(globalThis.chrome?.tabs?.query),\n"
+            "  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),\n"
+            "};\n"
+            "}"
+        )
+        super().prepare()
+
+    def close(self) -> None:
+        super().close()
+        if self.cleanup is not None:
+            self.cleanup.cleanup()
+            self.cleanup = None
+
     def inject(self) -> ExtensionInjectionResult | None:
         deadline = time.monotonic() + (self.options.get("injector_service_worker_ready_timeout_ms") or DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS) / 1000
         while True:
@@ -56,18 +120,35 @@ class BorrowExtensionInjector(ExtensionInjector):
                 self._sendWithTimeout("Runtime.enable", {}, session_id)
             except Exception:
                 pass
-            bootstrap = self._sendWithTimeout(
+            status = self._sendWithTimeout(
                 "Runtime.evaluate",
                 {
-                    "expression": f"({bootstrap_modcdp_server_expression()})()",
-                    "awaitPromise": True,
+                    "expression": BORROW_BOOTSTRAP_STATUS_EXPRESSION,
                     "returnByValue": True,
                 },
                 session_id,
             )
-            result = cast(Mapping[str, Any], bootstrap.get("result")) if isinstance(bootstrap.get("result"), Mapping) else {}
+            result = cast(Mapping[str, Any], status.get("result")) if isinstance(status.get("result"), Mapping) else {}
             raw_value = result.get("value")
             value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
+            if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
+                self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
+                return None
+            if not bool(value.get("ok")):
+                if self.bootstrap_modcdp_server_expression is None:
+                    raise RuntimeError("BorrowExtensionInjector requires prepare before inject.")
+                bootstrap = self._sendWithTimeout(
+                    "Runtime.evaluate",
+                    {
+                        "expression": f"({self.bootstrap_modcdp_server_expression})()",
+                        "awaitPromise": True,
+                        "returnByValue": True,
+                    },
+                    session_id,
+                )
+                result = cast(Mapping[str, Any], bootstrap.get("result")) if isinstance(bootstrap.get("result"), Mapping) else {}
+                raw_value = result.get("value")
+                value = cast(Mapping[str, Any], raw_value) if isinstance(raw_value, Mapping) else {}
             if not bool(value.get("has_tabs")) or not bool(value.get("has_debugger")):
                 self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
                 return None
@@ -99,37 +180,3 @@ class BorrowExtensionInjector(ExtensionInjector):
         except BaseException:
             self._sendWithTimeout("Target.detachFromTarget", {"sessionId": session_id})
             raise
-
-
-def bootstrap_modcdp_server_expression() -> str:
-    source = modcdp_server_source()
-    start = source.index("export function installModCDPServer")
-    end = source.index("export const ModCDPServer")
-    installer = source[start:end].replace("export function", "function", 1)
-    return (
-        "function() {\n"
-        "const __name = (fn) => fn;\n"
-        f"{installer}\n"
-        "const ModCDP = installModCDPServer(globalThis);\n"
-        "return {\n"
-        "  ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),\n"
-        "  extension_id: globalThis.chrome?.runtime?.id ?? null,\n"
-        "  has_tabs: Boolean(globalThis.chrome?.tabs?.query),\n"
-        "  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),\n"
-        "};\n"
-        "}"
-    )
-
-
-def modcdp_server_source() -> str:
-    candidates: list[Path] = []
-    for parent in Path(__file__).resolve().parents:
-        candidates.append(parent / "dist" / "js" / "src" / "server" / "ModCDPServer.js")
-        candidates.append(parent / "dist" / "extension" / "js" / "src" / "server" / "ModCDPServer.js")
-        candidates.append(parent / "dist" / "extension" / "ModCDPServer.js")
-        candidates.append(parent / "ModCDPServer.js")
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.read_text()
-    checked = ", ".join(str(candidate) for candidate in candidates)
-    raise FileNotFoundError(f"Unable to locate ModCDPServer.js; checked: {checked}")

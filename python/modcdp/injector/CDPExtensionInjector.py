@@ -29,7 +29,6 @@ class CDPExtensionInjector(ExtensionInjector):
             load_result = self._sendWithTimeout("Extensions.loadUnpacked", {"path": extension_path})
         except RuntimeError as error:
             if "Method not available" in str(error) or "wasn't found" in str(error) or "Method not found" in str(error):
-                self.last_error = error
                 return None
             raise RuntimeError(
                 f"Extensions.loadUnpacked failed for {extension_path}: {error}\n"

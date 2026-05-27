@@ -30,7 +30,7 @@ func (i *CLIExtensionInjector) Prepare() error {
 	return err
 }
 
-func (i *CLIExtensionInjector) GetLauncherConfig() LaunchOptions {
+func (i *CLIExtensionInjector) ConfigForLauncher() LaunchOptions {
 	if i.UnpackedExtensionPath == "" {
 		return LaunchOptions{}
 	}

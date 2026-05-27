@@ -67,11 +67,11 @@ test("nats upstream reconnects after close against a real NATS server", async ()
 
   try {
     await transport.connect();
-    assert.equal((transport as unknown as { connected: boolean }).connected, true);
+    assert.doesNotThrow(() => transport.send({ id: 1, method: "Browser.getVersion" }));
     await transport.close();
-    assert.equal((transport as unknown as { connected: boolean }).connected, false);
+    assert.throws(() => transport.send({ id: 2, method: "Browser.getVersion" }), /NATS transport is not connected/);
     await transport.connect();
-    assert.equal((transport as unknown as { connected: boolean }).connected, true);
+    assert.doesNotThrow(() => transport.send({ id: 3, method: "Browser.getVersion" }));
   } finally {
     await transport.close();
     await nats.close();

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { ProtocolResult } from "../types/modcdp.js";
 
-export const ProxyPendingSchema = z
+const ProxyPendingSchema = z
   .object({
     kind: z.string(),
     client_id: z.number().optional(),
@@ -13,9 +13,9 @@ export const ProxyPendingSchema = z
     reject: z.custom<(error: Error) => void>().optional(),
   })
   .passthrough();
-export type ProxyPending = z.infer<typeof ProxyPendingSchema>;
+type ProxyPending = z.infer<typeof ProxyPendingSchema>;
 
-export const ProxyUpstreamStateSchema = z
+const ProxyUpstreamStateSchema = z
   .object({
     url: z.string(),
     launched: z
@@ -27,10 +27,10 @@ export const ProxyUpstreamStateSchema = z
       .optional(),
   })
   .passthrough();
-export type ProxyUpstreamState = z.infer<typeof ProxyUpstreamStateSchema>;
+type ProxyUpstreamState = z.infer<typeof ProxyUpstreamStateSchema>;
 
-export type ProxyRawData = Buffer | ArrayBuffer | Buffer[];
-export type ProxyWebSocketLike = {
+type ProxyRawData = Buffer | ArrayBuffer | Buffer[];
+type ProxyWebSocketLike = {
   CLOSED: number;
   CLOSING: number;
   readyState: number;
@@ -38,7 +38,7 @@ export type ProxyWebSocketLike = {
   send(data: string): void;
 };
 
-export const ProxyConnectionStateSchema = z.object({
+const ProxyConnectionStateSchema = z.object({
   client: z.custom<ProxyWebSocketLike>(),
   upstream: z.custom<ProxyWebSocketLike>(),
   next_upstream_id: z.number(),
@@ -55,4 +55,7 @@ export const ProxyConnectionStateSchema = z.object({
   closing: z.boolean(),
   queued_from_client: z.array(z.custom<ProxyRawData>()),
 });
-export type ProxyConnectionState = z.infer<typeof ProxyConnectionStateSchema>;
+type ProxyConnectionState = z.infer<typeof ProxyConnectionStateSchema>;
+
+export { ProxyPendingSchema, ProxyUpstreamStateSchema, ProxyConnectionStateSchema };
+export type { ProxyPending, ProxyUpstreamState, ProxyRawData, ProxyWebSocketLike, ProxyConnectionState };

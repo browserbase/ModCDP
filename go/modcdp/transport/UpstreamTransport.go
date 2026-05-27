@@ -12,6 +12,7 @@ import (
 
 type InjectorOptions = types.InjectorOptions
 type LaunchOptions = types.LaunchOptions
+type UpstreamTransportOptions = types.UpstreamTransportOptions
 
 const DefaultModCDPExtensionID = injector.DefaultModCDPExtensionID
 
@@ -49,9 +50,11 @@ const (
 	UpstreamModeNativeMessaging UpstreamMode = "nativemessaging"
 	UpstreamModeReverseWS       UpstreamMode = "reversews"
 	UpstreamModeNATS            UpstreamMode = "nats"
+	UpstreamModeChromeDebugger  UpstreamMode = "chromedebugger"
 )
 
 type UpstreamTransport struct {
+	Options        UpstreamTransportOptions
 	recvListeners  []recvListener
 	closeListeners []closeListener
 	listenerMu     sync.Mutex
@@ -68,7 +71,44 @@ type closeListener struct {
 	fn func(error)
 }
 
+func NewUpstreamTransport(options UpstreamTransportOptions) UpstreamTransport {
+	return UpstreamTransport{Options: options}
+}
+
 func (e *UpstreamTransport) Update(config map[string]any) {
+	if config == nil {
+		return
+	}
+	if value, ok := config["upstream_ws_cdp_url"].(string); ok {
+		e.Options.UpstreamWSCDPURL = value
+	}
+	if value, ok := config["upstream_nats_url"].(string); ok {
+		e.Options.UpstreamNATSURL = value
+	}
+	if value, ok := config["upstream_nats_subject_prefix"].(string); ok {
+		e.Options.UpstreamNATSSubjectPrefix = value
+	}
+	if value, ok := config["upstream_nats_role"].(string); ok {
+		e.Options.UpstreamNATSRole = value
+	}
+	if value, ok := intFromConfig(config["upstream_nats_wait_timeout_ms"]); ok {
+		e.Options.UpstreamNATSWaitTimeoutMS = value
+	}
+	if value, ok := config["upstream_reversews_bind"].(string); ok {
+		e.Options.UpstreamReverseWSBind = value
+	}
+	if value, ok := intFromConfig(config["upstream_reversews_wait_timeout_ms"]); ok {
+		e.Options.UpstreamReverseWSWaitTimeoutMS = value
+	}
+	if value, ok := config["upstream_nativemessaging_host_name"].(string); ok {
+		e.Options.UpstreamNativeMessagingHostName = value
+	}
+	if value, ok := intFromConfig(config["upstream_ws_connect_error_settle_timeout_ms"]); ok {
+		e.Options.UpstreamWSConnectErrorSettleTimeoutMS = value
+	}
+	if value, ok := intFromConfig(config["upstream_cdp_send_timeout_ms"]); ok {
+		e.Options.UpstreamCDPSendTimeoutMS = value
+	}
 }
 
 func (e *UpstreamTransport) Connect() error {
@@ -83,15 +123,15 @@ func (e *UpstreamTransport) Send(message map[string]any) error {
 	return fmt.Errorf("%T.Send is not implemented", e)
 }
 
-func (e *UpstreamTransport) GetInjectorConfig() InjectorOptions {
+func (e *UpstreamTransport) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{}
 }
 
-func (e *UpstreamTransport) GetLauncherConfig() LaunchOptions {
+func (e *UpstreamTransport) ConfigForLauncher() LaunchOptions {
 	return LaunchOptions{}
 }
 
-func (e *UpstreamTransport) GetServerConfig() map[string]any {
+func (e *UpstreamTransport) ConfigForServer() map[string]any {
 	return map[string]any{}
 }
 

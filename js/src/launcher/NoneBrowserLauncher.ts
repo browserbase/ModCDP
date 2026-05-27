@@ -1,6 +1,6 @@
 import { BrowserLauncher, type LauncherOptions, type LaunchedBrowser } from "./BrowserLauncher.js";
 
-export class NoneBrowserLauncher extends BrowserLauncher {
+class NoneBrowserLauncher extends BrowserLauncher {
   constructor(options: LauncherOptions = {}) {
     super(options);
     this.launcher_mode = "none";
@@ -11,3 +11,5 @@ export class NoneBrowserLauncher extends BrowserLauncher {
     return this.launched;
   }
 }
+
+export { NoneBrowserLauncher };

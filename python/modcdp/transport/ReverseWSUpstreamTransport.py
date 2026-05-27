@@ -10,7 +10,7 @@ import time
 from typing import Any
 from urllib.parse import urlparse
 
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 
 
 DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292"
@@ -19,10 +19,10 @@ _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
 class ReverseWSUpstreamTransport(UpstreamTransport):
-    mode = "reversews"
+    upstream_mode = "reversews"
 
-    def __init__(self, options: dict[str, Any] | None = None) -> None:
-        super().__init__()
+    def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
+        super().__init__(options)
         options = options or {}
         self.wait_timeout_ms = int(options.get("upstream_reversews_wait_timeout_ms") or DEFAULT_UPSTREAM_REVERSEWS_WAIT_TIMEOUT_MS)
         self.server_socket: socket.socket | None = None
@@ -43,7 +43,7 @@ class ReverseWSUpstreamTransport(UpstreamTransport):
             self.wait_timeout_ms = int(wait_timeout_ms)
         return self
 
-    def getInjectorConfig(self) -> dict[str, Any]:
+    def configForInjector(self) -> dict[str, Any]:
         return {}
 
     def _setBind(self, bind: str) -> None:

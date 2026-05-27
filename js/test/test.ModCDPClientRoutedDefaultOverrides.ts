@@ -3,7 +3,7 @@ import { test } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 import type { cdp } from "../src/types/generated/cdp.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -95,8 +95,8 @@ test(
           "Target.setDiscoverTargets": "service_worker",
         },
       },
-      server: {
-        server_loopback_cdp_url: owner.upstream.upstream_ws_cdp_url,
+      server_options: {
+        upstream: { upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
         router: { router_routes: { "*.*": "loopback_cdp" } },
       },
     });
@@ -104,7 +104,7 @@ test(
     try {
       await cdp.connect();
       assert.equal(cdp.upstream.upstream_ws_cdp_url, owner.upstream.upstream_ws_cdp_url);
-      assert.equal(cdp.server.server_loopback_cdp_url, owner.upstream.upstream_ws_cdp_url);
+      assert.equal(cdp.server_options?.upstream?.upstream_ws_cdp_url, owner.upstream.upstream_ws_cdp_url);
 
       const rawTargets = (await cdp.send("Target.getTargets")) as { targetInfos: { type?: string; tabId?: number }[] };
       assert.ok(rawTargets.targetInfos?.length > 0, "expected raw Target.getTargets targetInfos");

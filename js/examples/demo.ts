@@ -10,7 +10,7 @@
 //                 *.* -> loopback_cdp on server. Default mode.)
 //   --debugger    client routes *.* through the extension service worker,
 //                 which uses chrome.debugger.sendCommand against the active
-//                 tab. (*.* -> service_worker on client, *.* -> chrome_debugger
+//                 tab. (*.* -> service_worker on client, *.* -> chromedebugger
 //                 on server.)
 //
 //   --upstream    select the browser/upstream transport. Defaults to ws.
@@ -29,7 +29,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import { spawn } from "node:child_process";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH =
@@ -89,7 +89,7 @@ function serverRoutesFor(mode, upstream_mode) {
   return {
     "Mod.*": "service_worker",
     "Custom.*": "service_worker",
-    "*.*": mode === "loopback" ? "loopback_cdp" : mode === "debugger" ? "chrome_debugger" : "auto",
+    "*.*": mode === "loopback" ? "loopback_cdp" : mode === "debugger" ? "chromedebugger" : "auto",
   };
 }
 
@@ -115,8 +115,10 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     ...(upstream_mode === "nats" ? { upstream_nats_wait_timeout_ms: DEFAULT_REVERSE_TRANSPORT_WAIT_TIMEOUT_MS } : {}),
   };
   const injector = {
-    injector_mode: cdp_url ? "discover" as const : "cli" as const,
-    injector_extension_path: EXTENSION_PATH,
+    injector_mode: cdp_url ? ("discover" as const) : ("cli" as const),
+    ...(cdp_url
+      ? { injector_discover_extension_path: EXTENSION_PATH }
+      : { injector_cli_extension_path: EXTENSION_PATH }),
     injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
     injector_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
   };
@@ -128,7 +130,7 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
       router: {
         router_routes: clientRoutesFor(mode),
       },
-      client: {
+      client_options: {
         client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
       },
     };
@@ -140,12 +142,14 @@ function clientOptionsFor(mode, upstream_mode, cdp_url, launch_options = {}) {
     router: {
       router_routes: clientRoutesFor(mode),
     },
-    client: {
+    client_options: {
       client_cdp_send_timeout_ms: DEFAULT_DEMO_CDP_SEND_TIMEOUT_MS,
     },
-    server: {
-      router: { router_routes: serverRoutesFor(mode, upstream_mode) },
-      server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
+    server_options: {
+      router: {
+        router_routes: serverRoutesFor(mode, upstream_mode),
+        loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
+      },
     },
   };
 }
@@ -249,9 +253,9 @@ async function main() {
 
     const configureResult = assertObject(
       await cdp.Mod.configure({
-        server: {
-          router: { router_routes: serverRoutesFor(mode, upstream_mode) },
-          server_loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
+        router: {
+          router_routes: serverRoutesFor(mode, upstream_mode),
+          loopback_execution_context_timeout_ms: DEFAULT_DEMO_EXECUTION_CONTEXT_TIMEOUT_MS,
         },
       }),
       "Mod.configure",

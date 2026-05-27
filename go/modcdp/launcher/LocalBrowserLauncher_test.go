@@ -60,7 +60,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverChosenCDPPortAndHonorsLaunch
 	if chrome.ProfileDir != profileDir {
 		t.Fatalf("ProfileDir = %q, want %q", chrome.ProfileDir, profileDir)
 	}
-	transportConfig := launcher.GetTransportConfig()
+	transportConfig := launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != chrome.CDPURL {
 		t.Fatalf("transport cdp_url = %v, want %s", transportConfig["upstream_ws_cdp_url"], chrome.CDPURL)
 	}
@@ -144,7 +144,7 @@ func TestLocalBrowserLauncherLaunchesRealBrowserOverLocalCDPTransportPipe(t *tes
 	if launcher.Launched != chrome {
 		t.Fatal("expected launcher to retain launched browser")
 	}
-	transportConfig := launcher.GetTransportConfig()
+	transportConfig := launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != "" {
 		t.Fatalf("transport cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}

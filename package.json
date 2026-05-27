@@ -65,9 +65,9 @@
       "types": "./dist/js/src/transport/DownstreamTransport.d.ts",
       "import": "./dist/js/src/transport/DownstreamTransport.js"
     },
-    "./transport/DownstreamTransportCollection.js": {
-      "types": "./dist/js/src/transport/DownstreamTransportCollection.d.ts",
-      "import": "./dist/js/src/transport/DownstreamTransportCollection.js"
+    "./transport/DownstreamTransportSet.js": {
+      "types": "./dist/js/src/transport/DownstreamTransportSet.d.ts",
+      "import": "./dist/js/src/transport/DownstreamTransportSet.js"
     },
     "./transport/WSUpstreamTransport.js": {
       "types": "./dist/js/src/transport/WSUpstreamTransport.d.ts",
@@ -97,9 +97,9 @@
       "types": "./dist/js/src/transport/ReverseWSDownstreamTransport.d.ts",
       "import": "./dist/js/src/transport/ReverseWSDownstreamTransport.js"
     },
-    "./transport/NativeHostDownstreamTransport.js": {
-      "types": "./dist/js/src/transport/NativeHostDownstreamTransport.d.ts",
-      "import": "./dist/js/src/transport/NativeHostDownstreamTransport.js"
+    "./transport/NativeMessagingDownstreamTransport.js": {
+      "types": "./dist/js/src/transport/NativeMessagingDownstreamTransport.d.ts",
+      "import": "./dist/js/src/transport/NativeMessagingDownstreamTransport.js"
     },
     "./transport/NATSDownstreamTransport.js": {
       "types": "./dist/js/src/transport/NATSDownstreamTransport.d.ts",

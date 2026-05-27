@@ -6,9 +6,9 @@ import {
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
-export const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
-export const DEFAULT_NATS_BRIDGE_URL = "ws://127.0.0.1:4223";
-export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
+const DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+const DEFAULT_NATS_BRIDGE_URL = "ws://127.0.0.1:4223";
+const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
 
 /**
  * Owns the NATS-over-WebSocket downstream connection from the extension service
@@ -31,11 +31,8 @@ export const DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX = "modcdp.default";
  * 5. `error`/`close` drops the socket and schedules reconnect while an endpoint
  *    is still configured.
  */
-export class NATSDownstreamTransport extends DownstreamTransport {
-  readonly name = "nats";
-
-  // Server-owned keepalive hook. Called after the NATS WebSocket opens.
-  private readonly ensureOffscreenKeepAlive: () => unknown;
+class NATSDownstreamTransport extends DownstreamTransport {
+  readonly name = "nats" as const;
 
   // Configured NATS WebSocket URL. Set by start and read by reconnect handling.
   private endpoint: string | null = null;
@@ -62,11 +59,6 @@ export class NATSDownstreamTransport extends DownstreamTransport {
   // handlePayload and read by sendResponse so responses route to the requesting
   // SDK client instead of being broadcast on the event subject.
   private readonly reply_subject_from_request = new WeakMap<CdpCommandMessage, string>();
-
-  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
-    super();
-    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
-  }
 
   /** True when the NATS WebSocket is open and can publish CDP event messages. */
   get connected() {
@@ -100,8 +92,8 @@ export class NATSDownstreamTransport extends DownstreamTransport {
     };
   }
 
-  /** Start the default NATS bridge configured into the shipped extension. */
-  startDefault() {
+  /** Start polling for NATS clients using the shipped extension default. */
+  startPollingForClients() {
     return this.start(DEFAULT_NATS_BRIDGE_URL, {
       upstream_nats_subject_prefix: DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
     });
@@ -188,7 +180,6 @@ export class NATSDownstreamTransport extends DownstreamTransport {
     this.socket = ws;
     this.buffer = "";
     ws.addEventListener("open", () => {
-      void this.ensureOffscreenKeepAlive();
       this.write(`CONNECT ${JSON.stringify(this.connectOptions())}\r\nPING\r\n`);
       this.write(`SUB ${this.subject_prefix}.client_to_browser 1\r\n`);
       this.publish(`${this.subject_prefix}.browser_to_client`, {
@@ -294,3 +285,10 @@ export class NATSDownstreamTransport extends DownstreamTransport {
     };
   }
 }
+
+export {
+  DEFAULT_NATS_BRIDGE_RECONNECT_INTERVAL_MS,
+  DEFAULT_NATS_BRIDGE_URL,
+  DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
+  NATSDownstreamTransport,
+};

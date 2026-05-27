@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
 import { PipeUpstreamTransport } from "../src/transport/PipeUpstreamTransport.js";
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -21,14 +21,8 @@ test("pipe upstream constructor, update, launcher config, and unconnected errors
     transport,
   );
   assert.equal(transport.upstream_ws_cdp_url, null);
-  await assert.rejects(
-    () => transport.connect(),
-    /upstream\.upstream_mode=pipe requires/,
-  );
-  assert.throws(
-    () => transport.send({ id: 1, method: "Runtime.evaluate" }),
-    /CDP pipe is not connected/,
-  );
+  await assert.rejects(() => transport.connect(), /upstream\.upstream_mode=pipe requires/);
+  assert.throws(() => transport.send({ id: 1, method: "Runtime.evaluate" }), /CDP pipe is not connected/);
 });
 
 test("pipe upstream resets connection state after pipe end and errors", async () => {
@@ -50,8 +44,7 @@ test("pipe upstream resets connection state after pipe end and errors", async ()
     });
 
     if (event_name === "end") pipe_read.emit("end");
-    else if (event_name === "read_error")
-      pipe_read.emit("error", new Error("read failed"));
+    else if (event_name === "read_error") pipe_read.emit("error", new Error("read failed"));
     else pipe_write.emit("error", new Error("write failed"));
 
     assert.equal(closed.length, 1);
@@ -81,7 +74,7 @@ test("pipe upstream launches a real browser without a CDP URL", async () => {
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server: { router: { router_routes: { "*.*": "chrome_debugger" } } },
+    server_options: { router: { router_routes: { "*.*": "chromedebugger" } } },
   });
 
   try {

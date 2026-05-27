@@ -39,7 +39,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertNotEqual(unpacked_extension_path, str(EXTENSION_PATH))
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
-            self.assertEqual(injector.getLauncherConfig(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
+            self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
             self.assertEqual(injector.options.get("injector_service_worker_extension_id"), DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()
@@ -53,7 +53,7 @@ class CLIExtensionInjectorTests(unittest.TestCase):
             unpacked_extension_path = cast(str, unpacked_extension_path)
             self.assertTrue((Path(unpacked_extension_path) / "manifest.json").exists())
             self.assertIn("modcdp-extension-", unpacked_extension_path)
-            self.assertEqual(injector.getLauncherConfig(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
+            self.assertEqual(injector.configForLauncher(), {"launcher_local_extra_args": [f"--load-extension={unpacked_extension_path}"]})
             self.assertEqual(injector.options.get("injector_service_worker_extension_id"), DEFAULT_MODCDP_EXTENSION_ID)
         finally:
             injector.close()

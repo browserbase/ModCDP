@@ -23,11 +23,11 @@ func TestBrowserLauncherMergesLaunchConfigAndExposesTransportAndInjectorOptions(
 	assertStringsEqual(t, launcher.Options.LauncherLocalArgs, []string{"--lang=en-US", "--load-extension=/tmp/args-one,/tmp/args-two"})
 	assertStringsEqual(t, launcher.Options.LauncherLocalExtraArgs, []string{"--window-size=900,700", "--load-extension=/tmp/one,/tmp/two"})
 
-	transportConfig := launcher.GetTransportConfig()
+	transportConfig := launcher.ConfigForUpstream()
 	if transportConfig["upstream_ws_cdp_url"] != "ws://127.0.0.1:9222/devtools/browser/updated" {
 		t.Fatalf("cdp_url = %v", transportConfig["upstream_ws_cdp_url"])
 	}
-	injectorConfig := launcher.GetInjectorConfig()
+	injectorConfig := launcher.ConfigForInjector()
 	if injectorConfig.InjectorBBAPIKey != "test-key" {
 		t.Fatalf("InjectorBBAPIKey = %v", injectorConfig.InjectorBBAPIKey)
 	}

@@ -4,7 +4,7 @@ Constructor option groups mirror the JS / Go ports:
     launcher          browser/session creation and cleanup
     upstream          message transport to raw CDP or a ModCDP server
     injector          raw-CDP extension discovery/injection/borrowing
-    server            ModCDPServer.configure params
+    server_options    ModCDPServer.configure params
     client            client routing and client-owned send/event timings
 
 Public methods: connect(), send(method, params), on(event, handler), close(), _cdp.send(), _cdp.on().
@@ -218,8 +218,8 @@ class ModCDPClient(CDPSurfaceMixin):
         launcher: Mapping[str, Any] | None = None,
         upstream: Mapping[str, Any] | None = None,
         injector: Mapping[str, Any] | None = None,
-        client: Mapping[str, Any] | None = None,
-        server: Mapping[str, JsonValue] | None | object = DEFAULT_SERVER,
+        client_options: Mapping[str, Any] | None = None,
+        server_options: Mapping[str, JsonValue] | None | object = DEFAULT_SERVER,
         custom_commands: Sequence[ModCDPAddCustomCommandParams] | None = None,
         custom_events: Sequence[ModCDPAddCustomEventParams] | None = None,
         custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
@@ -227,7 +227,7 @@ class ModCDPClient(CDPSurfaceMixin):
         launcher_input = dict(launcher or {})
         upstream_input = dict(upstream or {})
         injector_input = dict(injector or {})
-        client_input = dict(client or {})
+        client_options_input = dict(client_options or {})
         upstream_mode = str(upstream_input.get("upstream_mode") or "ws")
         self.upstream: dict[str, Any] = {
             "upstream_mode": upstream_mode,
@@ -301,31 +301,31 @@ class ModCDPClient(CDPSurfaceMixin):
                 _defaulted(injector_input.get("injector_target_session_poll_interval_ms"), DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS)
             ),
         }
-        self.client: dict[str, Any] = {
+        self.client_options: dict[str, Any] = {
             "client_routes": {
                 **DEFAULT_CLIENT_ROUTES,
-                **dict(cast(Mapping[str, str], client_input.get("client_routes") or {})),
+                **dict(cast(Mapping[str, str], client_options_input.get("client_routes") or {})),
             },
-            "client_hydrate_aliases": bool(client_input.get("client_hydrate_aliases", True)),
-            "client_mirror_upstream_events": bool(client_input.get("client_mirror_upstream_events", True)),
-            "client_cdp_send_timeout_ms": int(_defaulted(client_input.get("client_cdp_send_timeout_ms"), DEFAULT_CDP_SEND_TIMEOUT_MS)),
-            "client_event_wait_timeout_ms": int(_defaulted(client_input.get("client_event_wait_timeout_ms"), DEFAULT_EVENT_WAIT_TIMEOUT_MS)),
+            "client_hydrate_aliases": bool(client_options_input.get("client_hydrate_aliases", True)),
+            "client_mirror_upstream_events": bool(client_options_input.get("client_mirror_upstream_events", True)),
+            "client_cdp_send_timeout_ms": int(_defaulted(client_options_input.get("client_cdp_send_timeout_ms"), DEFAULT_CDP_SEND_TIMEOUT_MS)),
+            "client_event_wait_timeout_ms": int(_defaulted(client_options_input.get("client_event_wait_timeout_ms"), DEFAULT_EVENT_WAIT_TIMEOUT_MS)),
             "client_heartbeat_interval_ms": int(
-                _defaulted(client_input.get("client_heartbeat_interval_ms"), DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS)
+                _defaulted(client_options_input.get("client_heartbeat_interval_ms"), DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS)
             ),
         }
         self.cdp_url: str | None = cast(str | None, self.upstream.get("upstream_ws_cdp_url"))
-        if server is DEFAULT_SERVER:
-            self.server: ModCDPServerConfig | None = {"server_routes": {"*.*": "chrome_debugger"}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}
-        elif server is None:
-            self.server = None
-        elif isinstance(server, Mapping):
-            self.server = cast(ModCDPServerConfig, {
-                **({"server_routes": {"*.*": "chrome_debugger"}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}),
-                **dict(server),
+        if server_options is DEFAULT_SERVER:
+            self.server_options: ModCDPServerConfig | None = {"router": {"router_routes": {"*.*": "chromedebugger"}}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}
+        elif server_options is None:
+            self.server_options = None
+        elif isinstance(server_options, Mapping):
+            self.server_options = cast(ModCDPServerConfig, {
+                **({"router": {"router_routes": {"*.*": "chromedebugger"}}} if upstream_mode in ("nativemessaging", "reversews", "nats") else {}),
+                **dict(server_options),
             })
         else:
-            raise TypeError("server must be a mapping, None, or omitted")
+            raise TypeError("server_options must be a mapping, None, or omitted")
         self.custom_commands: list[ModCDPAddCustomCommandParams] = list(custom_commands or [])
         self.custom_events: list[ModCDPAddCustomEventParams] = list(custom_events or [])
         self.custom_middlewares: list[ModCDPAddMiddlewareParams] = list(custom_middlewares or [])
@@ -356,7 +356,7 @@ class ModCDPClient(CDPSurfaceMixin):
         self._command_result_model_schemas: set[str] = set()
         self._event_model_schemas: set[str] = set()
         self._event_classes: dict[str, type[CDPEvent]] = {}
-        if self.client["client_hydrate_aliases"]:
+        if self.client_options["client_hydrate_aliases"]:
             install_cdp_surface(self)
         self.Mod = _ModDomain(self)
         self._closed = False
@@ -380,7 +380,7 @@ class ModCDPClient(CDPSurfaceMixin):
 
         if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
             self.transport.waitForPeer()
-            if self.server is not None:
+            if self.server_options is not None:
                 self._send_message("Mod.configure", cast(ProtocolParams, self._server_configure_params()))
             threading.Thread(target=self._measure_ping_latency, daemon=True).start()
             self._start_heartbeat()
@@ -412,14 +412,14 @@ class ModCDPClient(CDPSurfaceMixin):
             self.injector["injector_execution_context_timeout_ms"],
         )
         self._send_message("Runtime.addBinding", {"name": CUSTOM_EVENT_BINDING_NAME}, self.ext_session_id)
-        if self.client["client_mirror_upstream_events"]:
+        if self.client_options["client_mirror_upstream_events"]:
             self._send_message("Runtime.addBinding", {"name": UPSTREAM_EVENT_BINDING_NAME}, self.ext_session_id)
 
-        if self.server is not None:
+        if self.server_options is not None:
             self._send_raw(wrap_command_if_needed(
                 "Mod.configure",
                 cast(ProtocolParams, self._server_configure_params()),
-                routes=cast(ModCDPRoutes, self.client["client_routes"]),
+                routes=cast(ModCDPRoutes, self.client_options["client_routes"]),
                 cdp_session_id=self.ext_session_id,
             ))
         self._start_heartbeat()
@@ -498,7 +498,7 @@ class ModCDPClient(CDPSurfaceMixin):
         command = wrap_command_if_needed(
             method,
             command_params,
-            routes=cast(ModCDPRoutes, self.client["client_routes"]),
+            routes=cast(ModCDPRoutes, self.client_options["client_routes"]),
             cdp_session_id=session_id,
         )
         result = self._send_raw(command)
@@ -593,7 +593,7 @@ class ModCDPClient(CDPSurfaceMixin):
     def __getattr__(self, domain: str):
         if domain.startswith("_"):
             raise AttributeError(domain)
-        if not self.client["client_hydrate_aliases"]:
+        if not self.client_options["client_hydrate_aliases"]:
             raise AttributeError(domain)
         from ..types.generated.cdp import DynamicDomain
 
@@ -602,26 +602,12 @@ class ModCDPClient(CDPSurfaceMixin):
         return dynamic
 
     def _server_configure_params(self) -> ModCDPServerConfig:
-        server = dict(self.server or {})
-        server_routes = server.pop("server_routes", None)
-        server_loopback_cdp_url = server.pop("server_loopback_cdp_url", None)
-        server_browser_token = server.pop("server_browser_token", None)
-        server_cdp_send_timeout_ms = server.pop(
-            "server_cdp_send_timeout_ms",
-            self.client["client_cdp_send_timeout_ms"],
-        )
-        server_loopback_execution_context_timeout_ms = server.pop(
-            "server_loopback_execution_context_timeout_ms",
-            self.injector["injector_execution_context_timeout_ms"],
-        )
-        server_ws_connect_error_settle_timeout_ms = server.pop(
-            "server_ws_connect_error_settle_timeout_ms",
-            self.upstream["upstream_ws_connect_error_settle_timeout_ms"],
-        )
-        server_downstream_client_timeout_ms = server.pop(
-            "server_downstream_client_timeout_ms",
-            max(int(self.client["client_heartbeat_interval_ms"]) * 4, 1_000),
-        )
+        server_options = dict(self.server_options or {})
+        upstream = dict(cast(Mapping[str, JsonValue], server_options.pop("upstream", {})))
+        router = dict(cast(Mapping[str, JsonValue], server_options.pop("router", {})))
+        server_client_options = dict(cast(Mapping[str, JsonValue], server_options.pop("client_options", {})))
+        downstream = dict(cast(Mapping[str, JsonValue], server_options.pop("downstream", {})))
+        server_browser_token = server_options.pop("server_browser_token", None)
         custom_events: list[ModCDPAddCustomEventObjectParams] = []
         for event in self.custom_events:
             custom_events.append(
@@ -637,25 +623,24 @@ class ModCDPClient(CDPSurfaceMixin):
         custom_middlewares: list[ModCDPAddMiddlewareParams] = list(self.custom_middlewares)
         return cast(ModCDPServerConfig, {
             "upstream": {
-                "upstream_mode": self.upstream.get("upstream_mode"),
-                **({"upstream_nats_url": self.upstream.get("upstream_nats_url")} if self.upstream.get("upstream_nats_url") else {}),
-                **(
-                    {"upstream_nats_subject_prefix": self.upstream.get("upstream_nats_subject_prefix")}
-                    if self.upstream.get("upstream_nats_subject_prefix")
-                    else {}
-                ),
+                "upstream_ws_connect_error_settle_timeout_ms": self.upstream["upstream_ws_connect_error_settle_timeout_ms"],
+                **upstream,
             },
-            "client": {"client_routes": self.client["client_routes"]},
-            "server": {
-                "server_cdp_send_timeout_ms": server_cdp_send_timeout_ms,
-                "server_loopback_execution_context_timeout_ms": server_loopback_execution_context_timeout_ms,
-                "server_ws_connect_error_settle_timeout_ms": server_ws_connect_error_settle_timeout_ms,
-                "server_downstream_client_timeout_ms": server_downstream_client_timeout_ms,
-                **({"server_routes": server_routes} if server_routes is not None else {}),
-                **({"server_loopback_cdp_url": server_loopback_cdp_url} if server_loopback_cdp_url is not None else {}),
-                **({"server_browser_token": server_browser_token} if server_browser_token is not None else {}),
-                **server,
+            "router": {
+                "loopback_execution_context_timeout_ms": self.injector["injector_execution_context_timeout_ms"],
+                **router,
             },
+            "client_options": {
+                "client_routes": self.client_options["client_routes"],
+                "client_cdp_send_timeout_ms": self.client_options["client_cdp_send_timeout_ms"],
+                **server_client_options,
+            },
+            "downstream": {
+                "downstream_client_timeout_ms": max(int(self.client_options["client_heartbeat_interval_ms"]) * 4, 1_000),
+                **downstream,
+            },
+            **({"server_browser_token": server_browser_token} if server_browser_token is not None else {}),
+            **server_options,
             "custom_events": custom_events,
             "custom_commands": custom_commands,
             "custom_middlewares": custom_middlewares,
@@ -688,9 +673,9 @@ class ModCDPClient(CDPSurfaceMixin):
 
     def _start_heartbeat(self) -> None:
         self._stop_heartbeat()
-        if not self.server or self.server.get("server_close_browser_on_downstream_disconnect") is not True:
+        if not self.server_options or (self.server_options.get("downstream") or {}).get("downstream_close_browser_on_disconnect") is not True:
             return
-        interval_ms = int(self.client["client_heartbeat_interval_ms"])
+        interval_ms = int(self.client_options["client_heartbeat_interval_ms"])
         stop = threading.Event()
         self._heartbeat_stop = stop
 
@@ -739,29 +724,29 @@ class ModCDPClient(CDPSurfaceMixin):
         for injector in injectors:
             injector.update(self._base_extension_injector_config(None))
         for injector in injectors:
-            injector.update(cast(InjectorOptions, launcher.getInjectorConfig()))
+            injector.update(cast(InjectorOptions, launcher.configForInjector()))
         for injector in injectors:
-            injector.update(cast(InjectorOptions, transport.getInjectorConfig()))
+            injector.update(cast(InjectorOptions, transport.configForInjector()))
         for injector in injectors:
             injector.prepare()
         for injector in injectors:
-            launcher.update(injector.getLauncherConfig())
+            launcher.update(injector.configForLauncher())
         for injector in injectors:
-            transport.update(injector.getTransportConfig())
-        launcher.update(cast(LauncherOptions, transport.getLauncherConfig()))
+            transport.update(injector.configForUpstream())
+        launcher.update(cast(LauncherOptions, transport.configForLauncher()))
         launcher.update({"launcher_local_loopback_cdp": self._server_needs_loopback_cdp()})
-        transport.update(launcher.getTransportConfig())
+        transport.update(launcher.configForUpstream())
 
         if self.upstream["upstream_mode"] in ("nativemessaging", "reversews", "nats"):
             transport.connect()
         if self.launcher.get("launcher_mode") != "none":
             launched = launcher.launch()
             self._launched_browser = launched
-            transport.update(launcher.getTransportConfig())
+            transport.update(launcher.configForUpstream())
             for injector in injectors:
-                injector.update(cast(InjectorOptions, launcher.getInjectorConfig()))
+                injector.update(cast(InjectorOptions, launcher.configForInjector()))
             for injector in injectors:
-                transport.update(injector.getTransportConfig())
+                transport.update(injector.configForUpstream())
         launched_cdp_url = cast(str | None, self._launched_browser.get("cdp_url")) if self._launched_browser else None
         if self.upstream["upstream_mode"] in ("ws", "pipe"):
             transport.connect()
@@ -771,27 +756,29 @@ class ModCDPClient(CDPSurfaceMixin):
             str | None,
             (transport.url or launched_cdp_url) if self.upstream["upstream_mode"] == "ws" else launched_cdp_url,
         )
-        if transport.mode == "ws" and transport.url:
+        if transport.upstream_mode == "ws" and transport.url:
             # For ws mode, cdp_url has been resolved to the concrete WebSocket CDP endpoint after connect().
             self.upstream["upstream_ws_cdp_url"] = transport.url
-        server_config = {"server_loopback_cdp_url": transport.url} if self.upstream["upstream_mode"] == "ws" and transport.url else {}
+        server_config = {"upstream": {"upstream_ws_cdp_url": transport.url}} if self.upstream["upstream_mode"] == "ws" and transport.url else {}
         if self.upstream["upstream_mode"] not in ("ws", "pipe") and launched_cdp_url:
-            server_config["server_loopback_cdp_url"] = launched_cdp_url
-        transport_server_config = transport.getServerConfig()
-        server_config.update(launcher.getServerConfig())
+            server_config["upstream"] = {"upstream_ws_cdp_url": launched_cdp_url}
+        transport_server_config = transport.configForServer()
+        server_config.update(launcher.configForServer())
         server_config.update(transport_server_config)
-        if self.server is not None and server_config.get("server_loopback_cdp_url"):
-            configured_loopback = self.server.get("server_loopback_cdp_url")
-            if "server_loopback_cdp_url" not in self.server or configured_loopback in (
+        server_upstream = cast(Mapping[str, Any], server_config.get("upstream") or {})
+        server_upstream_ws_cdp_url = server_upstream.get("upstream_ws_cdp_url")
+        if self.server_options is not None and server_upstream_ws_cdp_url:
+            configured_loopback = cast(Mapping[str, Any], self.server_options.get("upstream") or {}).get("upstream_ws_cdp_url")
+            if "upstream" not in self.server_options or configured_loopback in (
                 initial_transport_config.get("upstream_ws_cdp_url"),
                 launched_cdp_url,
             ):
-                self.server = cast(ModCDPServerConfig, {**self.server, **server_config})
+                self.server_options = cast(ModCDPServerConfig, {**self.server_options, **server_config})
 
     def _server_needs_loopback_cdp(self) -> bool:
-        if self.server is None or self.server.get("server_loopback_cdp_url"):
+        if self.server_options is None or (self.server_options.get("upstream") or {}).get("upstream_ws_cdp_url"):
             return False
-        return (self.server.get("server_routes") or {}).get("*.*") == "loopback_cdp"
+        return ((self.server_options.get("router") or {}).get("router_routes") or {}).get("*.*") == "loopback_cdp"
 
     def _upstream_transport_config(self) -> dict[str, Any]:
         return {
@@ -814,20 +801,20 @@ class ModCDPClient(CDPSurfaceMixin):
         self._send_message("Target.setDiscoverTargets", {"discover": True})
 
     def _upstream_transport(self):
-        mode = self.upstream.get("upstream_mode")
-        if mode == "ws":
+        upstream_mode = self.upstream.get("upstream_mode")
+        if upstream_mode == "ws":
             return WSUpstreamTransport()
-        if mode == "pipe":
+        if upstream_mode == "pipe":
             return PipeUpstreamTransport()
-        if mode == "reversews":
+        if upstream_mode == "reversews":
             return ReverseWSUpstreamTransport()
-        if mode == "nativemessaging":
+        if upstream_mode == "nativemessaging":
             return NativeMessagingUpstreamTransport({
                 "upstream_nativemessaging_host_name": self.upstream.get("upstream_nativemessaging_host_name"),
             })
-        if mode == "nats":
+        if upstream_mode == "nats":
             return NATSUpstreamTransport(self.upstream)
-        raise RuntimeError(f"unknown upstream.upstream_mode={mode}")
+        raise RuntimeError(f"unknown upstream.upstream_mode={upstream_mode}")
 
     def _extension_injectors_for_config(self) -> list[ExtensionInjector]:
         mode = self.injector.get("injector_mode")
@@ -862,7 +849,7 @@ class ModCDPClient(CDPSurfaceMixin):
                 method,
                 params or {},
                 session_id,
-                timeout=self.client["client_cdp_send_timeout_ms"] / 1000,
+                timeout=self.client_options["client_cdp_send_timeout_ms"] / 1000,
             )
 
         return {
@@ -883,7 +870,7 @@ class ModCDPClient(CDPSurfaceMixin):
             "injector_trust_service_worker_target": trust_service_worker_target,
             "injector_require_service_worker_target": self.injector["injector_require_service_worker_target"] or self.injector.get("injector_mode") == "discover",
             "injector_service_worker_ready_expression": cast(str | None, self.injector.get("injector_service_worker_ready_expression")),
-            "injector_cdp_send_timeout_ms": self.client["client_cdp_send_timeout_ms"],
+            "injector_cdp_send_timeout_ms": self.client_options["client_cdp_send_timeout_ms"],
             "injector_execution_context_timeout_ms": self.injector["injector_execution_context_timeout_ms"],
             "injector_service_worker_probe_timeout_ms": self.injector["injector_service_worker_probe_timeout_ms"],
             "injector_service_worker_ready_timeout_ms": self.injector["injector_service_worker_ready_timeout_ms"],
@@ -902,7 +889,6 @@ class ModCDPClient(CDPSurfaceMixin):
                 if result:
                     return cast(ExtensionInfo, result)
             except Exception as error:
-                injector.last_error = error
                 errors.append(f"{type(injector).__name__}: {error}")
         detail = f"\n\n{chr(10).join(errors)}" if errors else ""
         raise RuntimeError(f"Cannot install, discover, or borrow the ModCDP extension in the running browser.{detail}")
@@ -1135,7 +1121,7 @@ class ModCDPClient(CDPSurfaceMixin):
         timeout: float | None = None,
         record_raw_timing: bool = False,
     ) -> ProtocolResult:
-        effective_timeout = self.client["client_cdp_send_timeout_ms"] / 1000 if timeout is None else timeout
+        effective_timeout = self.client_options["client_cdp_send_timeout_ms"] / 1000 if timeout is None else timeout
         with self._lock:
             self._next_id += 1
             msg_id = self._next_id

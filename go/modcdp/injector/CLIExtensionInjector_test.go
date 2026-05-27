@@ -61,7 +61,7 @@ func TestCLIExtensionInjectorPreparesUnpackedExtensionDirectoryForLoadExtension(
 	if _, err := os.Stat(filepath.Join(injector.UnpackedExtensionPath, "manifest.json")); err != nil {
 		t.Fatalf("expected unpacked manifest: %v", err)
 	}
-	launcherConfig := injector.GetLauncherConfig()
+	launcherConfig := injector.ConfigForLauncher()
 	if len(launcherConfig.LauncherLocalExtraArgs) != 1 || launcherConfig.LauncherLocalExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
 		t.Fatalf("ExtraArgs = %#v", launcherConfig.LauncherLocalExtraArgs)
 	}
@@ -86,7 +86,7 @@ func TestCLIExtensionInjectorPreparesDefaultExtensionZipForLoadExtension(t *test
 	if _, err := os.Stat(filepath.Join(injector.UnpackedExtensionPath, "manifest.json")); err != nil {
 		t.Fatalf("expected unpacked manifest: %v", err)
 	}
-	launcherConfig := injector.GetLauncherConfig()
+	launcherConfig := injector.ConfigForLauncher()
 	if len(launcherConfig.LauncherLocalExtraArgs) != 1 || launcherConfig.LauncherLocalExtraArgs[0] != "--load-extension="+injector.UnpackedExtensionPath {
 		t.Fatalf("ExtraArgs = %#v", launcherConfig.LauncherLocalExtraArgs)
 	}

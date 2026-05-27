@@ -26,7 +26,7 @@ func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWit
 	}
 	cdp := modcdp.New(modcdp.Options{
 		Launcher: launchOptions,
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "ws"},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorOptions{
 			InjectorMode:                     "bb",
 			InjectorBBExtensionPath:          extensionPath,

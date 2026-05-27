@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +11,17 @@ import (
 
 type BorrowExtensionInjector struct {
 	ExtensionInjector
+	UnpackedExtensionPath           string
+	CleanupPath                     string
+	BootstrapModCDPServerExpression string
 }
+
+const borrowBootstrapStatusExpression = `(() => ({
+  ok: Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent),
+  extension_id: globalThis.chrome?.runtime?.id ?? null,
+  has_tabs: Boolean(globalThis.chrome?.tabs?.query),
+  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
+}))()`
 
 type borrowedExtensionCandidate struct {
 	result      *ExtensionInjectionResult
@@ -22,6 +31,47 @@ type borrowedExtensionCandidate struct {
 
 func NewBorrowExtensionInjector(options InjectorOptions) BorrowExtensionInjector {
 	return BorrowExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
+}
+
+func (i *BorrowExtensionInjector) Prepare() error {
+	if i.BootstrapModCDPServerExpression != "" {
+		return nil
+	}
+	unpackedPath, cleanupPath, err := prepareUnpackedExtension(i.Options.InjectorBorrowExtensionPath)
+	if err != nil {
+		return err
+	}
+	i.UnpackedExtensionPath = unpackedPath
+	i.CleanupPath = cleanupPath
+	body, err := os.ReadFile(filepath.Join(i.UnpackedExtensionPath, "modcdp", "service_worker.js"))
+	if err != nil {
+		_ = os.RemoveAll(i.CleanupPath)
+		i.CleanupPath = ""
+		i.UnpackedExtensionPath = ""
+		return err
+	}
+	source := string(body)
+	i.BootstrapModCDPServerExpression = fmt.Sprintf(`async function() {
+if (!globalThis.ModCDP) {
+%s
+}
+const ModCDP = globalThis.ModCDP;
+return {
+  ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),
+  extension_id: globalThis.chrome?.runtime?.id ?? null,
+  has_tabs: Boolean(globalThis.chrome?.tabs?.query),
+  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
+};
+}`, source)
+	return nil
+}
+
+func (i *BorrowExtensionInjector) Close() error {
+	if i.CleanupPath != "" {
+		_ = os.RemoveAll(i.CleanupPath)
+		i.CleanupPath = ""
+	}
+	return nil
 }
 
 func (i *BorrowExtensionInjector) Inject() (*ExtensionInjectionResult, error) {
@@ -90,21 +140,15 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 		_, _ = i.sendWithTimeout("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, "", i.Options.InjectorCDPSendTimeoutMS)
 	}
 	_, _ = i.sendWithTimeout("Runtime.enable", map[string]any{}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
-	bootstrap, err := modcdpServerBootstrapExpressionFromPath(i.Options.InjectorBorrowExtensionPath)
-	if err != nil {
-		detach()
-		return nil, err
-	}
-	probe, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
-		"expression":    fmt.Sprintf("(%s)()", bootstrap),
-		"awaitPromise":  true,
+	status, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
+		"expression":    borrowBootstrapStatusExpression,
 		"returnByValue": true,
 	}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
 	if err != nil {
 		detach()
 		return nil, err
 	}
-	result, _ := probe["result"].(map[string]any)
+	result, _ := status["result"].(map[string]any)
 	value, _ := result["value"].(map[string]any)
 	if hasTabs, _ := value["has_tabs"].(bool); !hasTabs {
 		detach()
@@ -113,6 +157,31 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 	if hasDebugger, _ := value["has_debugger"].(bool); !hasDebugger {
 		detach()
 		return nil, nil
+	}
+	if ok, _ := value["ok"].(bool); !ok {
+		if i.BootstrapModCDPServerExpression == "" {
+			detach()
+			return nil, fmt.Errorf("BorrowExtensionInjector requires Prepare before Inject")
+		}
+		probe, err := i.sendWithTimeout("Runtime.evaluate", map[string]any{
+			"expression":    fmt.Sprintf("(%s)()", i.BootstrapModCDPServerExpression),
+			"awaitPromise":  true,
+			"returnByValue": true,
+		}, sessionID, i.Options.InjectorCDPSendTimeoutMS)
+		if err != nil {
+			detach()
+			return nil, err
+		}
+		result, _ = probe["result"].(map[string]any)
+		value, _ = result["value"].(map[string]any)
+		if hasTabs, _ := value["has_tabs"].(bool); !hasTabs {
+			detach()
+			return nil, nil
+		}
+		if hasDebugger, _ := value["has_debugger"].(bool); !hasDebugger {
+			detach()
+			return nil, nil
+		}
 	}
 	ready, _ := value["ok"].(bool)
 	if ready && i.readyExpression() != modcdpReadyExpression {
@@ -150,58 +219,4 @@ func (i *BorrowExtensionInjector) bootstrapTarget(target map[string]any) (*borro
 		hasTabs:     hasTabs,
 		hasDebugger: hasDebugger,
 	}, nil
-}
-
-func modcdpServerBootstrapExpressionFromPath(extensionPath string) (string, error) {
-	serverPath, err := modcdpServerPathFromExtensionPath(extensionPath)
-	if err != nil {
-		return "", err
-	}
-	body, err := os.ReadFile(serverPath)
-	if err != nil {
-		return "", err
-	}
-	source := string(body)
-	start := strings.Index(source, "export function installModCDPServer")
-	end := strings.Index(source, "export const ModCDPServer")
-	if start < 0 || end < start {
-		return "", fmt.Errorf("could not find installModCDPServer in ModCDPServer.js")
-	}
-	installer := strings.Replace(source[start:end], "export function", "function", 1)
-	return fmt.Sprintf(`function() {
-const __name = (fn) => fn;
-%s
-const ModCDP = installModCDPServer(globalThis);
-return {
-  ok: Boolean(ModCDP?.handleCommand && ModCDP?.addCustomEvent),
-  extension_id: globalThis.chrome?.runtime?.id ?? null,
-  has_tabs: Boolean(globalThis.chrome?.tabs?.query),
-  has_debugger: Boolean(globalThis.chrome?.debugger?.sendCommand && globalThis.chrome?.debugger?.getTargets),
-};
-}`, installer), nil
-}
-
-func modcdpServerPathFromExtensionPath(extensionPath string) (string, error) {
-	candidates := []string{}
-	if extensionPath != "" {
-		candidates = append(candidates, filepath.Join(extensionPath, "ModCDPServer.js"))
-		candidates = append(candidates, filepath.Join(extensionPath, "js", "src", "server", "ModCDPServer.js"))
-		candidates = append(candidates, filepath.Join(filepath.Dir(extensionPath), "js", "src", "server", "ModCDPServer.js"))
-	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		for dir := filepath.Dir(file); ; dir = filepath.Dir(dir) {
-			candidates = append(candidates, filepath.Join(dir, "dist", "js", "src", "server", "ModCDPServer.js"))
-			candidates = append(candidates, filepath.Join(dir, "dist", "extension", "js", "src", "server", "ModCDPServer.js"))
-			candidates = append(candidates, filepath.Join(dir, "dist", "extension", "ModCDPServer.js"))
-			if parent := filepath.Dir(dir); parent == dir {
-				break
-			}
-		}
-	}
-	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
-		}
-	}
-	return "", fmt.Errorf("unable to locate ModCDPServer.js; checked: %s", strings.Join(candidates, ", "))
 }

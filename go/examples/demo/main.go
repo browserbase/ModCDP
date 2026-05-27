@@ -4,7 +4,7 @@
 //   --live       Use the running Google Chrome enabled via chrome://inspect.
 //   --direct     *.* -> direct_cdp on the client.
 //   --loopback   *.* -> service_worker on client; *.* -> loopback_cdp on server. Default.
-//   --debugger   *.* -> service_worker on client; *.* -> chrome_debugger on server.
+//   --debugger   *.* -> service_worker on client; *.* -> chromedebugger on server.
 //   --upstream   ws|pipe|reversews|nativemessaging|nats. Defaults to ws.
 //                reversews and nativemessaging use the fixed extension defaults:
 //                ws://127.0.0.1:29292 and com.modcdp.bridge.
@@ -33,42 +33,49 @@ const demoExecutionContextTimeoutMS = 60_000
 const reverseTransportWaitTimeoutMS = 60_000
 
 func optionsFor(mode, upstreamMode, cdpURL, extensionPath string, launchOptions modcdp.LaunchOptions) modcdp.Options {
-	upstream := modcdp.UpstreamConfig{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
+	upstream := modcdp.UpstreamTransportOptions{UpstreamMode: upstreamMode, UpstreamWSCDPURL: cdpURL}
 	if upstreamMode == "reversews" {
 		upstream.UpstreamReverseWSWaitTimeoutMS = reverseTransportWaitTimeoutMS
-	}
-	if upstreamMode == "nativemessaging" {
-		upstream.UpstreamNativeMessagingWaitTimeoutMS = reverseTransportWaitTimeoutMS
 	}
 	if upstreamMode == "nats" {
 		upstream.UpstreamNATSWaitTimeoutMS = reverseTransportWaitTimeoutMS
 	}
+	launcher := launchOptions
+	if cdpURL != "" {
+		launcher.LauncherMode = "remote"
+		launcher.LauncherRemoteCDPURL = cdpURL
+	} else {
+		launcher.LauncherMode = "local"
+	}
+	injector := modcdp.InjectorOptions{
+		InjectorMode:                      "cli",
+		InjectorCLIExtensionPath:          extensionPath,
+		InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
+	}
+	if cdpURL != "" {
+		injector.InjectorMode = "discover"
+		injector.InjectorDiscoverExtensionPath = extensionPath
+	}
 	if mode == "direct" {
 		return modcdp.Options{
-			Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
-			Upstream: upstream,
-			Injector: modcdp.InjectorConfig{
-				InjectorMode:                      "auto",
-				InjectorExtensionPath:             extensionPath,
-				InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
-			},
-			Client: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+			Launcher:      launcher,
+			Upstream:      upstream,
+			Injector:      injector,
+			ClientOptions: modcdp.ClientOptions{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
 		}
 	}
-	server := &modcdp.ServerConfig{
-		ServerRoutes:                            serverRoutesFor(mode, upstreamMode),
-		ServerLoopbackExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
+	server_options := &modcdp.ServerConfig{
+		Router: modcdp.RouterOptions{
+			RouterRoutes:                      serverRoutesFor(mode, upstreamMode),
+			LoopbackExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
+		},
 	}
 	return modcdp.Options{
-		Launcher: modcdp.LauncherConfig{LauncherMode: map[bool]string{true: "remote", false: "local"}[cdpURL != ""], LauncherOptions: launchOptions},
-		Upstream: upstream,
-		Injector: modcdp.InjectorConfig{
-			InjectorMode:                      "auto",
-			InjectorExtensionPath:             extensionPath,
-			InjectorExecutionContextTimeoutMS: demoExecutionContextTimeoutMS,
-		},
-		Client: modcdp.ClientConfig{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
-		Server: server,
+		Launcher:      launcher,
+		Upstream:      upstream,
+		Injector:      injector,
+		ClientOptions: modcdp.ClientOptions{ClientRoutes: clientRoutesFor(mode), ClientCDPSendTimeoutMS: demoCDPSendTimeoutMS},
+		ServerOptions: server_options,
 	}
 }
 
@@ -92,7 +99,7 @@ func serverRoutesFor(mode, upstreamMode string) map[string]string {
 	if mode == "loopback" {
 		serverRoute = "loopback_cdp"
 	} else if mode == "debugger" {
-		serverRoute = "chrome_debugger"
+		serverRoute = "chromedebugger"
 	}
 	routes := map[string]string{
 		"Mod.*":    "service_worker",
@@ -235,21 +242,18 @@ func main() {
 		fmt.Println("connect timing    ->", string(b))
 	}
 
-	serverConfig := map[string]any{
-		"server_routes": serverRoutesFor(mode, upstreamMode),
-		"server_loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS,
-	}
 	configureParams := map[string]any{
-		"upstream": map[string]any{"upstream_mode": upstreamMode},
-		"client":   map[string]any{"client_routes": clientRoutesFor(mode)},
-		"server":   serverConfig,
+		"upstream":       map[string]any{"upstream_mode": upstreamMode},
+		"router":         map[string]any{"router_routes": serverRoutesFor(mode, upstreamMode), "loopback_execution_context_timeout_ms": demoExecutionContextTimeoutMS},
+		"client_options": map[string]any{"client_routes": clientRoutesFor(mode)},
 	}
 	configureRaw, err := cdp.Mod.Configure(configureParams)
 	if err != nil {
 		log.Fatalf("Mod.configure: %v", err)
 	}
 	configure := mustMap(configureRaw, "Mod.configure")
-	configureRoutes := mustMap(configure["routes"], "Mod.configure.routes")
+	configureRouter := mustMap(configure["router"], "Mod.configure.router")
+	configureRoutes := mustMap(configureRouter["router_routes"], "Mod.configure.router.router_routes")
 	if configureRoutes["*.*"] != serverRoutesFor(mode, upstreamMode)["*.*"] {
 		log.Fatalf("unexpected Mod.configure result: %v", configure)
 	}

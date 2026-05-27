@@ -38,9 +38,12 @@ const upstream_ws_cdp_url = "http://127.0.0.1:9222"; // host:port, http(s), and 
 const cdp = new ModCDPClient({
   launcher: { launcher_mode: "remote" },
   upstream: { upstream_mode: "ws", upstream_ws_cdp_url },
-  injector: { injector_mode: "auto" },
-  client: { client_routes: { "Target.getTargets": "service_worker" } },
-  server: { server_loopback_cdp_url: upstream_ws_cdp_url, server_routes: { "*.*": "loopback_cdp" } },
+  injector: { injector_mode: "discover" },
+  client_options: { client_routes: { "Target.getTargets": "service_worker" } },
+  server_options: {
+    upstream: { upstream_ws_cdp_url },
+    router: { router_routes: { "*.*": "loopback_cdp" } },
+  },
 });
 await cdp.connect();
 
@@ -141,7 +144,7 @@ pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url
 # ✨ All ModCDP commands now work through playwright! you can modify/extend playwright behavior to your heart's content
 ```
 
-The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client='{"client_routes": {...}}'`, and `--server='{"server_routes": {...}}'` option groups as `ModCDPClient`. `--launcher-options='{...}'` passes launcher-owned options such as `headless` and `sandbox`; `--client-routes='{...}'` and `--server-routes='{...}'` are route-only shorthands. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
+The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-options='{"client_routes": {...}}'`, and `--server-options='{"router": {"router_routes": {...}}}'` option groups as `ModCDPClient`. `--launcher-options='{...}'` passes launcher-owned options such as `headless` and `sandbox`; `--client-routes='{...}'` and `--server-options-router-routes='{...}'` are route-only shorthands. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
 
 Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host.
 
@@ -170,7 +173,7 @@ Reverse mode is intentionally scoped to one local browser and one reverse extens
 | `--debugger`  | client → SW → `chrome.debugger.sendCommand` against the active tab | The browser exposes no remote CDP port and you only have extension permissions. |
 | `--direct`    | client → sends non-ModCDP commands to browser CDP directly         | You already have a CDP endpoint and don't need extension interception.          |
 
-Pass via `client: { client_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server: { server_routes: { "*.*": "loopback_cdp" | "chrome_debugger" } }`. The demos default to `--loopback` (the most powerful mode).
+Pass via `client_options: { client_routes: { "*.*": "direct_cdp" | "service_worker" } }` and `server_options: { router: { router_routes: { "*.*": "loopback_cdp" | "chromedebugger" } } }`. The demos default to `--loopback` (the most powerful mode).
 
 ## Repository layout
 
@@ -263,24 +266,24 @@ In reverse mode, the same `publishEvent(...)` path also sends CDP-shaped event m
 <summary><b>Routing details</b></summary>
 
 ```ts
-type CDPUpstream = "service_worker" | "direct_cdp" | "auto" | "loopback_cdp" | "chrome_debugger";
+type CDPUpstream = "service_worker" | "direct_cdp" | "auto" | "loopback_cdp" | "chromedebugger";
 
 // client-side defaults
 const client_routes = { "Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "service_worker" } as const;
 
 // server-side defaults (inside the SW)
-const server_routes = { "Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "auto" } as const;
+const server_router_routes = { "Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "auto" } as const;
 ```
 
 - **`service_worker`** — handle in the extension SW.
 - **`direct_cdp`** (client only) — send straight to the browser CDP websocket.
-- **`auto`** (server only) — try `loopback_cdp` first, fall back to `chrome_debugger`.
+- **`auto`** (server only) — try `loopback_cdp` first, fall back to `chromedebugger`.
 - **`loopback_cdp`** (server only) — SW dials a CDP websocket reachable from the browser. You may pass `http://host:port` as shorthand, but it is resolved to the concrete `ws://.../devtools/...` URL at configuration time. Useful for `Browser.*` commands that `chrome.debugger` doesn't support.
-- **`chrome_debugger`** (server only) — `chrome.debugger.sendCommand` against `params.debuggee || { tabId, targetId, extensionId }`, defaulting to the active last-focused tab.
+- **`chromedebugger`** (server only) — `chrome.debugger.sendCommand` against `params.debuggee || { tabId, targetId, extensionId }`, defaulting to the active last-focused tab.
 
 Route resolution is **deterministic across all three language clients**: exact-method match → longest-prefix wildcard → `*.*` fallback. This avoids map-iteration nondeterminism (Go) and key-insertion-order shadowing (JS/Python).
 
-When server-side `auto` routing tries loopback CDP discovery, the SW only trusts `127.0.0.1:9222` after verifying a per-connection `server.server_browser_token` against its own service-worker target. It will not accidentally route loopback commands through a different browser that happens to have the same extension installed.
+When server-side `auto` routing tries loopback CDP discovery, the SW only trusts `127.0.0.1:9222` after verifying a per-connection `server_options.server_browser_token` against its own service-worker target. It will not accidentally route loopback commands through a different browser that happens to have the same extension installed.
 
 </details>
 

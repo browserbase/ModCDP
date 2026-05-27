@@ -76,7 +76,7 @@ class WSUpstreamTransportTests(unittest.TestCase):
         )
         try:
             cdp.connect()
-            self.assertEqual(cdp.transport.mode if cdp.transport else None, "ws")
+            self.assertEqual(cdp.transport.upstream_mode if cdp.transport else None, "ws")
             timing = cdp.connect_timing
             self.assertIsNotNone(timing)
             if timing is None:

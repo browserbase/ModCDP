@@ -6,10 +6,10 @@ from modcdp.transport.NativeMessagingUpstreamTransport import NativeMessagingUps
 
 
 class NativeMessagingUpstreamTransportTests(unittest.TestCase):
-    def test_connects_to_native_messaging_stdio_directly(self) -> None:
+    def test_connects_to_nativemessaging_stdio_directly(self) -> None:
         transport = NativeMessagingUpstreamTransport()
-        self.assertEqual(transport.getInjectorConfig(), {"upstream_nativemessaging_host_name": "com.modcdp.bridge"})
-        self.assertEqual(transport.getServerConfig(), {})
+        self.assertEqual(transport.configForInjector(), {"upstream_nativemessaging_host_name": "com.modcdp.bridge"})
+        self.assertEqual(transport.configForServer(), {})
 
         try:
             transport.connect()

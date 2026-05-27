@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import { z } from "zod";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 import { CDPTypes } from "../src/types/CDPTypes.js";
 import type { cdp } from "../src/types/generated/cdp.js";
 
@@ -12,7 +12,7 @@ test("native CDP schemas validate method params, return values, and event payloa
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
   const runtime_params: cdp.types.ts.Runtime.EvaluateParams = {
     expression: "1 + 1",
@@ -33,8 +33,7 @@ test("native CDP schemas validate method params, return values, and event payloa
   };
 
   if (false) {
-    const alias_result: Awaited<ReturnType<typeof client.Runtime.evaluate>> =
-      runtime_result;
+    const alias_result: Awaited<ReturnType<typeof client.Runtime.evaluate>> = runtime_result;
     void alias_result;
     client.on(client.Target.targetCreated, (event) => {
       const targetId: string = event.targetInfo.targetId;
@@ -60,21 +59,10 @@ test("native CDP schemas validate method params, return values, and event payloa
     void badTargetEvent;
   }
 
-  assert.deepEqual(
-    types.parseCommandParams("Runtime.evaluate", runtime_params),
-    runtime_params,
-  );
-  assert.deepEqual(
-    types.parseCommandResult("Runtime.evaluate", runtime_result),
-    runtime_result,
-  );
-  assert.deepEqual(
-    types.parseEventPayload("Target.targetCreated", target_event),
-    target_event,
-  );
-  assert.throws(() =>
-    types.parseCommandParams("Runtime.evaluate", { returnByValue: true }),
-  );
+  assert.deepEqual(types.parseCommandParams("Runtime.evaluate", runtime_params), runtime_params);
+  assert.deepEqual(types.parseCommandResult("Runtime.evaluate", runtime_result), runtime_result);
+  assert.deepEqual(types.parseEventPayload("Target.targetCreated", target_event), target_event);
+  assert.throws(() => types.parseCommandParams("Runtime.evaluate", { returnByValue: true }));
   assert.throws(() => types.parseCommandResult("Runtime.evaluate", {}));
   assert.throws(() =>
     types.parseEventPayload("Target.targetCreated", {
@@ -89,7 +77,7 @@ test("Mod schemas validate method params, return values, event payloads, and mid
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
   const ping_params: cdp.types.ts.Mod.PingParams = { sent_at: 123 };
   const ping_result: cdp.types.ts.Mod.PingResponse = { ok: true };
@@ -110,12 +98,9 @@ test("Mod schemas validate method params, return values, event payloads, and mid
   };
 
   if (false) {
-    const alias_result: Awaited<ReturnType<typeof client.Mod.ping>> =
-      ping_result;
+    const alias_result: Awaited<ReturnType<typeof client.Mod.ping>> = ping_result;
     void alias_result;
-    const alias_middleware_result: Awaited<
-      ReturnType<typeof client.Mod.addMiddleware>
-    > = middleware_result;
+    const alias_middleware_result: Awaited<ReturnType<typeof client.Mod.addMiddleware>> = middleware_result;
     void alias_middleware_result;
     // @ts-expect-error Mod.ping sent_at must be a number.
     client.Mod.ping({ sent_at: "123" });
@@ -140,14 +125,8 @@ test("Mod schemas validate method params, return values, event payloads, and mid
     ok: true,
   });
   assert.deepEqual(types.parseEventPayload("Mod.pong", pong_event), pong_event);
-  assert.deepEqual(
-    types.parseCommandParams("Mod.addMiddleware", middleware_params),
-    middleware_params,
-  );
-  assert.deepEqual(
-    types.parseCommandResult("Mod.addMiddleware", middleware_result),
-    middleware_result,
-  );
+  assert.deepEqual(types.parseCommandParams("Mod.addMiddleware", middleware_params), middleware_params);
+  assert.deepEqual(types.parseCommandResult("Mod.addMiddleware", middleware_result), middleware_result);
   assert.throws(() => types.parseCommandParams("Mod.ping", { sent_at: "123" }));
   assert.throws(() => types.parseCommandResult("Mod.ping", { ok: "true" }));
   assert.throws(() =>
@@ -180,7 +159,7 @@ test("constructor custom schemas validate command params, return values, events,
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
     types: {
       custom_commands: {
         "Custom.sum": {
@@ -226,10 +205,7 @@ test("constructor custom schemas validate command params, return values, events,
     void badResult;
   }
 
-  assert.deepEqual(
-    client.types.parseCommandParams("Custom.sum", { left: 1, right: 2 }),
-    { left: 1, right: 2 },
-  );
+  assert.deepEqual(client.types.parseCommandParams("Custom.sum", { left: 1, right: 2 }), { left: 1, right: 2 });
   assert.equal(client.types.parseCommandResult("Custom.sum", { value: 3 }), 3);
   assert.deepEqual(
     client.types.parseEventPayload("Custom.finished", {
@@ -238,12 +214,8 @@ test("constructor custom schemas validate command params, return values, events,
     }),
     { total: 3, label: "ok" },
   );
-  assert.throws(() =>
-    client.types.parseCommandParams("Custom.sum", { left: "1", right: 2 }),
-  );
-  assert.throws(() =>
-    client.types.parseCommandResult("Custom.sum", { value: "3" }),
-  );
+  assert.throws(() => client.types.parseCommandParams("Custom.sum", { left: "1", right: 2 }));
+  assert.throws(() => client.types.parseCommandResult("Custom.sum", { value: "3" }));
   assert.throws(() =>
     client.types.parseEventPayload("Custom.finished", {
       total: "3",
@@ -276,7 +248,7 @@ test("dynamic Mod registration updates custom command, event, and middleware val
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
 
   assert.deepEqual(
@@ -301,19 +273,9 @@ test("dynamic Mod registration updates custom command, event, and middleware val
     { name: "Custom.dynamic", phase: "response", registered: true },
   );
 
-  assert.equal(
-    typeof (client as unknown as { Custom: { dynamic: unknown } }).Custom
-      .dynamic,
-    "function",
-  );
-  assert.deepEqual(
-    client.types.parseCommandParams("Custom.dynamic", { text: "ok" }),
-    { text: "ok" },
-  );
-  assert.equal(
-    client.types.parseCommandResult("Custom.dynamic", { ok: true }),
-    true,
-  );
+  assert.equal(typeof (client as unknown as { Custom: { dynamic: unknown } }).Custom.dynamic, "function");
+  assert.deepEqual(client.types.parseCommandParams("Custom.dynamic", { text: "ok" }), { text: "ok" });
+  assert.equal(client.types.parseCommandResult("Custom.dynamic", { ok: true }), true);
   assert.deepEqual(
     client.types.parseEventPayload("Custom.dynamicReady", {
       id: "550e8400-e29b-41d4-a716-446655440000",
@@ -327,15 +289,9 @@ test("dynamic Mod registration updates custom command, event, and middleware val
       expression: "async (payload, next) => next(payload)",
     },
   ]);
-  assert.throws(() =>
-    client.types.parseCommandParams("Custom.dynamic", { text: "" }),
-  );
-  assert.throws(() =>
-    client.types.parseCommandResult("Custom.dynamic", { ok: "yes" }),
-  );
-  assert.throws(() =>
-    client.types.parseEventPayload("Custom.dynamicReady", { id: "nope" }),
-  );
+  assert.throws(() => client.types.parseCommandParams("Custom.dynamic", { text: "" }));
+  assert.throws(() => client.types.parseCommandResult("Custom.dynamic", { ok: "yes" }));
+  assert.throws(() => client.types.parseEventPayload("Custom.dynamicReady", { id: "nope" }));
   await assert.rejects(() =>
     client.Mod.addMiddleware({
       name: "Custom.dynamic",
@@ -350,7 +306,7 @@ test("client.types update replaces the registry with extended runtime validation
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
   const updated_types = client.types.update({
     custom_commands: {
@@ -374,7 +330,7 @@ test("client.types update replaces the registry with extended runtime validation
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
     types: updated_types,
   });
   client.types = updated_types;
@@ -384,8 +340,7 @@ test("client.types update replaces the registry with extended runtime validation
       count: 1,
     };
     void params;
-    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> =
-      true;
+    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
     void result;
     typed_client.on("Custom.updatedReady", (event) => {
       const ready: boolean = event.ready;
@@ -403,23 +358,10 @@ test("client.types update replaces the registry with extended runtime validation
     void badResult;
   }
 
-  assert.equal(
-    typeof (client as unknown as { Custom: { updated: unknown } }).Custom
-      .updated,
-    "function",
-  );
-  assert.deepEqual(
-    client.types.parseCommandParams("Custom.updated", { count: 1 }),
-    { count: 1 },
-  );
-  assert.equal(
-    client.types.parseCommandResult("Custom.updated", { done: true }),
-    true,
-  );
-  assert.deepEqual(
-    client.types.parseEventPayload("Custom.updatedReady", { ready: true }),
-    { ready: true },
-  );
+  assert.equal(typeof (client as unknown as { Custom: { updated: unknown } }).Custom.updated, "function");
+  assert.deepEqual(client.types.parseCommandParams("Custom.updated", { count: 1 }), { count: 1 });
+  assert.equal(client.types.parseCommandResult("Custom.updated", { done: true }), true);
+  assert.deepEqual(client.types.parseEventPayload("Custom.updatedReady", { ready: true }), { ready: true });
   assert.deepEqual(client.types.customMiddlewareWireRegistrations(), [
     {
       name: "Custom.updated",
@@ -427,13 +369,7 @@ test("client.types update replaces the registry with extended runtime validation
       expression: "async (payload, next) => next(payload)",
     },
   ]);
-  assert.throws(() =>
-    client.types.parseCommandParams("Custom.updated", { count: 0 }),
-  );
-  assert.throws(() =>
-    client.types.parseCommandResult("Custom.updated", { done: "true" }),
-  );
-  assert.throws(() =>
-    client.types.parseEventPayload("Custom.updatedReady", { ready: "true" }),
-  );
+  assert.throws(() => client.types.parseCommandParams("Custom.updated", { count: 0 }));
+  assert.throws(() => client.types.parseCommandResult("Custom.updated", { done: "true" }));
+  assert.throws(() => client.types.parseEventPayload("Custom.updatedReady", { ready: "true" }));
 });

@@ -14,8 +14,8 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker
 	}
 	headless := true
 	owner := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{LauncherMode: "local", LauncherLocalHeadless: &headless},
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "ws"},
+		Launcher: modcdp.LaunchOptions{LauncherMode: "local", LauncherLocalHeadless: &headless},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
@@ -29,8 +29,8 @@ func TestBorrowExtensionInjectorBootstrapsModCDPInsideLiveExtensionServiceWorker
 		t.Fatal(err)
 	}
 	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
+		Launcher: modcdp.LaunchOptions{LauncherMode: "remote", LauncherRemoteCDPURL: owner.CDPURL},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "ws", UpstreamWSCDPURL: owner.CDPURL},
 		Injector: modcdp.InjectorOptions{
 			InjectorMode:                     "borrow",
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},

@@ -7,12 +7,12 @@ import (
 )
 
 func TestNativeMessagingUpstreamTransportConnectsToNativeMessagingStdioDirectly(t *testing.T) {
-	transport := NewNativeMessagingUpstreamTransport(NativeMessagingUpstreamTransportOptions{})
-	if !reflect.DeepEqual(transport.GetInjectorConfig(), InjectorOptions{}) {
-		t.Fatalf("injector config = %#v", transport.GetInjectorConfig())
+	transport := NewNativeMessagingUpstreamTransport(UpstreamTransportOptions{})
+	if !reflect.DeepEqual(transport.ConfigForInjector(), InjectorOptions{}) {
+		t.Fatalf("injector config = %#v", transport.ConfigForInjector())
 	}
-	if len(transport.GetServerConfig()) != 0 {
-		t.Fatalf("server config = %#v", transport.GetServerConfig())
+	if len(transport.ConfigForServer()) != 0 {
+		t.Fatalf("server config = %#v", transport.ConfigForServer())
 	}
 	if err := transport.Connect(); err != nil {
 		t.Fatal(err)

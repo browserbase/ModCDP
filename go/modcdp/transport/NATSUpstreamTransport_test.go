@@ -17,7 +17,7 @@ import (
 )
 
 func TestNATSUpstreamTransportConfigOwnsURLUpstreamNATSSubjectPrefixWaitTimeoutAndInjectorOptions(t *testing.T) {
-	encoded, err := json.Marshal(NATSUpstreamTransportOptions{
+	encoded, err := json.Marshal(UpstreamTransportOptions{
 		UpstreamNATSURL:           "ws://127.0.0.1:4223",
 		UpstreamNATSSubjectPrefix: "modcdp.one",
 		UpstreamNATSRole:          "client",
@@ -27,10 +27,10 @@ func TestNATSUpstreamTransportConfigOwnsURLUpstreamNATSSubjectPrefixWaitTimeoutA
 		t.Fatal(err)
 	}
 	if raw := string(encoded); raw != `{"upstream_nats_url":"ws://127.0.0.1:4223","upstream_nats_subject_prefix":"modcdp.one","upstream_nats_role":"client","upstream_nats_wait_timeout_ms":10}` {
-		t.Fatalf("NATSUpstreamTransportOptions JSON = %s", raw)
+		t.Fatalf("UpstreamTransportOptions JSON = %s", raw)
 	}
 
-	transport := NewNATSUpstreamTransport(NATSUpstreamTransportOptions{
+	transport := NewNATSUpstreamTransport(UpstreamTransportOptions{
 		UpstreamNATSURL:           "ws://127.0.0.1:4223",
 		UpstreamNATSSubjectPrefix: "modcdp.one",
 	})
@@ -40,7 +40,7 @@ func TestNATSUpstreamTransportConfigOwnsURLUpstreamNATSSubjectPrefixWaitTimeoutA
 	if transport.UpstreamNATSSubjectPrefix != "modcdp.one" {
 		t.Fatalf("UpstreamNATSSubjectPrefix = %q", transport.UpstreamNATSSubjectPrefix)
 	}
-	if injectorConfig := transport.GetInjectorConfig(); !reflect.DeepEqual(injectorConfig, InjectorOptions{}) {
+	if injectorConfig := transport.ConfigForInjector(); !reflect.DeepEqual(injectorConfig, InjectorOptions{}) {
 		t.Fatalf("injector config = %#v", injectorConfig)
 	}
 	transport.Update(map[string]any{
@@ -64,7 +64,7 @@ func TestNATSUpstreamTransportConfigOwnsURLUpstreamNATSSubjectPrefixWaitTimeoutA
 }
 
 func TestNATSUpstreamTransportCloseResetsPeerWaitState(t *testing.T) {
-	transport := NewNATSUpstreamTransport(NATSUpstreamTransportOptions{UpstreamNATSWaitTimeoutMS: 5})
+	transport := NewNATSUpstreamTransport(UpstreamTransportOptions{UpstreamNATSWaitTimeoutMS: 5})
 
 	transport.HandlePayload(`{"type":"modcdp.nats.hello","role":"browser","version":1}`)
 	if err := transport.WaitForPeer(); err != nil {
@@ -79,7 +79,7 @@ func TestNATSUpstreamTransportCloseResetsPeerWaitState(t *testing.T) {
 }
 
 func TestNATSUpstreamTransportCloseRejectsPendingPeerWaits(t *testing.T) {
-	transport := NewNATSUpstreamTransport(NATSUpstreamTransportOptions{
+	transport := NewNATSUpstreamTransport(UpstreamTransportOptions{
 		UpstreamNATSURL:           "ws://127.0.0.1:4223",
 		UpstreamNATSSubjectPrefix: "modcdp.close",
 		UpstreamNATSWaitTimeoutMS: 5_000,
@@ -105,7 +105,7 @@ func TestNATSUpstreamTransportCloseRejectsPendingPeerWaits(t *testing.T) {
 func TestNATSUpstreamTransportReconnectsAfterCloseAgainstRealNATSServer(t *testing.T) {
 	nats := startNATSServer(t)
 	defer nats.close()
-	transport := NewNATSUpstreamTransport(NATSUpstreamTransportOptions{
+	transport := NewNATSUpstreamTransport(UpstreamTransportOptions{
 		UpstreamNATSURL:           nats.url,
 		UpstreamNATSSubjectPrefix: fmt.Sprintf("modcdp.reconnect.%d", time.Now().UnixMilli()),
 	})

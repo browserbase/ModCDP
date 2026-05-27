@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -48,13 +48,19 @@ test("AutoSessionRouter tracks real target sessions and execution contexts from 
     await cdp.send("Runtime.enable", {}, sessionId);
     const contextId = await contextPromise;
     assert.equal(typeof contextId, "number");
-    assert.equal(cdp.router.execution_contexts.get(sessionId), contextId);
+    assert.equal(
+      [...cdp.router.contexts.values()].some((context) => context.sessionId === sessionId && context.id === contextId),
+      true,
+    );
 
     await cdp.Target.detachFromTarget({ sessionId });
     await expectEventually(() => {
       assert.equal(cdp.router.sessionId_from_targetId.get(targetId!), undefined);
     });
-    assert.equal(cdp.router.execution_contexts.get(sessionId), undefined);
+    assert.equal(
+      [...cdp.router.contexts.values()].some((context) => context.sessionId === sessionId),
+      false,
+    );
     await cdp.Target.closeTarget({ targetId }).catch(() => ({}));
     targetId = null;
 

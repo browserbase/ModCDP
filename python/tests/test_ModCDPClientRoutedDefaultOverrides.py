@@ -93,22 +93,22 @@ class ModCDPClientRoutedDefaultOverridesTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client={
+            client_options={
                 "client_routes": {
                     "Target.getTargets": "service_worker",
                     "Target.createTarget": "service_worker",
                     "Target.setDiscoverTargets": "service_worker",
                 }
             },
-            server={"server_loopback_cdp_url": owner.cdp_url, "server_routes": {"*.*": "loopback_cdp"}},
+            server_options={"upstream": {"upstream_ws_cdp_url": owner.cdp_url}, "router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
 
         try:
             cdp.connect()
             self.assertEqual(cdp.cdp_url, owner.cdp_url)
-            self.assertIsNotNone(cdp.server)
-            server = cast(dict[str, Any], cdp.server)
-            self.assertEqual(server["server_loopback_cdp_url"], owner.cdp_url)
+            self.assertIsNotNone(cdp.server_options)
+            server_options = cast(dict[str, Any], cdp.server_options)
+            self.assertEqual(server_options["upstream"]["upstream_ws_cdp_url"], owner.cdp_url)
 
             raw_targets = cdp.send("Target.getTargets")
             raw_target_infos = target_infos_from_result(raw_targets)

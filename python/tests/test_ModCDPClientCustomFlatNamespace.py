@@ -34,8 +34,8 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server={"server_routes": {"*.*": "loopback_cdp"}},
+            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
 
         async def run() -> None:
@@ -75,8 +75,8 @@ class ModCDPClientCustomFlatNamespaceTests(unittest.TestCase):
                 "injector_service_worker_url_suffixes": ["/modcdp/service_worker.js"],
                 "injector_trust_service_worker_target": True,
             },
-            client={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
-            server={"server_routes": {"*.*": "loopback_cdp"}},
+            client_options={"client_routes": {"Mod.*": "service_worker", "Custom.*": "service_worker", "*.*": "direct_cdp"}},
+            server_options={"router": {"router_routes": {"*.*": "loopback_cdp"}}},
         )
         seen: Queue[str] = Queue()
 

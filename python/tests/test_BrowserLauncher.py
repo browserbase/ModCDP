@@ -37,7 +37,7 @@ class BrowserLauncherTests(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "upstream_ws_cdp_url": launcher.getTransportConfig()["upstream_ws_cdp_url"],
+                "upstream_ws_cdp_url": launcher.configForUpstream()["upstream_ws_cdp_url"],
             },
             {
                 "upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/updated",
@@ -45,8 +45,8 @@ class BrowserLauncherTests(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "injector_bb_api_key": launcher.getInjectorConfig()["injector_bb_api_key"],
-                "injector_service_worker_extension_id": launcher.getInjectorConfig()["injector_service_worker_extension_id"],
+                "injector_bb_api_key": launcher.configForInjector()["injector_bb_api_key"],
+                "injector_service_worker_extension_id": launcher.configForInjector()["injector_service_worker_extension_id"],
             },
             {
                 "injector_bb_api_key": "test-key",

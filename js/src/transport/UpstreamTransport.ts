@@ -1,10 +1,7 @@
 import type { z } from "zod";
 import type { LauncherOptions } from "../launcher/BrowserLauncher.js";
 import type { cdp } from "../types/generated/cdp.js";
-import type {
-  CdpCommandSchema,
-  CdpNamedSchema,
-} from "../types/generated/zod/helpers.js";
+import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type {
   CdpCommandMessage,
@@ -14,20 +11,17 @@ import type {
   ProtocolPayload,
   ProtocolResult,
 } from "../types/modcdp.js";
-import {
-  CdpEventMessageSchema,
-  CdpResponseMessageSchema,
-} from "../types/modcdp.js";
+import { CdpEventMessageSchema, CdpResponseMessageSchema } from "../types/modcdp.js";
 
-export type UpstreamMode =
-  | "ws"                      // connect via CDP WebSocket over TCP (default, used by normal CDP, loopback CDP)
-  | "pipe"                    // connect via CDP over stdio pipe (used by local chrome with --remote-debugging-pipe CLI arg)
-  | "nativemessaging"         // connect via Native Messaging Host IPC (chrome -> sdk via hardcoded IPC paths)
-  | "reversews"               // connect via revers WebSocket (chrome -> sdk via hardcoded listening port)
-  | "nats"                    // connect via NATS messaging (chrome -> NATS -> sdk via hardcoded NATS localhost:port relay)
-  | "chrome_debugger";        // connect via CDP over Extension API chrome.debugger to pages (Browser.* methods not supported, only page-scoped methods allowed, not recommended for production)
-export type UpstreamNatsRole = "client" | "browser";
-export type UpstreamOptions = {
+type UpstreamMode =
+  | "ws" // connect via CDP WebSocket over TCP (default, used by normal CDP, loopback CDP)
+  | "pipe" // connect via CDP over stdio pipe (used by local chrome with --remote-debugging-pipe CLI arg)
+  | "nativemessaging" // connect via Native Messaging Host IPC (chrome -> sdk via hardcoded IPC paths)
+  | "reversews" // connect via revers WebSocket (chrome -> sdk via hardcoded listening port)
+  | "nats" // connect via NATS messaging (chrome -> NATS -> sdk via hardcoded NATS localhost:port relay)
+  | "chromedebugger"; // connect via CDP over Extension API chrome.debugger to pages (Browser.* methods not supported, only page-scoped methods allowed, not recommended for production)
+type UpstreamNatsRole = "client" | "browser";
+type UpstreamTransportOptions = {
   upstream_mode?: UpstreamMode;
   upstream_ws_cdp_url?: string | null;
   upstream_pipe_read?: NodeJS.ReadableStream | null;
@@ -43,19 +37,19 @@ export type UpstreamOptions = {
   upstream_cdp_send_timeout_ms?: number | null;
 };
 
-export type TargetRoute = {
+type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
   sessionId?: cdp.types.ts.Target.SessionID | null;
 };
 
-export type UpstreamEventListener = (
+type UpstreamEventListener = (
   payload: ProtocolPayload,
   targetId: cdp.types.ts.Target.TargetID | null,
   sessionId: cdp.types.ts.Target.SessionID | null,
 ) => void;
 
-export class UpstreamTransport {
-  readonly upstream_mode: UpstreamMode = "ws";
+class UpstreamTransport {
+  readonly upstream_mode: UpstreamMode;
   upstream_ws_cdp_url?: string | null = null;
   upstream_nats_url?: string | null = null;
   upstream_nats_subject_prefix?: string | null = null;
@@ -75,20 +69,40 @@ export class UpstreamTransport {
       timeout: ReturnType<typeof setTimeout> | null;
     }
   >();
-  private recv_listeners = new Set<
-    (message: CdpResponseMessage | CdpEventMessage) => void
-  >();
+  private recv_listeners = new Set<(message: CdpResponseMessage | CdpEventMessage) => void>();
   private close_listeners = new Set<(error: Error) => void>();
-  private event_listeners = new Map<
-    CdpNamedSchema<z.ZodType>,
-    Set<UpstreamEventListener>
-  >();
+  private event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<UpstreamEventListener>>();
+
+  constructor(options: UpstreamTransportOptions = {}) {
+    this.upstream_mode = options.upstream_mode ?? "ws";
+    this.upstream_ws_cdp_url = options.upstream_ws_cdp_url ?? null;
+    this.upstream_nats_url = options.upstream_nats_url ?? null;
+    this.upstream_nats_subject_prefix = options.upstream_nats_subject_prefix ?? null;
+    this.upstream_nats_wait_timeout_ms = options.upstream_nats_wait_timeout_ms ?? null;
+    this.upstream_reversews_bind = options.upstream_reversews_bind ?? null;
+    this.upstream_reversews_wait_timeout_ms = options.upstream_reversews_wait_timeout_ms ?? null;
+    this.upstream_nativemessaging_host_name = options.upstream_nativemessaging_host_name ?? null;
+    this.upstream_ws_connect_error_settle_timeout_ms = options.upstream_ws_connect_error_settle_timeout_ms ?? null;
+    this.upstream_cdp_send_timeout_ms = options.upstream_cdp_send_timeout_ms ?? 10_000;
+  }
 
   async connect() {
     throw new Error(`${this.constructor.name}.connect is not implemented.`);
   }
 
-  update(_config: UpstreamOptions = {}) {
+  update(config: UpstreamTransportOptions = {}) {
+    this.upstream_ws_cdp_url = config.upstream_ws_cdp_url ?? this.upstream_ws_cdp_url;
+    this.upstream_nats_url = config.upstream_nats_url ?? this.upstream_nats_url;
+    this.upstream_nats_subject_prefix = config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix;
+    this.upstream_nats_wait_timeout_ms = config.upstream_nats_wait_timeout_ms ?? this.upstream_nats_wait_timeout_ms;
+    this.upstream_reversews_bind = config.upstream_reversews_bind ?? this.upstream_reversews_bind;
+    this.upstream_reversews_wait_timeout_ms =
+      config.upstream_reversews_wait_timeout_ms ?? this.upstream_reversews_wait_timeout_ms;
+    this.upstream_nativemessaging_host_name =
+      config.upstream_nativemessaging_host_name ?? this.upstream_nativemessaging_host_name;
+    this.upstream_ws_connect_error_settle_timeout_ms =
+      config.upstream_ws_connect_error_settle_timeout_ms ?? this.upstream_ws_connect_error_settle_timeout_ms;
+    this.upstream_cdp_send_timeout_ms = config.upstream_cdp_send_timeout_ms ?? this.upstream_cdp_send_timeout_ms;
     return this;
   }
 
@@ -119,29 +133,18 @@ export class UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method:
-      | CdpCommandMessage
-      | string
-      | CdpCommandSchema<Params, Result, Name>,
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
-    route_or_sessionId:
-      | TargetRoute
-      | cdp.types.ts.Target.SessionID
-      | null = null,
+    route_or_sessionId: TargetRoute | cdp.types.ts.Target.SessionID | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (
-      typeof command_or_message_or_method !== "string" &&
-      "method" in command_or_message_or_method
-    ) {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       throw new Error(`${this.constructor.name}.send is not implemented.`);
     }
     if (typeof command_or_message_or_method === "string") {
       const method = command_or_message_or_method;
-      const sessionId =
-        typeof route_or_sessionId === "string" ? route_or_sessionId : null;
-      const timeout_ms =
-        options.timeout_ms ?? this.upstream_cdp_send_timeout_ms;
+      const sessionId = typeof route_or_sessionId === "string" ? route_or_sessionId : null;
+      const timeout_ms = options.timeout_ms ?? this.upstream_cdp_send_timeout_ms;
       const id = this.next_id++;
       const message: CdpCommandMessage = {
         id,
@@ -175,14 +178,8 @@ export class UpstreamTransport {
         command_or_message_or_method.params.parse(params),
         route_or_sessionId,
       ).then((result) => command_or_message_or_method.result.parse(result));
-    const route =
-      route_or_sessionId && typeof route_or_sessionId === "object"
-        ? route_or_sessionId
-        : undefined;
-    if (route && route.sessionId == null)
-      throw new Error(
-        `No CDP session is attached for targetId=${route.targetId}.`,
-      );
+    const route = route_or_sessionId && typeof route_or_sessionId === "object" ? route_or_sessionId : undefined;
+    if (route && route.sessionId == null) throw new Error(`No CDP session is attached for targetId=${route.targetId}.`);
     return this.send(
       command_or_message_or_method.id,
       command_or_message_or_method.params.parse(params),
@@ -198,11 +195,7 @@ export class UpstreamTransport {
       sessionId: cdp.types.ts.Target.SessionID | null,
     ) => void,
   ) {
-    const typed_listener: UpstreamEventListener = (
-      payload,
-      targetId,
-      sessionId,
-    ) => {
+    const typed_listener: UpstreamEventListener = (payload, targetId, sessionId) => {
       listener(event.parse(payload), targetId, sessionId);
     };
     const listeners = this.event_listeners.get(event);
@@ -222,9 +215,7 @@ export class UpstreamTransport {
   }
 
   async resolveTargetId(params: CdpDebuggeeCommandParams) {
-    return typeof params.targetId === "string" && params.targetId.length > 0
-      ? params.targetId
-      : null;
+    return typeof params.targetId === "string" && params.targetId.length > 0 ? params.targetId : null;
   }
 
   async createTarget(url: string) {
@@ -232,9 +223,7 @@ export class UpstreamTransport {
   }
 
   async attachToTarget(targetId: cdp.types.ts.Target.TargetID) {
-    return (
-      await this.send(Target.AttachToTargetCommand, { targetId, flatten: true })
-    ).sessionId;
+    return (await this.send(Target.AttachToTargetCommand, { targetId, flatten: true })).sessionId;
   }
 
   async detachFromTarget(sessionId: cdp.types.ts.Target.SessionID) {
@@ -280,12 +269,7 @@ export class UpstreamTransport {
     }
     const event = CdpEventMessageSchema.parse(parsed);
     const payload = (event.params ?? {}) as ProtocolPayload;
-    this.emitUpstreamEvent(
-      event.method,
-      payload,
-      null,
-      event.sessionId ?? null,
-    );
+    this.emitUpstreamEvent(event.method, payload, null, event.sessionId ?? null);
     this.emitRecv(event);
   }
 
@@ -304,17 +288,13 @@ export class UpstreamTransport {
   async waitForPeer() {}
 }
 
-export function parseHostPort(
-  value: string,
-  defaultHost: string,
-  defaultPort: number,
-) {
-  const parsed = new URL(
-    /^[a-z][a-z\d+\-.]*:\/\//i.test(value) ? value : `ws://${value}`,
-  );
+function parseHostPort(value: string, defaultHost: string, defaultPort: number) {
+  const parsed = new URL(/^[a-z][a-z\d+\-.]*:\/\//i.test(value) ? value : `ws://${value}`);
   const host = parsed.hostname || defaultHost;
   const port = Number(parsed.port || defaultPort);
-  if (!Number.isInteger(port) || port <= 0 || port > 65_535)
-    throw new Error(`Invalid host:port ${value}`);
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) throw new Error(`Invalid host:port ${value}`);
   return { host, port };
 }
+
+export { UpstreamTransport, parseHostPort };
+export type { UpstreamMode, UpstreamNatsRole, UpstreamTransportOptions, TargetRoute, UpstreamEventListener };

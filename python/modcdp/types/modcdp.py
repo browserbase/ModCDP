@@ -140,14 +140,30 @@ class ModCDPRawTiming(TypedDict):
     duration_ms: int
 
 
+class ModCDPRouterConfig(TypedDict, total=False):
+    router_routes: ModCDPRoutes
+    loopback_execution_context_timeout_ms: int
+
+
+class ModCDPClientConfig(TypedDict, total=False):
+    client_routes: ModCDPRoutes
+    client_hydrate_aliases: bool
+    client_mirror_upstream_events: bool
+    client_cdp_send_timeout_ms: int
+    client_event_wait_timeout_ms: int
+    client_heartbeat_interval_ms: int
+
+
+class ModCDPDownstreamConfig(TypedDict, total=False):
+    downstream_client_timeout_ms: int
+    downstream_close_browser_on_disconnect: bool
+
+
 class ModCDPServerConfig(TypedDict, total=False):
-    server_loopback_cdp_url: str | None
-    server_routes: ModCDPRoutes
-    server_cdp_send_timeout_ms: int
-    server_loopback_execution_context_timeout_ms: int
-    server_ws_connect_error_settle_timeout_ms: int
-    server_downstream_client_timeout_ms: int
-    server_close_browser_on_downstream_disconnect: bool
+    upstream: dict[str, JsonValue]
+    router: ModCDPRouterConfig
+    client_options: ModCDPClientConfig
+    downstream: ModCDPDownstreamConfig
     server_browser_token: str | None
     custom_commands: list[ModCDPAddCustomCommandParams]
     custom_events: list[ModCDPAddCustomEventObjectParams]

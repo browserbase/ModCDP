@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 test("typed CDP event tokens infer callback payloads without local type aliases", () => {
   const cdp = new ModCDPClient({
     launcher: { launcher_mode: "none" },
     upstream: { upstream_mode: "ws" },
     injector: { injector_mode: "none" },
-    server: null,
+    server_options: null,
   });
   const seen: string[] = [];
 

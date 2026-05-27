@@ -5,47 +5,48 @@ import { z } from "zod";
 const isZodType = (value: unknown): value is z.ZodType =>
   value != null && typeof value === "object" && typeof (value as z.ZodType).parse === "function";
 
-export const CdpCommandParamsSchema = z.object({}).passthrough();
-export type CdpCommandParams = z.infer<typeof CdpCommandParamsSchema>;
+const CdpCommandParamsSchema = z.object({}).passthrough();
+type CdpCommandParams = z.infer<typeof CdpCommandParamsSchema>;
 
-export const CdpCommandResultSchema = z.object({}).passthrough();
-export type CdpCommandResult = z.infer<typeof CdpCommandResultSchema>;
+const CdpCommandResultSchema = z.object({}).passthrough();
+type CdpCommandResult = z.infer<typeof CdpCommandResultSchema>;
 
-export const CdpEventParamsSchema = z.object({}).passthrough();
-export type CdpEventParams = z.infer<typeof CdpEventParamsSchema>;
+const CdpEventParamsSchema = z.object({}).passthrough();
+type CdpEventParams = z.infer<typeof CdpEventParamsSchema>;
 
-export const RuntimeBindingCalledEventSchema = z
+const RuntimeBindingCalledEventSchema = z
   .object({
     name: z.string(),
     payload: z.string(),
     executionContextId: z.number().optional(),
   })
   .passthrough();
-export type RuntimeBindingCalledEvent = z.infer<typeof RuntimeBindingCalledEventSchema>;
+type RuntimeBindingCalledEvent = z.infer<typeof RuntimeBindingCalledEventSchema>;
 
-export const TargetAttachedToTargetEventSchema = z
+const TargetAttachedToTargetEventSchema = z
   .object({
     sessionId: z.string(),
     targetInfo: z.object({ targetId: z.string() }).passthrough(),
     waitingForDebugger: z.boolean(),
   })
   .passthrough();
-export type TargetAttachedToTargetEvent = z.infer<typeof TargetAttachedToTargetEventSchema>;
+type TargetAttachedToTargetEvent = z.infer<typeof TargetAttachedToTargetEventSchema>;
 
-export const ModCDPRoutesSchema = z.object({}).catchall(z.string());
-export type ModCDPRoutes = z.infer<typeof ModCDPRoutesSchema>;
+const ModCDPRoutesSchema = z.object({}).catchall(z.string());
+type ModCDPRoutes = z.infer<typeof ModCDPRoutesSchema>;
 
-export const ModCDPRouterOptionsSchema = z
+const ModCDPRouterOptionsSchema = z
   .object({
     router_routes: ModCDPRoutesSchema.optional(),
+    loopback_execution_context_timeout_ms: z.number().positive().optional(),
   })
   .passthrough();
-export type ModCDPRouterOptions = z.infer<typeof ModCDPRouterOptionsSchema>;
+type ModCDPRouterOptions = z.infer<typeof ModCDPRouterOptionsSchema>;
 
-export const ModCDPCustomPayloadSchema = z.object({}).passthrough();
-export type ModCDPCustomPayload = z.infer<typeof ModCDPCustomPayloadSchema>;
+const ModCDPCustomPayloadSchema = z.object({}).passthrough();
+type ModCDPCustomPayload = z.infer<typeof ModCDPCustomPayloadSchema>;
 
-export type ModCDPNamedValue = {
+type ModCDPNamedValue = {
   cdp_command_name?: string;
   cdp_event_name?: string;
   id?: string;
@@ -60,7 +61,7 @@ export type ModCDPNamedValue = {
     | undefined;
 };
 
-export function normalizeModCDPName(value: ModCDPName) {
+function normalizeModCDPName(value: ModCDPName) {
   if (typeof value === "string") return value;
   const meta = typeof value?.meta === "function" ? value.meta() : undefined;
   const name =
@@ -76,7 +77,7 @@ export function normalizeModCDPName(value: ModCDPName) {
   return name;
 }
 
-export const ModCDPNameSchema = z.custom<string | ModCDPNamedValue>((value) => {
+const ModCDPNameSchema = z.custom<string | ModCDPNamedValue>((value) => {
   try {
     normalizeModCDPName(value as ModCDPName);
     return true;
@@ -84,23 +85,23 @@ export const ModCDPNameSchema = z.custom<string | ModCDPNamedValue>((value) => {
     return false;
   }
 });
-export type ModCDPName = z.infer<typeof ModCDPNameSchema>;
+type ModCDPName = z.infer<typeof ModCDPNameSchema>;
 
-export const ModCDPZodTypeSchema = z.custom<z.ZodType>(isZodType);
-export type ModCDPZodType = z.infer<typeof ModCDPZodTypeSchema>;
+const ModCDPZodTypeSchema = z.custom<z.ZodType>(isZodType);
+type ModCDPZodType = z.infer<typeof ModCDPZodTypeSchema>;
 
-export const ModCDPPayloadJsonSchemaSchema = z.record(z.string(), z.unknown());
-export const ModCDPPayloadShapeSchema = z.record(z.string(), ModCDPZodTypeSchema);
-export type ModCDPPayloadShape = z.infer<typeof ModCDPPayloadShapeSchema>;
+const ModCDPPayloadJsonSchemaSchema = z.record(z.string(), z.unknown());
+const ModCDPPayloadShapeSchema = z.record(z.string(), ModCDPZodTypeSchema);
+type ModCDPPayloadShape = z.infer<typeof ModCDPPayloadShapeSchema>;
 
-export const ModCDPPayloadSchemaSpecSchema = z.union([
+const ModCDPPayloadSchemaSpecSchema = z.union([
   ModCDPZodTypeSchema,
   ModCDPPayloadShapeSchema,
   ModCDPPayloadJsonSchemaSchema,
 ]);
-export type ModCDPPayloadSchemaSpec = z.infer<typeof ModCDPPayloadSchemaSpecSchema>;
+type ModCDPPayloadSchemaSpec = z.infer<typeof ModCDPPayloadSchemaSpecSchema>;
 
-export function normalizeModCDPPayloadSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
+function validateZodSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
   if (!schema) return null;
   if (isZodType(schema)) return schema;
   if (Object.values(schema).every(isZodType)) return z.object(schema as ModCDPPayloadShape).passthrough();
@@ -120,42 +121,42 @@ function isScalarJsonSchema(schema: Record<string, unknown>) {
   );
 }
 
-export const ModCDPEvaluateParamsSchema = z.object({
+const ModCDPEvaluateParamsSchema = z.object({
   expression: z.string(),
   params: ModCDPCustomPayloadSchema.optional(),
   cdpSessionId: z.string().nullable().optional(),
 });
-export type ModCDPEvaluateParams = z.infer<typeof ModCDPEvaluateParamsSchema>;
+type ModCDPEvaluateParams = z.infer<typeof ModCDPEvaluateParamsSchema>;
 
-export const ModCDPAddCustomCommandParamsSchema = z.object({
+const ModCDPAddCustomCommandParamsSchema = z.object({
   name: ModCDPNameSchema,
   expression: z.string().nullable().optional(),
   params_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
   result_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
 });
-export type ModCDPAddCustomCommandParams = z.infer<typeof ModCDPAddCustomCommandParamsSchema>;
+type ModCDPAddCustomCommandParams = z.infer<typeof ModCDPAddCustomCommandParamsSchema>;
 
-export const ModCDPAddCustomEventObjectParamsSchema = z.object({
+const ModCDPAddCustomEventObjectParamsSchema = z.object({
   name: ModCDPNameSchema,
   event_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
 });
-export type ModCDPAddCustomEventObjectParams = z.infer<typeof ModCDPAddCustomEventObjectParamsSchema>;
-export const ModCDPAddCustomEventParamsSchema = z.union([ModCDPZodTypeSchema, ModCDPAddCustomEventObjectParamsSchema]);
-export type ModCDPAddCustomEventParams = z.infer<typeof ModCDPAddCustomEventParamsSchema>;
+type ModCDPAddCustomEventObjectParams = z.infer<typeof ModCDPAddCustomEventObjectParamsSchema>;
+const ModCDPAddCustomEventParamsSchema = z.union([ModCDPZodTypeSchema, ModCDPAddCustomEventObjectParamsSchema]);
+type ModCDPAddCustomEventParams = z.infer<typeof ModCDPAddCustomEventParamsSchema>;
 
-export const ModCDPAddMiddlewareParamsSchema = z.object({
+const ModCDPAddMiddlewareParamsSchema = z.object({
   name: ModCDPNameSchema.optional(),
   phase: z.enum(["request", "response", "event"]),
   expression: z.string(),
 });
-export type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
+type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
 
-export const ModCDPLauncherOptionsSchema = z.object({}).passthrough();
-export type ModCDPLauncherOptions = z.infer<typeof ModCDPLauncherOptionsSchema>;
+const ModCDPLauncherOptionsSchema = z.object({}).passthrough();
+type ModCDPLauncherOptions = z.infer<typeof ModCDPLauncherOptionsSchema>;
 
-export const ModCDPUpstreamOptionsSchema = z
+const ModCDPUpstreamOptionsSchema = z
   .object({
-    upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats"]).optional(),
+    upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]).optional(),
     upstream_ws_cdp_url: z.string().nullable().optional(),
     upstream_nats_url: z.string().nullable().optional(),
     upstream_nats_subject_prefix: z.string().nullable().optional(),
@@ -163,11 +164,12 @@ export const ModCDPUpstreamOptionsSchema = z
     upstream_reversews_bind: z.string().nullable().optional(),
     upstream_reversews_wait_timeout_ms: z.number().positive().optional(),
     upstream_nativemessaging_host_name: z.string().nullable().optional(),
+    upstream_ws_connect_error_settle_timeout_ms: z.number().positive().optional(),
   })
   .passthrough();
-export type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;
+type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;
 
-export const ModCDPClientOptionsSchema = z
+const ModCDPClientOptionsSchema = z
   .object({
     client_hydrate_aliases: z.boolean().optional(),
     client_mirror_upstream_events: z.boolean().optional(),
@@ -176,45 +178,46 @@ export const ModCDPClientOptionsSchema = z
     client_heartbeat_interval_ms: z.number().positive().optional(),
   })
   .passthrough();
-export type ModCDPClientOptions = z.infer<typeof ModCDPClientOptionsSchema>;
+type ModCDPClientOptions = z.infer<typeof ModCDPClientOptionsSchema>;
 
-export const ModCDPServerOptionsSchema = z
+const ModCDPDownstreamOptionsSchema = z
   .object({
-    server_loopback_cdp_url: z.string().nullable().optional(),
-    router: ModCDPRouterOptionsSchema.optional(),
-    server_browser_token: z.string().nullable().optional(),
-    server_cdp_send_timeout_ms: z.number().positive().optional(),
-    server_loopback_execution_context_timeout_ms: z.number().positive().optional(),
-    server_ws_connect_error_settle_timeout_ms: z.number().positive().optional(),
-    server_downstream_client_timeout_ms: z.number().positive().optional(),
-    server_close_browser_on_downstream_disconnect: z.boolean().optional(),
+    downstream_client_timeout_ms: z.number().positive().optional(),
+    downstream_close_browser_on_disconnect: z.boolean().optional(),
   })
   .passthrough();
-export type ModCDPServerOptions = z.infer<typeof ModCDPServerOptionsSchema>;
+type ModCDPDownstreamOptions = z.infer<typeof ModCDPDownstreamOptionsSchema>;
 
-export const ModCDPConfigureParamsSchema = z.object({
-  launcher: ModCDPLauncherOptionsSchema.optional(),
-  client: ModCDPClientOptionsSchema.optional(),
-  server: ModCDPServerOptionsSchema.optional(),
-  custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
-  custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional(),
-  custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional(),
-});
-export type ModCDPConfigureParams = z.infer<typeof ModCDPConfigureParamsSchema>;
+const ModCDPServerOptionsSchema = z
+  .object({
+    upstream: ModCDPUpstreamOptionsSchema.optional(),
+    router: ModCDPRouterOptionsSchema.optional(),
+    client_options: ModCDPClientOptionsSchema.optional(),
+    downstream: ModCDPDownstreamOptionsSchema.optional(),
+    server_browser_token: z.string().nullable().optional(),
+    custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
+    custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional(),
+    custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional(),
+  })
+  .passthrough();
+type ModCDPServerOptions = z.infer<typeof ModCDPServerOptionsSchema>;
 
-export const ModCDPPingParamsSchema = z.object({
+const ModCDPConfigureParamsSchema = ModCDPServerOptionsSchema;
+type ModCDPConfigureParams = z.infer<typeof ModCDPConfigureParamsSchema>;
+
+const ModCDPPingParamsSchema = z.object({
   sent_at: z.number().optional(),
 });
-export type ModCDPPingParams = z.infer<typeof ModCDPPingParamsSchema>;
+type ModCDPPingParams = z.infer<typeof ModCDPPingParamsSchema>;
 
-export const ModCDPPongEventSchema = z.object({
+const ModCDPPongEventSchema = z.object({
   sent_at: z.number(),
   received_at: z.number(),
   from: z.string(),
 });
-export type ModCDPPongEvent = z.infer<typeof ModCDPPongEventSchema>;
+type ModCDPPongEvent = z.infer<typeof ModCDPPongEventSchema>;
 
-export const ModCDPPingLatencySchema = z.object({
+const ModCDPPingLatencySchema = z.object({
   sent_at: z.number(),
   received_at: z.number().nullable(),
   returned_at: z.number(),
@@ -222,18 +225,18 @@ export const ModCDPPingLatencySchema = z.object({
   service_worker_ms: z.number().nullable(),
   return_path_ms: z.number().nullable(),
 });
-export type ModCDPPingLatency = z.infer<typeof ModCDPPingLatencySchema>;
+type ModCDPPingLatency = z.infer<typeof ModCDPPingLatencySchema>;
 
-export const ModCDPGetTopologyParamsSchema = z
+const ModCDPGetTopologyParamsSchema = z
   .object({
     rootTargetId: z.string().optional(),
     targetId: z.string().optional(),
     active: z.boolean().optional(),
   })
   .passthrough();
-export type ModCDPGetTopologyParams = z.infer<typeof ModCDPGetTopologyParamsSchema>;
+type ModCDPGetTopologyParams = z.infer<typeof ModCDPGetTopologyParamsSchema>;
 
-export const ModCDPTopologyFrameSchema = z
+const ModCDPTopologyFrameSchema = z
   .object({
     targetId: z.string(),
     url: z.string().nullable().optional(),
@@ -241,9 +244,9 @@ export const ModCDPTopologyFrameSchema = z
     outerBackendNodeId: z.number().int().nullable().optional(),
   })
   .passthrough();
-export type ModCDPTopologyFrame = z.infer<typeof ModCDPTopologyFrameSchema>;
+type ModCDPTopologyFrame = z.infer<typeof ModCDPTopologyFrameSchema>;
 
-export const ModCDPTopologyDomRootSchema = z
+const ModCDPTopologyDomRootSchema = z
   .object({
     kind: z.enum(["document", "shadow"]),
     frameId: z.string(),
@@ -254,9 +257,9 @@ export const ModCDPTopologyDomRootSchema = z
     uniqueContextId: z.string().optional(),
   })
   .passthrough();
-export type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
+type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
 
-export const ModCDPTopologyTargetSchema = z
+const ModCDPTopologyTargetSchema = z
   .object({
     targetId: z.string(),
     type: z.string(),
@@ -268,9 +271,9 @@ export const ModCDPTopologyTargetSchema = z
     sessionId: z.string().nullable().optional(),
   })
   .passthrough();
-export type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
+type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
 
-export const ModCDPTopologyExecutionContextSchema = z
+const ModCDPTopologyExecutionContextSchema = z
   .object({
     id: z.number().int(),
     origin: z.string().optional(),
@@ -283,9 +286,9 @@ export const ModCDPTopologyExecutionContextSchema = z
     world: z.string(),
   })
   .passthrough();
-export type ModCDPTopologyExecutionContext = z.infer<typeof ModCDPTopologyExecutionContextSchema>;
+type ModCDPTopologyExecutionContext = z.infer<typeof ModCDPTopologyExecutionContextSchema>;
 
-export const ModCDPTopologySchema = z
+const ModCDPTopologySchema = z
   .object({
     objectGroup: z.string(),
     rootFrameId: z.string(),
@@ -295,9 +298,9 @@ export const ModCDPTopologySchema = z
     contexts: z.record(z.string(), ModCDPTopologyExecutionContextSchema),
   })
   .passthrough();
-export type ModCDPTopology = z.infer<typeof ModCDPTopologySchema>;
+type ModCDPTopology = z.infer<typeof ModCDPTopologySchema>;
 
-export const ModCDPCommandParamsSchema = z.union([
+const ModCDPCommandParamsSchema = z.union([
   ModCDPEvaluateParamsSchema,
   ModCDPGetTopologyParamsSchema,
   ModCDPAddCustomCommandParamsSchema,
@@ -307,132 +310,104 @@ export const ModCDPCommandParamsSchema = z.union([
   ModCDPPingParamsSchema,
   ModCDPCustomPayloadSchema,
 ]);
-export type ModCDPCommandParams = z.infer<typeof ModCDPCommandParamsSchema>;
+type ModCDPCommandParams = z.infer<typeof ModCDPCommandParamsSchema>;
 
-export const ModCDPCommandResultSchema = z.union([
-  z.object({ ok: z.boolean() }).passthrough(),
-  ModCDPCustomPayloadSchema,
-]);
-export type ModCDPCommandResult = z.infer<typeof ModCDPCommandResultSchema>;
+const ModCDPCommandResultSchema = z.union([z.object({ ok: z.boolean() }).passthrough(), ModCDPCustomPayloadSchema]);
+type ModCDPCommandResult = z.infer<typeof ModCDPCommandResultSchema>;
 
-export const ModCDPEvaluateResponseSchema = z.unknown();
-export type ModCDPEvaluateResponse = z.infer<typeof ModCDPEvaluateResponseSchema>;
+const ModCDPEvaluateResponseSchema = z.unknown();
+type ModCDPEvaluateResponse = z.infer<typeof ModCDPEvaluateResponseSchema>;
 
-export const ModCDPGetTopologyResponseSchema = ModCDPTopologySchema;
-export type ModCDPGetTopologyResponse = z.infer<typeof ModCDPGetTopologyResponseSchema>;
+const ModCDPGetTopologyResponseSchema = ModCDPTopologySchema;
+type ModCDPGetTopologyResponse = z.infer<typeof ModCDPGetTopologyResponseSchema>;
 
-export const ModCDPAddCustomCommandResponseSchema = z
+const ModCDPAddCustomCommandResponseSchema = z
   .object({
     name: z.string(),
     registered: z.boolean(),
   })
   .passthrough();
-export type ModCDPAddCustomCommandResponse = z.infer<typeof ModCDPAddCustomCommandResponseSchema>;
+type ModCDPAddCustomCommandResponse = z.infer<typeof ModCDPAddCustomCommandResponseSchema>;
 
-export const ModCDPAddCustomEventResponseSchema = z
+const ModCDPAddCustomEventResponseSchema = z
   .object({
     name: z.string(),
     registered: z.boolean(),
   })
   .passthrough();
-export type ModCDPAddCustomEventResponse = z.infer<typeof ModCDPAddCustomEventResponseSchema>;
+type ModCDPAddCustomEventResponse = z.infer<typeof ModCDPAddCustomEventResponseSchema>;
 
-export const ModCDPAddMiddlewareResponseSchema = z
+const ModCDPAddMiddlewareResponseSchema = z
   .object({
     name: z.string(),
     phase: z.enum(["request", "response", "event"]),
     registered: z.boolean(),
   })
   .passthrough();
-export type ModCDPAddMiddlewareResponse = z.infer<typeof ModCDPAddMiddlewareResponseSchema>;
+type ModCDPAddMiddlewareResponse = z.infer<typeof ModCDPAddMiddlewareResponseSchema>;
 
-export const ModCDPConfigureResponseSchema = z
-  .object({
-    loopback_cdp_url: z.string().nullable().optional(),
-    routes: ModCDPRoutesSchema,
-  })
-  .passthrough();
-export type ModCDPConfigureResponse = z.infer<typeof ModCDPConfigureResponseSchema>;
+const ModCDPConfigureResponseSchema = z.object({}).passthrough();
+type ModCDPConfigureResponse = z.infer<typeof ModCDPConfigureResponseSchema>;
 
-export const ModCDPPingResponseSchema = z
+const ModCDPPingResponseSchema = z
   .object({
     ok: z.boolean(),
   })
   .passthrough();
-export type ModCDPPingResponse = z.infer<typeof ModCDPPingResponseSchema>;
+type ModCDPPingResponse = z.infer<typeof ModCDPPingResponseSchema>;
 
-export const ModCDPBindingPayloadSchema = z.object({
+const ModCDPBindingPayloadSchema = z.object({
   event: z.string(),
   data: z.unknown(),
   cdpSessionId: z.string().nullable().optional(),
 });
-export type ModCDPBindingPayload = z.infer<typeof ModCDPBindingPayloadSchema>;
+type ModCDPBindingPayload = z.infer<typeof ModCDPBindingPayloadSchema>;
 
-export const CdpDebuggeeCommandParamsSchema = ModCDPCustomPayloadSchema.extend({
+const CdpDebuggeeCommandParamsSchema = ModCDPCustomPayloadSchema.extend({
   debuggee: z.custom<chrome.debugger.Debuggee>().nullable().optional(),
   tabId: z.number().nullable().optional(),
   targetId: z.string().nullable().optional(),
   extensionId: z.string().nullable().optional(),
 });
-export type CdpDebuggeeCommandParams = z.infer<typeof CdpDebuggeeCommandParamsSchema>;
+type CdpDebuggeeCommandParams = z.infer<typeof CdpDebuggeeCommandParamsSchema>;
 
-export const ProtocolParamsSchema = z.union([CdpCommandParamsSchema, ModCDPCommandParamsSchema]);
-export type ProtocolParams = z.infer<typeof ProtocolParamsSchema>;
+const ProtocolParamsSchema = z.union([CdpCommandParamsSchema, ModCDPCommandParamsSchema]);
+type ProtocolParams = z.infer<typeof ProtocolParamsSchema>;
 
-export const ProtocolResultSchema = z.union([CdpCommandResultSchema, ModCDPCommandResultSchema]);
-export type ProtocolResult = z.infer<typeof ProtocolResultSchema>;
+const ProtocolResultSchema = z.union([CdpCommandResultSchema, ModCDPCommandResultSchema]);
+type ProtocolResult = z.infer<typeof ProtocolResultSchema>;
 
-export const ProtocolEventParamsSchema = z.union([
-  CdpEventParamsSchema,
-  ModCDPPongEventSchema,
-  ModCDPCustomPayloadSchema,
-]);
-export type ProtocolEventParams = z.infer<typeof ProtocolEventParamsSchema>;
+const ProtocolEventParamsSchema = z.union([CdpEventParamsSchema, ModCDPPongEventSchema, ModCDPCustomPayloadSchema]);
+type ProtocolEventParams = z.infer<typeof ProtocolEventParamsSchema>;
 
-export const ProtocolPayloadSchema = z.union([
+const ProtocolPayloadSchema = z.union([
   ProtocolParamsSchema,
   ProtocolResultSchema,
   ProtocolEventParamsSchema,
   ModCDPBindingPayloadSchema,
   z.null(),
 ]);
-export type ProtocolPayload = z.infer<typeof ProtocolPayloadSchema>;
+type ProtocolPayload = z.infer<typeof ProtocolPayloadSchema>;
 
-export const ModCDPCustomCommandRegistrationSchema = ModCDPAddCustomCommandParamsSchema.extend({
-  expression: z.string().nullable().optional(),
-  handler:
-    z.custom<
-      (params: ProtocolParams, cdpSessionId: string | null, method?: string) => ProtocolResult | Promise<ProtocolResult>
-    >(),
-});
-export type ModCDPCustomCommandRegistration = z.infer<typeof ModCDPCustomCommandRegistrationSchema>;
+const ModCDPCustomCommandRegistrationSchema = ModCDPAddCustomCommandParamsSchema;
+type ModCDPCustomCommandRegistration = z.infer<typeof ModCDPCustomCommandRegistrationSchema>;
 
-export const ModCDPCustomEventRegistrationSchema = ModCDPAddCustomEventObjectParamsSchema;
-export type ModCDPCustomEventRegistration = z.infer<typeof ModCDPCustomEventRegistrationSchema>;
+const ModCDPCustomEventRegistrationSchema = ModCDPAddCustomEventObjectParamsSchema;
+type ModCDPCustomEventRegistration = z.infer<typeof ModCDPCustomEventRegistrationSchema>;
 
-export const ModCDPMiddlewareRegistrationSchema = ModCDPAddMiddlewareParamsSchema.extend({
-  expression: z.string().nullable().optional(),
-  handler:
-    z.custom<
-      (
-        payload: ProtocolPayload,
-        next: (payload?: ProtocolPayload) => Promise<ProtocolPayload>,
-        context: ModCDPCustomPayload,
-      ) => ProtocolPayload | Promise<ProtocolPayload>
-    >(),
-});
-export type ModCDPMiddlewareRegistration = z.infer<typeof ModCDPMiddlewareRegistrationSchema>;
+const ModCDPMiddlewareRegistrationSchema = ModCDPAddMiddlewareParamsSchema;
+type ModCDPMiddlewareRegistration = z.infer<typeof ModCDPMiddlewareRegistrationSchema>;
 
-export const CdpErrorSchema = z
+const CdpErrorSchema = z
   .object({
     code: z.number().optional(),
     message: z.string(),
     data: z.unknown().optional(),
   })
   .passthrough();
-export type CdpError = z.infer<typeof CdpErrorSchema>;
+type CdpError = z.infer<typeof CdpErrorSchema>;
 
-export const CdpCommandMessageSchema = z
+const CdpCommandMessageSchema = z
   .object({
     id: z.number(),
     method: z.string(),
@@ -440,9 +415,9 @@ export const CdpCommandMessageSchema = z
     sessionId: z.string().optional(),
   })
   .passthrough();
-export type CdpCommandMessage = z.infer<typeof CdpCommandMessageSchema>;
+type CdpCommandMessage = z.infer<typeof CdpCommandMessageSchema>;
 
-export const CdpResponseMessageSchema = z
+const CdpResponseMessageSchema = z
   .object({
     id: z.number(),
     result: z.unknown().optional(),
@@ -450,21 +425,21 @@ export const CdpResponseMessageSchema = z
     sessionId: z.string().optional(),
   })
   .passthrough();
-export type CdpResponseMessage = z.infer<typeof CdpResponseMessageSchema>;
+type CdpResponseMessage = z.infer<typeof CdpResponseMessageSchema>;
 
-export const CdpEventMessageSchema = z
+const CdpEventMessageSchema = z
   .object({
     method: z.string(),
     params: ProtocolEventParamsSchema.optional(),
     sessionId: z.string().optional(),
   })
   .passthrough();
-export type CdpEventMessage = z.infer<typeof CdpEventMessageSchema>;
+type CdpEventMessage = z.infer<typeof CdpEventMessageSchema>;
 
-export const CdpMessageSchema = z.union([CdpCommandMessageSchema, CdpResponseMessageSchema, CdpEventMessageSchema]);
-export type CdpMessage = z.infer<typeof CdpMessageSchema>;
+const CdpMessageSchema = z.union([CdpCommandMessageSchema, CdpResponseMessageSchema, CdpEventMessageSchema]);
+type CdpMessage = z.infer<typeof CdpMessageSchema>;
 
-export const TranslatedStepSchema = z
+const TranslatedStepSchema = z
   .object({
     method: z.string(),
     params: ProtocolParamsSchema.optional(),
@@ -472,27 +447,27 @@ export const TranslatedStepSchema = z
     unwrap: z.enum(["runtime", "runtime_json"]).optional(),
   })
   .passthrough();
-export type TranslatedStep = z.infer<typeof TranslatedStepSchema>;
+type TranslatedStep = z.infer<typeof TranslatedStepSchema>;
 
-export const TranslatedCommandSchema = z
+const TranslatedCommandSchema = z
   .object({
     route: z.string(),
     target: z.enum(["direct_cdp", "service_worker"]),
     steps: z.array(TranslatedStepSchema),
   })
   .passthrough();
-export type TranslatedCommand = z.infer<typeof TranslatedCommandSchema>;
+type TranslatedCommand = z.infer<typeof TranslatedCommandSchema>;
 
-export const UnwrappedModCDPEventSchema = z
+const UnwrappedModCDPEventSchema = z
   .object({
     event: z.string(),
     data: ProtocolPayloadSchema,
     sessionId: z.string().nullable(),
   })
   .passthrough();
-export type UnwrappedModCDPEvent = z.infer<typeof UnwrappedModCDPEventSchema>;
+type UnwrappedModCDPEvent = z.infer<typeof UnwrappedModCDPEventSchema>;
 
-export const Mod = {
+const Mod = {
   Routes: ModCDPRoutesSchema,
   CustomPayload: ModCDPCustomPayloadSchema,
   Name: ModCDPNameSchema,
@@ -532,3 +507,129 @@ export const Mod = {
   CustomEventRegistration: ModCDPCustomEventRegistrationSchema,
   MiddlewareRegistration: ModCDPMiddlewareRegistrationSchema,
 } as const;
+
+export {
+  CdpCommandParamsSchema,
+  CdpCommandResultSchema,
+  CdpEventParamsSchema,
+  RuntimeBindingCalledEventSchema,
+  TargetAttachedToTargetEventSchema,
+  ModCDPRoutesSchema,
+  ModCDPRouterOptionsSchema,
+  ModCDPCustomPayloadSchema,
+  normalizeModCDPName,
+  ModCDPNameSchema,
+  ModCDPZodTypeSchema,
+  ModCDPPayloadJsonSchemaSchema,
+  ModCDPPayloadShapeSchema,
+  ModCDPPayloadSchemaSpecSchema,
+  validateZodSchema,
+  ModCDPEvaluateParamsSchema,
+  ModCDPAddCustomCommandParamsSchema,
+  ModCDPAddCustomEventObjectParamsSchema,
+  ModCDPAddCustomEventParamsSchema,
+  ModCDPAddMiddlewareParamsSchema,
+  ModCDPLauncherOptionsSchema,
+  ModCDPUpstreamOptionsSchema,
+  ModCDPClientOptionsSchema,
+  ModCDPDownstreamOptionsSchema,
+  ModCDPServerOptionsSchema,
+  ModCDPConfigureParamsSchema,
+  ModCDPPingParamsSchema,
+  ModCDPPongEventSchema,
+  ModCDPPingLatencySchema,
+  ModCDPGetTopologyParamsSchema,
+  ModCDPTopologyFrameSchema,
+  ModCDPTopologyDomRootSchema,
+  ModCDPTopologyTargetSchema,
+  ModCDPTopologyExecutionContextSchema,
+  ModCDPTopologySchema,
+  ModCDPCommandParamsSchema,
+  ModCDPCommandResultSchema,
+  ModCDPEvaluateResponseSchema,
+  ModCDPGetTopologyResponseSchema,
+  ModCDPAddCustomCommandResponseSchema,
+  ModCDPAddCustomEventResponseSchema,
+  ModCDPAddMiddlewareResponseSchema,
+  ModCDPConfigureResponseSchema,
+  ModCDPPingResponseSchema,
+  ModCDPBindingPayloadSchema,
+  CdpDebuggeeCommandParamsSchema,
+  ProtocolParamsSchema,
+  ProtocolResultSchema,
+  ProtocolEventParamsSchema,
+  ProtocolPayloadSchema,
+  ModCDPCustomCommandRegistrationSchema,
+  ModCDPCustomEventRegistrationSchema,
+  ModCDPMiddlewareRegistrationSchema,
+  CdpErrorSchema,
+  CdpCommandMessageSchema,
+  CdpResponseMessageSchema,
+  CdpEventMessageSchema,
+  CdpMessageSchema,
+  TranslatedStepSchema,
+  TranslatedCommandSchema,
+  UnwrappedModCDPEventSchema,
+  Mod,
+};
+export type {
+  CdpCommandParams,
+  CdpCommandResult,
+  CdpEventParams,
+  RuntimeBindingCalledEvent,
+  TargetAttachedToTargetEvent,
+  ModCDPRoutes,
+  ModCDPRouterOptions,
+  ModCDPCustomPayload,
+  ModCDPNamedValue,
+  ModCDPName,
+  ModCDPZodType,
+  ModCDPPayloadShape,
+  ModCDPPayloadSchemaSpec,
+  ModCDPEvaluateParams,
+  ModCDPAddCustomCommandParams,
+  ModCDPAddCustomEventObjectParams,
+  ModCDPAddCustomEventParams,
+  ModCDPAddMiddlewareParams,
+  ModCDPLauncherOptions,
+  ModCDPUpstreamOptions,
+  ModCDPClientOptions,
+  ModCDPDownstreamOptions,
+  ModCDPServerOptions,
+  ModCDPConfigureParams,
+  ModCDPPingParams,
+  ModCDPPongEvent,
+  ModCDPPingLatency,
+  ModCDPGetTopologyParams,
+  ModCDPTopologyFrame,
+  ModCDPTopologyDomRoot,
+  ModCDPTopologyTarget,
+  ModCDPTopologyExecutionContext,
+  ModCDPTopology,
+  ModCDPCommandParams,
+  ModCDPCommandResult,
+  ModCDPEvaluateResponse,
+  ModCDPGetTopologyResponse,
+  ModCDPAddCustomCommandResponse,
+  ModCDPAddCustomEventResponse,
+  ModCDPAddMiddlewareResponse,
+  ModCDPConfigureResponse,
+  ModCDPPingResponse,
+  ModCDPBindingPayload,
+  CdpDebuggeeCommandParams,
+  ProtocolParams,
+  ProtocolResult,
+  ProtocolEventParams,
+  ProtocolPayload,
+  ModCDPCustomCommandRegistration,
+  ModCDPCustomEventRegistration,
+  ModCDPMiddlewareRegistration,
+  CdpError,
+  CdpCommandMessage,
+  CdpResponseMessage,
+  CdpEventMessage,
+  CdpMessage,
+  TranslatedStep,
+  TranslatedCommand,
+  UnwrappedModCDPEvent,
+};

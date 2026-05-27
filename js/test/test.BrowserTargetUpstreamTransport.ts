@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 
-import { ModCDPClient } from "../src/client/ModCDPClient.js";
+import { ModCDPClient } from "../src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
@@ -32,8 +32,8 @@ test("loopback browser-target upstream routes commands, events, and topology thr
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server: {
-      server_loopback_cdp_url: owner.upstream.upstream_ws_cdp_url,
+    server_options: {
+      upstream: { upstream_ws_cdp_url: owner.upstream.upstream_ws_cdp_url },
       router: { router_routes: { "*.*": "loopback_cdp" } },
     },
   });
@@ -85,8 +85,8 @@ test("chrome.debugger browser-target upstream routes commands, events, and topol
       injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
       injector_trust_service_worker_target: true,
     },
-    server: {
-      router: { router_routes: { "*.*": "chrome_debugger" } },
+    server_options: {
+      router: { router_routes: { "*.*": "chromedebugger" } },
     },
   });
 

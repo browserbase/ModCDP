@@ -1,23 +1,11 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
-import type {
-  CdpCommandMessage,
-  ProtocolPayload,
-  ProtocolResult,
-} from "../types/modcdp.js";
-import {
-  UpstreamTransport,
-  type TargetRoute,
-  type UpstreamOptions,
-} from "./UpstreamTransport.js";
+import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportOptions } from "./UpstreamTransport.js";
 
-export const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
+const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
 
-type NativeMessagingOptions = UpstreamOptions & {
-  upstream_nativemessaging_host_name?: string | null;
-};
-
-export class NativeMessagingUpstreamTransport extends UpstreamTransport {
+class NativeMessagingUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "nativemessaging" as const;
   declare upstream_nativemessaging_host_name: string;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
@@ -25,11 +13,11 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
 
   constructor({
     upstream_nativemessaging_host_name = DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
-  }: NativeMessagingOptions = {}) {
-    super();
+    ...options
+  }: UpstreamTransportOptions = {}) {
+    super(options);
     this.upstream_nativemessaging_host_name =
-      upstream_nativemessaging_host_name ||
-      DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
+      upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
   }
 
   override send(message: CdpCommandMessage): void;
@@ -53,22 +41,14 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
     Result extends z.ZodType<Record<string, unknown>>,
     Name extends string,
   >(
-    command_or_message_or_method:
-      | CdpCommandMessage
-      | string
-      | CdpCommandSchema<Params, Result, Name>,
+    command_or_message_or_method: CdpCommandMessage | string | CdpCommandSchema<Params, Result, Name>,
     params: ProtocolPayload | z.input<Params> = {},
     route_or_sessionId: TargetRoute | string | null = null,
     options: { timeout_ms?: number | null } = {},
   ): void | Promise<ProtocolResult> | Promise<z.output<Result>> {
-    if (
-      typeof command_or_message_or_method !== "string" &&
-      "method" in command_or_message_or_method
-    ) {
+    if (typeof command_or_message_or_method !== "string" && "method" in command_or_message_or_method) {
       if (!this.read_native_message)
-        throw new Error(
-          `Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`,
-        );
+        throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
       writeLengthPrefixedJSON(process.stdout, command_or_message_or_method);
       return;
     }
@@ -80,16 +60,11 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
         options,
       );
     }
-    return super.send(
-      command_or_message_or_method,
-      params as z.input<Params>,
-      route_or_sessionId,
-    );
+    return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamOptions = {}) {
-    if (typeof config.upstream_cdp_send_timeout_ms === "number")
-      this.upstream_cdp_send_timeout_ms = config.upstream_cdp_send_timeout_ms;
+  update(config: UpstreamTransportOptions = {}) {
+    super.update(config);
     return this;
   }
 
@@ -105,19 +80,13 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
       });
     };
     process.stdin.on("data", this.read_native_message);
-    process.stdin.on("end", () =>
-      this.emitClose(new Error("Native messaging stdin closed")),
-    );
-    process.stdin.on("error", () =>
-      this.emitClose(new Error("Native messaging stdin error")),
-    );
+    process.stdin.on("end", () => this.emitClose(new Error("Native messaging stdin closed")));
+    process.stdin.on("error", () => this.emitClose(new Error("Native messaging stdin error")));
   }
 
   async waitForPeer() {
     if (!this.read_native_message)
-      throw new Error(
-        `Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`,
-      );
+      throw new Error(`Native messaging stdio is not connected for ${this.upstream_nativemessaging_host_name}.`);
   }
 
   async close() {
@@ -128,20 +97,14 @@ export class NativeMessagingUpstreamTransport extends UpstreamTransport {
   }
 }
 
-function writeLengthPrefixedJSON(
-  stream: { write: (chunk: Buffer) => void },
-  message: unknown,
-) {
+function writeLengthPrefixedJSON(stream: { write: (chunk: Buffer) => void }, message: unknown) {
   const body = Buffer.from(JSON.stringify(message), "utf8");
   const header = Buffer.alloc(4);
   header.writeUInt32LE(body.length, 0);
   stream.write(Buffer.concat([header, body]));
 }
 
-function readLengthPrefixedJSON(
-  buffer: Buffer<ArrayBufferLike>,
-  onRecv: (message: unknown) => void,
-) {
+function readLengthPrefixedJSON(buffer: Buffer<ArrayBufferLike>, onRecv: (message: unknown) => void) {
   while (buffer.length >= 4) {
     const length = buffer.readUInt32LE(0);
     if (buffer.length < length + 4) return buffer;
@@ -151,3 +114,5 @@ function readLengthPrefixedJSON(
   }
   return buffer;
 }
+
+export { DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME, NativeMessagingUpstreamTransport };

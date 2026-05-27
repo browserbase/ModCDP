@@ -4,59 +4,60 @@ import json
 import struct
 import sys
 import threading
-from collections.abc import Mapping
 from typing import Any
 
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 
 
 DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge"
 
 
 class NativeMessagingUpstreamTransport(UpstreamTransport):
-    mode = "nativemessaging"
+    upstream_mode = "nativemessaging"
 
-    def __init__(self, options: Mapping[str, Any] | None = None) -> None:
-        super().__init__()
+    def __init__(self, options: UpstreamTransportOptions | None = None) -> None:
+        super().__init__(options)
         normalized_options = dict(options or {})
         self.upstream_nativemessaging_host_name = str(normalized_options.get("upstream_nativemessaging_host_name") or DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME)
-        self.connected = False
+        self.read_thread: threading.Thread | None = None
 
     def update(self, config: dict[str, Any] | None = None) -> "NativeMessagingUpstreamTransport":
         return self
 
-    def getServerConfig(self) -> dict[str, Any]:
+    def configForServer(self) -> dict[str, Any]:
         return {}
 
-    def getInjectorConfig(self) -> dict[str, Any]:
+    def configForInjector(self) -> dict[str, Any]:
         return {}
 
     def connect(self) -> None:
-        if self.connected:
+        if self.read_thread is not None:
             return
-        self.connected = True
-        threading.Thread(target=self._read_loop, daemon=True).start()
+        self.read_thread = threading.Thread(target=self._read_loop, daemon=True)
+        self.read_thread.start()
 
     def send(self, message: dict[str, Any]) -> None:
-        if not self.connected:
+        if self.read_thread is None:
             raise RuntimeError(f"Native messaging stdio is not connected for {self.upstream_nativemessaging_host_name}.")
         _write_length_prefixed_json(sys.stdout.buffer, message)
 
     def waitForPeer(self) -> None:
-        if not self.connected:
+        if self.read_thread is None:
             raise RuntimeError(f"Native messaging stdio is not connected for {self.upstream_nativemessaging_host_name}.")
 
     def close(self) -> None:
-        self.connected = False
+        self.read_thread = None
 
     def _read_loop(self) -> None:
+        read_thread = threading.current_thread()
         try:
             for message in _read_length_prefixed_json_messages(sys.stdin.buffer):
-                if not self.connected:
+                if self.read_thread is not read_thread:
                     return
                 self._emit_recv(message)
         except Exception as error:
-            if self.connected:
+            if self.read_thread is read_thread:
+                self.read_thread = None
                 self._emit_close(error if isinstance(error, Exception) else Exception(str(error)))
 
 

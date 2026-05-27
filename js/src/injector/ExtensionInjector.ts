@@ -1,12 +1,6 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import type { z } from "zod";
 import type { LauncherOptions } from "../launcher/BrowserLauncher.js";
-import type {
-  TargetRoute,
-  UpstreamOptions,
-} from "../transport/UpstreamTransport.js";
+import type { TargetRoute, UpstreamTransportOptions } from "../transport/UpstreamTransport.js";
 import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
@@ -14,25 +8,18 @@ import * as Target from "../types/generated/zod/Target.js";
 import type { ProtocolParams, ProtocolResult } from "../types/modcdp.js";
 
 const EXT_ID_FROM_URL = /^chrome-extension:\/\/([a-z]+)\//;
-export const DEFAULT_MODCDP_EXTENSION_ID = "mdedooklbnfejodmnhmkdpkaedafkehf";
-export const DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = [
-  "/modcdp/service_worker.js",
-];
-const MODCDP_READY_EXPRESSION =
-  "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
-export const DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000;
-export const DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
-export const DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS = 10_000;
-export const DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000;
-export const DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100;
-export const DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20;
+const DEFAULT_MODCDP_EXTENSION_ID = "mdedooklbnfejodmnhmkdpkaedafkehf";
+const DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES = ["/modcdp/service_worker.js"];
+const MODCDP_READY_EXPRESSION = "Boolean(globalThis.ModCDP?.handleCommand && globalThis.ModCDP?.addCustomEvent)";
+const DEFAULT_CDP_SEND_TIMEOUT_MS = 10_000;
+const DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
+const DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS = 10_000;
+const DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS = 60_000;
+const DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS = 100;
+const DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS = 20;
 
-export interface SendCDP {
-  (
-    method: string,
-    params?: ProtocolParams,
-    session_id?: string | null,
-  ): Promise<ProtocolResult>;
+interface SendCDP {
+  (method: string, params?: ProtocolParams, session_id?: string | null): Promise<ProtocolResult>;
   <
     Params extends z.ZodType<Record<string, unknown>>,
     Result extends z.ZodType<Record<string, unknown>>,
@@ -43,16 +30,16 @@ export interface SendCDP {
     route?: TargetRoute | cdp.types.ts.Target.SessionID | null,
   ): Promise<z.output<Result>>;
 }
-export type TargetInfo = { targetId: string; type?: string; url?: string };
+type TargetInfo = { targetId: string; type?: string; url?: string };
 
-export type InjectorMode =
-  | "cli"       // launch local chrome with --load-extension=/path/to/extension CLI args
-  | "cdp"       // connect to existing chrome and inject via Extensions.loadUnpacked(...) CDP API
-  | "bb"        // use Browserbase extension (via Browserbase SDK extensions upload API) 
-  | "discover"  // auto-discover an existing extension service worker thats already running in the browser
-  | "borrow"    // hijack *any* extension service worker in the browser that has enough permissions to run our ModCDP server (essentially running as a parasite on some other random extension, not recommended for production)
-  | "none";     // no ModCDPServer at all
-export type InjectorOptions = {
+type InjectorMode =
+  | "cli" // launch local chrome with --load-extension=/path/to/extension CLI args
+  | "cdp" // connect to existing chrome and inject via Extensions.loadUnpacked(...) CDP API
+  | "bb" // use Browserbase extension (via Browserbase SDK extensions upload API)
+  | "discover" // auto-discover an existing extension service worker thats already running in the browser
+  | "borrow" // hijack *any* extension service worker in the browser that has enough permissions to run our ModCDP server (essentially running as a parasite on some other random extension, not recommended for production)
+  | "none"; // no ModCDPServer at all
+type InjectorOptions = {
   injector_mode?: InjectorMode;
   send?: SendCDP | null;
   injector_cli_extension_path?: string | null;
@@ -79,7 +66,7 @@ export type InjectorOptions = {
   injector_bb_base_url?: string | null;
 };
 
-export type ExtensionInjectionResult = {
+type ExtensionInjectionResult = {
   source: string;
   extension_id?: string | null;
   target_id: string;
@@ -87,117 +74,11 @@ export type ExtensionInjectionResult = {
   session_id: string;
 };
 
-export type PreparedExtension = {
-  unpacked_extension_path: string;
-  cleanup: () => Promise<void>;
-};
-
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function defaultModCDPExtensionPath() {
-  if (
-    typeof process === "object" &&
-    process?.versions?.node &&
-    import.meta.url.startsWith("file:")
-  ) {
-    const relative_path = import.meta.url.includes("/dist/js/src/")
-      ? "../../../../dist/extension.zip"
-      : "../../../dist/extension.zip";
-    return decodeURIComponent(
-      new URL(/* @vite-ignore */ relative_path, import.meta.url).pathname,
-    );
-  }
-  return "../../../dist/extension.zip";
-}
-
-function firstString(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-export async function prepareUnpackedExtension(
-  extension_path: string,
-): Promise<PreparedExtension> {
-  const unpacked_path = fs.mkdtempSync(
-    path.join(os.tmpdir(), "modcdp-extension-"),
-  );
-  const cleanup = async () =>
-    fs.rmSync(unpacked_path, { recursive: true, force: true });
-  try {
-    if (extension_path.endsWith(".zip")) {
-      await extractZip(extension_path, unpacked_path);
-    } else {
-      fs.cpSync(extension_path, unpacked_path, { recursive: true });
-    }
-    return { unpacked_extension_path: extensionRoot(unpacked_path), cleanup };
-  } catch (error) {
-    await cleanup();
-    throw error;
-  }
-}
-
-export async function extensionIdFromManifestKey(extension_path: string) {
-  const [crypto, fs, path] = await Promise.all([
-    import("node:crypto"),
-    import("node:fs"),
-    import("node:path"),
-  ]);
-  const manifest_path = path.join(extension_path, "manifest.json");
-  if (!fs.existsSync(manifest_path)) return null;
-  const manifest = JSON.parse(fs.readFileSync(manifest_path, "utf8")) as Record<
-    string,
-    unknown
-  >;
-  const key = firstString(manifest.key);
-  if (!key) return null;
-  const digest = crypto
-    .createHash("sha256")
-    .update(Buffer.from(key, "base64"))
-    .digest()
-    .subarray(0, 16);
-  const alphabet = "abcdefghijklmnop";
-  return [...digest]
-    .map((byte) => alphabet[byte >> 4] + alphabet[byte & 0x0f])
-    .join("");
-}
-
-function extensionRoot(unpacked_path: string) {
-  if (fs.existsSync(path.join(unpacked_path, "manifest.json")))
-    return unpacked_path;
-  const nested_path = path.join(unpacked_path, "extension");
-  if (fs.existsSync(path.join(nested_path, "manifest.json")))
-    return nested_path;
-  return unpacked_path;
-}
-
-async function extractZip(zip_path: string, destination: string) {
-  const { execFileSync } = await import("node:child_process");
-  const listing = execFileSync("unzip", ["-Z1", zip_path], {
-    encoding: "utf8",
-  });
-  for (const raw_name of listing.split(/\r?\n/)) {
-    if (!raw_name) continue;
-    const name = raw_name.replaceAll("\\", "/");
-    const normalized = path.posix.normalize(name);
-    if (
-      path.posix.isAbsolute(normalized) ||
-      normalized === "." ||
-      normalized === ".." ||
-      normalized.startsWith("../")
-    ) {
-      throw new Error(
-        `zip entry ${JSON.stringify(raw_name)} escapes extension extraction directory`,
-      );
-    }
-  }
-  execFileSync("unzip", ["-q", zip_path, "-d", destination]);
-}
-
-export class ExtensionInjector {
+class ExtensionInjector {
   injector_mode: InjectorMode;
   send: SendCDP;
   injector_cli_extension_path: string | null;
@@ -229,60 +110,40 @@ export class ExtensionInjector {
   session_id: string | null;
   extra_args: string[];
   protected unusable_target_ids = new Set<string>();
-  last_error: Error | null = null;
 
   constructor(options: InjectorOptions = {}) {
     this.injector_mode = options.injector_mode ?? "none";
     this.send =
       options.send ??
       (async () => {
-        throw new Error(
-          `${this.constructor.name} requires a CDP send function.`,
-        );
+        throw new Error(`${this.constructor.name} requires a CDP send function.`);
       });
-    this.injector_cli_extension_path =
-      options.injector_cli_extension_path ?? null;
+    this.injector_cli_extension_path = options.injector_cli_extension_path ?? null;
     this.injector_cli_extension_id = options.injector_cli_extension_id ?? null;
-    this.injector_cdp_extension_path =
-      options.injector_cdp_extension_path ?? null;
+    this.injector_cdp_extension_path = options.injector_cdp_extension_path ?? null;
     this.injector_cdp_extension_id = options.injector_cdp_extension_id ?? null;
-    this.injector_bb_extension_path =
-      options.injector_bb_extension_path ?? null;
+    this.injector_bb_extension_path = options.injector_bb_extension_path ?? null;
     this.injector_bb_extension_id = options.injector_bb_extension_id ?? null;
-    this.injector_discover_extension_path =
-      options.injector_discover_extension_path ?? null;
-    this.injector_borrow_extension_path =
-      options.injector_borrow_extension_path ?? null;
-    this.injector_service_worker_extension_id =
-      options.injector_service_worker_extension_id ?? null;
-    this.injector_service_worker_url_includes =
-      options.injector_service_worker_url_includes ?? [];
+    this.injector_discover_extension_path = options.injector_discover_extension_path ?? null;
+    this.injector_borrow_extension_path = options.injector_borrow_extension_path ?? null;
+    this.injector_service_worker_extension_id = options.injector_service_worker_extension_id ?? null;
+    this.injector_service_worker_url_includes = options.injector_service_worker_url_includes ?? [];
     this.injector_service_worker_url_suffixes =
-      options.injector_service_worker_url_suffixes ??
-      DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES;
-    this.injector_trust_service_worker_target =
-      options.injector_trust_service_worker_target ?? false;
-    this.injector_require_service_worker_target =
-      options.injector_require_service_worker_target ?? false;
-    this.injector_service_worker_ready_expression =
-      options.injector_service_worker_ready_expression ?? null;
-    this.injector_cdp_send_timeout_ms =
-      options.injector_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS;
+      options.injector_service_worker_url_suffixes ?? DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES;
+    this.injector_trust_service_worker_target = options.injector_trust_service_worker_target ?? false;
+    this.injector_require_service_worker_target = options.injector_require_service_worker_target ?? false;
+    this.injector_service_worker_ready_expression = options.injector_service_worker_ready_expression ?? null;
+    this.injector_cdp_send_timeout_ms = options.injector_cdp_send_timeout_ms ?? DEFAULT_CDP_SEND_TIMEOUT_MS;
     this.injector_execution_context_timeout_ms =
-      options.injector_execution_context_timeout_ms ??
-      DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS;
+      options.injector_execution_context_timeout_ms ?? DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS;
     this.injector_service_worker_probe_timeout_ms =
-      options.injector_service_worker_probe_timeout_ms ??
-      DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS;
+      options.injector_service_worker_probe_timeout_ms ?? DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS;
     this.injector_service_worker_ready_timeout_ms =
-      options.injector_service_worker_ready_timeout_ms ??
-      DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS;
+      options.injector_service_worker_ready_timeout_ms ?? DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS;
     this.injector_service_worker_poll_interval_ms =
-      options.injector_service_worker_poll_interval_ms ??
-      DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS;
+      options.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS;
     this.injector_target_session_poll_interval_ms =
-      options.injector_target_session_poll_interval_ms ??
-      DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS;
+      options.injector_target_session_poll_interval_ms ?? DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS;
     this.injector_bb_api_key = options.injector_bb_api_key ?? null;
     this.injector_bb_base_url = options.injector_bb_base_url ?? null;
     this.source = null;
@@ -296,63 +157,40 @@ export class ExtensionInjector {
   update(config: InjectorOptions = {}) {
     this.injector_mode = config.injector_mode ?? this.injector_mode;
     this.send = config.send ?? this.send;
-    this.injector_cli_extension_path =
-      config.injector_cli_extension_path ?? this.injector_cli_extension_path;
-    this.injector_cli_extension_id =
-      config.injector_cli_extension_id ?? this.injector_cli_extension_id;
-    this.injector_cdp_extension_path =
-      config.injector_cdp_extension_path ?? this.injector_cdp_extension_path;
-    this.injector_cdp_extension_id =
-      config.injector_cdp_extension_id ?? this.injector_cdp_extension_id;
-    this.injector_bb_extension_path =
-      config.injector_bb_extension_path ?? this.injector_bb_extension_path;
-    this.injector_bb_extension_id =
-      config.injector_bb_extension_id ?? this.injector_bb_extension_id;
+    this.injector_cli_extension_path = config.injector_cli_extension_path ?? this.injector_cli_extension_path;
+    this.injector_cli_extension_id = config.injector_cli_extension_id ?? this.injector_cli_extension_id;
+    this.injector_cdp_extension_path = config.injector_cdp_extension_path ?? this.injector_cdp_extension_path;
+    this.injector_cdp_extension_id = config.injector_cdp_extension_id ?? this.injector_cdp_extension_id;
+    this.injector_bb_extension_path = config.injector_bb_extension_path ?? this.injector_bb_extension_path;
+    this.injector_bb_extension_id = config.injector_bb_extension_id ?? this.injector_bb_extension_id;
     this.injector_discover_extension_path =
-      config.injector_discover_extension_path ??
-      this.injector_discover_extension_path;
-    this.injector_borrow_extension_path =
-      config.injector_borrow_extension_path ??
-      this.injector_borrow_extension_path;
+      config.injector_discover_extension_path ?? this.injector_discover_extension_path;
+    this.injector_borrow_extension_path = config.injector_borrow_extension_path ?? this.injector_borrow_extension_path;
     this.injector_service_worker_extension_id =
-      config.injector_service_worker_extension_id ??
-      this.injector_service_worker_extension_id;
+      config.injector_service_worker_extension_id ?? this.injector_service_worker_extension_id;
     this.injector_service_worker_url_includes =
-      config.injector_service_worker_url_includes ??
-      this.injector_service_worker_url_includes;
+      config.injector_service_worker_url_includes ?? this.injector_service_worker_url_includes;
     this.injector_service_worker_url_suffixes =
-      config.injector_service_worker_url_suffixes ??
-      this.injector_service_worker_url_suffixes;
+      config.injector_service_worker_url_suffixes ?? this.injector_service_worker_url_suffixes;
     this.injector_trust_service_worker_target =
-      config.injector_trust_service_worker_target ??
-      this.injector_trust_service_worker_target;
+      config.injector_trust_service_worker_target ?? this.injector_trust_service_worker_target;
     this.injector_require_service_worker_target =
-      config.injector_require_service_worker_target ??
-      this.injector_require_service_worker_target;
+      config.injector_require_service_worker_target ?? this.injector_require_service_worker_target;
     this.injector_service_worker_ready_expression =
-      config.injector_service_worker_ready_expression ??
-      this.injector_service_worker_ready_expression;
-    this.injector_cdp_send_timeout_ms =
-      config.injector_cdp_send_timeout_ms ?? this.injector_cdp_send_timeout_ms;
+      config.injector_service_worker_ready_expression ?? this.injector_service_worker_ready_expression;
+    this.injector_cdp_send_timeout_ms = config.injector_cdp_send_timeout_ms ?? this.injector_cdp_send_timeout_ms;
     this.injector_execution_context_timeout_ms =
-      config.injector_execution_context_timeout_ms ??
-      this.injector_execution_context_timeout_ms;
+      config.injector_execution_context_timeout_ms ?? this.injector_execution_context_timeout_ms;
     this.injector_service_worker_probe_timeout_ms =
-      config.injector_service_worker_probe_timeout_ms ??
-      this.injector_service_worker_probe_timeout_ms;
+      config.injector_service_worker_probe_timeout_ms ?? this.injector_service_worker_probe_timeout_ms;
     this.injector_service_worker_ready_timeout_ms =
-      config.injector_service_worker_ready_timeout_ms ??
-      this.injector_service_worker_ready_timeout_ms;
+      config.injector_service_worker_ready_timeout_ms ?? this.injector_service_worker_ready_timeout_ms;
     this.injector_service_worker_poll_interval_ms =
-      config.injector_service_worker_poll_interval_ms ??
-      this.injector_service_worker_poll_interval_ms;
+      config.injector_service_worker_poll_interval_ms ?? this.injector_service_worker_poll_interval_ms;
     this.injector_target_session_poll_interval_ms =
-      config.injector_target_session_poll_interval_ms ??
-      this.injector_target_session_poll_interval_ms;
-    this.injector_bb_api_key =
-      config.injector_bb_api_key ?? this.injector_bb_api_key;
-    this.injector_bb_base_url =
-      config.injector_bb_base_url ?? this.injector_bb_base_url;
+      config.injector_target_session_poll_interval_ms ?? this.injector_target_session_poll_interval_ms;
+    this.injector_bb_api_key = config.injector_bb_api_key ?? this.injector_bb_api_key;
+    this.injector_bb_base_url = config.injector_bb_base_url ?? this.injector_bb_base_url;
     return this;
   }
 
@@ -380,7 +218,7 @@ export class ExtensionInjector {
     };
   }
 
-  configForUpstream(): UpstreamOptions {
+  configForUpstream(): UpstreamTransportOptions {
     return {};
   }
 
@@ -395,9 +233,7 @@ export class ExtensionInjector {
     return (await this.send(Target.GetTargetsCommand, {})).targetInfos;
   }
 
-  protected async probeTarget(
-    target: TargetInfo,
-  ): Promise<ExtensionInjectionResult | null> {
+  protected async probeTarget(target: TargetInfo): Promise<ExtensionInjectionResult | null> {
     if (this.unusable_target_ids.has(target.targetId)) return null;
     const attached = await this.send(Target.AttachToTargetCommand, {
       targetId: target.targetId,
@@ -435,14 +271,12 @@ export class ExtensionInjector {
     }
   }
 
-  protected async discoverReadyServiceWorker({
-    matched_only = false,
-  }: { matched_only?: boolean } = {}) {
+  protected async discoverReadyServiceWorker({ matched_only = false }: { matched_only?: boolean } = {}) {
     const target_infos = await this.targetInfos();
     if (this.injector_trust_service_worker_target) {
-      const trusted_target = target_infos.find((candidate) =>
-        this.serviceWorkerTargetMatches(candidate),
-      ) as TargetInfo | undefined;
+      const trusted_target = target_infos.find((candidate) => this.serviceWorkerTargetMatches(candidate)) as
+        | TargetInfo
+        | undefined;
       if (trusted_target) {
         const probed = await this.probeTarget(trusted_target);
         if (probed) return { ...probed, source: "trusted" };
@@ -472,35 +306,38 @@ export class ExtensionInjector {
         matched_only,
       });
       if (discovered) return discovered;
-      await delay(
-        this.injector_service_worker_poll_interval_ms ??
-          DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
-      );
+      await delay(this.injector_service_worker_poll_interval_ms ?? DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS);
     }
     return null;
   }
 
-  protected serviceWorkerTargetMatches(candidate: {
-    type?: string;
-    url?: string;
-  }) {
+  protected serviceWorkerTargetMatches(candidate: { type?: string; url?: string }) {
     const url = candidate.url ?? "";
     if (candidate.type !== "service_worker") return false;
     if (!url.startsWith("chrome-extension://")) return false;
     const has_extension_id = Boolean(this.injector_service_worker_extension_id);
     if (
       this.injector_service_worker_extension_id &&
-      !url.startsWith(
-        `chrome-extension://${this.injector_service_worker_extension_id}/`,
-      )
+      !url.startsWith(`chrome-extension://${this.injector_service_worker_extension_id}/`)
     )
       return false;
     const includes = this.injector_service_worker_url_includes ?? [];
     const suffixes = this.injector_service_worker_url_suffixes ?? [];
-    if (includes.length > 0 && !includes.every((part) => url.includes(part)))
-      return false;
-    if (suffixes.length > 0 && !suffixes.some((suffix) => url.endsWith(suffix)))
-      return false;
+    if (includes.length > 0 && !includes.every((part) => url.includes(part))) return false;
+    if (suffixes.length > 0 && !suffixes.some((suffix) => url.endsWith(suffix))) return false;
     return has_extension_id || includes.length > 0 || suffixes.length > 0;
   }
 }
+
+export {
+  DEFAULT_MODCDP_EXTENSION_ID,
+  DEFAULT_MODCDP_SERVICE_WORKER_URL_SUFFIXES,
+  DEFAULT_CDP_SEND_TIMEOUT_MS,
+  DEFAULT_EXECUTION_CONTEXT_TIMEOUT_MS,
+  DEFAULT_SERVICE_WORKER_PROBE_TIMEOUT_MS,
+  DEFAULT_SERVICE_WORKER_READY_TIMEOUT_MS,
+  DEFAULT_SERVICE_WORKER_POLL_INTERVAL_MS,
+  DEFAULT_TARGET_SESSION_POLL_INTERVAL_MS,
+  ExtensionInjector,
+};
+export type { SendCDP, TargetInfo, InjectorMode, InjectorOptions, ExtensionInjectionResult };

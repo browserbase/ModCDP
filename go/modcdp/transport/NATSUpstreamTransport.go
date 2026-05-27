@@ -29,7 +29,6 @@ type NATSUpstreamTransport struct {
 	Conn                      net.Conn
 	IsWebSocket               bool
 	buffer                    string
-	connected                 bool
 	writeMu                   sync.Mutex
 	bufferMu                  sync.Mutex
 	peerCh                    chan struct{}
@@ -38,14 +37,7 @@ type NATSUpstreamTransport struct {
 	stateMu                   sync.Mutex
 }
 
-type NATSUpstreamTransportOptions struct {
-	UpstreamNATSURL           string `json:"upstream_nats_url,omitempty"`
-	UpstreamNATSSubjectPrefix string `json:"upstream_nats_subject_prefix,omitempty"`
-	UpstreamNATSRole          string `json:"upstream_nats_role,omitempty"`
-	UpstreamNATSWaitTimeoutMS int    `json:"upstream_nats_wait_timeout_ms,omitempty"`
-}
-
-func NewNATSUpstreamTransport(options NATSUpstreamTransportOptions) *NATSUpstreamTransport {
+func NewNATSUpstreamTransport(options UpstreamTransportOptions) *NATSUpstreamTransport {
 	normalizedURL, subjectPrefix := normalizeUpstreamNATSURL(firstNonEmptyString(options.UpstreamNATSURL, DefaultUpstreamNATSURL), options.UpstreamNATSSubjectPrefix)
 	role := firstNonEmptyString(options.UpstreamNATSRole, "client")
 	waitTimeoutMS := options.UpstreamNATSWaitTimeoutMS
@@ -53,6 +45,7 @@ func NewNATSUpstreamTransport(options NATSUpstreamTransportOptions) *NATSUpstrea
 		waitTimeoutMS = DefaultUpstreamNATSWaitTimeoutMS
 	}
 	return &NATSUpstreamTransport{
+		UpstreamTransport:         NewUpstreamTransport(options),
 		URL:                       normalizedURL,
 		UpstreamNATSSubjectPrefix: subjectPrefix,
 		UpstreamNATSRole:          role,
@@ -63,6 +56,7 @@ func NewNATSUpstreamTransport(options NATSUpstreamTransportOptions) *NATSUpstrea
 }
 
 func (t *NATSUpstreamTransport) Update(config map[string]any) {
+	t.UpstreamTransport.Update(config)
 	if config == nil {
 		return
 	}
@@ -79,16 +73,15 @@ func (t *NATSUpstreamTransport) Update(config map[string]any) {
 	}
 }
 
-func (t *NATSUpstreamTransport) GetInjectorConfig() InjectorOptions {
+func (t *NATSUpstreamTransport) ConfigForInjector() InjectorOptions {
 	return InjectorOptions{}
 }
 
 func (t *NATSUpstreamTransport) Connect() error {
-	t.stateMu.Lock()
-	if t.connected {
-		t.stateMu.Unlock()
+	if t.currentConn() != nil {
 		return nil
 	}
+	t.stateMu.Lock()
 	t.closeCh = make(chan struct{})
 	closeCh := t.closeCh
 	t.stateMu.Unlock()
@@ -151,17 +144,11 @@ func (t *NATSUpstreamTransport) Connect() error {
 		t.cleanupFailedConnect(t.currentConn())
 		return err
 	}
-	t.stateMu.Lock()
-	t.connected = true
-	t.stateMu.Unlock()
 	return nil
 }
 
 func (t *NATSUpstreamTransport) Send(message map[string]any) error {
-	t.stateMu.Lock()
-	connected := t.connected
-	t.stateMu.Unlock()
-	if !connected || t.currentConn() == nil {
+	if t.currentConn() == nil {
 		return fmt.Errorf("NATS transport is not connected")
 	}
 	return t.publish(t.outgoingSubject(), map[string]any{"type": "modcdp.nats.message", "message": message})
@@ -184,7 +171,6 @@ func (t *NATSUpstreamTransport) WaitForPeer() error {
 
 func (t *NATSUpstreamTransport) Close() error {
 	t.stateMu.Lock()
-	t.connected = false
 	closeCh := t.closeCh
 	t.closeCh = make(chan struct{})
 	t.peerCh = make(chan struct{})
@@ -219,7 +205,6 @@ func (t *NATSUpstreamTransport) cleanupFailedConnect(conn net.Conn) {
 	}
 	t.writeMu.Unlock()
 	t.stateMu.Lock()
-	t.connected = false
 	t.stateMu.Unlock()
 }
 
@@ -277,6 +262,11 @@ func (t *NATSUpstreamTransport) readWebSocketLoop(conn net.Conn, closeCh chan st
 		data, _, err := wsutil.ReadServerData(conn)
 		if err != nil {
 			if !natsClosed(closeCh) {
+				t.writeMu.Lock()
+				if t.Conn == conn {
+					t.Conn = nil
+				}
+				t.writeMu.Unlock()
 				t.emitClose(err)
 			}
 			return
@@ -293,6 +283,11 @@ func (t *NATSUpstreamTransport) readTCPLoop(conn net.Conn, closeCh chan struct{}
 		n, err := conn.Read(chunk)
 		if err != nil {
 			if !natsClosed(closeCh) {
+				t.writeMu.Lock()
+				if t.Conn == conn {
+					t.Conn = nil
+				}
+				t.writeMu.Unlock()
 				t.emitClose(err)
 			}
 			return

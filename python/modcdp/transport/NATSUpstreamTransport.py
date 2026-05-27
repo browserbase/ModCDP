@@ -5,13 +5,12 @@ import socket
 import ssl
 import threading
 import time
-from collections.abc import Mapping
 from typing import Any, cast
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from websocket import WebSocket
 
-from ..transport.UpstreamTransport import UpstreamTransport
+from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportOptions
 
 
 DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223"
@@ -20,13 +19,13 @@ DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS = 10_000
 
 
 class NATSUpstreamTransport(UpstreamTransport):
-    mode = "nats"
+    upstream_mode = "nats"
 
     def __init__(
         self,
-        options: Mapping[str, Any] | None = None,
+        options: UpstreamTransportOptions | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(options)
         normalized_options = dict(options or {})
         normalized_url, normalized_nats_subject_prefix = _normalize_nats_url(
             cast(str | None, normalized_options.get("upstream_nats_url")) or DEFAULT_UPSTREAM_NATS_URL,
@@ -37,7 +36,6 @@ class NATSUpstreamTransport(UpstreamTransport):
         self.upstream_nats_role = str(normalized_options.get("upstream_nats_role") or "client")
         self.wait_timeout_ms = int(normalized_options.get("upstream_nats_wait_timeout_ms") or DEFAULT_UPSTREAM_NATS_WAIT_TIMEOUT_MS)
         self.socket: WebSocket | socket.socket | None = None
-        self.connected = False
         self.peer_seen = threading.Event()
         self._peer_condition = threading.Condition()
         self._close_generation = 0
@@ -62,39 +60,46 @@ class NATSUpstreamTransport(UpstreamTransport):
             self.wait_timeout_ms = int(wait_timeout_ms)
         return self
 
-    def getInjectorConfig(self) -> dict[str, Any]:
+    def configForInjector(self) -> dict[str, Any]:
         return {}
 
     def connect(self) -> None:
-        if self.connected:
+        if self.socket is not None:
             return
         with self._peer_condition:
             self._close_generation += 1
             close_generation = self._close_generation
             self.peer_seen.clear()
-        parsed = urlparse(self.url)
-        if parsed.scheme in ("ws", "wss"):
-            ws = WebSocket()
-            ws.connect(self.url)
-            self.socket = ws
-            self._write_protocol(f"CONNECT {json.dumps(_connect_options())}\r\nPING\r\n")
-            threading.Thread(target=self._read_websocket_loop, args=(ws, close_generation), daemon=True).start()
-        elif parsed.scheme in ("nats", "tls"):
-            port = parsed.port or 4222
-            host = cast(str, parsed.hostname or "127.0.0.1")
-            raw_socket = socket.create_connection((host, port))
-            tcp_socket = ssl.create_default_context().wrap_socket(raw_socket, server_hostname=host) if parsed.scheme == "tls" else raw_socket
-            self.socket = tcp_socket
-            self._write_protocol(f"CONNECT {json.dumps(_connect_options())}\r\nPING\r\n")
-            threading.Thread(target=self._read_tcp_loop, args=(tcp_socket, close_generation), daemon=True).start()
-        else:
-            raise RuntimeError(f"upstream.upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got {self.url}.")
-        self.connected = True
-        self._subscribe()
-        self._publish(self._outgoing_subject(), {"type": "modcdp.nats.hello", "role": self.upstream_nats_role, "version": 1})
+        try:
+            parsed = urlparse(self.url)
+            if parsed.scheme in ("ws", "wss"):
+                ws = WebSocket()
+                ws.connect(self.url)
+                self.socket = ws
+                self._write_protocol(f"CONNECT {json.dumps(_connect_options())}\r\nPING\r\n")
+                threading.Thread(target=self._read_websocket_loop, args=(ws, close_generation), daemon=True).start()
+            elif parsed.scheme in ("nats", "tls"):
+                port = parsed.port or 4222
+                host = cast(str, parsed.hostname or "127.0.0.1")
+                raw_socket = socket.create_connection((host, port))
+                tcp_socket = ssl.create_default_context().wrap_socket(raw_socket, server_hostname=host) if parsed.scheme == "tls" else raw_socket
+                self.socket = tcp_socket
+                self._write_protocol(f"CONNECT {json.dumps(_connect_options())}\r\nPING\r\n")
+                threading.Thread(target=self._read_tcp_loop, args=(tcp_socket, close_generation), daemon=True).start()
+            else:
+                raise RuntimeError(f"upstream.upstream_mode=nats requires ws://, wss://, nats://, or tls:// URL, got {self.url}.")
+            self._subscribe()
+            self._publish(self._outgoing_subject(), {"type": "modcdp.nats.hello", "role": self.upstream_nats_role, "version": 1})
+        except Exception:
+            try:
+                if self.socket is not None:
+                    self.socket.close()
+            finally:
+                self.socket = None
+            raise
 
     def send(self, message: dict[str, Any]) -> None:
-        if not self.connected or self.socket is None:
+        if self.socket is None:
             raise RuntimeError("NATS transport is not connected.")
         self._publish(self._outgoing_subject(), {"type": "modcdp.nats.message", "message": message})
 
@@ -119,7 +124,6 @@ class NATSUpstreamTransport(UpstreamTransport):
         except Exception:
             pass
         self.socket = None
-        self.connected = False
         self.peer_seen.clear()
         with self._peer_condition:
             self._close_generation += 1
@@ -162,6 +166,8 @@ class NATSUpstreamTransport(UpstreamTransport):
                 self.buffer = self._consume_protocol(self.buffer)
         except Exception as error:
             if not self._generation_closed(close_generation):
+                if self.socket is ws:
+                    self.socket = None
                 self._emit_close(error if isinstance(error, Exception) else RuntimeError(str(error)))
 
     def _read_tcp_loop(self, tcp_socket: socket.socket, close_generation: int) -> None:
@@ -169,11 +175,15 @@ class NATSUpstreamTransport(UpstreamTransport):
             while not self._generation_closed(close_generation):
                 chunk = tcp_socket.recv(65536)
                 if not chunk:
+                    if self.socket is tcp_socket:
+                        self.socket = None
                     break
                 self.buffer += chunk.decode()
                 self.buffer = self._consume_protocol(self.buffer)
         except Exception as error:
             if not self._generation_closed(close_generation):
+                if self.socket is tcp_socket:
+                    self.socket = None
                 self._emit_close(error if isinstance(error, Exception) else RuntimeError(str(error)))
 
     def _consume_protocol(self, buffer: str) -> str:

@@ -6,14 +6,14 @@ import {
 } from "../types/modcdp.js";
 import { DownstreamTransport } from "./DownstreamTransport.js";
 
-export const DEFAULT_NATIVE_BRIDGE_HOST_NAME = "com.modcdp.bridge";
-export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
+const DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME = "com.modcdp.bridge";
+const DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
 
 /**
  * Owns the native messaging downstream connection from the extension service
  * worker to a native ModCDP host.
  *
- * This class owns only native-host lifecycle: chrome.runtime.connectNative,
+ * This class owns only nativemessaging lifecycle: chrome.runtime.connectNative,
  * reconnect scheduling, port status, hello messages, command-message decoding,
  * CDP response posting, and event-message forwarding. It does not own ModCDP
  * command registration, routing, middleware, upstream target/session state,
@@ -29,18 +29,15 @@ export const DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS = 2_000;
  * 4. `onDisconnect` clears the active port, stores the browser-provided error,
  *    and schedules reconnect while a host is still configured.
  */
-export class NativeHostDownstreamTransport extends DownstreamTransport {
-  readonly name = "native";
-
-  // Server-owned keepalive hook. Called after the native port connects.
-  private readonly ensureOffscreenKeepAlive: () => unknown;
+class NativeMessagingDownstreamTransport extends DownstreamTransport {
+  readonly name = "nativemessaging" as const;
 
   // Configured native host name. Set by start, read by reconnect scheduling.
   private host_name: string | null = null;
 
   // Reconnect interval currently configured for the native host. Set by start
   // and read by disconnect/error handling.
-  private reconnect_interval_ms = DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS;
+  private reconnect_interval_ms = DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS;
 
   // Active native messaging port. Set by connect, cleared by disconnect/error,
   // read by start and emit.
@@ -61,21 +58,16 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
   // read by sendResponse so responses go only to the originating downstream client.
   private readonly port_from_request = new WeakMap<CdpCommandMessage, chrome.runtime.Port>();
 
-  constructor({ ensureOffscreenKeepAlive }: { ensureOffscreenKeepAlive: () => unknown }) {
-    super();
-    this.ensureOffscreenKeepAlive = ensureOffscreenKeepAlive;
-  }
-
   /** True when the native messaging port is connected and can receive events. */
   get connected() {
     return this.port != null;
   }
 
-  /** Configure and start the native-host downstream connection. */
+  /** Configure and start the nativemessaging downstream connection. */
   start(
-    hostName = DEFAULT_NATIVE_BRIDGE_HOST_NAME,
+    hostName = DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME,
     {
-      reconnect_interval_ms = DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
+      reconnect_interval_ms = DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS,
     }: {
       reconnect_interval_ms?: number;
     } = {},
@@ -85,10 +77,10 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
     return this.connect(hostName);
   }
 
-  /** Start the default native host configured into the shipped extension. */
-  startDefault() {
-    return this.start(DEFAULT_NATIVE_BRIDGE_HOST_NAME, {
-      reconnect_interval_ms: DEFAULT_NATIVE_BRIDGE_RECONNECT_INTERVAL_MS,
+  /** Start polling for native messaging clients using the shipped extension default. */
+  startPollingForClients() {
+    return this.start(DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME, {
+      reconnect_interval_ms: DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS,
     });
   }
 
@@ -124,7 +116,7 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
     return 1;
   }
 
-  /** Return generic status without exposing native-host lifecycle to ModCDPServer. */
+  /** Return generic status without exposing nativemessaging lifecycle to ModCDPServer. */
   status() {
     return {
       connected: this.connected,
@@ -150,7 +142,7 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
       return {
         upstream_nativemessaging_host_name: hostName,
         connected: false,
-        reason: "native_messaging_unavailable",
+        reason: "nativemessaging_unavailable",
       };
     }
     if (this.port) return { upstream_nativemessaging_host_name: hostName, connected: true };
@@ -159,9 +151,8 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
       this.last_error = null;
       const port = chrome_api.runtime.connectNative(hostName);
       this.port = port;
-      void this.ensureOffscreenKeepAlive();
       port.postMessage({
-        type: "modcdp.native.hello",
+        type: "modcdp.nativemessaging.hello",
         role: "extension-service-worker",
         version: 1,
         extension_id: globalThis.chrome?.runtime?.id ?? null,
@@ -193,3 +184,9 @@ export class NativeHostDownstreamTransport extends DownstreamTransport {
     await this.handleRequest(message);
   }
 }
+
+export {
+  DEFAULT_NATIVEMESSAGING_BRIDGE_HOST_NAME,
+  DEFAULT_NATIVEMESSAGING_BRIDGE_RECONNECT_INTERVAL_MS,
+  NativeMessagingDownstreamTransport,
+};

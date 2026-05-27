@@ -57,7 +57,7 @@ func (i *BBExtensionInjector) Prepare() error {
 	return nil
 }
 
-func (i *BBExtensionInjector) GetLauncherConfig() LaunchOptions {
+func (i *BBExtensionInjector) ConfigForLauncher() LaunchOptions {
 	if i.ExtensionID == "" {
 		return LaunchOptions{}
 	}

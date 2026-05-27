@@ -150,7 +150,6 @@ class ExtensionInjector:
             **dict(options or {}),
         })
         self.unusable_target_ids: set[str] = set()
-        self.last_error: Exception | None = None
 
     def update(self, config: InjectorOptions | None = None) -> "ExtensionInjector":
         config = cast(InjectorOptions, dict(config or {}))
@@ -171,13 +170,13 @@ class ExtensionInjector:
         )
         return self
 
-    def getInjectorConfig(self) -> InjectorOptions:
+    def configForInjector(self) -> InjectorOptions:
         return cast(InjectorOptions, dict(self.options))
 
-    def getLauncherConfig(self) -> LauncherOptions:
+    def configForLauncher(self) -> LauncherOptions:
         return {}
 
-    def getTransportConfig(self) -> dict[str, Any]:
+    def configForUpstream(self) -> dict[str, Any]:
         return {}
 
     def prepare(self) -> None:

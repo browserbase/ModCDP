@@ -21,7 +21,7 @@ class BBExtensionInjectorTests(unittest.TestCase):
             self.assertTrue(str(injector.options.get("injector_cli_extension_path", "")).endswith("extension.zip"))
             self.assertTrue(str(injector.zip_path or "").endswith("extension.zip"))
             upload.assert_called_once_with(injector.zip_path)
-            self.assertEqual(injector.getLauncherConfig(), {"injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+            self.assertEqual(injector.configForLauncher(), {"injector_service_worker_extension_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
         finally:
             injector.close()
 

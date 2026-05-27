@@ -10,8 +10,8 @@ import (
 )
 
 func TestPipeUpstreamTransportConstructorUpdateLauncherConfigAndUnconnectedErrorsMatchTransportSurface(t *testing.T) {
-	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{})
-	if launcherConfig := transport.GetLauncherConfig(); launcherConfig.LauncherLocalCDPTransport != "pipe" {
+	transport := NewPipeUpstreamTransport(UpstreamTransportOptions{})
+	if launcherConfig := transport.ConfigForLauncher(); launcherConfig.LauncherLocalCDPTransport != "pipe" {
 		t.Fatalf("launcher config = %#v", launcherConfig)
 	}
 	transport.Update(map[string]any{"upstream_ws_cdp_url": "ws://127.0.0.1:9222/devtools/browser/ignored"})
@@ -37,9 +37,9 @@ func TestPipeUpstreamTransportResetsConnectionStateAfterPipeCloses(t *testing.T)
 	defer pipeWriteReader.Close()
 	defer pipeWrite.Close()
 
-	transport := NewPipeUpstreamTransport(PipeUpstreamTransportOptions{
-		PipeRead:  pipeRead,
-		PipeWrite: pipeWrite,
+	transport := NewPipeUpstreamTransport(UpstreamTransportOptions{
+		UpstreamPipeRead:  pipeRead,
+		UpstreamPipeWrite: pipeWrite,
 	})
 	closed := make(chan error, 1)
 	transport.OnClose(func(err error) { closed <- err })
@@ -66,18 +66,18 @@ func TestPipeUpstreamTransportLaunchesRealBrowserWithoutCDPURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	cdp := modcdp.New(modcdp.Options{
-		Launcher: modcdp.LauncherConfig{
+		Launcher: modcdp.LaunchOptions{
 			LauncherMode:          "local",
 			LauncherLocalHeadless: boolPtr(true),
 		},
-		Upstream: modcdp.UpstreamConfig{UpstreamMode: "pipe"},
+		Upstream: modcdp.UpstreamTransportOptions{UpstreamMode: "pipe"},
 		Injector: modcdp.InjectorOptions{
 			InjectorMode:                     "cli",
 			InjectorCLIExtensionPath:         extensionPath,
 			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
 			InjectorTrustServiceWorkerTarget: true,
 		},
-		Server: &modcdp.ServerConfig{ServerRoutes: map[string]string{"*.*": "chrome_debugger"}},
+		ServerOptions: &modcdp.ServerConfig{Router: modcdp.RouterOptions{RouterRoutes: map[string]string{"*.*": "chromedebugger"}}},
 	})
 	defer cdp.Close()
 

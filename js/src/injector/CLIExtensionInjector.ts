@@ -1,12 +1,11 @@
+import { ExtensionInjector, type InjectorOptions } from "./ExtensionInjector.js";
 import {
   defaultModCDPExtensionPath,
   extensionIdFromManifestKey,
-  ExtensionInjector,
-  type InjectorOptions,
   prepareUnpackedExtension,
-} from "./ExtensionInjector.js";
+} from "./NodeExtensionFiles.js";
 
-export class CLIExtensionInjector extends ExtensionInjector {
+class CLIExtensionInjector extends ExtensionInjector {
   private unpacked_extension_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
@@ -58,3 +57,5 @@ export class CLIExtensionInjector extends ExtensionInjector {
     return this.extension_id;
   }
 }
+
+export { CLIExtensionInjector };

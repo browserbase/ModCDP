@@ -8,8 +8,6 @@ import { homedir, platform, tmpdir } from "node:os";
 import path from "node:path";
 import {
   BrowserLauncher,
-  DEFAULT_CHROME_READY_POLL_INTERVAL_MS,
-  DEFAULT_CHROME_READY_TIMEOUT_MS,
   resolveCdpWebSocketUrl,
   type LauncherOptions,
   type LaunchedBrowser,
@@ -287,7 +285,7 @@ async function waitForBrowserSelectedCdpWebSocketUrl(
   throw new Error(`Chrome did not expose DevToolsActivePort from ${profile_dir} within ${timeout_ms}ms`);
 }
 
-export class LocalBrowserLauncher extends BrowserLauncher {
+class LocalBrowserLauncher extends BrowserLauncher {
   constructor(options: LauncherOptions = {}) {
     super(options);
     this.launcher_mode = "local";
@@ -315,16 +313,23 @@ export class LocalBrowserLauncher extends BrowserLauncher {
   }
 
   async launch(options: LauncherOptions = {}): Promise<LaunchedBrowser> {
-    const launcher_local_executable_path = options.launcher_local_executable_path ?? this.launcher_local_executable_path;
-    const launcher_local_cdp_listen_port = options.launcher_local_cdp_listen_port ?? this.launcher_local_cdp_listen_port;
+    const launcher_local_executable_path =
+      options.launcher_local_executable_path ?? this.launcher_local_executable_path;
+    const launcher_local_cdp_listen_port =
+      options.launcher_local_cdp_listen_port ?? this.launcher_local_cdp_listen_port;
     const launcher_local_user_data_dir = options.launcher_local_user_data_dir ?? this.launcher_local_user_data_dir;
     const launcher_local_headless =
-      options.launcher_local_headless ?? this.launcher_local_headless ?? (process.platform === "linux" && !process.env.DISPLAY);
-    const launcher_local_sandbox = options.launcher_local_sandbox ?? this.launcher_local_sandbox ?? process.platform !== "linux";
+      options.launcher_local_headless ??
+      this.launcher_local_headless ??
+      (process.platform === "linux" && !process.env.DISPLAY);
+    const launcher_local_sandbox =
+      options.launcher_local_sandbox ?? this.launcher_local_sandbox ?? process.platform !== "linux";
     const launcher_local_args = options.launcher_local_args ?? this.launcher_local_args ?? [];
     const launcher_local_extra_args = options.launcher_local_extra_args ?? this.launcher_local_extra_args ?? [];
-    const launcher_local_cdp_transport = options.launcher_local_cdp_transport ?? this.launcher_local_cdp_transport ?? "port";
-    const launcher_local_loopback_cdp = options.launcher_local_loopback_cdp ?? this.launcher_local_loopback_cdp ?? false;
+    const launcher_local_cdp_transport =
+      options.launcher_local_cdp_transport ?? this.launcher_local_cdp_transport ?? "port";
+    const launcher_local_loopback_cdp =
+      options.launcher_local_loopback_cdp ?? this.launcher_local_loopback_cdp ?? false;
     const launcher_local_cleanup_user_data_dir =
       options.launcher_local_cleanup_user_data_dir ?? this.launcher_local_cleanup_user_data_dir ?? false;
     const launcher_local_chrome_ready_timeout_ms =
@@ -455,3 +460,5 @@ export class LocalBrowserLauncher extends BrowserLauncher {
     throw new Error(`Chrome did not become ready within ${launcher_local_chrome_ready_timeout_ms}ms`);
   }
 }
+
+export { LocalBrowserLauncher };

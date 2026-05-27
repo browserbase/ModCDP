@@ -18,15 +18,12 @@ type WSUpstreamTransport struct {
 	writeMu sync.Mutex
 }
 
-type WSUpstreamTransportOptions struct {
-	UpstreamWSCDPURL string `json:"upstream_ws_cdp_url,omitempty"`
-}
-
-func NewWSUpstreamTransport(options WSUpstreamTransportOptions) *WSUpstreamTransport {
-	return &WSUpstreamTransport{URL: options.UpstreamWSCDPURL}
+func NewWSUpstreamTransport(options UpstreamTransportOptions) *WSUpstreamTransport {
+	return &WSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(options), URL: options.UpstreamWSCDPURL}
 }
 
 func (t *WSUpstreamTransport) Update(config map[string]any) {
+	t.UpstreamTransport.Update(config)
 	if config == nil {
 		return
 	}

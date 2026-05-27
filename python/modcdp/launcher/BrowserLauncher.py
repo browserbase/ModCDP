@@ -81,18 +81,18 @@ class BrowserLauncher:
         )
         return self
 
-    def getTransportConfig(self) -> dict[str, Any]:
+    def configForUpstream(self) -> dict[str, Any]:
         return {
             "upstream_ws_cdp_url": (self.launched or {}).get("cdp_url") or self.options.get("launcher_remote_cdp_url"),
             "upstream_pipe_read": (self.launched or {}).get("pipe_read"),
             "upstream_pipe_write": (self.launched or {}).get("pipe_write"),
         }
 
-    def getServerConfig(self) -> dict[str, Any]:
+    def configForServer(self) -> dict[str, Any]:
         loopback_cdp_url = (self.launched or {}).get("loopback_cdp_url")
-        return {"server_loopback_cdp_url": loopback_cdp_url} if loopback_cdp_url else {}
+        return {"upstream": {"upstream_ws_cdp_url": loopback_cdp_url}} if loopback_cdp_url else {}
 
-    def getInjectorConfig(self) -> dict[str, Any]:
+    def configForInjector(self) -> dict[str, Any]:
         return {
             "injector_bb_api_key": self.options.get("launcher_bb_api_key"),
             "injector_bb_base_url": self.options.get("launcher_bb_base_url"),
