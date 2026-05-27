@@ -545,6 +545,7 @@ class ModCDPClient(CDPSurfaceMixin):
 
     def _server_configure_params(self) -> ModCDPServerConfig:
         server_config = dict(self.server_config or {})
+        has_upstream_config = "upstream" in server_config
         upstream = dict(cast(Mapping[str, JsonValue], server_config.pop("upstream", {})))
         router = dict(cast(Mapping[str, JsonValue], server_config.pop("router", {})))
         server_client_config = dict(cast(Mapping[str, JsonValue], server_config.pop("client_config", {})))
@@ -554,10 +555,16 @@ class ModCDPClient(CDPSurfaceMixin):
         custom_commands = self.types.customCommandWireRegistrations(expression_required=True)
         custom_middlewares = self.types.customMiddlewareWireRegistrations()
         return cast(ModCDPServerConfig, {
-            "upstream": {
-                "upstream_ws_connect_error_settle_timeout_ms": self.upstream.config.upstream_ws_connect_error_settle_timeout_ms,
-                **upstream,
-            },
+            **(
+                {
+                    "upstream": {
+                        "upstream_ws_connect_error_settle_timeout_ms": self.upstream.config.upstream_ws_connect_error_settle_timeout_ms,
+                        **upstream,
+                    },
+                }
+                if has_upstream_config
+                else {}
+            ),
             "router": {
                 "loopback_execution_context_timeout_ms": self.injector.config.injector_execution_context_timeout_ms
                 if self.injector is not None

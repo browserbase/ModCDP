@@ -799,9 +799,8 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	if customMiddlewares == nil {
 		customMiddlewares = []map[string]any{}
 	}
-	upstream := map[string]any{
-		"upstream_ws_connect_error_settle_timeout_ms": c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS,
-	}
+	upstream := map[string]any{}
+	hasUpstreamConfig := false
 	router := map[string]any{
 		"loopback_execution_context_timeout_ms": c.Config.Injector.InjectorExecutionContextTimeoutMS,
 	}
@@ -814,9 +813,11 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 	params := map[string]any{}
 	if c.Config.ServerConfig != nil {
 		if c.Config.ServerConfig.Upstream.UpstreamWSCDPURL != "" {
+			hasUpstreamConfig = true
 			upstream["upstream_ws_cdp_url"] = c.Config.ServerConfig.Upstream.UpstreamWSCDPURL
 		}
 		if c.Config.ServerConfig.Upstream.UpstreamWSConnectErrorSettleTimeoutMS != 0 {
+			hasUpstreamConfig = true
 			upstream["upstream_ws_connect_error_settle_timeout_ms"] = c.Config.ServerConfig.Upstream.UpstreamWSConnectErrorSettleTimeoutMS
 		}
 		if c.Config.ServerConfig.Router.RouterRoutes != nil {
@@ -838,7 +839,12 @@ func (c *ModCDPClient) serverConfigureParams(customCommands []map[string]any, cu
 			params["server_browser_token"] = c.Config.ServerConfig.ServerBrowserToken
 		}
 	}
-	params["upstream"] = upstream
+	if hasUpstreamConfig {
+		if _, ok := upstream["upstream_ws_connect_error_settle_timeout_ms"]; !ok {
+			upstream["upstream_ws_connect_error_settle_timeout_ms"] = c.Config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS
+		}
+		params["upstream"] = upstream
+	}
 	params["router"] = router
 	params["client_config"] = clientConfig
 	params["downstream"] = downstream
