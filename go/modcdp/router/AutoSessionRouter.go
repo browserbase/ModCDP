@@ -21,10 +21,10 @@ var browserLevelDomains = map[string]bool{"Browser": true, "Target": true, "Syst
 type AutoSessionRouter struct {
 	Config                    types.ModCDPRouterConfig
 	upstream                  *transport.UpstreamTransport
-	sessionId_from_targetId   map[string]string
-	targetId_from_sessionId   map[string]string
-	targets                   map[string]map[string]any
-	contexts                  map[string]map[string]any
+	SessionId_from_targetId   map[string]string
+	TargetId_from_sessionId   map[string]string
+	Targets                   map[string]map[string]any
+	Contexts                  map[string]map[string]any
 	execution_context_waiters map[string][]chan executionContextResult
 	subscription_cleanups     []func()
 	started                   bool
@@ -53,10 +53,10 @@ func NewAutoSessionRouter(upstream *transport.UpstreamTransport, config types.Mo
 	return &AutoSessionRouter{
 		Config:                    config,
 		upstream:                  upstream,
-		sessionId_from_targetId:   map[string]string{},
-		targetId_from_sessionId:   map[string]string{},
-		targets:                   map[string]map[string]any{},
-		contexts:                  map[string]map[string]any{},
+		SessionId_from_targetId:   map[string]string{},
+		TargetId_from_sessionId:   map[string]string{},
+		Targets:                   map[string]map[string]any{},
+		Contexts:                  map[string]map[string]any{},
 		execution_context_waiters: map[string][]chan executionContextResult{},
 		subscription_cleanups:     []func(){},
 	}
@@ -95,9 +95,9 @@ func (r *AutoSessionRouter) Stop() {
 
 func (r *AutoSessionRouter) ToJSON() map[string]any {
 	r.mu.Lock()
-	sessions := len(r.sessionId_from_targetId)
-	targets := len(r.targets)
-	contexts := len(r.contexts)
+	sessions := len(r.SessionId_from_targetId)
+	targets := len(r.Targets)
+	contexts := len(r.Contexts)
 	waiters := len(r.execution_context_waiters)
 	started := r.started
 	routerRoutes := cloneStringMap(r.Config.RouterRoutes)
@@ -127,7 +127,7 @@ func (r *AutoSessionRouter) Send(method string, params map[string]any, requested
 		}
 	}
 	if requestedSessionID != "" {
-		targetID := r.targetId_from_sessionId[requestedSessionID]
+		targetID := r.TargetId_from_sessionId[requestedSessionID]
 		if targetID == "" {
 			return nil, fmt.Errorf("No target is recorded for sessionId=%s.", requestedSessionID)
 		}
@@ -164,7 +164,7 @@ func (r *AutoSessionRouter) Send(method string, params map[string]any, requested
 
 func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
 	r.mu.Lock()
-	sessionID := r.sessionId_from_targetId[targetID]
+	sessionID := r.SessionId_from_targetId[targetID]
 	r.mu.Unlock()
 	if sessionID != "" {
 		return sessionID
@@ -176,7 +176,7 @@ func (r *AutoSessionRouter) AttachToTarget(targetID string) string {
 	attachedSessionID, _ := result["sessionId"].(string)
 	if attachedSessionID != "" {
 		r.mu.Lock()
-		r.recordTargetSession(targetID, attachedSessionID, r.targets[targetID])
+		r.recordTargetSession(targetID, attachedSessionID, r.Targets[targetID])
 		r.mu.Unlock()
 	}
 	return attachedSessionID
@@ -203,11 +203,11 @@ func (r *AutoSessionRouter) EnsureRouteForTarget(targetID string) (string, strin
 		}
 	}
 	if resolvedTargetID != "" {
-		sessionID := r.sessionId_from_targetId[resolvedTargetID]
+		sessionID := r.SessionId_from_targetId[resolvedTargetID]
 		if sessionID != "" {
 			return resolvedTargetID, sessionID, nil
 		}
-		target := r.targets[resolvedTargetID]
+		target := r.Targets[resolvedTargetID]
 		if target != nil {
 			if _, hasSessionID := target["sessionId"]; hasSessionID && target["sessionId"] == nil {
 				return resolvedTargetID, "", nil
@@ -315,7 +315,7 @@ func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, session
 		frameID, _ := frame["id"].(string)
 		if frameID != "" {
 			r.mu.Lock()
-			targetID := r.targetId_from_sessionId[sessionID]
+			targetID := r.TargetId_from_sessionId[sessionID]
 			r.mu.Unlock()
 			r.forgetExecutionContextsForFrame(sessionID, targetID, frameID)
 		}
@@ -323,7 +323,7 @@ func (r *AutoSessionRouter) recordProtocolEvent(method string, data any, session
 		frameID, _ := eventData["frameId"].(string)
 		if frameID != "" {
 			r.mu.Lock()
-			targetID := r.targetId_from_sessionId[sessionID]
+			targetID := r.TargetId_from_sessionId[sessionID]
 			r.mu.Unlock()
 			r.forgetExecutionContextsForFrame(sessionID, targetID, frameID)
 		}
@@ -402,7 +402,7 @@ func (r *AutoSessionRouter) EnsureExecutionContext(frame map[string]string, sele
 		if selector["worldName"] != "" {
 			context["name"] = selector["worldName"]
 		}
-		r.contexts[contextKey(routeTargetID, sessionID, executionContextID, "")] = context
+		r.Contexts[contextKey(routeTargetID, sessionID, executionContextID, "")] = context
 		return context, nil
 	}
 	return r.waitForExecutionContextMatching(func(context map[string]any) bool {
@@ -572,7 +572,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		}
 	}
 
-	for _, context := range r.contexts {
+	for _, context := range r.Contexts {
 		contextTargetID, _ := context["targetId"].(string)
 		if !targetIDs[contextTargetID] {
 			continue
@@ -583,7 +583,7 @@ func (r *AutoSessionRouter) GetTopology(params map[string]any) (map[string]any, 
 		contexts[contextKey(contextTargetID, contextSessionID, contextID, contextUniqueID)] = context
 	}
 	targets := map[string]map[string]any{}
-	for targetID, target := range r.targets {
+	for targetID, target := range r.Targets {
 		for _, targetInfo := range targetInfos {
 			if targetInfo["targetId"] == targetID {
 				targets[targetID] = target
@@ -757,8 +757,8 @@ func (r *AutoSessionRouter) recordTarget(targetInfo map[string]any) {
 	if targetID == "" {
 		return
 	}
-	sessionID := r.sessionId_from_targetId[targetID]
-	existing := r.targets[targetID]
+	sessionID := r.SessionId_from_targetId[targetID]
+	existing := r.Targets[targetID]
 	target := cloneMap(targetInfo)
 	if sessionID != "" {
 		target["sessionId"] = sessionID
@@ -767,38 +767,38 @@ func (r *AutoSessionRouter) recordTarget(targetInfo map[string]any) {
 			target["sessionId"] = nil
 		}
 	}
-	r.targets[targetID] = target
+	r.Targets[targetID] = target
 }
 
 func (r *AutoSessionRouter) recordTargetSession(targetID string, sessionID string, targetInfo map[string]any) {
-	r.sessionId_from_targetId[targetID] = sessionID
-	r.targetId_from_sessionId[sessionID] = targetID
+	r.SessionId_from_targetId[targetID] = sessionID
+	r.TargetId_from_sessionId[sessionID] = targetID
 	target := cloneMap(targetInfo)
 	if len(target) == 0 {
-		target = cloneMap(r.targets[targetID])
+		target = cloneMap(r.Targets[targetID])
 	}
 	if len(target) == 0 {
 		target = map[string]any{"targetId": targetID, "type": "page"}
 	}
 	target["targetId"] = targetID
 	target["sessionId"] = sessionID
-	r.targets[targetID] = target
+	r.Targets[targetID] = target
 }
 
 func (r *AutoSessionRouter) recordTargetSessionlessAttachment(targetID string) {
-	existing := cloneMap(r.targets[targetID])
+	existing := cloneMap(r.Targets[targetID])
 	if len(existing) == 0 {
 		existing = map[string]any{"targetId": targetID, "type": "page"}
 	}
 	existing["sessionId"] = nil
-	r.targets[targetID] = existing
+	r.Targets[targetID] = existing
 }
 
 func (r *AutoSessionRouter) recordExecutionContext(eventTargetID string, sessionID string, context map[string]any) {
 	r.mu.Lock()
 	targetID := eventTargetID
 	if targetID == "" {
-		targetID = r.targetId_from_sessionId[sessionID]
+		targetID = r.TargetId_from_sessionId[sessionID]
 	}
 	if targetID == "" {
 		r.mu.Unlock()
@@ -828,7 +828,7 @@ func (r *AutoSessionRouter) recordExecutionContext(eventTargetID string, session
 	topologyContext["frameId"] = frameID
 	topologyContext["world"] = world
 	uniqueID, _ := context["uniqueId"].(string)
-	r.contexts[contextKey(targetID, sessionID, contextID, uniqueID)] = topologyContext
+	r.Contexts[contextKey(targetID, sessionID, contextID, uniqueID)] = topologyContext
 	waiterKey := sessionID
 	if waiterKey == "" {
 		waiterKey = targetID
@@ -843,8 +843,8 @@ func (r *AutoSessionRouter) recordExecutionContext(eventTargetID string, session
 
 func (r *AutoSessionRouter) forgetTarget(targetID string) {
 	r.mu.Lock()
-	sessionID := r.sessionId_from_targetId[targetID]
-	delete(r.targets, targetID)
+	sessionID := r.SessionId_from_targetId[targetID]
+	delete(r.Targets, targetID)
 	r.mu.Unlock()
 	if sessionID != "" {
 		r.forgetSession(sessionID)
@@ -854,20 +854,20 @@ func (r *AutoSessionRouter) forgetTarget(targetID string) {
 
 func (r *AutoSessionRouter) forgetSession(sessionID string) {
 	r.mu.Lock()
-	targetID := r.targetId_from_sessionId[sessionID]
-	delete(r.targetId_from_sessionId, sessionID)
+	targetID := r.TargetId_from_sessionId[sessionID]
+	delete(r.TargetId_from_sessionId, sessionID)
 	if targetID != "" {
-		delete(r.sessionId_from_targetId, targetID)
+		delete(r.SessionId_from_targetId, targetID)
 	}
-	for contextKey, context := range r.contexts {
+	for contextKey, context := range r.Contexts {
 		if context["sessionId"] == sessionID || context["targetId"] == sessionID {
-			delete(r.contexts, contextKey)
+			delete(r.Contexts, contextKey)
 		}
 	}
 	waiters := r.execution_context_waiters[sessionID]
 	delete(r.execution_context_waiters, sessionID)
 	r.mu.Unlock()
-	err := fmt.Errorf("Runtime execution context wait cancelled because session %s detached", sessionID)
+	err := fmt.Errorf("Runtime execution context wait cancelled because session %s detached.", sessionID)
 	for _, waiter := range waiters {
 		waiter <- executionContextResult{err: err}
 	}
@@ -876,13 +876,13 @@ func (r *AutoSessionRouter) forgetSession(sessionID string) {
 func (r *AutoSessionRouter) forgetExecutionContextByID(routeKey string, contextID int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for contextKey, context := range r.contexts {
+	for contextKey, context := range r.Contexts {
 		currentContextID, ok := intFromAny(context["id"])
 		if !ok || currentContextID != contextID {
 			continue
 		}
 		if context["sessionId"] == routeKey || context["targetId"] == routeKey {
-			delete(r.contexts, contextKey)
+			delete(r.Contexts, contextKey)
 		}
 	}
 }
@@ -890,9 +890,9 @@ func (r *AutoSessionRouter) forgetExecutionContextByID(routeKey string, contextI
 func (r *AutoSessionRouter) forgetExecutionContextsForRoute(routeKey string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for contextKey, context := range r.contexts {
+	for contextKey, context := range r.Contexts {
 		if context["sessionId"] == routeKey || context["targetId"] == routeKey {
-			delete(r.contexts, contextKey)
+			delete(r.Contexts, contextKey)
 		}
 	}
 }
@@ -900,14 +900,14 @@ func (r *AutoSessionRouter) forgetExecutionContextsForRoute(routeKey string) {
 func (r *AutoSessionRouter) forgetExecutionContextsForFrame(sessionID string, targetID string, frameID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for contextKey, context := range r.contexts {
+	for contextKey, context := range r.Contexts {
 		if context["frameId"] != frameID {
 			continue
 		}
 		if sessionID != "" && context["sessionId"] == sessionID {
-			delete(r.contexts, contextKey)
+			delete(r.Contexts, contextKey)
 		} else if targetID != "" && context["targetId"] == targetID {
-			delete(r.contexts, contextKey)
+			delete(r.Contexts, contextKey)
 		}
 	}
 }
@@ -928,7 +928,7 @@ func (r *AutoSessionRouter) callFunctionOnParamsForRoute(params map[string]any, 
 }
 
 func (r *AutoSessionRouter) findExecutionContext(targetID string, sessionID string, frameID string, selector map[string]string) map[string]any {
-	for _, context := range r.contexts {
+	for _, context := range r.Contexts {
 		if context["targetId"] != targetID || context["frameId"] != frameID {
 			continue
 		}
@@ -956,7 +956,7 @@ func (r *AutoSessionRouter) waitForExecutionContextMatching(matches func(map[str
 		timeoutMS = r.Config.LoopbackExecutionContextTimeoutMS
 	}
 	r.mu.Lock()
-	for _, context := range r.contexts {
+	for _, context := range r.Contexts {
 		if matches(context) {
 			r.mu.Unlock()
 			return context, nil

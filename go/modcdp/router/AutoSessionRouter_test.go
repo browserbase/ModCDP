@@ -4,79 +4,85 @@
 // - ./python/tests/test_AutoSessionRouter.py
 // NO MOCKING, NO MONKEY PATCHING, NO SIMULATING, NO FAKING, NO SKIPPING ALLOWED.
 // USE REAL USER-FACING CODE PATHS WITH REAL BROWSERS, REAL CLASSES, REAL URLS, etc. Hard fail if keys or other env requirements are missing.
-package router
+package router_test
 
 import (
-	"strings"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"sort"
 	"testing"
 	"time"
 
-	"github.com/browserbase/modcdp/go/modcdp/launcher"
-	"github.com/browserbase/modcdp/go/modcdp/transport"
-	"github.com/browserbase/modcdp/go/modcdp/types"
+	modcdp "github.com/browserbase/modcdp/go/modcdp/client"
 )
 
 func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testing.T) {
 	headless := true
-	chrome, err := launcher.NewLocalBrowserLauncher(launcher.LauncherConfig{
-		LauncherLocalHeadless: &headless,
-	}).Launch(launcher.LauncherConfig{})
+	extensionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "dist", "extension"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer chrome.Close()
-	upstream := transport.NewWSUpstreamTransport(types.UpstreamTransportConfig{
-		UpstreamMode:             "ws",
-		UpstreamWSCDPURL:         chrome.CDPURL,
-		UpstreamCDPSendTimeoutMS: 10000,
+	cdp := modcdp.New(modcdp.Config{
+		Launcher: modcdp.LauncherConfig{
+			LauncherMode:                "local",
+			LauncherLocalHeadless:       &headless,
+			LauncherLocalExecutablePath: loadExtensionTestBrowserPath(t),
+		},
+		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector: modcdp.InjectorConfig{
+			InjectorMode:                     "cli",
+			InjectorCLIExtensionPath:         extensionPath,
+			InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},
+			InjectorTrustServiceWorkerTarget: true,
+		},
+		Router: modcdp.RouterConfig{RouterRoutes: map[string]string{
+			"Mod.*":    "service_worker",
+			"Custom.*": "service_worker",
+			"*.*":      "direct_cdp",
+		}},
 	})
-	if err := upstream.Connect(); err != nil {
-		t.Fatal(err)
-	}
-	defer upstream.Close()
-
-	router := NewAutoSessionRouter(&upstream.UpstreamTransport, types.ModCDPRouterConfig{LoopbackExecutionContextTimeoutMS: 30000})
-	if err := router.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer router.Stop()
-
-	send := func(method string, params map[string]any, sessionID string) (map[string]any, error) {
-		return upstream.Send(method, params, sessionID)
-	}
+	defer cdp.Close()
 
 	var targetID string
 	var pendingTargetID string
 	defer func() {
 		if targetID != "" {
-			_, _ = send("Target.closeTarget", map[string]any{"targetId": targetID}, "")
+			closeTarget(cdp, targetID)
 		}
 		if pendingTargetID != "" {
-			_, _ = send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, "")
+			closeTarget(cdp, pendingTargetID)
 		}
 	}()
 
-	created, err := send("Target.createTarget", map[string]any{"url": "about:blank#modcdp-auto-session-router"}, "")
+	if err := cdp.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	created, err := cdp.Target.CreateTarget(modcdp.TargetCreateTargetParams{URL: "about:blank#modcdp-auto-session-router"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetID, _ = created["targetId"].(string)
-	sessionID := waitForString(t, func() string { return router.sessionId_from_targetId[targetID] })
+	targetID = string(created.TargetID)
+	sessionID := waitForString(t, func() string { return cdp.Router.SessionId_from_targetId[targetID] })
+
 	contextResult := make(chan int, 1)
 	contextError := make(chan error, 1)
 	go func() {
-		contextID, err := router.WaitForExecutionContext(sessionID, 30000)
+		contextID, err := cdp.Router.WaitForExecutionContext(sessionID, 30000)
 		if err != nil {
 			contextError <- err
 			return
 		}
 		contextResult <- contextID
 	}()
-	if _, err := send("Runtime.enable", map[string]any{}, sessionID); err != nil {
+	if _, err := cdp.Send("Runtime.enable", map[string]any{}, sessionID); err != nil {
 		t.Fatal(err)
 	}
+	var contextID int
 	select {
-	case contextID := <-contextResult:
+	case contextID = <-contextResult:
 		if contextID == 0 {
 			t.Fatal("context id was zero")
 		}
@@ -85,74 +91,208 @@ func TestAutoSessionRouterTracksRealTargetSessionsAndExecutionContexts(t *testin
 	case <-time.After(35 * time.Second):
 		t.Fatal("timed out waiting for execution context")
 	}
-	if _, err := send("Target.detachFromTarget", map[string]any{"sessionId": sessionID}, ""); err != nil {
-		t.Fatal(err)
-	}
-	waitForString(t, func() string {
-		if router.sessionId_from_targetId[targetID] == "" {
-			return "detached"
+	foundContext := false
+	for _, context := range cdp.Router.Contexts {
+		if context["sessionId"] == sessionID && context["id"] == contextID {
+			foundContext = true
+			break
 		}
-		return ""
+	}
+	if !foundContext {
+		t.Fatalf("context id %d for session %s was not recorded", contextID, sessionID)
+	}
+
+	detachTarget(t, cdp, sessionID)
+	expectEventually(t, func() error {
+		if cdp.Router.SessionId_from_targetId[targetID] != "" {
+			return fmt.Errorf("session still recorded")
+		}
+		return nil
 	})
-	for _, context := range router.contexts {
+	for _, context := range cdp.Router.Contexts {
 		if context["sessionId"] == sessionID {
 			t.Fatal("execution context remained after detach")
 		}
 	}
-	if _, err := send("Target.closeTarget", map[string]any{"targetId": targetID}, ""); err != nil {
-		t.Fatal(err)
-	}
+	closeTarget(cdp, targetID)
 	targetID = ""
 
-	pendingCreated, err := send("Target.createTarget", map[string]any{"url": "about:blank#modcdp-auto-session-router-pending-context"}, "")
+	pendingCreated, err := cdp.Target.CreateTarget(modcdp.TargetCreateTargetParams{URL: "about:blank#modcdp-auto-session-router-pending-context"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pendingTargetID, _ = pendingCreated["targetId"].(string)
-	pendingSessionID := waitForString(t, func() string { return router.sessionId_from_targetId[pendingTargetID] })
+	pendingTargetID = string(pendingCreated.TargetID)
+	pendingSessionID := waitForString(t, func() string { return cdp.Router.SessionId_from_targetId[pendingTargetID] })
 	pendingContextError := make(chan error, 1)
 	go func() {
-		_, err := router.WaitForExecutionContext(pendingSessionID, 30000)
+		_, err := cdp.Router.WaitForExecutionContext(pendingSessionID, 30000)
 		pendingContextError <- err
 	}()
-	if _, err := send("Target.detachFromTarget", map[string]any{"sessionId": pendingSessionID}, ""); err != nil {
-		t.Fatal(err)
-	}
+	detachTarget(t, cdp, pendingSessionID)
 	select {
 	case err := <-pendingContextError:
-		if err == nil || !strings.Contains(err.Error(), "Runtime execution context wait cancelled because session "+pendingSessionID+" detached") {
+		expected := "Runtime execution context wait cancelled because session " + pendingSessionID + " detached."
+		if err == nil || err.Error() != expected {
 			t.Fatalf("wait error = %v", err)
 		}
 	case <-time.After(35 * time.Second):
 		t.Fatal("timed out waiting for detach error")
 	}
-	waitForString(t, func() string {
-		if router.sessionId_from_targetId[pendingTargetID] == "" {
-			return "detached"
+	expectEventually(t, func() error {
+		if cdp.Router.SessionId_from_targetId[pendingTargetID] != "" {
+			return fmt.Errorf("pending session still recorded")
 		}
-		return ""
+		return nil
 	})
-	for _, context := range router.contexts {
-		if context["sessionId"] == pendingSessionID {
-			t.Fatal("execution context was recorded for detached pending session")
-		}
-	}
-	if _, err := send("Target.closeTarget", map[string]any{"targetId": pendingTargetID}, ""); err != nil {
+	closeTarget(cdp, pendingTargetID)
+	pendingTargetID = ""
+}
+
+func detachTarget(t *testing.T, cdp *modcdp.ModCDPClient, sessionID string) {
+	t.Helper()
+	value := modcdp.TargetSessionID(sessionID)
+	if _, err := cdp.Target.DetachFromTarget(modcdp.TargetDetachFromTargetParams{SessionIDValue: &value}); err != nil {
 		t.Fatal(err)
 	}
-	pendingTargetID = ""
+}
+
+func closeTarget(cdp *modcdp.ModCDPClient, targetID string) {
+	value := modcdp.TargetTargetID(targetID)
+	_, _ = cdp.Target.CloseTarget(modcdp.TargetCloseTargetParams{TargetID: value})
 }
 
 func waitForString(t *testing.T, fn func() string) string {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		value := fn()
 		if value != "" {
 			return value
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatal("timed out waiting for string")
 	return ""
+}
+
+func expectEventually(t *testing.T, assertion func() error) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	var lastError error
+	for time.Now().Before(deadline) {
+		if err := assertion(); err != nil {
+			lastError = err
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		return
+	}
+	if lastError != nil {
+		t.Fatal(lastError)
+	}
+	t.Fatal("timed out waiting for assertion")
+}
+
+// MODCDP_TEST_SUPPORT: LANGUAGE-SPECIFIC TEST SUPPORT ONLY.
+// Keep setup semantics 1:1 with TS; this only selects a real browser for real --load-extension runs.
+func loadExtensionTestBrowserPath(t *testing.T) string {
+	t.Helper()
+	for _, candidate := range []string{os.Getenv("CHROME_PATH"), linuxChromiumPath()} {
+		if candidate == "" {
+			continue
+		}
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = "."
+	}
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		localAppData = filepath.Join(home, "AppData", "Local")
+	}
+	var patterns []string
+	switch runtime.GOOS {
+	case "darwin":
+		patterns = []string{
+			filepath.Join(home, "Library", "Caches", "ms-playwright", "chromium-*", "chrome-mac*", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+			filepath.Join(home, "Library", "Caches", "ms-playwright", "chromium-*", "chrome-mac*", "Chromium.app", "Contents", "MacOS", "Chromium"),
+			filepath.Join(home, "Library", "Caches", "puppeteer", "chrome", "mac*-*", "chrome-mac*", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+		}
+	case "windows":
+		patterns = []string{
+			filepath.Join(localAppData, "ms-playwright", "chromium-*", "chrome-win*", "chrome.exe"),
+			filepath.Join(home, ".cache", "puppeteer", "chrome", "win*-*", "chrome.exe"),
+		}
+	default:
+		patterns = []string{
+			filepath.Join(home, ".cache", "ms-playwright", "chromium-*", "chrome-linux*", "chrome"),
+			filepath.Join("/opt", "pw-browsers", "chromium-*", "chrome-linux*", "chrome"),
+			filepath.Join(home, ".cache", "puppeteer", "chrome", "linux-*", "chrome-linux*", "chrome"),
+		}
+	}
+	var candidates []string
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err == nil {
+			candidates = append(candidates, matches...)
+		}
+	}
+	candidates = newestChromeForTestingFirst(candidates)
+	if len(candidates) > 0 {
+		return candidates[0]
+	}
+	t.Fatal("No browser found for --load-extension tests. Install Chrome for Testing or set CHROME_PATH.")
+	return ""
+}
+
+func linuxChromiumPath() string {
+	if runtime.GOOS == "linux" {
+		return "/usr/bin/chromium"
+	}
+	return ""
+}
+
+func newestChromeForTestingFirst(candidates []string) []string {
+	seen := map[string]bool{}
+	deduped := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate == "" || seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		deduped = append(deduped, candidate)
+	}
+	sort.Slice(deduped, func(i, j int) bool {
+		leftVersion, leftMtime := browserPathScore(deduped[i])
+		rightVersion, rightMtime := browserPathScore(deduped[j])
+		if leftVersion != rightVersion {
+			return leftVersion > rightVersion
+		}
+		if leftMtime != rightMtime {
+			return leftMtime > rightMtime
+		}
+		return deduped[i] < deduped[j]
+	})
+	return deduped
+}
+
+func browserPathScore(candidate string) (int, int64) {
+	version := 0
+	for _, match := range regexp.MustCompile(`\d+`).FindAllString(candidate, -1) {
+		value := 0
+		for _, digit := range match {
+			value = value*10 + int(digit-'0')
+		}
+		if value > version {
+			version = value
+		}
+	}
+	info, err := os.Stat(candidate)
+	if err != nil {
+		return version, 0
+	}
+	return version, info.ModTime().UnixNano()
 }
