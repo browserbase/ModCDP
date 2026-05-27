@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportOptions } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 const DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME = "com.modcdp.bridge";
 
@@ -14,7 +14,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
   constructor({
     upstream_nativemessaging_host_name = DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME,
     ...options
-  }: UpstreamTransportOptions = {}) {
+  }: UpstreamTransportConfig = {}) {
     super(options);
     this.upstream_nativemessaging_host_name =
       upstream_nativemessaging_host_name || DEFAULT_UPSTREAM_NATIVEMESSAGING_HOST_NAME;
@@ -63,7 +63,7 @@ class NativeMessagingUpstreamTransport extends UpstreamTransport {
     return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
     super.update(config);
     return this;
   }

@@ -9,7 +9,7 @@ import {
   CdpDebuggeeCommandParamsSchema,
   type CdpDebuggeeCommandParams,
   type ModCDPGetTopologyParams,
-  type ModCDPRouterOptions,
+  type ModCDPRouterConfig,
   type ModCDPRoutes,
   type ModCDPTopology,
   type ModCDPTopologyDomRoot,
@@ -33,7 +33,7 @@ type ExecutionContextWaiter = {
   timeout: ReturnType<typeof setTimeout>;
   matches: (context: ModCDPTopologyExecutionContext) => boolean;
 };
-type AutoSessionRouterOptions = ModCDPRouterOptions & {
+type AutoSessionRouterConfig = ModCDPRouterConfig & {
   upstream: UpstreamTransport;
   types: CDPTypes;
   loopback_execution_context_timeout_ms: number;
@@ -115,7 +115,7 @@ class AutoSessionRouter {
     types,
     router_routes = DEFAULT_CLIENT_ROUTER_ROUTES,
     loopback_execution_context_timeout_ms,
-  }: AutoSessionRouterOptions) {
+  }: AutoSessionRouterConfig) {
     this.upstream = upstream;
     this.types = types;
     this.router_routes = { ...router_routes };
@@ -706,4 +706,4 @@ async function runTopologyQueue<T>(items: Iterable<T>, worker: (item: T) => Prom
 }
 
 export { DEFAULT_CLIENT_ROUTER_ROUTES, AutoSessionRouter };
-export type { AutoSessionRouterOptions };
+export type { AutoSessionRouterConfig };

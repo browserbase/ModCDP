@@ -2,7 +2,7 @@ import { resolveCdpWebSocketUrl } from "../launcher/BrowserLauncher.js";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportOptions } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
 
@@ -11,7 +11,7 @@ class WSUpstreamTransport extends UpstreamTransport {
   ws: WebSocket | null = null;
   private connect_promise: Promise<void> | null = null;
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
     super(options);
     this.upstream_ws_cdp_url = options.upstream_ws_cdp_url ?? "";
     this.upstream_ws_connect_error_settle_timeout_ms =
@@ -68,7 +68,7 @@ class WSUpstreamTransport extends UpstreamTransport {
     );
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
     super.update(config);
     return this;
   }

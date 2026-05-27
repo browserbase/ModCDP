@@ -3,7 +3,7 @@ import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
 import type { CdpCommandMessage, CdpDebuggeeCommandParams, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportOptions } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 const target_auto_attach_params = {
   autoAttach: true,
@@ -62,7 +62,7 @@ class ChromeDebuggerUpstreamTransport extends UpstreamTransport {
   // Non-null means native detach events are clearing attached-debuggee state.
   private debugger_onDetach_listener: ((source: chrome.debugger.Debuggee, reason?: string) => void) | null = null;
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
     super(options);
   }
 

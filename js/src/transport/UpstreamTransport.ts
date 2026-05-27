@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { LauncherOptions } from "../launcher/BrowserLauncher.js";
+import type { LauncherConfig } from "../launcher/BrowserLauncher.js";
 import type { cdp } from "../types/generated/cdp.js";
 import type { CdpCommandSchema, CdpNamedSchema } from "../types/generated/zod/helpers.js";
 import * as Target from "../types/generated/zod/Target.js";
@@ -8,10 +8,11 @@ import type {
   CdpDebuggeeCommandParams,
   CdpEventMessage,
   CdpResponseMessage,
+  ModCDPUpstreamConfig,
   ProtocolPayload,
   ProtocolResult,
 } from "../types/modcdp.js";
-import { CdpEventMessageSchema, CdpResponseMessageSchema } from "../types/modcdp.js";
+import { CdpEventMessageSchema, CdpResponseMessageSchema, ModCDPUpstreamConfigSchema } from "../types/modcdp.js";
 
 type UpstreamMode =
   | "ws" // connect via CDP WebSocket over TCP (default, used by normal CDP, loopback CDP)
@@ -21,21 +22,7 @@ type UpstreamMode =
   | "nats" // connect via NATS messaging (chrome -> NATS -> sdk via hardcoded NATS localhost:port relay)
   | "chromedebugger"; // connect via CDP over Extension API chrome.debugger to pages (Browser.* methods not supported, only page-scoped methods allowed, not recommended for production)
 type UpstreamNatsRole = "client" | "browser";
-type UpstreamTransportOptions = {
-  upstream_mode?: UpstreamMode;
-  upstream_ws_cdp_url?: string | null;
-  upstream_pipe_read?: NodeJS.ReadableStream | null;
-  upstream_pipe_write?: NodeJS.WritableStream | null;
-  upstream_nats_url?: string | null;
-  upstream_nats_subject_prefix?: string | null;
-  upstream_nats_role?: UpstreamNatsRole | null;
-  upstream_nats_wait_timeout_ms?: number | null;
-  upstream_reversews_bind?: string | null;
-  upstream_reversews_wait_timeout_ms?: number | null;
-  upstream_nativemessaging_host_name?: string | null;
-  upstream_ws_connect_error_settle_timeout_ms?: number | null;
-  upstream_cdp_send_timeout_ms?: number | null;
-};
+type UpstreamTransportConfig = ModCDPUpstreamConfig;
 
 type TargetRoute = {
   targetId: cdp.types.ts.Target.TargetID;
@@ -73,7 +60,8 @@ class UpstreamTransport {
   private close_listeners = new Set<(error: Error) => void>();
   private event_listeners = new Map<CdpNamedSchema<z.ZodType>, Set<UpstreamEventListener>>();
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
+    options = ModCDPUpstreamConfigSchema.parse(options);
     this.upstream_mode = options.upstream_mode ?? "ws";
     this.upstream_ws_cdp_url = options.upstream_ws_cdp_url ?? null;
     this.upstream_nats_url = options.upstream_nats_url ?? null;
@@ -90,7 +78,8 @@ class UpstreamTransport {
     throw new Error(`${this.constructor.name}.connect is not implemented.`);
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
+    config = ModCDPUpstreamConfigSchema.parse(config);
     this.upstream_ws_cdp_url = config.upstream_ws_cdp_url ?? this.upstream_ws_cdp_url;
     this.upstream_nats_url = config.upstream_nats_url ?? this.upstream_nats_url;
     this.upstream_nats_subject_prefix = config.upstream_nats_subject_prefix ?? this.upstream_nats_subject_prefix;
@@ -106,7 +95,7 @@ class UpstreamTransport {
     return this;
   }
 
-  configForLauncher(): LauncherOptions {
+  configForLauncher(): LauncherConfig {
     return {};
   }
 
@@ -297,4 +286,4 @@ function parseHostPort(value: string, defaultHost: string, defaultPort: number) 
 }
 
 export { UpstreamTransport, parseHostPort };
-export type { UpstreamMode, UpstreamNatsRole, UpstreamTransportOptions, TargetRoute, UpstreamEventListener };
+export type { UpstreamMode, UpstreamNatsRole, UpstreamTransportConfig, TargetRoute, UpstreamEventListener };

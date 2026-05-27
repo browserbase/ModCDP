@@ -6,7 +6,7 @@ import { defaultModCDPExtensionPath, prepareUnpackedExtension } from "./NodeExte
 import {
   ExtensionInjector,
   type ExtensionInjectionResult,
-  type InjectorOptions,
+  type InjectorConfig,
   type TargetInfo,
 } from "./ExtensionInjector.js";
 
@@ -26,9 +26,9 @@ class BorrowExtensionInjector extends ExtensionInjector {
   private cleanup: (() => Promise<void>) | null = null;
   private bootstrap_modcdp_server_expression: string | null = null;
 
-  constructor(options: InjectorOptions = {}) {
+  constructor(options: InjectorConfig = {}) {
     super(options);
-    this.injector_mode = "borrow";
+    this.config.injector_mode = "borrow";
   }
 
   async prepare() {
@@ -36,7 +36,7 @@ class BorrowExtensionInjector extends ExtensionInjector {
       await super.prepare();
       return;
     }
-    const extension_path = this.injector_borrow_extension_path ?? defaultModCDPExtensionPath();
+    const extension_path = this.config.injector_borrow_extension_path ?? defaultModCDPExtensionPath();
     const prepared = await prepareUnpackedExtension(extension_path);
     this.unpacked_extension_path = prepared.unpacked_extension_path;
     this.cleanup = prepared.cleanup;
@@ -68,11 +68,11 @@ class BorrowExtensionInjector extends ExtensionInjector {
   }
 
   async inject() {
-    const deadline = Date.now() + (this.injector_service_worker_ready_timeout_ms ?? 60_000);
+    const deadline = Date.now() + (this.config.injector_service_worker_ready_timeout_ms ?? 60_000);
     do {
       const borrowed = await this.borrowVisibleServiceWorkers();
       if (borrowed) return borrowed;
-      await new Promise((resolve) => setTimeout(resolve, this.injector_service_worker_poll_interval_ms ?? 100));
+      await new Promise((resolve) => setTimeout(resolve, this.config.injector_service_worker_poll_interval_ms ?? 100));
     } while (Date.now() < deadline);
     return null;
   }
@@ -88,9 +88,9 @@ class BorrowExtensionInjector extends ExtensionInjector {
       return target.type === "service_worker" && target_url.startsWith("chrome-extension://");
     });
     const has_configured_matcher =
-      Boolean(this.injector_service_worker_extension_id) ||
-      (this.injector_service_worker_url_includes?.length ?? 0) > 0 ||
-      (this.injector_service_worker_url_suffixes?.length ?? 0) > 0;
+      Boolean(this.config.injector_service_worker_extension_id) ||
+      (this.config.injector_service_worker_url_includes?.length ?? 0) > 0 ||
+      (this.config.injector_service_worker_url_suffixes?.length ?? 0) > 0;
     const candidates = has_configured_matcher
       ? visible_service_workers.filter((target) => this.serviceWorkerTargetMatches(target))
       : visible_service_workers;
@@ -109,14 +109,14 @@ class BorrowExtensionInjector extends ExtensionInjector {
     has_tabs: boolean;
     has_debugger: boolean;
   } | null> {
-    const attach_result = await this.send(Target.AttachToTargetCommand, {
+    const attach_result = await this.config.send(Target.AttachToTargetCommand, {
       targetId: target.targetId,
       flatten: true,
     });
     const session_id = attach_result.sessionId;
     try {
-      await this.send(Runtime.EnableCommand, {}, session_id).catch(() => {});
-      const status = await this.send(
+      await this.config.send(Runtime.EnableCommand, {}, session_id).catch(() => {});
+      const status = await this.config.send(
         Runtime.EvaluateCommand,
         {
           expression: BORROW_BOOTSTRAP_STATUS_EXPRESSION,
@@ -126,16 +126,18 @@ class BorrowExtensionInjector extends ExtensionInjector {
       );
       let value = status.result?.value || {};
       if (!value.has_tabs || !value.has_debugger) {
-        await this.send(Target.DetachFromTargetCommand, {
-          sessionId: session_id,
-        }).catch(() => {});
+        await this.config
+          .send(Target.DetachFromTargetCommand, {
+            sessionId: session_id,
+          })
+          .catch(() => {});
         return null;
       }
       if (!value.ok) {
         if (!this.bootstrap_modcdp_server_expression) {
           throw new Error("BorrowExtensionInjector requires prepare before inject.");
         }
-        const bootstrap = await this.send(
+        const bootstrap = await this.config.send(
           Runtime.EvaluateCommand,
           {
             expression: `(${this.bootstrap_modcdp_server_expression})()`,
@@ -147,14 +149,16 @@ class BorrowExtensionInjector extends ExtensionInjector {
         value = bootstrap.result?.value || {};
       }
       if (!value.has_tabs || !value.has_debugger) {
-        await this.send(Target.DetachFromTargetCommand, {
-          sessionId: session_id,
-        }).catch(() => {});
+        await this.config
+          .send(Target.DetachFromTargetCommand, {
+            sessionId: session_id,
+          })
+          .catch(() => {});
         return null;
       }
       let ready = Boolean(value.ok);
       if (ready && this.readyExpression() !== MODCDP_READY_EXPRESSION) {
-        const probe = await this.send(
+        const probe = await this.config.send(
           Runtime.EvaluateCommand,
           {
             expression: this.readyExpression(),
@@ -165,9 +169,11 @@ class BorrowExtensionInjector extends ExtensionInjector {
         ready = probe.result?.value === true;
       }
       if (!ready) {
-        await this.send(Target.DetachFromTargetCommand, {
-          sessionId: session_id,
-        }).catch(() => {});
+        await this.config
+          .send(Target.DetachFromTargetCommand, {
+            sessionId: session_id,
+          })
+          .catch(() => {});
         return null;
       }
       return {
@@ -182,9 +188,11 @@ class BorrowExtensionInjector extends ExtensionInjector {
         has_debugger: Boolean(value.has_debugger),
       };
     } catch (error) {
-      await this.send(Target.DetachFromTargetCommand, {
-        sessionId: session_id,
-      }).catch(() => {});
+      await this.config
+        .send(Target.DetachFromTargetCommand, {
+          sessionId: session_id,
+        })
+        .catch(() => {});
       throw error;
     }
   }

@@ -1,34 +1,8 @@
-import type { UpstreamTransport, UpstreamTransportOptions } from "../transport/UpstreamTransport.js";
-import type { ModCDPServerOptions } from "../types/modcdp.js";
+import type { UpstreamTransport, UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
+import { ModCDPLauncherConfigSchema, type ModCDPLauncherConfig, type ModCDPServerConfig } from "../types/modcdp.js";
 
-type LauncherMode = "local" | "remote" | "bb" | "none";
-type LauncherOptions = {
-  launcher_mode?: LauncherMode;
-  launcher_local_executable_path?: string | null;
-  launcher_local_user_data_dir?: string | null;
-  launcher_remote_cdp_url?: string | null;
-  launcher_local_cdp_listen_port?: number | null;
-  launcher_local_headless?: boolean;
-  launcher_local_sandbox?: boolean;
-  launcher_local_args?: string[];
-  launcher_local_extra_args?: string[];
-  launcher_local_cdp_transport?: "port" | "pipe";
-  launcher_local_loopback_cdp?: boolean;
-  launcher_local_cleanup_user_data_dir?: boolean;
-  launcher_local_chrome_ready_timeout_ms?: number;
-  launcher_local_chrome_ready_poll_interval_ms?: number;
-  launcher_bb_api_key?: string | null;
-  launcher_bb_base_url?: string | null;
-  launcher_bb_session_id?: string | null;
-  launcher_bb_keep_alive?: boolean;
-  launcher_bb_close_session_on_close?: boolean;
-  launcher_bb_region?: string | null;
-  launcher_bb_timeout?: number | null;
-  launcher_bb_extension_id?: string | null;
-  launcher_bb_browser_settings?: Record<string, unknown> | null;
-  launcher_bb_user_metadata?: Record<string, unknown> | null;
-  launcher_bb_session_create_params?: Record<string, unknown> | null;
-};
+type LauncherConfig = ModCDPLauncherConfig;
+type LauncherMode = NonNullable<NonNullable<LauncherConfig["launcher_mode"]>>;
 
 type LaunchedBrowser = {
   proc?: unknown;
@@ -102,7 +76,8 @@ class BrowserLauncher {
   // runtime state
   launched: LaunchedBrowser | null = null;
 
-  constructor(options: LauncherOptions = {}) {
+  constructor(options: LauncherConfig = {}) {
+    options = ModCDPLauncherConfigSchema.parse(options);
     this.launcher_mode = options.launcher_mode ?? "none";
     this.launcher_local_executable_path = options.launcher_local_executable_path ?? null;
     this.launcher_local_user_data_dir = options.launcher_local_user_data_dir ?? null;
@@ -132,7 +107,8 @@ class BrowserLauncher {
     this.launcher_bb_session_create_params = options.launcher_bb_session_create_params ?? null;
   }
 
-  update(config: LauncherOptions = {}) {
+  update(config: LauncherConfig = {}) {
+    config = ModCDPLauncherConfigSchema.parse(config);
     this.launcher_mode = config.launcher_mode ?? this.launcher_mode;
     this.launcher_local_executable_path = config.launcher_local_executable_path ?? this.launcher_local_executable_path;
     this.launcher_local_user_data_dir = config.launcher_local_user_data_dir ?? this.launcher_local_user_data_dir;
@@ -171,11 +147,11 @@ class BrowserLauncher {
     return this;
   }
 
-  async launch(_options: LauncherOptions = {}): Promise<LaunchedBrowser> {
+  async launch(_options: LauncherConfig = {}): Promise<LaunchedBrowser> {
     throw new Error(`${this.constructor.name}.launch is not implemented.`);
   }
 
-  configForUpstream(): UpstreamTransportOptions {
+  configForUpstream(): UpstreamTransportConfig {
     return {
       upstream_ws_cdp_url: this.launched?.cdp_url ?? this.launcher_remote_cdp_url,
       upstream_pipe_read: this.launched?.pipe_read,
@@ -183,7 +159,7 @@ class BrowserLauncher {
     };
   }
 
-  configForServer(upstream: UpstreamTransport): ModCDPServerOptions {
+  configForServer(upstream: UpstreamTransport): ModCDPServerConfig {
     const launcher_local_loopback_cdp_url =
       this.launched?.loopback_cdp_url ??
       (upstream.upstream_mode === "ws" && upstream.upstream_ws_cdp_url
@@ -219,4 +195,4 @@ export {
   BrowserLauncher,
   resolveCdpWebSocketUrl,
 };
-export type { LauncherMode, LauncherOptions, LaunchedBrowser };
+export type { LauncherMode, LauncherConfig, LaunchedBrowser };

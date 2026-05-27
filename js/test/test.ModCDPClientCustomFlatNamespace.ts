@@ -11,7 +11,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_PATH = path.resolve(HERE, "..", "..", "dist", "extension");
 
 test("custom commands install flat namespace methods through a real service worker", async () => {
-  const params_schema = z.object({ id: z.string() });
+  const params_schema = z.object({ id: z.string(), suffix: z.string().optional() });
   const result_schema = z.object({ success: z.boolean() });
   const cdp = new ModCDPClient({
     launcher: {
@@ -38,9 +38,21 @@ test("custom commands install flat namespace methods through a real service work
         "Custom.doSomething": {
           params_schema,
           result_schema,
-          expression: "async ({ id }) => ({ success: id === 'abc' })",
+          expression: "async ({ id, suffix = '' }) => ({ success: `${id}${suffix}` === 'abcmiddleware' })",
+        },
+        "Custom.badResult": {
+          params_schema: z.object({ id: z.string() }),
+          result_schema,
+          expression: "async () => ({ success: 'yes' })",
         },
       },
+      custom_middlewares: [
+        {
+          name: "Custom.doSomething",
+          phase: "request",
+          expression: "async (payload, next) => next({ ...payload, suffix: 'middleware' })",
+        },
+      ],
     },
   });
 
@@ -52,8 +64,19 @@ test("custom commands install flat namespace methods through a real service work
 
     assert.equal(success, true);
     assert.equal(rawSuccess, true);
+    if (false) {
+      const typed_params: Parameters<typeof cdp.Custom.doSomething>[0] = { id: "abc" };
+      void typed_params;
+      const typed_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = true;
+      void typed_result;
+      // @ts-expect-error custom command result unwraps the single success field to boolean.
+      const bad_result: Awaited<ReturnType<typeof cdp.Custom.doSomething>> = { success: true };
+      void bad_result;
+    }
     // @ts-expect-error typed custom command params reject non-string ids statically.
     await assert.rejects(() => cdp.Custom.doSomething({ id: 123 }));
+    await assert.rejects(() => cdp.send("Custom.doSomething", { id: 123 }), /string/);
+    await assert.rejects(() => cdp.Custom.badResult({ id: "abc" }), /boolean/);
   } finally {
     await cdp.close();
   }
@@ -104,6 +127,212 @@ test("custom events validate raw string handlers through a real service worker",
     });
     await received;
     assert.deepEqual(seen, ["ok"]);
+  } finally {
+    await cdp.close();
+  }
+}, 60_000);
+
+test("dynamic custom command, event, and middleware registration validates through a real service worker", async () => {
+  const cdp = new ModCDPClient({
+    launcher: {
+      launcher_mode: "local",
+      launcher_local_headless: true,
+    },
+    upstream: { upstream_mode: "ws" },
+    injector: {
+      injector_mode: "cdp",
+      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
+      injector_trust_service_worker_target: true,
+    },
+    router: {
+      router_routes: {
+        "Mod.*": "service_worker",
+        "Custom.*": "service_worker",
+        "*.*": "direct_cdp",
+      },
+    },
+    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+  });
+  const seen: string[] = [];
+
+  try {
+    await cdp.connect();
+
+    if (false) {
+      cdp.Mod.addCustomCommand("Custom.dynamic", {
+        params_schema: z.object({ text: z.string() }),
+        result_schema: z.object({ ok: z.boolean() }),
+        expression: "async ({ text }) => ({ ok: text === 'live-dynamic' })",
+      });
+      cdp.Mod.addCustomEvent("Custom.dynamicReady", {
+        event_schema: z.object({ id: z.string() }),
+      });
+      cdp.Mod.addMiddleware({
+        name: "Custom.dynamic",
+        phase: cdp.REQUEST,
+        expression: "async (payload, next) => next(payload)",
+      });
+      // @ts-expect-error Mod.addMiddleware phase is request, response, or event.
+      cdp.Mod.addMiddleware({ name: "Custom.dynamic", phase: "after", expression: "async (payload, next) => next(payload)" });
+    }
+
+    assert.deepEqual(
+      await cdp.Mod.addCustomCommand("Custom.dynamic", {
+        params_schema: z.object({ text: z.string().min(1) }),
+        result_schema: z.object({ ok: z.boolean() }),
+        expression: "async ({ text }) => ({ ok: text === 'live-dynamic' })",
+      }),
+      { name: "Custom.dynamic", registered: true },
+    );
+    assert.deepEqual(
+      await cdp.Mod.addCustomCommand("Custom.dynamicBadResult", {
+        params_schema: z.object({ text: z.string() }),
+        result_schema: z.object({ ok: z.boolean() }),
+        expression: "async () => ({ ok: 'yes' })",
+      }),
+      { name: "Custom.dynamicBadResult", registered: true },
+    );
+    assert.deepEqual(
+      await cdp.Mod.addCustomEvent("Custom.dynamicReady", {
+        event_schema: z.object({ id: z.string().uuid() }),
+      }),
+      { name: "Custom.dynamicReady", registered: true },
+    );
+    assert.deepEqual(
+      await cdp.Mod.addMiddleware({
+        name: "Custom.dynamic",
+        phase: cdp.REQUEST,
+        expression: "async (payload, next) => next({ ...payload, text: `${payload.text}-dynamic` })",
+      }),
+      { name: "Custom.dynamic", phase: "request", registered: true },
+    );
+
+    assert.equal(await cdp.send("Custom.dynamic", { text: "live" }), true);
+    await assert.rejects(() => cdp.send("Custom.dynamic", { text: "" }), /Too small/);
+    await assert.rejects(() => cdp.send("Custom.dynamicBadResult", { text: "live" }), /boolean/);
+    await assert.rejects(
+      () =>
+        cdp.Mod.addMiddleware({
+          name: "Custom.dynamic",
+          // @ts-expect-error dynamic middleware registration rejects invalid phases statically.
+          phase: "after",
+          expression: "async (payload, next) => next(payload)",
+        }),
+      /Invalid option/,
+    );
+
+    const received = new Promise<void>((resolve) => {
+      cdp.on("Custom.dynamicReady", () => {
+        seen.push("ready");
+        resolve();
+      });
+    });
+    await cdp.Mod.evaluate({
+      expression:
+        "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.dynamicReady', data: { id: '550e8400-e29b-41d4-a716-446655440000' }, cdpSessionId: null }))",
+    });
+    await received;
+    assert.deepEqual(seen, ["ready"]);
+  } finally {
+    await cdp.close();
+  }
+}, 60_000);
+
+test("assigned type registry validates updated custom command, event, and middleware schemas through a real service worker", async () => {
+  const cdp = new ModCDPClient({
+    launcher: {
+      launcher_mode: "local",
+      launcher_local_headless: true,
+    },
+    upstream: { upstream_mode: "ws" },
+    injector: {
+      injector_mode: "cdp",
+      injector_cdp_extension_path: EXTENSION_PATH,
+      injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
+      injector_trust_service_worker_target: true,
+    },
+    router: {
+      router_routes: {
+        "Mod.*": "service_worker",
+        "Custom.*": "service_worker",
+        "*.*": "direct_cdp",
+      },
+    },
+    server_options: { router: { router_routes: { "*.*": "loopback_cdp" } } },
+  });
+  const updated_types = cdp.types.update({
+    custom_commands: {
+      "Custom.updated": {
+        params_schema: z.object({ count: z.number().int().nonnegative() }),
+        result_schema: z.object({ done: z.boolean() }),
+        expression: "async ({ count }) => ({ done: count === 2 })",
+      },
+      "Custom.updatedBadResult": {
+        params_schema: z.object({ count: z.number() }),
+        result_schema: z.object({ done: z.boolean() }),
+        expression: "async () => ({ done: 'yes' })",
+      },
+    },
+    custom_events: {
+      "Custom.updatedReady": { event_schema: z.object({ ready: z.boolean() }) },
+    },
+    custom_middlewares: [
+      {
+        name: "Custom.updated",
+        phase: "request",
+        expression: "async (payload, next) => next({ ...payload, count: payload.count + 1 })",
+      },
+    ],
+  });
+  const typed_client = new ModCDPClient({
+    launcher: { launcher_mode: "none" },
+    upstream: { upstream_mode: "ws" },
+    injector: { injector_mode: "none" },
+    server_options: null,
+    types: updated_types,
+  });
+  cdp.types = updated_types;
+  const seen: boolean[] = [];
+
+  if (false) {
+    const params: Parameters<typeof typed_client.Custom.updated>[0] = { count: 1 };
+    void params;
+    const result: Awaited<ReturnType<typeof typed_client.Custom.updated>> = true;
+    void result;
+    typed_client.on("Custom.updatedReady", (event) => {
+      const ready: boolean = event.ready;
+      void ready;
+      // @ts-expect-error Custom.updatedReady.ready is boolean.
+      const badReady: string = event.ready;
+      void badReady;
+    });
+    // @ts-expect-error Custom.updated count is required.
+    typed_client.Custom.updated({});
+    // @ts-expect-error Custom.updated unwraps the single done result field to boolean.
+    const badResult: Awaited<ReturnType<typeof typed_client.Custom.updated>> = { done: true };
+    void badResult;
+  }
+
+  try {
+    await cdp.connect();
+
+    assert.equal(await cdp.send("Custom.updated", { count: 1 }), true);
+    await assert.rejects(() => cdp.send("Custom.updated", { count: -1 }), /Too small/);
+    await assert.rejects(() => cdp.send("Custom.updatedBadResult", { count: 1 }), /boolean/);
+
+    const received = new Promise<void>((resolve) => {
+      cdp.on("Custom.updatedReady", () => {
+        seen.push(true);
+        resolve();
+      });
+    });
+    await cdp.Mod.evaluate({
+      expression:
+        "async () => globalThis.__ModCDP_custom_event__(JSON.stringify({ event: 'Custom.updatedReady', data: { ready: true }, cdpSessionId: null }))",
+    });
+    await received;
+    assert.deepEqual(seen, [true]);
   } finally {
     await cdp.close();
   }
@@ -246,7 +475,7 @@ test("service worker server validates registered custom command and event schema
 
   try {
     await server.configure({
-      server_options: { router: { router_routes: { "*.*": "chromedebugger" } } },
+      router: { router_routes: { "*.*": "chromedebugger" } },
     });
 
     server.addCustomCommand({

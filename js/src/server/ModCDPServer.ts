@@ -6,7 +6,7 @@
 import * as Browser from "../types/generated/zod/Browser.js";
 import * as Runtime from "../types/generated/zod/Runtime.js";
 import { ModCDPClient } from "../client/ModCDPClient.js";
-import { Mod } from "../types/modcdp.js";
+import { Mod, ModCDPConfigureParamsSchema, ModCDPServerConfigSchema } from "../types/modcdp.js";
 import { routeFor } from "../translate/translate.js";
 import { DownstreamTransportSet } from "../transport/DownstreamTransportSet.js";
 import { NativeMessagingDownstreamTransport } from "../transport/NativeMessagingDownstreamTransport.js";
@@ -19,7 +19,7 @@ import type {
   ModCDPCustomEventRegistration,
   ModCDPMiddlewareRegistration,
   ModCDPRoutes,
-  ModCDPServerOptions,
+  ModCDPServerConfig,
   ProtocolParams,
   ProtocolPayload,
   ProtocolResult,
@@ -136,7 +136,8 @@ class ModCDPServer {
   private creating_offscreen_keep_alive: Promise<void> | null = null;
   private offscreen_keep_alive_port: chrome.runtime.Port | null = null;
 
-  constructor(options: ModCDPServerOptions = {}) {
+  constructor(options: ModCDPServerConfig = {}) {
+    options = ModCDPServerConfigSchema.parse(options);
     this.server_browser_token = null;
     this.started_at = null;
     this.downstream = new DownstreamTransportSet({
@@ -352,7 +353,10 @@ class ModCDPServer {
 
   /** Apply Mod.configure settings, server-owned transport config, and custom registry entries through one path. */
   configure(params: ModCDPConfigureParams = {}) {
-    const { custom_commands = [], custom_events = [], custom_middlewares = [] } = params;
+    params = ModCDPConfigureParamsSchema.parse(params);
+    const custom_commands = params.custom_commands ?? [];
+    const custom_events = params.custom_events ?? [];
+    const custom_middlewares = params.custom_middlewares ?? [];
 
     this.server_browser_token = params.server_browser_token ?? this.server_browser_token;
     this.downstream.update(params.downstream ?? {});
@@ -507,4 +511,4 @@ export {
   DEFAULT_NATS_BRIDGE_SUBJECT_PREFIX,
 } from "../transport/NATSDownstreamTransport.js";
 export { DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS } from "../transport/ReverseWSDownstreamTransport.js";
-export type { ModCDPServerOptions } from "../types/modcdp.js";
+export type { ModCDPServerConfig } from "../types/modcdp.js";

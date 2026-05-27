@@ -3,7 +3,8 @@ import {
   type CdpCommandMessage,
   type CdpEventMessage,
   type CdpResponseMessage,
-  type ModCDPDownstreamOptions,
+  type ModCDPDownstreamConfig,
+  ModCDPDownstreamConfigSchema,
   type ProtocolPayload,
 } from "../types/modcdp.js";
 import {
@@ -15,9 +16,7 @@ import {
 
 const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
 
-type DownstreamTransportSetOptions = ModCDPDownstreamOptions & {
-  closeBrowser?: () => void | Promise<void>;
-};
+type DownstreamTransportSetConfig = ModCDPDownstreamConfig;
 
 /**
  * Owns the SDK/client-facing transports installed in the extension service worker.
@@ -39,13 +38,15 @@ class DownstreamTransportSet {
   private readonly transports = new Map<DownstreamTransportName, DownstreamTransport>();
   private downstream_client_lease: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(options: DownstreamTransportSetOptions = {}) {
+  constructor(options: DownstreamTransportSetConfig = {}) {
+    options = ModCDPDownstreamConfigSchema.parse(options);
     this.downstream_client_timeout_ms = options.downstream_client_timeout_ms ?? DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS;
     this.downstream_close_browser_on_disconnect = options.downstream_close_browser_on_disconnect ?? false;
     this.closeBrowser = options.closeBrowser ?? (() => {});
   }
 
-  update(config: DownstreamTransportSetOptions = {}) {
+  update(config: DownstreamTransportSetConfig = {}) {
+    config = ModCDPDownstreamConfigSchema.parse(config);
     this.downstream_client_timeout_ms = config.downstream_client_timeout_ms ?? this.downstream_client_timeout_ms;
     this.downstream_close_browser_on_disconnect =
       config.downstream_close_browser_on_disconnect ?? this.downstream_close_browser_on_disconnect;
@@ -143,4 +144,4 @@ class DownstreamTransportSet {
 }
 
 export { DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS, DownstreamTransportSet };
-export type { DownstreamTransportSetOptions };
+export type { DownstreamTransportSetConfig };

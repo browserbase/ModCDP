@@ -2,7 +2,7 @@ import type { WebSocket as WsSocket, WebSocketServer as WsServer } from "ws";
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { parseHostPort, UpstreamTransport, type UpstreamTransportOptions } from "./UpstreamTransport.js";
+import { parseHostPort, UpstreamTransport, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 import type { TargetRoute } from "./UpstreamTransport.js";
 
 const DEFAULT_UPSTREAM_REVERSEWS_BIND = "127.0.0.1:29292";
@@ -31,7 +31,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     return this.endpoint_url;
   }
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
     super(options);
     this.upstream_reversews_bind = options.upstream_reversews_bind ?? DEFAULT_UPSTREAM_REVERSEWS_BIND;
     this.upstream_reversews_wait_timeout_ms =
@@ -83,7 +83,7 @@ class ReverseWSUpstreamTransport extends UpstreamTransport {
     return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
     super.update(config);
     if (config.upstream_reversews_bind) {
       this.upstream_reversews_bind = config.upstream_reversews_bind;

@@ -5,14 +5,14 @@ import type { ProtocolResult } from "../types/modcdp.js";
 const ProxyPendingSchema = z
   .object({
     kind: z.string(),
-    client_id: z.number().optional(),
-    client_session_id: z.string().nullable().optional(),
-    event_name: z.string().optional(),
-    unwrap: z.enum(["runtime", "runtime_json"]).optional(),
+    client_id: z.number().optional().nullable(),
+    client_session_id: z.string().optional().nullable(),
+    event_name: z.string().optional().nullable(),
+    unwrap: z.enum(["runtime", "runtime_json"]).optional().nullable(),
     resolve: z.custom<(value: ProtocolResult) => void>().optional(),
     reject: z.custom<(error: Error) => void>().optional(),
   })
-  .passthrough();
+  .strict();
 type ProxyPending = z.infer<typeof ProxyPendingSchema>;
 
 const ProxyUpstreamStateSchema = z
@@ -26,7 +26,7 @@ const ProxyUpstreamStateSchema = z
       .nullable()
       .optional(),
   })
-  .passthrough();
+  .strict();
 type ProxyUpstreamState = z.infer<typeof ProxyUpstreamStateSchema>;
 
 type ProxyRawData = Buffer | ArrayBuffer | Buffer[];
@@ -54,7 +54,7 @@ const ProxyConnectionStateSchema = z.object({
   bootstrapped: z.boolean(),
   closing: z.boolean(),
   queued_from_client: z.array(z.custom<ProxyRawData>()),
-});
+}).strict();
 type ProxyConnectionState = z.infer<typeof ProxyConnectionStateSchema>;
 
 export { ProxyPendingSchema, ProxyUpstreamStateSchema, ProxyConnectionStateSchema };

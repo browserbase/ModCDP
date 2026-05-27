@@ -43,13 +43,13 @@ import { BorrowExtensionInjector } from "../injector/BorrowExtensionInjector.js"
 import { CDPExtensionInjector } from "../injector/CDPExtensionInjector.js";
 import { CLIExtensionInjector } from "../injector/CLIExtensionInjector.js";
 import { DiscoverExtensionInjector } from "../injector/DiscoverExtensionInjector.js";
-import type { InjectorOptions } from "../injector/ExtensionInjector.js";
-import type { LauncherMode, LauncherOptions } from "../launcher/BrowserLauncher.js";
+import type { InjectorConfig } from "../injector/ExtensionInjector.js";
+import type { LauncherMode, LauncherConfig } from "../launcher/BrowserLauncher.js";
 import { NATSUpstreamTransport } from "../transport/NATSUpstreamTransport.js";
 import { NativeMessagingUpstreamTransport } from "../transport/NativeMessagingUpstreamTransport.js";
 import { PipeUpstreamTransport } from "../transport/PipeUpstreamTransport.js";
 import { ReverseWSUpstreamTransport } from "../transport/ReverseWSUpstreamTransport.js";
-import type { UpstreamTransportOptions } from "../transport/UpstreamTransport.js";
+import type { UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
 import {
   UPSTREAM_EVENT_BINDING_NAME,
   wrapModCDPEvaluate,
@@ -65,9 +65,9 @@ import type {
   CdpEventMessage,
   CdpResponseMessage,
   CdpMessage,
-  ModCDPClientOptions,
-  ModCDPRouterOptions,
-  ModCDPServerOptions,
+  ModCDPClientConfig,
+  ModCDPRouterConfig,
+  ModCDPServerConfig,
   ProtocolResult,
 } from "../types/modcdp.js";
 import type { ProxyConnectionState } from "./ProxyConnectionState.js";
@@ -129,12 +129,12 @@ async function startProxy({
 }: {
   proxy_listen_host?: string;
   proxy_listen_port?: number;
-  launcher?: LauncherOptions;
-  upstream?: UpstreamTransportOptions;
-  injector?: InjectorOptions;
-  router?: ModCDPRouterOptions;
-  client_options?: ModCDPClientOptions;
-  server_options?: ModCDPServerOptions | null;
+  launcher?: LauncherConfig;
+  upstream?: UpstreamTransportConfig;
+  injector?: InjectorConfig;
+  router?: ModCDPRouterConfig;
+  client_options?: ModCDPClientConfig;
+  server_options?: ModCDPServerConfig | null;
   forward_mirrored_upstream_events?: boolean;
   upstream_monitor_interval_ms?: number;
 } = {}) {
@@ -324,7 +324,7 @@ async function startProxy({
         upstream_reversews_bind: upstream.upstream_reversews_bind,
         upstream_reversews_wait_timeout_ms: reverse_wait_timeout_ms,
       },
-      injector: proxyInjectorOptions(injector, "none"),
+      injector: proxyInjectorConfig(injector, "none"),
       router,
       client_options: { client_hydrate_aliases: false, ...client_options },
       server_options,
@@ -346,13 +346,9 @@ async function startProxy({
     upstream_ws_cdp_url &&
     !isWebSocketEndpoint(upstream_ws_cdp_url)
   ) {
-    stopUpstreamMonitor = monitorUpstream(
-      upstream_ws_cdp_url,
-      upstream_monitor_interval_ms,
-      () => {
-        void close().catch((error) => log("proxy close failed:", errorMessage(error)));
-      },
-    );
+    stopUpstreamMonitor = monitorUpstream(upstream_ws_cdp_url, upstream_monitor_interval_ms, () => {
+      void close().catch((error) => log("proxy close failed:", errorMessage(error)));
+    });
   }
   log(
     reverseOptions
@@ -402,11 +398,7 @@ function errorMessage(error: unknown): string {
   return "";
 }
 
-function monitorUpstream(
-  upstream: string,
-  upstream_monitor_interval_ms: number,
-  onClosed: () => void,
-) {
+function monitorUpstream(upstream: string, upstream_monitor_interval_ms: number, onClosed: () => void) {
   let stopped = false;
   let socket: WebSocket | null = null;
   let interval: NodeJS.Timeout | null = null;
@@ -594,7 +586,7 @@ async function handleReverseConnection(
       log("reverse parse error", e.message);
       return;
     }
-    dbg("reverse->", msg.id ?? "", msg.method ?? "(response)", msg.sessionId ?? "");
+    dbg("reverse->", "id" in msg ? msg.id : "", "method" in msg ? msg.method : "(response)", msg.sessionId ?? "");
     handleReverseUpstreamMessage(state, msg);
   };
   reverse.addEventListener("message", onReverseMessage);
@@ -709,12 +701,12 @@ async function handleConnection(
     onUpstreamClosed,
     activeCdps,
   }: {
-    launcher: LauncherOptions;
-    upstream: UpstreamTransportOptions;
-    injector: InjectorOptions;
-    router?: ModCDPRouterOptions;
-    client_options?: ModCDPClientOptions;
-    server_options?: ModCDPServerOptions | null;
+    launcher: LauncherConfig;
+    upstream: UpstreamTransportConfig;
+    injector: InjectorConfig;
+    router?: ModCDPRouterConfig;
+    client_options?: ModCDPClientConfig;
+    server_options?: ModCDPServerConfig | null;
     forward_mirrored_upstream_events: boolean;
     activeCdps: Set<ModCDPClient>;
     onUpstreamClosed: () => void;
@@ -723,7 +715,7 @@ async function handleConnection(
   const cdp = new ModCDPClient({
     launcher: { ...launcher, launcher_mode: launcher.launcher_mode as LauncherMode },
     upstream: { upstream_mode: "ws", upstream_ws_cdp_url: upstream.upstream_ws_cdp_url },
-    injector: proxyInjectorOptions(injector, "none"),
+    injector: proxyInjectorConfig(injector, "none"),
     router,
     client_options: { client_hydrate_aliases: false, ...client_options },
     server_options,
@@ -783,7 +775,7 @@ async function handleConnection(
       log("upstream parse error", e.message);
       return;
     }
-    dbg("upstream->", msg.id ?? "", msg.method ?? "(response)", msg.sessionId ?? "");
+    dbg("upstream->", "id" in msg ? msg.id : "", "method" in msg ? msg.method : "(response)", msg.sessionId ?? "");
     handleUpstreamMessage(state, msg);
   });
   upstream_socket.addEventListener("close", () => {
@@ -842,12 +834,12 @@ async function handleClientManagedConnection(
     server_options,
     activeCdps,
   }: {
-    launcher: LauncherOptions;
-    upstream: UpstreamTransportOptions;
-    injector: InjectorOptions;
-    router?: ModCDPRouterOptions;
-    client_options?: ModCDPClientOptions;
-    server_options?: ModCDPServerOptions | null;
+    launcher: LauncherConfig;
+    upstream: UpstreamTransportConfig;
+    injector: InjectorConfig;
+    router?: ModCDPRouterConfig;
+    client_options?: ModCDPClientConfig;
+    server_options?: ModCDPServerConfig | null;
     activeCdps: Set<ModCDPClient>;
   },
 ) {
@@ -862,7 +854,7 @@ async function handleClientManagedConnection(
       upstream_nativemessaging_host_name: upstream.upstream_nativemessaging_host_name,
       upstream_ws_connect_error_settle_timeout_ms: upstream.upstream_ws_connect_error_settle_timeout_ms,
     },
-    injector: proxyInjectorOptions(injector, "none"),
+    injector: proxyInjectorConfig(injector, "none"),
     router,
     client_options: { client_hydrate_aliases: false, ...client_options },
     server_options,
@@ -940,7 +932,7 @@ function wireClientManagedConnection(
   });
 }
 
-function proxyInjectorOptions(injector: InjectorOptions, default_mode: NonNullable<InjectorOptions["injector_mode"]>) {
+function proxyInjectorConfig(injector: InjectorConfig, default_mode: NonNullable<InjectorConfig["injector_mode"]>) {
   return {
     injector_service_worker_url_suffixes: ["/modcdp/service_worker.js"],
     ...injector,
@@ -1232,7 +1224,7 @@ function runProxyCli(args = process.argv.slice(2)) {
     proxy_listen_host,
     proxy_listen_port,
     launcher: {
-      launcher_mode: launcher_mode as LauncherOptions["launcher_mode"],
+      launcher_mode: launcher_mode as LauncherConfig["launcher_mode"],
       launcher_local_executable_path:
         typeof argv["launcher-local-executable-path"] === "string" && argv["launcher-local-executable-path"] !== "true"
           ? String(argv["launcher-local-executable-path"])
@@ -1251,7 +1243,7 @@ function runProxyCli(args = process.argv.slice(2)) {
       ),
     },
     upstream: {
-      upstream_mode: upstream_mode as UpstreamTransportOptions["upstream_mode"],
+      upstream_mode: upstream_mode as UpstreamTransportConfig["upstream_mode"],
       upstream_ws_cdp_url:
         explicit_upstream_ws_cdp_url ?? (upstream_mode === "ws" && launcher_mode !== "local" ? DEFAULT_UPSTREAM : null),
       upstream_nats_url:
@@ -1282,7 +1274,7 @@ function runProxyCli(args = process.argv.slice(2)) {
           : null,
     },
     injector: {
-      injector_mode: String(argv["injector-mode"] || "none") as InjectorOptions["injector_mode"],
+      injector_mode: String(argv["injector-mode"] || "none") as InjectorConfig["injector_mode"],
       injector_cli_extension_path,
       injector_cli_extension_id: optionalStringArg(argv, "injector-cli-extension-id"),
       injector_cdp_extension_path,
@@ -1306,8 +1298,8 @@ function runProxyCli(args = process.argv.slice(2)) {
       injector_target_session_poll_interval_ms: optionalNumberArg(argv, "injector-target-session-poll-interval-ms"),
     },
     router: routerConfig,
-    client_options: client_options_config as ModCDPClientOptions,
-    server_options: server_options_config as ModCDPServerOptions,
+    client_options: client_options_config as ModCDPClientConfig,
+    server_options: server_options_config as ModCDPServerConfig,
     forward_mirrored_upstream_events,
   });
   let shuttingDown = false;

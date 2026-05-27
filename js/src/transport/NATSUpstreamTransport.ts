@@ -7,7 +7,7 @@ import {
   UpstreamTransport,
   type TargetRoute,
   type UpstreamNatsRole,
-  type UpstreamTransportOptions,
+  type UpstreamTransportConfig,
 } from "./UpstreamTransport.js";
 
 const DEFAULT_UPSTREAM_NATS_URL = "ws://127.0.0.1:4223";
@@ -39,7 +39,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
     timeout: ReturnType<typeof setTimeout>;
   }>();
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
     super(options);
     const { url, upstream_nats_subject_prefix } = normalizeNatsUrl(
       options.upstream_nats_url ?? DEFAULT_UPSTREAM_NATS_URL,
@@ -98,7 +98,7 @@ class NATSUpstreamTransport extends UpstreamTransport {
     return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
     super.update(config);
     if (config.upstream_nats_url || config.upstream_nats_subject_prefix) {
       const normalized = normalizeNatsUrl(

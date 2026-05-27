@@ -5,45 +5,56 @@ import { z } from "zod";
 const isZodType = (value: unknown): value is z.ZodType =>
   value != null && typeof value === "object" && typeof (value as z.ZodType).parse === "function";
 
-const CdpCommandParamsSchema = z.object({}).passthrough();
+const CdpCommandParamsSchema = z.record(z.string(), z.unknown());
 type CdpCommandParams = z.infer<typeof CdpCommandParamsSchema>;
 
-const CdpCommandResultSchema = z.object({}).passthrough();
+const CdpCommandResultSchema = z.record(z.string(), z.unknown());
 type CdpCommandResult = z.infer<typeof CdpCommandResultSchema>;
 
-const CdpEventParamsSchema = z.object({}).passthrough();
+const CdpEventParamsSchema = z.record(z.string(), z.unknown());
 type CdpEventParams = z.infer<typeof CdpEventParamsSchema>;
 
-const RuntimeBindingCalledEventSchema = z
-  .object({
-    name: z.string(),
-    payload: z.string(),
-    executionContextId: z.number().optional(),
-  })
-  .passthrough();
+const RuntimeBindingCalledEventSchema = z.object({
+  name: z.string(),
+  payload: z.string(),
+  executionContextId: z.number().optional().nullable(),
+});
 type RuntimeBindingCalledEvent = z.infer<typeof RuntimeBindingCalledEventSchema>;
 
-const TargetAttachedToTargetEventSchema = z
-  .object({
-    sessionId: z.string(),
-    targetInfo: z.object({ targetId: z.string() }).passthrough(),
-    waitingForDebugger: z.boolean(),
-  })
-  .passthrough();
+const TargetAttachedToTargetEventSchema = z.object({
+  sessionId: z.string(),
+  targetInfo: z.object({ targetId: z.string() }),
+  waitingForDebugger: z.boolean(),
+});
 type TargetAttachedToTargetEvent = z.infer<typeof TargetAttachedToTargetEventSchema>;
+
+const DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS = 10_000;
+const DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS = 10_000;
+const DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS = 10_000;
+const DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS = 250;
+const DEFAULT_UPSTREAM_CDP_SEND_TIMEOUT_MS = 10_000;
+const DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS = 250;
+const DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS = 1_000;
+const DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS = 45_000;
+const DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS = 100;
 
 const ModCDPRoutesSchema = z.object({}).catchall(z.string());
 type ModCDPRoutes = z.infer<typeof ModCDPRoutesSchema>;
 
-const ModCDPRouterOptionsSchema = z
+const ModCDPRouterConfigSchema = z
   .object({
-    router_routes: ModCDPRoutesSchema.optional(),
-    loopback_execution_context_timeout_ms: z.number().positive().optional(),
+    router_routes: ModCDPRoutesSchema.optional().nullable(),
+    loopback_execution_context_timeout_ms: z.number().positive().optional().nullable(),
   })
-  .passthrough();
-type ModCDPRouterOptions = z.infer<typeof ModCDPRouterOptionsSchema>;
+  .strict()
+  .transform((config) => ({
+    router_routes: config.router_routes ?? {},
+    loopback_execution_context_timeout_ms:
+      config.loopback_execution_context_timeout_ms ?? DEFAULT_ROUTER_EXECUTION_CONTEXT_TIMEOUT_MS,
+  }));
+type ModCDPRouterConfig = z.input<typeof ModCDPRouterConfigSchema>;
 
-const ModCDPCustomPayloadSchema = z.object({}).passthrough();
+const ModCDPCustomPayloadSchema = z.record(z.string(), z.unknown());
 type ModCDPCustomPayload = z.infer<typeof ModCDPCustomPayloadSchema>;
 
 type ModCDPNamedValue = {
@@ -104,10 +115,10 @@ type ModCDPPayloadSchemaSpec = z.infer<typeof ModCDPPayloadSchemaSpecSchema>;
 function validateZodSchema(schema: ModCDPPayloadSchemaSpec | null | undefined) {
   if (!schema) return null;
   if (isZodType(schema)) return schema;
-  if (Object.values(schema).every(isZodType)) return z.object(schema as ModCDPPayloadShape).passthrough();
+  if (Object.values(schema).every(isZodType)) return z.object(schema as ModCDPPayloadShape);
   if (typeof schema === "object") {
     const zod_schema = z.fromJSONSchema(schema);
-    return isScalarJsonSchema(schema) ? z.object({ value: zod_schema }).passthrough() : zod_schema;
+    return isScalarJsonSchema(schema) ? z.object({ value: zod_schema }) : zod_schema;
   }
   throw new Error("Unsupported payload schema; pass a Zod schema, Zod shape, or object JSON schema.");
 }
@@ -123,87 +134,193 @@ function isScalarJsonSchema(schema: Record<string, unknown>) {
 
 const ModCDPEvaluateParamsSchema = z.object({
   expression: z.string(),
-  params: ModCDPCustomPayloadSchema.optional(),
-  cdpSessionId: z.string().nullable().optional(),
+  params: ModCDPCustomPayloadSchema.optional().nullable(),
+  cdpSessionId: z.string().optional().nullable(),
 });
 type ModCDPEvaluateParams = z.infer<typeof ModCDPEvaluateParamsSchema>;
 
 const ModCDPAddCustomCommandParamsSchema = z.object({
   name: ModCDPNameSchema,
-  expression: z.string().nullable().optional(),
-  params_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
-  result_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
+  expression: z.string().optional().nullable(),
+  params_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
+  result_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
 });
 type ModCDPAddCustomCommandParams = z.infer<typeof ModCDPAddCustomCommandParamsSchema>;
 
 const ModCDPAddCustomEventObjectParamsSchema = z.object({
   name: ModCDPNameSchema,
-  event_schema: ModCDPPayloadSchemaSpecSchema.nullable().optional(),
+  event_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
 });
 type ModCDPAddCustomEventObjectParams = z.infer<typeof ModCDPAddCustomEventObjectParamsSchema>;
 const ModCDPAddCustomEventParamsSchema = z.union([ModCDPZodTypeSchema, ModCDPAddCustomEventObjectParamsSchema]);
 type ModCDPAddCustomEventParams = z.infer<typeof ModCDPAddCustomEventParamsSchema>;
 
 const ModCDPAddMiddlewareParamsSchema = z.object({
-  name: ModCDPNameSchema.optional(),
+  name: ModCDPNameSchema.optional().nullable(),
   phase: z.enum(["request", "response", "event"]),
   expression: z.string(),
 });
 type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
 
-const ModCDPLauncherOptionsSchema = z.object({}).passthrough();
-type ModCDPLauncherOptions = z.infer<typeof ModCDPLauncherOptionsSchema>;
-
-const ModCDPUpstreamOptionsSchema = z
+const ModCDPLauncherConfigSchema = z
   .object({
-    upstream_mode: z.enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"]).optional(),
-    upstream_ws_cdp_url: z.string().nullable().optional(),
-    upstream_nats_url: z.string().nullable().optional(),
-    upstream_nats_subject_prefix: z.string().nullable().optional(),
-    upstream_nats_wait_timeout_ms: z.number().positive().optional(),
-    upstream_reversews_bind: z.string().nullable().optional(),
-    upstream_reversews_wait_timeout_ms: z.number().positive().optional(),
-    upstream_nativemessaging_host_name: z.string().nullable().optional(),
-    upstream_ws_connect_error_settle_timeout_ms: z.number().positive().optional(),
+    launcher_mode: z.enum(["local", "remote", "bb", "none"]).optional().nullable(),
+    launcher_local_executable_path: z.string().optional().nullable(),
+    launcher_local_user_data_dir: z.string().optional().nullable(),
+    launcher_remote_cdp_url: z.string().optional().nullable(),
+    launcher_local_cdp_listen_port: z.number().int().min(0).optional().nullable(),
+    launcher_local_headless: z.boolean().optional().nullable(),
+    launcher_local_sandbox: z.boolean().optional().nullable(),
+    launcher_local_args: z.array(z.string()).optional().nullable(),
+    launcher_local_extra_args: z.array(z.string()).optional().nullable(),
+    launcher_local_cdp_transport: z.enum(["port", "pipe"]).optional().nullable(),
+    launcher_local_loopback_cdp: z.boolean().optional().nullable(),
+    launcher_local_cleanup_user_data_dir: z.boolean().optional().nullable(),
+    launcher_local_chrome_ready_timeout_ms: z.number().positive().optional().nullable(),
+    launcher_local_chrome_ready_poll_interval_ms: z.number().positive().optional().nullable(),
+    launcher_bb_api_key: z.string().optional().nullable(),
+    launcher_bb_base_url: z.string().optional().nullable(),
+    launcher_bb_session_id: z.string().optional().nullable(),
+    launcher_bb_keep_alive: z.boolean().optional().nullable(),
+    launcher_bb_close_session_on_close: z.boolean().optional().nullable(),
+    launcher_bb_region: z.string().optional().nullable(),
+    launcher_bb_timeout: z.number().positive().optional().nullable(),
+    launcher_bb_extension_id: z.string().optional().nullable(),
+    launcher_bb_browser_settings: z.record(z.string(), z.unknown()).optional().nullable(),
+    launcher_bb_user_metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+    launcher_bb_session_create_params: z.record(z.string(), z.unknown()).optional().nullable(),
   })
-  .passthrough();
-type ModCDPUpstreamOptions = z.infer<typeof ModCDPUpstreamOptionsSchema>;
+  .strict()
+  .transform((config) => ({
+    launcher_mode: config.launcher_mode ?? "none",
+    launcher_local_executable_path: config.launcher_local_executable_path ?? null,
+    launcher_local_user_data_dir: config.launcher_local_user_data_dir ?? null,
+    launcher_remote_cdp_url: config.launcher_remote_cdp_url ?? null,
+    launcher_local_cdp_listen_port: config.launcher_local_cdp_listen_port ?? null,
+    launcher_local_headless: config.launcher_local_headless ?? null,
+    launcher_local_sandbox: config.launcher_local_sandbox ?? null,
+    launcher_local_args: config.launcher_local_args ?? [],
+    launcher_local_extra_args: config.launcher_local_extra_args ?? [],
+    launcher_local_cdp_transport: config.launcher_local_cdp_transport ?? "port",
+    launcher_local_loopback_cdp: config.launcher_local_loopback_cdp ?? false,
+    launcher_local_cleanup_user_data_dir: config.launcher_local_cleanup_user_data_dir ?? false,
+    launcher_local_chrome_ready_timeout_ms:
+      config.launcher_local_chrome_ready_timeout_ms ?? DEFAULT_LAUNCHER_CHROME_READY_TIMEOUT_MS,
+    launcher_local_chrome_ready_poll_interval_ms:
+      config.launcher_local_chrome_ready_poll_interval_ms ?? DEFAULT_LAUNCHER_CHROME_READY_POLL_INTERVAL_MS,
+    launcher_bb_api_key: config.launcher_bb_api_key ?? null,
+    launcher_bb_base_url: config.launcher_bb_base_url ?? null,
+    launcher_bb_session_id: config.launcher_bb_session_id ?? null,
+    launcher_bb_keep_alive: config.launcher_bb_keep_alive ?? false,
+    launcher_bb_close_session_on_close: config.launcher_bb_close_session_on_close ?? null,
+    launcher_bb_region: config.launcher_bb_region ?? null,
+    launcher_bb_timeout: config.launcher_bb_timeout ?? null,
+    launcher_bb_extension_id: config.launcher_bb_extension_id ?? null,
+    launcher_bb_browser_settings: config.launcher_bb_browser_settings ?? null,
+    launcher_bb_user_metadata: config.launcher_bb_user_metadata ?? null,
+    launcher_bb_session_create_params: config.launcher_bb_session_create_params ?? null,
+  }));
+type ModCDPLauncherConfig = z.input<typeof ModCDPLauncherConfigSchema>;
 
-const ModCDPClientOptionsSchema = z
+const ModCDPUpstreamConfigSchema = z
   .object({
-    client_hydrate_aliases: z.boolean().optional(),
-    client_mirror_upstream_events: z.boolean().optional(),
-    client_cdp_send_timeout_ms: z.number().positive().optional(),
-    client_event_wait_timeout_ms: z.number().positive().optional(),
-    client_heartbeat_interval_ms: z.number().positive().optional(),
+    upstream_mode: z
+      .enum(["ws", "pipe", "nativemessaging", "reversews", "nats", "chromedebugger"])
+      .optional()
+      .nullable(),
+    upstream_ws_cdp_url: z.string().optional().nullable(),
+    upstream_pipe_read: z.custom<NodeJS.ReadableStream>().optional().nullable(),
+    upstream_pipe_write: z.custom<NodeJS.WritableStream>().optional().nullable(),
+    upstream_nats_url: z.string().optional().nullable(),
+    upstream_nats_subject_prefix: z.string().optional().nullable(),
+    upstream_nats_role: z.enum(["client", "browser"]).optional().nullable(),
+    upstream_nats_wait_timeout_ms: z.number().positive().optional().nullable(),
+    upstream_reversews_bind: z.string().optional().nullable(),
+    upstream_reversews_wait_timeout_ms: z.number().positive().optional().nullable(),
+    upstream_nativemessaging_host_name: z.string().optional().nullable(),
+    upstream_ws_connect_error_settle_timeout_ms: z.number().positive().optional().nullable(),
+    upstream_cdp_send_timeout_ms: z.number().positive().optional().nullable(),
   })
-  .passthrough();
-type ModCDPClientOptions = z.infer<typeof ModCDPClientOptionsSchema>;
+  .strict()
+  .transform((config) => ({
+    upstream_mode: config.upstream_mode ?? "ws",
+    upstream_ws_cdp_url: config.upstream_ws_cdp_url ?? null,
+    upstream_pipe_read: config.upstream_pipe_read ?? null,
+    upstream_pipe_write: config.upstream_pipe_write ?? null,
+    upstream_nats_url: config.upstream_nats_url ?? null,
+    upstream_nats_subject_prefix: config.upstream_nats_subject_prefix ?? null,
+    upstream_nats_role: config.upstream_nats_role ?? "client",
+    upstream_nats_wait_timeout_ms: config.upstream_nats_wait_timeout_ms ?? null,
+    upstream_reversews_bind: config.upstream_reversews_bind ?? null,
+    upstream_reversews_wait_timeout_ms: config.upstream_reversews_wait_timeout_ms ?? null,
+    upstream_nativemessaging_host_name: config.upstream_nativemessaging_host_name ?? null,
+    upstream_ws_connect_error_settle_timeout_ms:
+      config.upstream_ws_connect_error_settle_timeout_ms ?? DEFAULT_UPSTREAM_WS_CONNECT_ERROR_SETTLE_TIMEOUT_MS,
+    upstream_cdp_send_timeout_ms: config.upstream_cdp_send_timeout_ms ?? DEFAULT_UPSTREAM_CDP_SEND_TIMEOUT_MS,
+  }));
+type ModCDPUpstreamConfig = z.input<typeof ModCDPUpstreamConfigSchema>;
 
-const ModCDPDownstreamOptionsSchema = z
+const ModCDPClientConfigSchema = z
   .object({
-    downstream_client_timeout_ms: z.number().positive().optional(),
-    downstream_close_browser_on_disconnect: z.boolean().optional(),
+    client_hydrate_aliases: z.boolean().optional().nullable(),
+    client_mirror_upstream_events: z.boolean().optional().nullable(),
+    client_cdp_send_timeout_ms: z.number().positive().optional().nullable(),
+    client_event_wait_timeout_ms: z.number().positive().optional().nullable(),
+    client_heartbeat_interval_ms: z.number().positive().optional().nullable(),
   })
-  .passthrough();
-type ModCDPDownstreamOptions = z.infer<typeof ModCDPDownstreamOptionsSchema>;
+  .strict()
+  .transform((config) => ({
+    client_hydrate_aliases: config.client_hydrate_aliases ?? true,
+    client_mirror_upstream_events: config.client_mirror_upstream_events ?? true,
+    client_cdp_send_timeout_ms: config.client_cdp_send_timeout_ms ?? DEFAULT_CLIENT_CDP_SEND_TIMEOUT_MS,
+    client_event_wait_timeout_ms: config.client_event_wait_timeout_ms ?? DEFAULT_CLIENT_EVENT_WAIT_TIMEOUT_MS,
+    client_heartbeat_interval_ms: config.client_heartbeat_interval_ms ?? DEFAULT_CLIENT_HEARTBEAT_INTERVAL_MS,
+  }));
+type ModCDPClientConfig = z.input<typeof ModCDPClientConfigSchema>;
 
-const ModCDPServerOptionsSchema = z
+const ModCDPDownstreamConfigSchema = z
   .object({
-    upstream: ModCDPUpstreamOptionsSchema.optional(),
-    router: ModCDPRouterOptionsSchema.optional(),
-    client_options: ModCDPClientOptionsSchema.optional(),
-    downstream: ModCDPDownstreamOptionsSchema.optional(),
-    server_browser_token: z.string().nullable().optional(),
-    custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
-    custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional(),
-    custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional(),
+    downstream_client_timeout_ms: z.number().positive().optional().nullable(),
+    downstream_close_browser_on_disconnect: z.boolean().optional().nullable(),
+    closeBrowser: z
+      .custom<() => void | Promise<void>>((value) => typeof value === "function")
+      .optional()
+      .nullable(),
   })
-  .passthrough();
-type ModCDPServerOptions = z.infer<typeof ModCDPServerOptionsSchema>;
+  .strict()
+  .transform((config) => ({
+    downstream_client_timeout_ms: config.downstream_client_timeout_ms ?? DEFAULT_DOWNSTREAM_CLIENT_TIMEOUT_MS,
+    downstream_close_browser_on_disconnect: config.downstream_close_browser_on_disconnect ?? false,
+    closeBrowser: config.closeBrowser ?? (() => {}),
+  }));
+type ModCDPDownstreamConfig = z.input<typeof ModCDPDownstreamConfigSchema>;
 
-const ModCDPConfigureParamsSchema = ModCDPServerOptionsSchema;
-type ModCDPConfigureParams = z.infer<typeof ModCDPConfigureParamsSchema>;
+const ModCDPServerConfigSchema = z
+  .object({
+    upstream: ModCDPUpstreamConfigSchema.optional().nullable(),
+    router: ModCDPRouterConfigSchema.optional().nullable(),
+    client_options: ModCDPClientConfigSchema.optional().nullable(),
+    downstream: ModCDPDownstreamConfigSchema.optional().nullable(),
+    server_browser_token: z.string().optional().nullable(),
+    custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional().nullable(),
+    custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional().nullable(),
+    custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional().nullable(),
+  })
+  .strict()
+  .transform((config) => ({
+    upstream: ModCDPUpstreamConfigSchema.parse(config.upstream ?? {}),
+    router: ModCDPRouterConfigSchema.parse(config.router ?? {}),
+    client_options: ModCDPClientConfigSchema.parse(config.client_options ?? {}),
+    downstream: ModCDPDownstreamConfigSchema.parse(config.downstream ?? {}),
+    server_browser_token: config.server_browser_token ?? null,
+    custom_commands: config.custom_commands ?? [],
+    custom_events: config.custom_events ?? [],
+    custom_middlewares: config.custom_middlewares ?? [],
+  }));
+type ModCDPServerConfig = z.input<typeof ModCDPServerConfigSchema>;
+
+const ModCDPConfigureParamsSchema = ModCDPServerConfigSchema;
+type ModCDPConfigureParams = z.input<typeof ModCDPConfigureParamsSchema>;
 
 const ModCDPPingParamsSchema = z.object({
   sent_at: z.number().optional(),
@@ -227,77 +344,65 @@ const ModCDPPingLatencySchema = z.object({
 });
 type ModCDPPingLatency = z.infer<typeof ModCDPPingLatencySchema>;
 
-const ModCDPGetTopologyParamsSchema = z
-  .object({
-    rootTargetId: z.string().optional(),
-    targetId: z.string().optional(),
-    active: z.boolean().optional(),
-  })
-  .passthrough();
+const ModCDPGetTopologyParamsSchema = z.object({
+  rootTargetId: z.string().optional().nullable(),
+  targetId: z.string().optional().nullable(),
+  active: z.boolean().optional().nullable(),
+});
 type ModCDPGetTopologyParams = z.infer<typeof ModCDPGetTopologyParamsSchema>;
 
-const ModCDPTopologyFrameSchema = z
-  .object({
-    targetId: z.string(),
-    url: z.string().nullable().optional(),
-    parentFrameId: z.string().nullable().optional(),
-    outerBackendNodeId: z.number().int().nullable().optional(),
-  })
-  .passthrough();
+const ModCDPTopologyFrameSchema = z.object({
+  targetId: z.string(),
+  url: z.string().optional().nullable(),
+  parentFrameId: z.string().optional().nullable(),
+  outerBackendNodeId: z.number().int().optional().nullable(),
+});
 type ModCDPTopologyFrame = z.infer<typeof ModCDPTopologyFrameSchema>;
 
-const ModCDPTopologyDomRootSchema = z
-  .object({
-    kind: z.enum(["document", "shadow"]),
-    frameId: z.string(),
-    outerBackendNodeId: z.number().int().nullable().optional(),
-    innerBackendNodeId: z.number().int().nullable().optional(),
-    mode: z.enum(["open", "closed", "user-agent"]).optional(),
-    executionContextId: z.number().int().optional(),
-    uniqueContextId: z.string().optional(),
-  })
-  .passthrough();
+const ModCDPTopologyDomRootSchema = z.object({
+  kind: z.enum(["document", "shadow"]),
+  frameId: z.string(),
+  outerBackendNodeId: z.number().int().optional().nullable(),
+  innerBackendNodeId: z.number().int().optional().nullable(),
+  mode: z.enum(["open", "closed", "user-agent"]).optional().nullable(),
+  executionContextId: z.number().int().optional().nullable(),
+  uniqueContextId: z.string().optional().nullable(),
+});
 type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
 
-const ModCDPTopologyTargetSchema = z
-  .object({
-    targetId: z.string(),
-    type: z.string(),
-    title: z.string().optional(),
-    url: z.string().optional(),
-    attached: z.boolean().optional(),
-    parentId: z.string().optional(),
-    parentFrameId: z.string().optional(),
-    sessionId: z.string().nullable().optional(),
-  })
-  .passthrough();
+const ModCDPTopologyTargetSchema = z.object({
+  targetId: z.string(),
+  type: z.string(),
+  title: z.string().optional().nullable(),
+  url: z.string().optional().nullable(),
+  attached: z.boolean().optional().nullable(),
+  parentId: z.string().optional().nullable(),
+  parentFrameId: z.string().optional().nullable(),
+  sessionId: z.string().optional().nullable(),
+});
 type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
 
-const ModCDPTopologyExecutionContextSchema = z
-  .object({
-    id: z.number().int(),
-    origin: z.string().optional(),
-    name: z.string().optional(),
-    uniqueId: z.string().optional(),
-    auxData: z.record(z.string(), z.unknown()).optional(),
-    sessionId: z.string().nullable(),
-    targetId: z.string(),
-    frameId: z.string().nullable().optional(),
-    world: z.string(),
-  })
-  .passthrough();
+const ModCDPTopologyExecutionContextSchema = z.object({
+  id: z.number().int(),
+  origin: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+  uniqueId: z.string().optional().nullable(),
+  auxData: z.record(z.string(), z.unknown()).optional().nullable(),
+  sessionId: z.string().nullable(),
+  targetId: z.string(),
+  frameId: z.string().optional().nullable(),
+  world: z.string(),
+});
 type ModCDPTopologyExecutionContext = z.infer<typeof ModCDPTopologyExecutionContextSchema>;
 
-const ModCDPTopologySchema = z
-  .object({
-    objectGroup: z.string(),
-    rootFrameId: z.string(),
-    frames: z.record(z.string(), ModCDPTopologyFrameSchema),
-    roots: z.record(z.string(), ModCDPTopologyDomRootSchema),
-    targets: z.record(z.string(), ModCDPTopologyTargetSchema),
-    contexts: z.record(z.string(), ModCDPTopologyExecutionContextSchema),
-  })
-  .passthrough();
+const ModCDPTopologySchema = z.object({
+  objectGroup: z.string(),
+  rootFrameId: z.string(),
+  frames: z.record(z.string(), ModCDPTopologyFrameSchema),
+  roots: z.record(z.string(), ModCDPTopologyDomRootSchema),
+  targets: z.record(z.string(), ModCDPTopologyTargetSchema),
+  contexts: z.record(z.string(), ModCDPTopologyExecutionContextSchema),
+});
 type ModCDPTopology = z.infer<typeof ModCDPTopologySchema>;
 
 const ModCDPCommandParamsSchema = z.union([
@@ -312,7 +417,7 @@ const ModCDPCommandParamsSchema = z.union([
 ]);
 type ModCDPCommandParams = z.infer<typeof ModCDPCommandParamsSchema>;
 
-const ModCDPCommandResultSchema = z.union([z.object({ ok: z.boolean() }).passthrough(), ModCDPCustomPayloadSchema]);
+const ModCDPCommandResultSchema = z.union([z.object({ ok: z.boolean() }), ModCDPCustomPayloadSchema]);
 type ModCDPCommandResult = z.infer<typeof ModCDPCommandResultSchema>;
 
 const ModCDPEvaluateResponseSchema = z.unknown();
@@ -321,39 +426,31 @@ type ModCDPEvaluateResponse = z.infer<typeof ModCDPEvaluateResponseSchema>;
 const ModCDPGetTopologyResponseSchema = ModCDPTopologySchema;
 type ModCDPGetTopologyResponse = z.infer<typeof ModCDPGetTopologyResponseSchema>;
 
-const ModCDPAddCustomCommandResponseSchema = z
-  .object({
-    name: z.string(),
-    registered: z.boolean(),
-  })
-  .passthrough();
+const ModCDPAddCustomCommandResponseSchema = z.object({
+  name: z.string(),
+  registered: z.boolean(),
+});
 type ModCDPAddCustomCommandResponse = z.infer<typeof ModCDPAddCustomCommandResponseSchema>;
 
-const ModCDPAddCustomEventResponseSchema = z
-  .object({
-    name: z.string(),
-    registered: z.boolean(),
-  })
-  .passthrough();
+const ModCDPAddCustomEventResponseSchema = z.object({
+  name: z.string(),
+  registered: z.boolean(),
+});
 type ModCDPAddCustomEventResponse = z.infer<typeof ModCDPAddCustomEventResponseSchema>;
 
-const ModCDPAddMiddlewareResponseSchema = z
-  .object({
-    name: z.string(),
-    phase: z.enum(["request", "response", "event"]),
-    registered: z.boolean(),
-  })
-  .passthrough();
+const ModCDPAddMiddlewareResponseSchema = z.object({
+  name: z.string(),
+  phase: z.enum(["request", "response", "event"]),
+  registered: z.boolean(),
+});
 type ModCDPAddMiddlewareResponse = z.infer<typeof ModCDPAddMiddlewareResponseSchema>;
 
-const ModCDPConfigureResponseSchema = z.object({}).passthrough();
+const ModCDPConfigureResponseSchema = z.object({});
 type ModCDPConfigureResponse = z.infer<typeof ModCDPConfigureResponseSchema>;
 
-const ModCDPPingResponseSchema = z
-  .object({
-    ok: z.boolean(),
-  })
-  .passthrough();
+const ModCDPPingResponseSchema = z.object({
+  ok: z.boolean(),
+});
 type ModCDPPingResponse = z.infer<typeof ModCDPPingResponseSchema>;
 
 const ModCDPBindingPayloadSchema = z.object({
@@ -363,12 +460,14 @@ const ModCDPBindingPayloadSchema = z.object({
 });
 type ModCDPBindingPayload = z.infer<typeof ModCDPBindingPayloadSchema>;
 
-const CdpDebuggeeCommandParamsSchema = ModCDPCustomPayloadSchema.extend({
-  debuggee: z.custom<chrome.debugger.Debuggee>().nullable().optional(),
-  tabId: z.number().nullable().optional(),
-  targetId: z.string().nullable().optional(),
-  extensionId: z.string().nullable().optional(),
-});
+const CdpDebuggeeCommandParamsSchema = z
+  .object({
+    debuggee: z.custom<chrome.debugger.Debuggee>().nullable().optional(),
+    tabId: z.number().nullable().optional(),
+    targetId: z.string().nullable().optional(),
+    extensionId: z.string().nullable().optional(),
+  })
+  .catchall(z.unknown());
 type CdpDebuggeeCommandParams = z.infer<typeof CdpDebuggeeCommandParamsSchema>;
 
 const ProtocolParamsSchema = z.union([CdpCommandParamsSchema, ModCDPCommandParamsSchema]);
@@ -398,73 +497,59 @@ type ModCDPCustomEventRegistration = z.infer<typeof ModCDPCustomEventRegistratio
 const ModCDPMiddlewareRegistrationSchema = ModCDPAddMiddlewareParamsSchema;
 type ModCDPMiddlewareRegistration = z.infer<typeof ModCDPMiddlewareRegistrationSchema>;
 
-const CdpErrorSchema = z
-  .object({
-    code: z.number().optional(),
-    message: z.string(),
-    data: z.unknown().optional(),
-  })
-  .passthrough();
+const CdpErrorSchema = z.object({
+  code: z.number().optional().nullable(),
+  message: z.string(),
+  data: z.unknown().optional().nullable(),
+});
 type CdpError = z.infer<typeof CdpErrorSchema>;
 
-const CdpCommandMessageSchema = z
-  .object({
-    id: z.number(),
-    method: z.string(),
-    params: ProtocolParamsSchema.optional(),
-    sessionId: z.string().optional(),
-  })
-  .passthrough();
+const CdpCommandMessageSchema = z.object({
+  id: z.number(),
+  method: z.string(),
+  params: ProtocolParamsSchema.optional().nullable(),
+  sessionId: z.string().optional().nullable(),
+});
 type CdpCommandMessage = z.infer<typeof CdpCommandMessageSchema>;
 
-const CdpResponseMessageSchema = z
-  .object({
-    id: z.number(),
-    result: z.unknown().optional(),
-    error: CdpErrorSchema.optional(),
-    sessionId: z.string().optional(),
-  })
-  .passthrough();
+const CdpResponseMessageSchema = z.object({
+  id: z.number(),
+  result: z.unknown().optional().nullable(),
+  error: CdpErrorSchema.optional().nullable(),
+  sessionId: z.string().optional().nullable(),
+});
 type CdpResponseMessage = z.infer<typeof CdpResponseMessageSchema>;
 
-const CdpEventMessageSchema = z
-  .object({
-    method: z.string(),
-    params: ProtocolEventParamsSchema.optional(),
-    sessionId: z.string().optional(),
-  })
-  .passthrough();
+const CdpEventMessageSchema = z.object({
+  method: z.string(),
+  params: ProtocolEventParamsSchema.optional().nullable(),
+  sessionId: z.string().optional().nullable(),
+});
 type CdpEventMessage = z.infer<typeof CdpEventMessageSchema>;
 
 const CdpMessageSchema = z.union([CdpCommandMessageSchema, CdpResponseMessageSchema, CdpEventMessageSchema]);
 type CdpMessage = z.infer<typeof CdpMessageSchema>;
 
-const TranslatedStepSchema = z
-  .object({
-    method: z.string(),
-    params: ProtocolParamsSchema.optional(),
-    sessionId: z.string().nullable().optional(),
-    unwrap: z.enum(["runtime", "runtime_json"]).optional(),
-  })
-  .passthrough();
+const TranslatedStepSchema = z.object({
+  method: z.string(),
+  params: ProtocolParamsSchema.optional().nullable(),
+  sessionId: z.string().optional().nullable(),
+  unwrap: z.enum(["runtime", "runtime_json"]).optional().nullable(),
+});
 type TranslatedStep = z.infer<typeof TranslatedStepSchema>;
 
-const TranslatedCommandSchema = z
-  .object({
-    route: z.string(),
-    target: z.enum(["direct_cdp", "service_worker"]),
-    steps: z.array(TranslatedStepSchema),
-  })
-  .passthrough();
+const TranslatedCommandSchema = z.object({
+  route: z.string(),
+  target: z.enum(["direct_cdp", "service_worker"]),
+  steps: z.array(TranslatedStepSchema),
+});
 type TranslatedCommand = z.infer<typeof TranslatedCommandSchema>;
 
-const UnwrappedModCDPEventSchema = z
-  .object({
-    event: z.string(),
-    data: ProtocolPayloadSchema,
-    sessionId: z.string().nullable(),
-  })
-  .passthrough();
+const UnwrappedModCDPEventSchema = z.object({
+  event: z.string(),
+  data: ProtocolPayloadSchema,
+  sessionId: z.string().nullable(),
+});
 type UnwrappedModCDPEvent = z.infer<typeof UnwrappedModCDPEventSchema>;
 
 const Mod = {
@@ -480,10 +565,11 @@ const Mod = {
   AddCustomEventObjectParams: ModCDPAddCustomEventObjectParamsSchema,
   AddCustomEventParams: ModCDPAddCustomEventParamsSchema,
   AddMiddlewareParams: ModCDPAddMiddlewareParamsSchema,
-  LauncherOptions: ModCDPLauncherOptionsSchema,
-  UpstreamOptions: ModCDPUpstreamOptionsSchema,
-  ClientOptions: ModCDPClientOptionsSchema,
-  ServerOptions: ModCDPServerOptionsSchema,
+  LauncherConfig: ModCDPLauncherConfigSchema,
+  UpstreamConfig: ModCDPUpstreamConfigSchema,
+  ClientConfig: ModCDPClientConfigSchema,
+  DownstreamConfig: ModCDPDownstreamConfigSchema,
+  ServerConfig: ModCDPServerConfigSchema,
   ConfigureParams: ModCDPConfigureParamsSchema,
   PingParams: ModCDPPingParamsSchema,
   PongEvent: ModCDPPongEventSchema,
@@ -515,7 +601,7 @@ export {
   RuntimeBindingCalledEventSchema,
   TargetAttachedToTargetEventSchema,
   ModCDPRoutesSchema,
-  ModCDPRouterOptionsSchema,
+  ModCDPRouterConfigSchema,
   ModCDPCustomPayloadSchema,
   normalizeModCDPName,
   ModCDPNameSchema,
@@ -529,11 +615,11 @@ export {
   ModCDPAddCustomEventObjectParamsSchema,
   ModCDPAddCustomEventParamsSchema,
   ModCDPAddMiddlewareParamsSchema,
-  ModCDPLauncherOptionsSchema,
-  ModCDPUpstreamOptionsSchema,
-  ModCDPClientOptionsSchema,
-  ModCDPDownstreamOptionsSchema,
-  ModCDPServerOptionsSchema,
+  ModCDPLauncherConfigSchema,
+  ModCDPUpstreamConfigSchema,
+  ModCDPClientConfigSchema,
+  ModCDPDownstreamConfigSchema,
+  ModCDPServerConfigSchema,
   ModCDPConfigureParamsSchema,
   ModCDPPingParamsSchema,
   ModCDPPongEventSchema,
@@ -579,7 +665,7 @@ export type {
   RuntimeBindingCalledEvent,
   TargetAttachedToTargetEvent,
   ModCDPRoutes,
-  ModCDPRouterOptions,
+  ModCDPRouterConfig,
   ModCDPCustomPayload,
   ModCDPNamedValue,
   ModCDPName,
@@ -591,11 +677,11 @@ export type {
   ModCDPAddCustomEventObjectParams,
   ModCDPAddCustomEventParams,
   ModCDPAddMiddlewareParams,
-  ModCDPLauncherOptions,
-  ModCDPUpstreamOptions,
-  ModCDPClientOptions,
-  ModCDPDownstreamOptions,
-  ModCDPServerOptions,
+  ModCDPLauncherConfig,
+  ModCDPUpstreamConfig,
+  ModCDPClientConfig,
+  ModCDPDownstreamConfig,
+  ModCDPServerConfig,
   ModCDPConfigureParams,
   ModCDPPingParams,
   ModCDPPongEvent,

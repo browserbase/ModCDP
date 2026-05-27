@@ -223,7 +223,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     if (unwrap_key && unwrap_schema && (result == null || typeof result !== "object")) return unwrap_schema.parse(result);
     const parsed_result = result_schema.parse(result);
     return unwrap_key && parsed_result && typeof parsed_result === "object"
-      ? (parsed_result as Record<string, unknown>)[unwrap_key]
+      ? Reflect.get(parsed_result, unwrap_key)
       : parsed_result;
   }
 
@@ -329,9 +329,10 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     if (parts.length !== 2 || !parts[0] || !parts[1])
       throw new Error(`Custom command must use Domain.method format, got ${name}`);
     const [domain, method] = parts;
-    const writable_target = target as Record<string, Record<string, unknown>>;
     if (method === "*") {
-      writable_target[domain] = new Proxy(writable_target[domain] ?? {}, {
+      const existing_domain = Reflect.get(target, domain);
+      const domain_target = existing_domain != null && typeof existing_domain === "object" ? existing_domain : {};
+      Reflect.set(target, domain, new Proxy(domain_target, {
         get(existing, property, receiver) {
           if (typeof property !== "string") return Reflect.get(existing, property, receiver);
           if (property in existing) return Reflect.get(existing, property, receiver);
@@ -356,13 +357,15 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
               configurable: true,
             },
           });
-          existing[property] = alias;
+          Reflect.set(existing, property, alias);
           return alias;
         },
-      });
+      }));
       return;
     }
-    writable_target[domain] ??= {};
+    const existing_domain = Reflect.get(target, domain);
+    const domain_target = existing_domain != null && typeof existing_domain === "object" ? existing_domain : {};
+    if (existing_domain !== domain_target) Reflect.set(target, domain, domain_target);
     const alias = (params?: unknown) => send(name, params ?? {});
     Object.defineProperties(alias, {
       cdp_command_name: { value: name, enumerable: true, configurable: true },
@@ -379,7 +382,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
         configurable: true,
       },
     });
-    writable_target[domain][method] = alias;
+    Reflect.set(domain_target, method, alias);
   }
 
   private hydrateBuiltinSchemas() {

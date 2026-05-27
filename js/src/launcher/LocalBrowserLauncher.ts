@@ -9,7 +9,7 @@ import path from "node:path";
 import {
   BrowserLauncher,
   resolveCdpWebSocketUrl,
-  type LauncherOptions,
+  type LauncherConfig,
   type LaunchedBrowser,
 } from "./BrowserLauncher.js";
 
@@ -286,7 +286,7 @@ async function waitForBrowserSelectedCdpWebSocketUrl(
 }
 
 class LocalBrowserLauncher extends BrowserLauncher {
-  constructor(options: LauncherOptions = {}) {
+  constructor(options: LauncherConfig = {}) {
     super(options);
     this.launcher_mode = "local";
   }
@@ -312,7 +312,7 @@ class LocalBrowserLauncher extends BrowserLauncher {
     return port;
   }
 
-  async launch(options: LauncherOptions = {}): Promise<LaunchedBrowser> {
+  async launch(options: LauncherConfig = {}): Promise<LaunchedBrowser> {
     const launcher_local_executable_path =
       options.launcher_local_executable_path ?? this.launcher_local_executable_path;
     const launcher_local_cdp_listen_port =

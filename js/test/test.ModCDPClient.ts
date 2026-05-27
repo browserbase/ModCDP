@@ -8,7 +8,8 @@ import { z } from "zod";
 
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { ModCDPClient } from "../src/index.js";
-import { ModCDPUpstreamOptionsSchema } from "../src/types/modcdp.js";
+import type { cdp as cdp_types } from "../src/types/generated/cdp.js";
+import { ModCDPUpstreamConfigSchema } from "../src/types/modcdp.js";
 import { CdpSocket } from "./helpers.BrowserLauncher.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -69,11 +70,11 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
   assert.equal(cdp.launcher.launcher_local_executable_path, "/tmp/chrome");
   assert.equal(cdp.launcher.launcher_local_user_data_dir, "/tmp/profile");
   assert.equal(cdp.upstream.upstream_ws_connect_error_settle_timeout_ms, 321);
-  assert.equal(cdp.injector.injector_execution_context_timeout_ms, 4321);
-  assert.equal(cdp.injector.injector_service_worker_probe_timeout_ms, 5432);
-  assert.equal(cdp.injector.injector_service_worker_ready_timeout_ms, 6543);
-  assert.equal(cdp.injector.injector_service_worker_poll_interval_ms, 76);
-  assert.equal(cdp.injector.injector_target_session_poll_interval_ms, 87);
+  assert.equal(cdp.injector.config.injector_execution_context_timeout_ms, 4321);
+  assert.equal(cdp.injector.config.injector_service_worker_probe_timeout_ms, 5432);
+  assert.equal(cdp.injector.config.injector_service_worker_ready_timeout_ms, 6543);
+  assert.equal(cdp.injector.config.injector_service_worker_poll_interval_ms, 76);
+  assert.equal(cdp.injector.config.injector_target_session_poll_interval_ms, 87);
   assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
   assert.equal(cdp.client_options.client_hydrate_aliases, false);
   assert.equal(cdp.client_options.client_mirror_upstream_events, false);
@@ -98,7 +99,7 @@ test("ModCDPClient uses flat owner-prefixed config", () => {
 });
 
 test("ModCDPClient constructs chrome debugger upstream transport from upstream options", () => {
-  const upstream = ModCDPUpstreamOptionsSchema.parse({
+  const upstream = ModCDPUpstreamConfigSchema.parse({
     upstream_mode: "chromedebugger",
   });
   const cdp = new ModCDPClient({
@@ -244,7 +245,7 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
     await cdp.connect();
     assert.equal(cdp.launcher.launcher_mode, "local");
     assert.equal(cdp.upstream.upstream_mode, "ws");
-    assert.equal(cdp.injector?.injector_mode, "cli");
+    assert.equal(cdp.injector?.config.injector_mode, "cli");
     assert.equal(["discover", "cli", "cdp", "borrow"].includes(String(cdp.connect_timing?.injector_source)), true);
     assert.equal(cdp.router.router_routes["*.*"], "direct_cdp");
     assert.match(cdp.upstream.upstream_ws_cdp_url ?? "", /^ws:\/\//);
@@ -264,7 +265,62 @@ test("ModCDPClient connects with nested launch/upstream/extension/client/server 
       ),
       true,
     );
-    assert.equal(typeof (await cdp.Browser.getVersion()).product, "string");
+    const version = await cdp.Browser.getVersion();
+    assert.match(version.product, /Chrome|Chromium/);
+    assert.equal(typeof version.protocolVersion, "string");
+    const runtime_evaluation = await cdp.Runtime.evaluate({
+      expression: "1 + 1",
+      returnByValue: true,
+    });
+    assert.equal(runtime_evaluation.result.type, "number");
+    assert.equal(runtime_evaluation.result.value, 2);
+    await assert.rejects(
+      // @ts-expect-error Runtime.evaluate requires expression in the public alias params.
+      () => cdp.Runtime.evaluate({ returnByValue: true }),
+      /expression/,
+    );
+    await assert.rejects(
+      // @ts-expect-error Mod.ping sent_at is a number in the public alias params.
+      () => cdp.Mod.ping({ sent_at: "bad" }),
+      /number/,
+    );
+    assert.deepEqual(
+      await cdp.Mod.addMiddleware({
+        name: cdp.Mod.ping,
+        phase: cdp.RESPONSE,
+        expression: "async (payload, next) => next(payload)",
+      }),
+      { name: "Mod.ping", phase: "response", registered: true },
+    );
+    await assert.rejects(
+      () =>
+        cdp.Mod.addMiddleware({
+          name: cdp.Mod.ping,
+          // @ts-expect-error middleware phase is a narrow public union.
+          phase: "after",
+          expression: "async (payload, next) => next(payload)",
+        }),
+      /Invalid option/,
+    );
+    const created_event = new Promise<string>((resolve) => {
+      const listener = (payload: cdp_types.types.ts.Target.TargetCreatedEvent) => {
+        if (payload.targetInfo.url !== "about:blank#public-api-target-created") return;
+        cdp.off(cdp.Target.targetCreated, listener);
+        const targetId: string = payload.targetInfo.targetId;
+        resolve(targetId);
+        if (false) {
+          // @ts-expect-error Target.targetCreated targetInfo.targetId is a string.
+          const badTargetId: number = payload.targetInfo.targetId;
+          void badTargetId;
+        }
+      };
+      cdp.on(cdp.Target.targetCreated, listener);
+    });
+    const created_via_alias = await cdp.Target.createTarget({
+      url: "about:blank#public-api-target-created",
+    });
+    assert.equal(await created_event, created_via_alias.targetId);
+    await cdp.Target.closeTarget({ targetId: created_via_alias.targetId });
     const direct_target = (await cdp.send("Target.createTarget", {
       url: "about:blank#direct-session-routing",
     })) as Record<string, unknown>;
@@ -310,7 +366,7 @@ test("ModCDPClient preserves explicit empty service worker suffix config", async
     },
   });
 
-  assert.deepEqual(cdp.injector.injector_service_worker_url_suffixes, []);
+  assert.deepEqual(cdp.injector.config.injector_service_worker_url_suffixes, []);
 }, 60_000);
 
 function reversewsTestBrowserPath() {
@@ -402,7 +458,7 @@ function scorePath(candidate: string) {
 test("ModCDPClient defaults service worker suffix config to the ModCDP worker", async () => {
   const cdp = new ModCDPClient({ injector: { injector_mode: "discover" } });
 
-  assert.deepEqual(cdp.injector?.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"]);
+  assert.deepEqual(cdp.injector?.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"]);
 });
 
 test("ModCDPClient preserves explicit null server config", () => {
@@ -483,7 +539,7 @@ test("ModCDPClient rejects unknown component modes at their owning factory bound
       new ModCDPClient({
         injector: { injector_mode: "bogus" as any },
       }),
-    /unknown injector\.injector_mode=bogus/,
+    /unknown injector\.config.injector_mode=bogus/,
   );
 });
 

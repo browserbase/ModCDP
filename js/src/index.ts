@@ -32,7 +32,7 @@ upstream_transport_constructors.set("nats", NATSUpstreamTransport);
 export * from "./client/ModCDPClient.js";
 export { ModCDPServer } from "./server/ModCDPServer.js";
 export { BrowserLauncher, resolveCdpWebSocketUrl } from "./launcher/BrowserLauncher.js";
-export type { LauncherOptions, LaunchedBrowser, LauncherMode } from "./launcher/BrowserLauncher.js";
+export type { LauncherConfig, LaunchedBrowser, LauncherMode } from "./launcher/BrowserLauncher.js";
 export { LocalBrowserLauncher } from "./launcher/LocalBrowserLauncher.js";
 export { RemoteBrowserLauncher } from "./launcher/RemoteBrowserLauncher.js";
 export { BBBrowserLauncher } from "./launcher/BBBrowserLauncher.js";
@@ -50,7 +50,7 @@ export {
 export type { PreparedExtension } from "./injector/NodeExtensionFiles.js";
 export type {
   ExtensionInjectionResult,
-  InjectorOptions,
+  InjectorConfig,
   InjectorMode,
   SendCDP,
   TargetInfo,
@@ -61,7 +61,7 @@ export { DiscoverExtensionInjector } from "./injector/DiscoverExtensionInjector.
 export { BorrowExtensionInjector } from "./injector/BorrowExtensionInjector.js";
 export { BBExtensionInjector } from "./injector/BBExtensionInjector.js";
 export { UpstreamTransport, parseHostPort } from "./transport/UpstreamTransport.js";
-export type { UpstreamMode, UpstreamTransportOptions } from "./transport/UpstreamTransport.js";
+export type { UpstreamMode, UpstreamTransportConfig } from "./transport/UpstreamTransport.js";
 export { DownstreamTransport } from "./transport/DownstreamTransport.js";
 export { DownstreamTransportSet } from "./transport/DownstreamTransportSet.js";
 export type {

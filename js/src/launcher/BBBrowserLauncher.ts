@@ -1,4 +1,4 @@
-import { BrowserLauncher, type LauncherOptions, type LaunchedBrowser } from "./BrowserLauncher.js";
+import { BrowserLauncher, type LauncherConfig, type LaunchedBrowser } from "./BrowserLauncher.js";
 
 const DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com";
 const DEFAULT_BROWSERBASE_VIEWPORT = { width: 1288, height: 711 };
@@ -90,12 +90,12 @@ async function closeBrowserCDP(cdp_url: string | undefined) {
 }
 
 class BBBrowserLauncher extends BrowserLauncher {
-  constructor(options: LauncherOptions = {}) {
+  constructor(options: LauncherConfig = {}) {
     super(options);
     this.launcher_mode = "bb";
   }
 
-  async launch(options: LauncherOptions = {}): Promise<LaunchedBrowser> {
+  async launch(options: LauncherConfig = {}): Promise<LaunchedBrowser> {
     const browserbase_api_key = firstString(
       options.launcher_bb_api_key,
       this.launcher_bb_api_key,

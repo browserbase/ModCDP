@@ -1,4 +1,4 @@
-import { ExtensionInjector, type InjectorOptions } from "./ExtensionInjector.js";
+import { ExtensionInjector, type InjectorConfig } from "./ExtensionInjector.js";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,24 +17,24 @@ class BBExtensionInjector extends ExtensionInjector {
   private zip_path: string | null = null;
   private cleanup: (() => Promise<void>) | null = null;
 
-  constructor(options: InjectorOptions = {}) {
+  constructor(options: InjectorConfig = {}) {
     super(options);
-    this.injector_mode = "bb";
+    this.config.injector_mode = "bb";
   }
 
   async prepare() {
-    const configured_extension_id = firstString(this.injector_bb_extension_id);
+    const configured_extension_id = firstString(this.config.injector_bb_extension_id);
     if (configured_extension_id) {
       this.extension_id = configured_extension_id;
       return;
     }
     if (this.extension_id) return;
-    const extension_path = this.injector_bb_extension_path;
+    const extension_path = this.config.injector_bb_extension_path;
     if (!extension_path) return;
     this.zip_path = extension_path.endsWith(".zip") ? extension_path : await this.zipExtensionDir(extension_path);
     try {
       this.extension_id = await this.uploadExtension(this.zip_path);
-      this.injector_bb_extension_id = this.extension_id;
+      this.config.injector_bb_extension_id = this.extension_id;
     } catch (error) {
       await this.close();
       throw error;
@@ -42,15 +42,18 @@ class BBExtensionInjector extends ExtensionInjector {
   }
 
   async inject() {
-    const extension_id = this.injector_service_worker_extension_id;
-    this.injector_service_worker_extension_id = null;
+    const extension_id = this.config.injector_service_worker_extension_id;
+    this.config.injector_service_worker_extension_id = null;
     try {
-      const discovered = await this.waitForReadyServiceWorker(this.injector_service_worker_ready_timeout_ms ?? 60_000, {
-        matched_only: this.injector_trust_service_worker_target,
-      });
+      const discovered = await this.waitForReadyServiceWorker(
+        this.config.injector_service_worker_ready_timeout_ms ?? 60_000,
+        {
+          matched_only: this.config.injector_trust_service_worker_target,
+        },
+      );
       return discovered ? { ...discovered, source: "bb" } : null;
     } finally {
-      this.injector_service_worker_extension_id = extension_id;
+      this.config.injector_service_worker_extension_id = extension_id;
     }
   }
 
@@ -67,12 +70,12 @@ class BBExtensionInjector extends ExtensionInjector {
   }
 
   private async uploadExtension(zip_path: string) {
-    const browserbase_api_key = firstString(this.injector_bb_api_key, process.env.BROWSERBASE_API_KEY);
+    const browserbase_api_key = firstString(this.config.injector_bb_api_key, process.env.BROWSERBASE_API_KEY);
     if (!browserbase_api_key) {
       throw new Error("BBExtensionInjector requires BROWSERBASE_API_KEY or injector.injector_bb_api_key.");
     }
     const base_url =
-      firstString(this.injector_bb_base_url, process.env.BROWSERBASE_BASE_URL) ?? DEFAULT_BROWSERBASE_BASE_URL;
+      firstString(this.config.injector_bb_base_url, process.env.BROWSERBASE_BASE_URL) ?? DEFAULT_BROWSERBASE_BASE_URL;
     const form = new FormData();
     const zip_bytes = readFileSync(zip_path);
     const zip_array_buffer = zip_bytes.buffer.slice(

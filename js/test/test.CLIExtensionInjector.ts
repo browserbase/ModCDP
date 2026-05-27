@@ -78,7 +78,7 @@ test("CLIExtensionInjector prepares an unpacked extension directory for --load-e
     assert.notEqual(unpacked_extension_path, EXTENSION_PATH);
     assert.equal(existsSync(path.join(unpacked_extension_path!, "manifest.json")), true);
     assert.deepEqual(injector.extra_args, [`--load-extension=${unpacked_extension_path}`]);
-    assert.equal(injector.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
+    assert.equal(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
   } finally {
     await injector.close();
   }
@@ -95,7 +95,7 @@ test("CLIExtensionInjector prepares the default extension zip for --load-extensi
     assert.match(unpacked_extension_path!, /modcdp-extension-/);
     assert.equal(existsSync(path.join(unpacked_extension_path!, "manifest.json")), true);
     assert.deepEqual(injector.extra_args, [`--load-extension=${unpacked_extension_path}`]);
-    assert.equal(injector.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
+    assert.equal(injector.config.injector_service_worker_extension_id, DEFAULT_MODCDP_EXTENSION_ID);
   } finally {
     await injector.close();
   }

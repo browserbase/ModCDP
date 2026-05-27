@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { CdpCommandSchema } from "../types/generated/zod/helpers.js";
 import type { CdpCommandMessage, ProtocolPayload, ProtocolResult } from "../types/modcdp.js";
-import { UpstreamTransport, type TargetRoute, type UpstreamTransportOptions } from "./UpstreamTransport.js";
+import { UpstreamTransport, type TargetRoute, type UpstreamTransportConfig } from "./UpstreamTransport.js";
 
 class PipeUpstreamTransport extends UpstreamTransport {
   readonly upstream_mode = "pipe" as const;
@@ -11,7 +11,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
   private upstream_pipe_read: NodeJS.ReadableStream | null;
   private upstream_pipe_write: NodeJS.WritableStream | null;
 
-  constructor(options: UpstreamTransportOptions = {}) {
+  constructor(options: UpstreamTransportConfig = {}) {
     super(options);
     this.upstream_ws_cdp_url = null;
     this.upstream_pipe_read = options.upstream_pipe_read ?? null;
@@ -60,7 +60,7 @@ class PipeUpstreamTransport extends UpstreamTransport {
     return super.send(command_or_message_or_method, params as z.input<Params>, route_or_sessionId);
   }
 
-  update(config: UpstreamTransportOptions = {}) {
+  update(config: UpstreamTransportConfig = {}) {
     super.update(config);
     this.upstream_ws_cdp_url = null;
     this.upstream_pipe_read = config.upstream_pipe_read ?? this.upstream_pipe_read;
