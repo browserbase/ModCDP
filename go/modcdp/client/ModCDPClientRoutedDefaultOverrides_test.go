@@ -64,7 +64,7 @@ async (payload, next) => {
 }
 `
 
-func TestModCDPClientRoutedDefaultOverrides(t *testing.T) {
+func TestServiceWorkerRoutedStandardCDPCommandsAndEventsCanBeTransformed(t *testing.T) {
 	headless := true
 	extensionPath, err := filepath.Abs("../../../dist/extension")
 	if err != nil {

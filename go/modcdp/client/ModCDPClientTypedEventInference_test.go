@@ -8,7 +8,7 @@ package client
 
 import "testing"
 
-func TestTypedCDPEventsWrapRawHandlers(t *testing.T) {
+func TestTypedCDPEventTokensInferCallbackPayloadsWithoutLocalTypeAliases(t *testing.T) {
 	cdp := New(Config{})
 	typedEvents := make(chan TargetTargetCreatedEvent, 1)
 	rawEvents := make(chan any, 1)

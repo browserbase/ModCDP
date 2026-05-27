@@ -20,7 +20,7 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
-func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealSession(t *testing.T) {
+func TestBBBrowserLauncherCreatesVerifiesResumesAndReleasesRealBrowserbaseSession(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("BROWSERBASE_API_KEY")) == "" {
 		t.Fatal("BROWSERBASE_API_KEY is required for live Browserbase tests")
 	}
