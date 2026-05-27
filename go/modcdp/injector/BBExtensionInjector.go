@@ -21,7 +21,6 @@ const DefaultBrowserbaseBaseURL = "https://api.browserbase.com"
 
 type BBExtensionInjector struct {
 	ExtensionInjector
-	ExtensionID string
 	ZipPath     string
 	CleanupPath string
 }

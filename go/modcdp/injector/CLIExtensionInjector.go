@@ -11,7 +11,6 @@ import (
 type CLIExtensionInjector struct {
 	ExtensionInjector
 	UnpackedExtensionPath string
-	ExtensionID           string
 	CleanupPath           string
 }
 
