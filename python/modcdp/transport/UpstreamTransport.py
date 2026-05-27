@@ -22,6 +22,7 @@ UpstreamTransportConfig: TypeAlias = ModCDPUpstreamConfig
 
 class UpstreamTransport:
     upstream_mode: UpstreamMode = "ws"
+    upstream_is_modcdp_server: bool = False
     url: str | None = None
 
     def __init__(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:

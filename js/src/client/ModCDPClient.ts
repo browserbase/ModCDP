@@ -323,6 +323,28 @@ export class ModCDPClient<
       return this;
     }
 
+    if (this.upstream.upstream_is_modcdp_server) {
+      const configure_started_at = Date.now();
+      if (this.server_config !== null) await this.upstream.send("Mod.configure", this._serverConfigureParams());
+      const configure_completed_at = Date.now();
+      this._startHeartbeat();
+      void this._measurePingLatency().catch(() => {});
+      const connected_at = Date.now();
+      this.connect_timing = {
+        started_at: connect_started_at,
+        upstream_mode: this.upstream.config.upstream_mode,
+        transport_started_at,
+        transport_connected_at,
+        transport_duration_ms: transport_connected_at - transport_started_at,
+        configure_started_at,
+        configure_completed_at,
+        configure_duration_ms: configure_completed_at - configure_started_at,
+        connected_at,
+        duration_ms: connected_at - connect_started_at,
+      };
+      return this;
+    }
+
     await this.router.start();
 
     const injector_started_at = Date.now();
@@ -394,6 +416,20 @@ export class ModCDPClient<
         duration_ms: Date.now() - started_at,
       };
       return this.types.parseCommandResult(method, prepared.local_result);
+    }
+    if (this.upstream.upstream_is_modcdp_server) {
+      const result = await this.upstream.send(method, command_params as ProtocolPayload, session_id, {
+        timeout_ms: this.config.client_cdp_send_timeout_ms,
+      });
+      const completed_at = Date.now();
+      this.last_command_timing = {
+        method,
+        target: "modcdp_server",
+        started_at,
+        completed_at,
+        duration_ms: completed_at - started_at,
+      };
+      return this.types.parseCommandResult(method, result);
     }
     if (this.injector == null && this.server_config === null) {
       const result = await this.router.send(method, command_params as ProtocolParams, session_id);
@@ -525,7 +561,9 @@ export class ModCDPClient<
       transport.update(launcher.configForUpstream());
       if (this.injector) transport.update(this.injector.configForUpstream());
     }
+    const peer_wait_started_at = Date.now();
     await transport.connect();
+    await transport.waitForPeer({ connected_after_ms: peer_wait_started_at });
 
     if (this.upstream.config.upstream_mode === "ws" && transport.config.upstream_ws_cdp_url)
       this.upstream.update({ upstream_ws_cdp_url: transport.config.upstream_ws_cdp_url });

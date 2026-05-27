@@ -331,7 +331,10 @@ class LocalBrowserLauncher extends BrowserLauncher {
   override update(config: LocalBrowserLauncherInput = {}) {
     const next_config = LocalBrowserLauncherConfigSchema.parse({ ...this.config, ...config, launcher_mode: "local" });
     if (config.launcher_local_args) {
-      next_config.launcher_local_args = mergeLocalChromeArgs(this.config.launcher_local_args, config.launcher_local_args);
+      next_config.launcher_local_args = mergeLocalChromeArgs(
+        this.config.launcher_local_args,
+        config.launcher_local_args,
+      );
     }
     if (config.launcher_local_extra_args) {
       next_config.launcher_local_extra_args = mergeLocalChromeArgs(

@@ -54,16 +54,17 @@ type HostPort struct {
 }
 
 type UpstreamTransport struct {
-	Config         UpstreamTransportConfig
-	recvListeners  []recvListener
-	closeListeners []closeListener
-	eventListeners map[string][]upstreamEventListener
-	listenerMu     sync.Mutex
-	nextListenerID int64
-	nextID         int64
-	pending        map[int64]chan map[string]any
-	pendingMu      sync.Mutex
-	writeCommand   func(map[string]any) error
+	Config                 UpstreamTransportConfig
+	UpstreamIsModCDPServer bool
+	recvListeners          []recvListener
+	closeListeners         []closeListener
+	eventListeners         map[string][]upstreamEventListener
+	listenerMu             sync.Mutex
+	nextListenerID         int64
+	nextID                 int64
+	pending                map[int64]chan map[string]any
+	pendingMu              sync.Mutex
+	writeCommand           func(map[string]any) error
 }
 
 type recvListener struct {

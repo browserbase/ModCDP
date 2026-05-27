@@ -42,6 +42,10 @@ type UpstreamEventListener = (
 
 class UpstreamTransport {
   config: UpstreamTransportBaseConfig;
+  // True when this transport terminates at a ModCDPServer peer instead of a
+  // raw browser CDP endpoint. ModCDPClient reads this to skip local
+  // target/session bootstrap and send CDP-shaped commands directly upstream.
+  upstream_is_modcdp_server = false;
   private next_id = 1;
   private pending = new Map<
     number,
