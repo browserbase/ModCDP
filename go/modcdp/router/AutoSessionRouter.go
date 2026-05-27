@@ -18,9 +18,14 @@ import (
 var targetAutoAttachParams = map[string]any{"autoAttach": true, "waitForDebuggerOnStart": false, "flatten": true}
 var browserLevelDomains = map[string]bool{"Browser": true, "Target": true, "SystemInfo": true}
 
+type ProtocolTypes interface {
+	NativeCommandSchema(method string) map[string]any
+}
+
 type AutoSessionRouter struct {
 	Config                    types.ModCDPRouterConfig
 	upstream                  *transport.UpstreamTransport
+	types                     ProtocolTypes
 	SessionId_from_targetId   map[string]string
 	TargetId_from_sessionId   map[string]string
 	Targets                   map[string]map[string]any
@@ -37,7 +42,7 @@ type executionContextResult struct {
 	err       error
 }
 
-func NewAutoSessionRouter(upstream *transport.UpstreamTransport, config types.ModCDPRouterConfig) *AutoSessionRouter {
+func NewAutoSessionRouter(upstream *transport.UpstreamTransport, protocolTypes ProtocolTypes, config types.ModCDPRouterConfig) *AutoSessionRouter {
 	if config.RouterRoutes == nil {
 		config.RouterRoutes = translate.DefaultClientRoutes()
 	} else {
@@ -53,6 +58,7 @@ func NewAutoSessionRouter(upstream *transport.UpstreamTransport, config types.Mo
 	return &AutoSessionRouter{
 		Config:                    config,
 		upstream:                  upstream,
+		types:                     protocolTypes,
 		SessionId_from_targetId:   map[string]string{},
 		TargetId_from_sessionId:   map[string]string{},
 		Targets:                   map[string]map[string]any{},
@@ -119,6 +125,9 @@ func (r *AutoSessionRouter) ToJSON() map[string]any {
 }
 
 func (r *AutoSessionRouter) Send(method string, params map[string]any, requestedSessionID string) (map[string]any, error) {
+	if r.types == nil || r.types.NativeCommandSchema(method) == nil {
+		return nil, fmt.Errorf("AutoSessionRouter cannot route unknown CDP command %s.", method)
+	}
 	domain := method
 	for index, char := range method {
 		if char == '.' {

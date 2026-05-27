@@ -419,7 +419,7 @@ func New(config Config) *ModCDPClient {
 		handlers:  map[string][]handlerEntry{},
 	}
 	client.Mod = ModDomain{client: client}
-	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, config.Router)
+	client.Router = NewAutoSessionRouter(&upstream.UpstreamTransport, client.Types, config.Router)
 	client.Launcher = client.browserLauncher()
 	injectors := client.extensionInjectorsForConfig()
 	if len(injectors) > 0 {

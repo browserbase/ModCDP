@@ -426,6 +426,7 @@ class CDPTypes:
         self.event_schemas: dict[str, TypeAdapter[object]] = {}
         self.command_params_schemas: dict[str, TypeAdapter[object]] = {}
         self.command_result_schemas: dict[str, TypeAdapter[object]] = {}
+        self.native_command_schemas: dict[str, TypeAdapter[object]] = {}
         self.event_classes: dict[str, type[CDPEvent]] = {}
         self._lock = threading.RLock()
         self.hydrateNativeProtocolSchemas()
@@ -507,8 +508,14 @@ class CDPTypes:
                         continue
                     method = f"{domain}.{command_base[:1].lower()}{command_base[1:]}"
                     if issubclass(params_class, CDPParams):
-                        self.command_params_schemas[method] = TypeAdapter(params_class)
+                        adapter: TypeAdapter[object] = TypeAdapter(params_class)
+                        self.command_params_schemas[method] = adapter
+                        self.native_command_schemas[method] = adapter
                     self.command_result_schemas[method] = TypeAdapter(result_class)
+
+    def nativeCommandSchema(self, method: str) -> TypeAdapter[object] | None:
+        with self._lock:
+            return self.native_command_schemas.get(method)
 
     def prepareCommand(self, method: str, params: object = None, can_register_locally: bool = False) -> CommandPreparation:
         if method == "Mod.addCustomCommand":

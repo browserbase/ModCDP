@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from ..translate.translate import DEFAULT_CLIENT_ROUTES
 from ..transport.UpstreamTransport import UpstreamTransport
+from ..types.CDPTypes import CDPTypes
 from ..types.modcdp import ModCDPRoutes, ProtocolParams, ProtocolResult, _isObjectMap
 from ..types.toJSON import modCDPToJSON
 
@@ -28,7 +29,12 @@ class RouterConfig(BaseModel):
 
 
 class AutoSessionRouter:
-    def __init__(self, upstream: UpstreamTransport, config: RouterConfig | Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        upstream: UpstreamTransport,
+        types: CDPTypes,
+        config: RouterConfig | Mapping[str, Any] | None = None,
+    ) -> None:
         raw_config = dict(config.model_dump() if isinstance(config, RouterConfig) else config or {})
         self.config = RouterConfig.model_validate(
             {
@@ -40,6 +46,7 @@ class AutoSessionRouter:
             }
         )
         self.upstream = upstream
+        self.types = types
         self.sessionId_from_targetId: dict[str, str] = {}
         self.targetId_from_sessionId: dict[str, str] = {}
         self.targets: dict[str, dict[str, Any]] = {}
@@ -145,6 +152,8 @@ class AutoSessionRouter:
         )
 
     def send(self, method: str, params: ProtocolParams | None = None, requested_session_id: str | None = None) -> ProtocolResult:
+        if self.types.nativeCommandSchema(method) is None:
+            raise RuntimeError(f"AutoSessionRouter cannot route unknown CDP command {method}.")
         command_params = dict(params or {})
         domain = method.split(".", 1)[0]
         if requested_session_id is not None:

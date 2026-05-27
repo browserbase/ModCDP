@@ -278,7 +278,7 @@ class ModCDPClient(CDPSurfaceMixin):
 
         self._handlers: dict[str, list[Handler]] = {}
         self._handler_wrappers: dict[tuple[str, Handler], Handler] = {}
-        self.router = AutoSessionRouter(self.upstream, parsed_router_config.model_dump())
+        self.router = AutoSessionRouter(self.upstream, self.types, parsed_router_config.model_dump())
         if self.config.client_hydrate_aliases:
             install_cdp_surface(self)
         self.Mod = _ModDomain(self)

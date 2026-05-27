@@ -25,6 +25,7 @@ type CDPTypes struct {
 	CustomMiddlewares    []CustomMiddleware
 	commandParamsSchemas map[string]map[string]any
 	commandResultSchemas map[string]map[string]any
+	nativeCommandSchemas map[string]map[string]any
 	eventSchemas         map[string]map[string]any
 	mu                   sync.RWMutex
 }
@@ -333,9 +334,15 @@ func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, cus
 		CustomMiddlewares:    []CustomMiddleware{},
 		commandParamsSchemas: map[string]map[string]any{},
 		commandResultSchemas: map[string]map[string]any{},
+		nativeCommandSchemas: map[string]map[string]any{},
 		eventSchemas:         map[string]map[string]any{},
 	}
 	types.hydrateNativeProtocolSchemas()
+	types.mu.Lock()
+	for method, schema := range types.commandParamsSchemas {
+		types.nativeCommandSchemas[method] = schema
+	}
+	types.mu.Unlock()
 	for _, command := range defaultBuiltinCommands {
 		if _, _, err := types.AddCustomCommand(command); err != nil {
 			panic(err)
@@ -480,6 +487,12 @@ func (types *CDPTypes) ParseCommandParams(method string, params map[string]any) 
 		return nil, fmt.Errorf("%s params did not match params_schema: %w", method, err)
 	}
 	return params, nil
+}
+
+func (types *CDPTypes) NativeCommandSchema(method string) map[string]any {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
+	return types.nativeCommandSchemas[method]
 }
 
 func (types *CDPTypes) ParseCommandResult(method string, result any) (any, error) {
