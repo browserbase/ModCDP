@@ -51,16 +51,6 @@ export type ModCDPServerOptions = ProtocolModCDPServerOptions & {
   global_scope?: ModCDPGlobalScope;
 };
 
-export type ModCDPSessionHandle = {
-  sessionId: string | null;
-  readonly types: ModCDPClient["types"];
-  readonly commands: ModCDPClient["types"]["commands"];
-  readonly events: ModCDPClient["types"]["events"];
-  readonly upstream: AutoSessionRouter;
-  send(method: string, params?: ProtocolParams): Promise<ProtocolResult>;
-  emit(eventName: string, payload?: ProtocolPayload): Promise<ProtocolResult>;
-};
-
 type ModCDPGlobalScope = typeof globalThis &
   Record<string, unknown> & {
     ModCDP?: ModCDPServer;
@@ -86,11 +76,15 @@ const DEFAULT_ROUTES = {
  */
 export class ModCDPServer {
   readonly __ModCDPServerVersion = MODCDP_SERVER_VERSION;
+
+  // sub-services
   router: { router_routes: ModCDPRoutes };
   loopback_cdp_url: string | null;
   browser_token: string | null;
   client: ModCDPClient | null;
   downstream: DownstreamTransportCollection;
+
+  // runtime state
   cdp_send_timeout_ms: number;
   loopback_execution_context_timeout_ms: number;
   ws_connect_error_settle_timeout_ms: number;
@@ -398,7 +392,9 @@ export class ModCDPServer {
           (async () => {
             const payload = ${JSON.stringify(payload ?? {})};
             const context = ${JSON.stringify(context ?? {})};
-            const cdp = globalThis.ModCDP.attachToSession(${JSON.stringify(cdpSessionId)});
+            const cdpSessionId = ${JSON.stringify(cdpSessionId)};
+            const upstream = globalThis.ModCDP.client;
+            const downstream = globalThis.ModCDP.downstream;
             const ModCDP = globalThis.ModCDP;
             const chrome = globalThis.chrome;
             const next = async (nextValue = payload) => ({ __ModCDP_middleware_next__: true, value: nextValue });
@@ -517,29 +513,6 @@ export class ModCDPServer {
       response: { result },
     });
     return client.types.parseCommandResult(method, result) as ProtocolResult;
-  }
-
-  attachToSession(cdpSessionId: string | null = null): ModCDPSessionHandle {
-    const server = this;
-    return {
-      sessionId: cdpSessionId,
-      get types() {
-        return server.setupServerClient().types;
-      },
-      get commands() {
-        return server.setupServerClient().types.commands;
-      },
-      get events() {
-        return server.setupServerClient().types.events;
-      },
-      get upstream() {
-        return server.setupServerClient().router;
-      },
-      send: (method: string, params: ProtocolParams = {}) =>
-        this.handleCommand(method, params, cdpSessionId),
-      emit: (eventName: string, payload: ProtocolPayload = {}) =>
-        this.emit(eventName, payload, cdpSessionId),
-    };
   }
 
   async emit(
@@ -876,7 +849,9 @@ export class ModCDPServer {
       (async () => {
         const params = ${JSON.stringify(params ?? {})};
         const method = ${JSON.stringify(method)};
-        const cdp = globalThis.ModCDP.attachToSession(${JSON.stringify(cdpSessionId)});
+        const cdpSessionId = ${JSON.stringify(cdpSessionId)};
+        const upstream = globalThis.ModCDP.client;
+        const downstream = globalThis.ModCDP.downstream;
         const ModCDP = globalThis.ModCDP;
         const chrome = globalThis.chrome;
         const value = (${expression});

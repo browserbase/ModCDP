@@ -37,7 +37,12 @@ function normalizeModCDPName(
         cdp_event_name?: string;
         id?: string;
         name?: string;
-        meta?: () => { cdp_command_name?: unknown; cdp_event_name?: unknown; id?: unknown; name?: unknown };
+        meta?: () => {
+          cdp_command_name?: unknown;
+          cdp_event_name?: unknown;
+          id?: unknown;
+          name?: unknown;
+        };
       }
     | string,
 ) {
@@ -46,18 +51,24 @@ function normalizeModCDPName(
   const name =
     value?.cdp_command_name ??
     value?.cdp_event_name ??
-    (typeof meta?.cdp_command_name === "string" ? meta.cdp_command_name : undefined) ??
-    (typeof meta?.cdp_event_name === "string" ? meta.cdp_event_name : undefined) ??
+    (typeof meta?.cdp_command_name === "string"
+      ? meta.cdp_command_name
+      : undefined) ??
+    (typeof meta?.cdp_event_name === "string"
+      ? meta.cdp_event_name
+      : undefined) ??
     value?.id ??
     (typeof meta?.id === "string" ? meta.id : undefined) ??
     (typeof meta?.name === "string" ? meta.name : undefined) ??
     value?.name;
-  if (typeof name !== "string" || !name) throw new Error("Expected a CDP name string or a named CDP schema/alias.");
+  if (typeof name !== "string" || !name)
+    throw new Error("Expected a CDP name string or a named CDP schema/alias.");
   return name;
 }
 
 export function routeFor(method: string, routes: ModCDPRoutes = {}) {
-  if (Object.prototype.hasOwnProperty.call(routes, method)) return routes[method];
+  if (Object.prototype.hasOwnProperty.call(routes, method))
+    return routes[method];
   let bestPrefixLen = -1;
   let bestRoute: string | null = null;
   for (const [pattern, route] of Object.entries(routes)) {
@@ -84,7 +95,9 @@ export function wrapModCDPEvaluate({
     functionDeclaration: `
       async function() {
         const params = ${JSON.stringify(params)};
-        const cdp = globalThis.ModCDP.attachToSession(${JSON.stringify(cdpSessionId)});
+        const cdpSessionId = ${JSON.stringify(cdpSessionId)};
+        const upstream = globalThis.ModCDP.client;
+        const downstream = globalThis.ModCDP.downstream;
         const ModCDP = globalThis.ModCDP;
         const chrome = globalThis.chrome;
         const value = (${expression});
@@ -110,7 +123,8 @@ export function wrapModCDPAddCustomCommand({
           result_schema: null,
           expression: ${JSON.stringify(expression)},
           handler: async (params, cdpSessionId, method) => {
-            const cdp = globalThis.ModCDP.attachToSession(cdpSessionId);
+            const upstream = globalThis.ModCDP.client;
+            const downstream = globalThis.ModCDP.downstream;
             const ModCDP = globalThis.ModCDP;
             const chrome = globalThis.chrome;
             const handler = (${expression});
@@ -124,7 +138,11 @@ export function wrapModCDPAddCustomCommand({
   };
 }
 
-export function wrapModCDPAddCustomEvent({ name }: { name: string }): cdp.types.ts.Runtime.EvaluateParams {
+export function wrapModCDPAddCustomEvent({
+  name,
+}: {
+  name: string;
+}): cdp.types.ts.Runtime.EvaluateParams {
   const eventName = normalizeModCDPName(name);
   return {
     functionDeclaration: `
@@ -154,7 +172,9 @@ export function wrapModCDPAddMiddleware({
           phase: ${JSON.stringify(phase)},
           expression: ${JSON.stringify(expression)},
           handler: async (payload, next, context = {}) => {
-            const cdp = globalThis.ModCDP.attachToSession(context.cdpSessionId ?? null);
+            const cdpSessionId = context.cdpSessionId ?? null;
+            const upstream = globalThis.ModCDP.client;
+            const downstream = globalThis.ModCDP.downstream;
             const ModCDP = globalThis.ModCDP;
             const chrome = globalThis.chrome;
             const middleware = (${expression});
@@ -176,13 +196,21 @@ export function wrapCustomCommand(
   return {
     functionDeclaration:
       "async function(method, paramsJson, cdpSessionId) { return JSON.stringify(await globalThis.ModCDP.handleCommand(method, JSON.parse(paramsJson), cdpSessionId)); }",
-    arguments: [{ value: method }, { value: JSON.stringify(params) }, { value: cdpSessionId }],
+    arguments: [
+      { value: method },
+      { value: JSON.stringify(params) },
+      { value: cdpSessionId },
+    ],
     awaitPromise: true,
     returnByValue: true,
   };
 }
 
-function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, cdpSessionId: string | null = null) {
+function wrapServiceWorkerCommand(
+  method: string,
+  params: ProtocolParams = {},
+  cdpSessionId: string | null = null,
+) {
   if (method === "Mod.addCustomEvent") {
     const eventParams = params as { name: any };
     const eventName = normalizeModCDPName(eventParams.name);
@@ -204,9 +232,13 @@ function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, c
       cdpSessionId: evaluateParams.cdpSessionId ?? cdpSessionId,
     });
   } else if (method === "Mod.addCustomCommand") {
-    runtimeParams = wrapModCDPAddCustomCommand(params as ModCDPAddCustomCommandParams);
+    runtimeParams = wrapModCDPAddCustomCommand(
+      params as ModCDPAddCustomCommandParams,
+    );
   } else if (method === "Mod.addMiddleware") {
-    runtimeParams = wrapModCDPAddMiddleware(params as ModCDPAddMiddlewareParams);
+    runtimeParams = wrapModCDPAddMiddleware(
+      params as ModCDPAddMiddlewareParams,
+    );
   } else {
     runtimeParams = wrapCustomCommand(
       method,
@@ -228,7 +260,10 @@ function wrapServiceWorkerCommand(method: string, params: ProtocolParams = {}, c
 export function wrapCommandIfNeeded(
   method: string,
   params: ProtocolParams = {},
-  { routes = DEFAULT_CLIENT_ROUTES, cdpSessionId = null }: TranslateOptions = {},
+  {
+    routes = DEFAULT_CLIENT_ROUTES,
+    cdpSessionId = null,
+  }: TranslateOptions = {},
 ): TranslatedCommand {
   params = params ?? {};
   const route = routeFor(method, routes);
@@ -236,7 +271,13 @@ export function wrapCommandIfNeeded(
     return {
       route,
       target: "direct_cdp",
-      steps: [{ method, params, ...(cdpSessionId ? { sessionId: cdpSessionId } : {}) }],
+      steps: [
+        {
+          method,
+          params,
+          ...(cdpSessionId ? { sessionId: cdpSessionId } : {}),
+        },
+      ],
     };
   }
   if (route === "service_worker") {
@@ -254,12 +295,16 @@ export function wrapCommandIfNeeded(
 function unwrapRuntimeResponse(result: cdp.types.ts.Runtime.EvaluateResult) {
   if (result?.exceptionDetails) {
     const ex = result.exceptionDetails;
-    throw new Error(ex.exception?.description || ex.text || "Runtime call failed");
+    throw new Error(
+      ex.exception?.description || ex.text || "Runtime call failed",
+    );
   }
   return result?.result?.value;
 }
 
-function unwrapRuntimeJsonResponse(result: cdp.types.ts.Runtime.EvaluateResult) {
+function unwrapRuntimeJsonResponse(
+  result: cdp.types.ts.Runtime.EvaluateResult,
+) {
   const value = unwrapRuntimeResponse(result);
   return typeof value === "string" ? JSON.parse(value) : value;
 }
@@ -268,8 +313,13 @@ export function unwrapResponseIfNeeded(
   result: ProtocolResult | cdp.types.ts.Runtime.EvaluateResult,
   unwrap: string | null = null,
 ) {
-  if (unwrap === "runtime_json") return unwrapRuntimeJsonResponse(result as cdp.types.ts.Runtime.EvaluateResult);
-  return unwrap === "runtime" ? unwrapRuntimeResponse(result as cdp.types.ts.Runtime.EvaluateResult) : (result ?? {});
+  if (unwrap === "runtime_json")
+    return unwrapRuntimeJsonResponse(
+      result as cdp.types.ts.Runtime.EvaluateResult,
+    );
+  return unwrap === "runtime"
+    ? unwrapRuntimeResponse(result as cdp.types.ts.Runtime.EvaluateResult)
+    : (result ?? {});
 }
 
 // Returns { event, data } or null when the binding is not a ModCDP event,
@@ -293,16 +343,30 @@ export function unwrapEventIfNeeded(
   const isUpstreamEventBinding = bindingName === UPSTREAM_EVENT_BINDING_NAME;
   const isCustomEventBinding = bindingName === CUSTOM_EVENT_BINDING_NAME;
   if (!isUpstreamEventBinding && !isCustomEventBinding) return null;
-  const payloadEvent = typeof payload.event === "string" && payload.event.length > 0 ? payload.event : null;
+  const payloadEvent =
+    typeof payload.event === "string" && payload.event.length > 0
+      ? payload.event
+      : null;
   if (payloadEvent == null) return null;
-  if (payloadEvent === UPSTREAM_EVENT_BINDING_NAME || payloadEvent === CUSTOM_EVENT_BINDING_NAME) return null;
-  const data = Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
-  const sourceSessionId = typeof payload.cdpSessionId === "string" ? payload.cdpSessionId : sessionId;
+  if (
+    payloadEvent === UPSTREAM_EVENT_BINDING_NAME ||
+    payloadEvent === CUSTOM_EVENT_BINDING_NAME
+  )
+    return null;
+  const data = Object.prototype.hasOwnProperty.call(payload, "data")
+    ? payload.data
+    : payload;
+  const sourceSessionId =
+    typeof payload.cdpSessionId === "string" ? payload.cdpSessionId : sessionId;
   return { event: payloadEvent, data, sessionId: sourceSessionId };
 }
 
 // --- shared encoder used by the extension service worker --------------------
 
-export function encodeBindingPayload({ event, data, cdpSessionId = null }: ModCDPBindingPayload) {
+export function encodeBindingPayload({
+  event,
+  data,
+  cdpSessionId = null,
+}: ModCDPBindingPayload) {
   return JSON.stringify({ event, data, cdpSessionId });
 }
