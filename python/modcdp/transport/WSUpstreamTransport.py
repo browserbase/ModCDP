@@ -17,8 +17,8 @@ from ..transport.UpstreamTransport import UpstreamTransport, UpstreamTransportCo
 class WSUpstreamTransport(UpstreamTransport):
     upstream_mode = "ws"
 
-    def __init__(self, options: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:
-        super().__init__(options)
+    def __init__(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:
+        super().__init__(config)
         self.url = self.config.upstream_ws_cdp_url or ""
         self.ws: Any | None = None
         self._reader_thread: threading.Thread | None = None

@@ -7,12 +7,13 @@ from __future__ import annotations
 import tempfile
 import time
 
-from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, defaultModCDPExtensionPath, prepareUnpackedExtension
+from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig, defaultModCDPExtensionPath, prepareUnpackedExtension
 
 
 class CDPExtensionInjector(ExtensionInjector):
-    def __init__(self, options=None) -> None:
-        super().__init__(options)
+    def __init__(self, config: InjectorConfig | dict | None = None) -> None:
+        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config, "injector_mode": "cdp"})
         self.unpacked_extension_path: str | None = None
         self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
 

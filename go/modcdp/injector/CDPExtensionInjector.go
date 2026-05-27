@@ -17,8 +17,9 @@ type CDPExtensionInjector struct {
 	CleanupPath           string
 }
 
-func NewCDPExtensionInjector(options InjectorConfig) CDPExtensionInjector {
-	return CDPExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
+func NewCDPExtensionInjector(config InjectorConfig) CDPExtensionInjector {
+	config.InjectorMode = "cdp"
+	return CDPExtensionInjector{ExtensionInjector: NewExtensionInjector(config)}
 }
 
 func (i *CDPExtensionInjector) Prepare() error {

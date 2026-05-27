@@ -43,8 +43,8 @@ class LocalBrowserLauncher(BrowserLauncher):
     def freePort() -> int:
         return _free_port()
 
-    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
-        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+    def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
+        merged = self.config if config is None else _launcher_config({**self.config.model_dump(), **_launcher_config(config).model_dump(exclude_unset=True)})
         executable_path = self.findChromeBinary(merged.launcher_local_executable_path)
         use_pipe = merged.launcher_local_cdp_transport == "pipe"
         use_loopback_cdp = (not use_pipe) or merged.launcher_local_loopback_cdp or merged.launcher_local_cdp_listen_port is not None

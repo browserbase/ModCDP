@@ -30,8 +30,9 @@ BORROW_BOOTSTRAP_STATUS_EXPRESSION = """
 
 
 class BorrowExtensionInjector(ExtensionInjector):
-    def __init__(self, options: InjectorConfig | dict[str, Any] | None = None) -> None:
-        super().__init__(options)
+    def __init__(self, config: InjectorConfig | dict[str, Any] | None = None) -> None:
+        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config, "injector_mode": "borrow"})
         self.unpacked_extension_path: str | None = None
         self.cleanup: tempfile.TemporaryDirectory[str] | None = None
         self.bootstrap_modcdp_server_expression: str | None = None

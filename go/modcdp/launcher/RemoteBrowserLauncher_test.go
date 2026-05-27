@@ -62,15 +62,15 @@ func TestRemoteBrowserLauncherConnectsToRealBrowserFromHTTPAndWebSocketCDPEndpoi
 	}
 	fromHostPort.Close()
 
-	optionsLauncher := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
-	fromOptions, err := optionsLauncher.Launch(LauncherConfig{})
+	configLauncher := NewRemoteBrowserLauncher(LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})
+	fromConfig, err := configLauncher.Launch(LauncherConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fromOptions.CDPURL != local.CDPURL {
-		t.Fatalf("fromOptions.CDPURL = %q, want %q", fromOptions.CDPURL, local.CDPURL)
+	if fromConfig.CDPURL != local.CDPURL {
+		t.Fatalf("fromConfig.CDPURL = %q, want %q", fromConfig.CDPURL, local.CDPURL)
 	}
-	fromOptions.Close()
+	fromConfig.Close()
 
 	wsLauncher := NewRemoteBrowserLauncher(LauncherConfig{})
 	fromWS, err := wsLauncher.Launch(LauncherConfig{LauncherRemoteCDPURL: local.CDPURL})

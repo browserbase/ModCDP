@@ -104,12 +104,12 @@ type BrowserLauncher struct {
 	Launched *LaunchedBrowser
 }
 
-func NewBrowserLauncher(options LauncherConfig) BrowserLauncher {
-	return BrowserLauncher{Config: options}
+func NewBrowserLauncher(config LauncherConfig) BrowserLauncher {
+	return BrowserLauncher{Config: config}
 }
 
 func (l *BrowserLauncher) Update(config LauncherConfig) *BrowserLauncher {
-	l.Config = mergeLaunchOptions(l.Config, config)
+	l.Config = mergeLaunchConfig(l.Config, config)
 	return l
 }
 
@@ -126,11 +126,11 @@ func (l BrowserLauncher) ConfigForServer() map[string]any {
 	return map[string]any{}
 }
 
-func (l BrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
+func (l BrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error) {
 	return nil, fmt.Errorf("%T.Launch is not implemented", l)
 }
 
-func mergeLaunchOptions(existing LauncherConfig, incoming LauncherConfig) LauncherConfig {
+func mergeLaunchConfig(existing LauncherConfig, incoming LauncherConfig) LauncherConfig {
 	merged := existing
 	if incoming.LauncherLocalExecutablePath != "" {
 		merged.LauncherLocalExecutablePath = incoming.LauncherLocalExecutablePath

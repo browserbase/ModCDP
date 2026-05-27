@@ -11,7 +11,7 @@
 //	Injector       raw-CDP extension discovery/injection/borrowing.
 //	ServerConfig         ModCDPServer.configure params.
 //	ClientConfig client routing and client-owned send/event timings.
-//	Upstream      upstream transport options and upstream-owned timings.
+//	Upstream      upstream transport config and upstream-owned timings.
 //
 // Public methods: Connect, Send(method, params), On, Close.
 // Synchronous; one background goroutine reads messages off the WS.
@@ -598,7 +598,7 @@ func (c *ModCDPClient) connectUpstreamTransport() error {
 	transport.Update(initialTransportConfig)
 	launcher.Update(c.Config.Launcher)
 	for _, injector := range injectors {
-		injector.Update(c.baseInjectorOptions(nil))
+		injector.Update(c.baseInjectorConfig(nil))
 	}
 	for _, injector := range injectors {
 		if err := injector.Prepare(); err != nil {
@@ -1168,7 +1168,7 @@ func isKnownExtensionMode(mode string) bool {
 	return mode == "cli" || mode == "cdp" || mode == "bb" || mode == "discover" || mode == "borrow" || mode == "none"
 }
 
-func (c *ModCDPClient) baseInjectorOptions(send SendCDP) InjectorConfig {
+func (c *ModCDPClient) baseInjectorConfig(send SendCDP) InjectorConfig {
 	trustMatchedServiceWorker := c.trustServiceWorkerTarget()
 	return InjectorConfig{
 		Send:                                 send,
@@ -1207,7 +1207,7 @@ func (c *ModCDPClient) injectExtension(injectors []extensionInjector) (*Extensio
 	}
 	var errors []string
 	for _, injector := range injectors {
-		injector.Update(c.baseInjectorOptions(send))
+		injector.Update(c.baseInjectorConfig(send))
 		if err := injector.Prepare(); err != nil {
 			errors = append(errors, fmt.Sprintf("%T: %v", injector, err))
 			continue

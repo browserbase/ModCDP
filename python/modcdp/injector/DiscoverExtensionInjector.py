@@ -9,14 +9,16 @@ import tempfile
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
+    InjectorConfig,
     extensionIdFromManifestKey,
     prepareUnpackedExtension,
 )
 
 
 class DiscoverExtensionInjector(ExtensionInjector):
-    def __init__(self, options=None) -> None:
-        super().__init__(options)
+    def __init__(self, config: InjectorConfig | dict | None = None) -> None:
+        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config, "injector_mode": "discover"})
         self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None
 
     def prepare(self) -> None:

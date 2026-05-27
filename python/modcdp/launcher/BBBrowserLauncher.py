@@ -19,8 +19,8 @@ DEFAULT_BROWSERBASE_VIEWPORT = {"width": 1288, "height": 711}
 
 
 class BBBrowserLauncher(BrowserLauncher):
-    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
-        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+    def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
+        merged = self.config if config is None else _launcher_config({**self.config.model_dump(), **_launcher_config(config).model_dump(exclude_unset=True)})
         browserbase_api_key = _first_string(merged.launcher_bb_api_key, os.environ.get("BROWSERBASE_API_KEY"))
         if not browserbase_api_key:
             raise RuntimeError("launcher.launcher_mode=bb requires BROWSERBASE_API_KEY or launcher.launcher_bb_api_key.")

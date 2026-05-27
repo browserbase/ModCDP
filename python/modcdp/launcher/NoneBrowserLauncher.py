@@ -8,6 +8,6 @@ from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, Launched
 
 
 class NoneBrowserLauncher(BrowserLauncher):
-    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
+    def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
         self.launched = {"cdp_url": None, "close": lambda: None}
         return self.launched

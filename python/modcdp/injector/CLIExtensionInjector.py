@@ -10,6 +10,7 @@ from ..launcher.BrowserLauncher import LauncherConfig
 from ..injector.ExtensionInjector import (
     ExtensionInjector,
     ExtensionInjectionResult,
+    InjectorConfig,
     defaultModCDPExtensionPath,
     extensionIdFromManifestKey,
     prepareUnpackedExtension,
@@ -17,8 +18,9 @@ from ..injector.ExtensionInjector import (
 
 
 class CLIExtensionInjector(ExtensionInjector):
-    def __init__(self, options=None) -> None:
-        super().__init__(options)
+    def __init__(self, config: InjectorConfig | dict | None = None) -> None:
+        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config, "injector_mode": "cli"})
         self.unpacked_extension_path: str | None = None
         self.extension_id: str | None = None
         self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None

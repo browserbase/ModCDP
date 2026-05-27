@@ -10,12 +10,12 @@ type RemoteBrowserLauncher struct {
 	BrowserLauncher
 }
 
-func NewRemoteBrowserLauncher(options LauncherConfig) *RemoteBrowserLauncher {
-	return &RemoteBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
+func NewRemoteBrowserLauncher(config LauncherConfig) *RemoteBrowserLauncher {
+	return &RemoteBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 
-func (l *RemoteBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
-	cdpURL := firstString(options.LauncherRemoteCDPURL, l.Config.LauncherRemoteCDPURL)
+func (l *RemoteBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error) {
+	cdpURL := firstString(config.LauncherRemoteCDPURL, l.Config.LauncherRemoteCDPURL)
 	if cdpURL == "" {
 		return nil, fmt.Errorf("launcher.launcher_mode=remote requires launcher_remote_cdp_url")
 	}

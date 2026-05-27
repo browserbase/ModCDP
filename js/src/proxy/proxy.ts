@@ -25,7 +25,7 @@ import { NATSUpstreamTransport } from "../transport/NATSUpstreamTransport.js";
 import { NativeMessagingUpstreamTransport } from "../transport/NativeMessagingUpstreamTransport.js";
 import { PipeUpstreamTransport } from "../transport/PipeUpstreamTransport.js";
 import { ReverseWSUpstreamTransport } from "../transport/ReverseWSUpstreamTransport.js";
-import type { UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
+import { parseHostPort, type UpstreamTransportConfig } from "../transport/UpstreamTransport.js";
 import { CdpCommandMessageSchema } from "../types/modcdp.js";
 import type { ModCDPClientConfig } from "../client/ModCDPClient.js";
 
@@ -208,9 +208,11 @@ async function handleDownstreamMessage(socket: WebSocket, cdp: ModCDPClient, raw
 
 function runProxyCli(args = process.argv.slice(2)) {
   const argv = parseProxyArgs(args);
+  const bind = typeof argv.bind === "string" ? parseHostPort(argv.bind, DEFAULT_HOST, DEFAULT_PORT) : null;
   const proxy_promise = startProxy({
-    proxy_listen_host: (argv.proxy_listen_host as string | undefined) ?? DEFAULT_HOST,
-    proxy_listen_port: (argv.proxy_listen_port as number | undefined) ?? DEFAULT_PORT,
+    proxy_listen_host: (argv.proxy_listen_host as string | undefined) ?? bind?.host ?? DEFAULT_HOST,
+    proxy_listen_port:
+      (argv.proxy_listen_port as number | undefined) ?? (argv.port as number | undefined) ?? bind?.port ?? DEFAULT_PORT,
     launcher: configGroup(argv, "launcher"),
     upstream: configGroup(argv, "upstream"),
     injector: configGroup(argv, "injector"),
@@ -249,10 +251,10 @@ function parseProxyArgs(args: string[]) {
     if (!arg.startsWith("--")) continue;
     const raw = arg.slice(2);
     const equals = raw.indexOf("=");
-    if (equals >= 0) result[raw.slice(0, equals)] = parseCliValue(raw.slice(equals + 1));
+    if (equals >= 0) result[raw.slice(0, equals).replaceAll("-", "_")] = parseCliValue(raw.slice(equals + 1));
     else {
       const next = args[i + 1];
-      result[raw] = next && !next.startsWith("--") ? parseCliValue(next) : true;
+      result[raw.replaceAll("-", "_")] = next && !next.startsWith("--") ? parseCliValue(next) : true;
       if (next && !next.startsWith("--")) i += 1;
     }
   }
@@ -264,7 +266,7 @@ function configGroup(argv: Record<string, unknown>, group: string, field_prefix 
     typeof argv[group] === "object" && argv[group] !== null && !Array.isArray(argv[group]) ? argv[group] : {};
   const prefix = `${field_prefix}_`;
   const entries = Object.entries(argv)
-    .filter(([key]) => key.startsWith(prefix))
+    .filter(([key]) => key !== group && key.startsWith(prefix))
     .map(([key, value]) => [key, value]);
   return { ...config, ...Object.fromEntries(entries) };
 }

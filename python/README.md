@@ -144,7 +144,7 @@ pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url
 # ✨ All ModCDP commands now work through playwright! you can modify/extend playwright behavior to your heart's content
 ```
 
-The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-options='{"client_routes": {...}}'`, and `--server-options='{"router": {"router_routes": {...}}}'` option groups as `ModCDPClient`. `--launcher-options='{...}'` passes launcher-owned options such as `headless` and `sandbox`; `--client-routes='{...}'` and `--server-options-router-routes='{...}'` are route-only shorthands. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
+The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-config='{"client_cdp_send_timeout_ms": 10000}'`, `--router='{"router_routes": {...}}'`, and `--server-config='{"router": {"router_routes": {...}}}'` option groups as `ModCDPClient`. CLI flags use kebab case and map to the owner-prefixed config fields, for example `--launcher-local-executable-path` maps to `launcher.launcher_local_executable_path`. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
 
 Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host.
 
@@ -219,7 +219,7 @@ dist/                     Built JS output used by the extension and Node CLI scr
 ## Requirements
 
 - Stock Google Chrome can be used without relaunch flags: visit `chrome://inspect/#remote-debugging` to expose the current browser at `http://127.0.0.1:9222`, and load/install the ModCDP extension in that profile. Pass that endpoint as `upstream: { upstream_mode: "ws", upstream_ws_cdp_url: "http://127.0.0.1:9222" }`.
-- Automated/test browsers can still preload the extension with `--load-extension=<path>`. `Extensions.loadUnpacked` is used as a fallback when the connected browser exposes it over CDP.
+- Automated/test browsers need the extension-loading path that their Chrome build actually supports. Chrome for Testing currently supports `--load-extension=<path>` and may not expose `Extensions.loadUnpacked`; Canary 150 exposes `Extensions.loadUnpacked` and does not load this MV3 extension through `--load-extension` in the local headless test path.
 - Node ≥ 22, Python ≥ 3.11 with `websocket-client`, Go ≥ 1.25 with `gobwas/ws`.
 
 ---
@@ -472,13 +472,23 @@ Custom roundtrip overhead is dominated by `Runtime.evaluate` + the SW's loopback
 </details>
 
 <details>
-<summary><b>macOS Chrome compatibility matrix (tested 2026-05-01)</b></summary>
+<summary><b>macOS Chrome compatibility notes (tested 2026-05-27)</b></summary>
 
-Tested browsers:
+Latest local extension-loading probe:
 
-- `/Applications/Google Chrome.app` — Google Chrome `148.0.7778.96 beta`
-- `/Applications/Google Chrome Canary.app` — Google Chrome `149.0.7819.0 canary`
-- Playwright Chrome for Testing — `147.0.7727.15`
+| Browser | Version | `--load-extension=<dist/extension>` | `Extensions.loadUnpacked` |
+| --- | --- | --- | --- |
+| Chrome Canary | `150.0.7859.0` | no ModCDP service worker target appeared | returned `mdedooklbnfejodmnhmkdpkaedafkehf`; service worker target appeared |
+| Playwright Chrome for Testing | `148.0.7778.96` | service worker target appeared | `Method not available.` |
+
+Practical guidance:
+
+- Use `injector_mode: "cdp"` / `Extensions.loadUnpacked` for Canary 150 when loading the extension into an already-running local browser over CDP.
+- Use `injector_mode: "cli"` / `--load-extension=<path>` with Chrome for Testing, Linux `/usr/bin/chromium`, or an explicit `CHROME_PATH` known to support launch-arg extension loading.
+- Local tests that exercise `injector_mode: "cli"` pin the executable to Chrome for Testing on macOS because the default local browser candidate may be Canary, and Canary 150 does not load this extension through `--load-extension` in the headless launch path.
+- `Extensions.loadUnpacked` is not a universal fallback. It is only available in browser builds that expose the `Extensions` CDP domain.
+
+Previous latency probe definitions:
 
 Latency columns:
 
@@ -489,40 +499,6 @@ Latency columns:
 
 The launched-browser rows used an isolated temporary user data dir. The live/default-profile row is separate because it depends on the user enabling Chrome's `chrome://inspect/#remote-debugging` flow and accepting Chrome's connection prompt.
 
-| Browser                           | UI               | Mode         | Works | `chrome.tabs.query` | `chrome.debugger` | `Browser.getVersion` | `Target.getTargets` | Default profile | direct ms | pong ms | loopback ms | debugger ms |
-| --------------------------------- | ---------------- | ------------ | ----- | ------------------- | ----------------- | -------------------- | ------------------- | --------------- | --------: | ------: | ----------: | ----------: |
-| Chrome Beta 148                   | `--headless=new` | `--direct`   | yes   | yes                 | no                | yes                  | yes                 | no              |       4.8 |       3 |           - |           - |
-| Chrome Beta 148                   | `--headless=new` | `--loopback` | yes   | yes                 | no                | yes                  | yes                 | no              |       2.3 |       2 |        13.5 |           - |
-| Chrome Beta 148                   | `--headless=new` | `--debugger` | no    | yes                 | no                | no                   | no                  | no              |       5.3 |       5 |           - |           - |
-| Chrome Beta 148                   | headful          | `--direct`   | yes   | yes                 | no                | yes                  | yes                 | no              |       5.1 |       1 |           - |           - |
-| Chrome Beta 148                   | headful          | `--loopback` | yes   | yes                 | no                | yes                  | yes                 | no              |       2.4 |       1 |        13.5 |           - |
-| Chrome Beta 148                   | headful          | `--debugger` | no    | yes                 | no                | no                   | no                  | no              |       2.2 |       2 |           - |           - |
-| Chrome Canary 149                 | `--headless=new` | `--direct`   | yes   | yes                 | yes               | yes                  | yes                 | no              |       2.2 |       1 |           - |           - |
-| Chrome Canary 149                 | `--headless=new` | `--loopback` | yes   | yes                 | yes               | yes                  | yes                 | no              |       2.6 |       1 |        14.4 |           - |
-| Chrome Canary 149                 | `--headless=new` | `--debugger` | yes   | yes                 | yes               | no                   | no                  | no              |       2.1 |       1 |           - |         1.4 |
-| Chrome Canary 149                 | headful          | `--direct`   | yes   | yes                 | yes               | yes                  | yes                 | no              |       2.4 |       1 |           - |           - |
-| Chrome Canary 149                 | headful          | `--loopback` | yes   | yes                 | yes               | yes                  | yes                 | no              |       2.2 |       1 |        13.5 |           - |
-| Chrome Canary 149                 | headful          | `--debugger` | yes   | yes                 | yes               | no                   | no                  | no              |       2.3 |       0 |           - |         1.2 |
-| Playwright Chrome for Testing 147 | `--headless=new` | `--direct`   | yes   | yes                 | yes\*             | yes                  | yes                 | no              |       2.3 |       3 |           - |           - |
-| Playwright Chrome for Testing 147 | `--headless=new` | `--loopback` | yes   | yes                 | yes\*             | yes                  | yes                 | no              |       1.9 |       1 |        13.0 |           - |
-| Playwright Chrome for Testing 147 | `--headless=new` | `--debugger` | yes   | yes                 | yes\*             | no                   | no                  | no              |       2.6 |       1 |           - |         0.7 |
-| Playwright Chrome for Testing 147 | headful          | `--direct`   | yes   | yes                 | yes\*             | yes                  | yes                 | no              |       2.0 |       1 |           - |           - |
-| Playwright Chrome for Testing 147 | headful          | `--loopback` | yes   | yes                 | yes\*             | yes                  | yes                 | no              |       2.4 |       1 |        12.5 |           - |
-| Playwright Chrome for Testing 147 | headful          | `--debugger` | yes   | yes                 | yes\*             | no                   | no                  | no              |       2.1 |       1 |           - |         1.2 |
-
-`*` Playwright Chrome for Testing exposes `chrome.debugger` when the ModCDP extension is launched with `--load-extension`. With auto-injection only, `--direct` and `--loopback` still work, but `chrome.debugger` is not available in the borrowed/injected service worker.
-
-Live/default-profile status:
-
-| Browser                           | UI               | Mode     | Result                                                                                                 |
-| --------------------------------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| Chrome Beta 148                   | `--headless=new` | `--live` | not applicable                                                                                         |
-| Chrome Beta 148                   | headful          | `--live` | current advertised `DevToolsActivePort` was stale; websocket failed with `ECONNREFUSED 127.0.0.1:9222` |
-| Chrome Canary 149                 | `--headless=new` | `--live` | not applicable                                                                                         |
-| Chrome Canary 149                 | headful          | `--live` | no active live endpoint found                                                                          |
-| Playwright Chrome for Testing 147 | `--headless=new` | `--live` | not applicable                                                                                         |
-| Playwright Chrome for Testing 147 | headful          | `--live` | no active live endpoint found                                                                          |
-
 Minimum viable macOS CLI args:
 
 | Mode                  | Browsers                          | Args                                                                                                                                   |
@@ -531,11 +507,10 @@ Minimum viable macOS CLI args:
 | `--direct` headless   | all three                         | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile> chrome://newtab/`                                        |
 | `--loopback` headful  | all three                         | `--remote-debugging-port=<port> --user-data-dir=<temp-profile> --remote-allow-origins=* chrome://newtab/`                              |
 | `--loopback` headless | all three                         | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile> --remote-allow-origins=* chrome://newtab/`               |
-| `--debugger`          | Chrome Beta 148                   | no working set found; `chrome.debugger` is unavailable in the extension service worker                                                 |
-| `--debugger` headful  | Chrome Canary 149                 | `--remote-debugging-port=<port> --user-data-dir=<temp-profile> chrome://newtab/`                                                       |
-| `--debugger` headless | Chrome Canary 149                 | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile> chrome://newtab/`                                        |
-| `--debugger` headful  | Playwright Chrome for Testing 147 | `--remote-debugging-port=<port> --user-data-dir=<temp-profile> --load-extension=<repo>/dist/extension chrome://newtab/`                |
-| `--debugger` headless | Playwright Chrome for Testing 147 | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile> --load-extension=<repo>/dist/extension chrome://newtab/` |
+| `--debugger` headful  | Canary 150                        | `--remote-debugging-port=<port> --user-data-dir=<temp-profile>` plus `Extensions.loadUnpacked {path:"<repo>/dist/extension"}`          |
+| `--debugger` headless | Canary 150                        | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile>` plus `Extensions.loadUnpacked {path:"<repo>/dist/extension"}` |
+| `--debugger` headful  | Chrome for Testing 148            | `--remote-debugging-port=<port> --user-data-dir=<temp-profile> --load-extension=<repo>/dist/extension chrome://newtab/`                |
+| `--debugger` headless | Chrome for Testing 148            | `--headless=new --remote-debugging-port=<port> --user-data-dir=<temp-profile> --load-extension=<repo>/dist/extension chrome://newtab/` |
 
 Recommended full macOS launch args:
 
@@ -544,7 +519,6 @@ Recommended full macOS launch args:
 --user-data-dir=<temp-profile>
 --remote-allow-origins=*
 --enable-unsafe-extension-debugging
---load-extension=<repo>/dist/extension
 --no-first-run
 --no-default-browser-check
 --disable-default-apps
@@ -558,6 +532,6 @@ Recommended full macOS launch args:
 chrome://newtab/
 ```
 
-Add `--headless=new` for headless launches. Do not pass `--no-sandbox`, `--disable-gpu`, or `--remote-debugging-address` on macOS. On Linux only, pass `--no-sandbox` when there is no usable sandbox/display environment.
+Add `--load-extension=<repo>/dist/extension` only for browser builds that support launch-arg extension loading. For Canary 150, load the extension after startup with `Extensions.loadUnpacked`. Add `--headless=new` for headless launches. Do not pass `--no-sandbox`, `--disable-gpu`, or `--remote-debugging-address` on macOS. On Linux only, pass `--no-sandbox` when there is no usable sandbox/display environment.
 
 </details>

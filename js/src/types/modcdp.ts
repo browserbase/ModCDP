@@ -331,16 +331,18 @@ const ModCDPTopologyDomRootSchema = z.object({
 });
 type ModCDPTopologyDomRoot = z.infer<typeof ModCDPTopologyDomRootSchema>;
 
-const ModCDPTopologyTargetSchema = z.object({
-  targetId: z.string(),
-  type: z.string(),
-  title: z.string().optional().nullable(),
-  url: z.string().optional().nullable(),
-  attached: z.boolean().optional().nullable(),
-  parentId: z.string().optional().nullable(),
-  parentFrameId: z.string().optional().nullable(),
-  sessionId: z.string().optional().nullable(),
-}).passthrough();
+const ModCDPTopologyTargetSchema = z
+  .object({
+    targetId: z.string(),
+    type: z.string(),
+    title: z.string().optional().nullable(),
+    url: z.string().optional().nullable(),
+    attached: z.boolean().optional().nullable(),
+    parentId: z.string().optional().nullable(),
+    parentFrameId: z.string().optional().nullable(),
+    sessionId: z.string().optional().nullable(),
+  })
+  .passthrough();
 type ModCDPTopologyTarget = z.infer<typeof ModCDPTopologyTargetSchema>;
 
 const ModCDPTopologyExecutionContextSchema = z.object({

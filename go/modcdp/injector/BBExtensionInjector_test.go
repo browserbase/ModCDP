@@ -23,15 +23,15 @@ func TestBBExtensionInjectorUploadsRealExtensionAndLaunchesBrowserbaseBrowserWit
 	if err != nil {
 		t.Fatal(err)
 	}
-	launchOptions := modcdp.LauncherConfig{
+	launchConfig := modcdp.LauncherConfig{
 		LauncherMode:      "bb",
 		LauncherBBTimeout: 120,
 	}
 	if region := os.Getenv("BROWSERBASE_REGION"); region != "" {
-		launchOptions.LauncherBBRegion = region
+		launchConfig.LauncherBBRegion = region
 	}
 	cdp := modcdp.New(modcdp.Config{
-		Launcher: launchOptions,
+		Launcher: launchConfig,
 		Upstream: modcdp.UpstreamTransportConfig{UpstreamMode: "ws"},
 		Injector: modcdp.InjectorConfig{
 			InjectorMode:                     "bb",

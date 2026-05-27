@@ -26,8 +26,8 @@ type LocalBrowserLauncher struct {
 	BrowserLauncher
 }
 
-func NewLocalBrowserLauncher(options LauncherConfig) *LocalBrowserLauncher {
-	return &LocalBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
+func NewLocalBrowserLauncher(config LauncherConfig) *LocalBrowserLauncher {
+	return &LocalBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 
 func (l *LocalBrowserLauncher) FindChromeBinary(explicit string) (string, error) {
@@ -38,25 +38,25 @@ func (l *LocalBrowserLauncher) FreePort() (int, error) {
 	return freePort()
 }
 
-func (l *LocalBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
-	options = mergeLaunchOptions(l.Config, options)
+func (l *LocalBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error) {
+	config = mergeLaunchConfig(l.Config, config)
 
-	executablePath, err := l.FindChromeBinary(options.LauncherLocalExecutablePath)
+	executablePath, err := l.FindChromeBinary(config.LauncherLocalExecutablePath)
 	if err != nil {
 		return nil, err
 	}
-	chromeReadyTimeoutMS := options.LauncherLocalChromeReadyTimeoutMS
+	chromeReadyTimeoutMS := config.LauncherLocalChromeReadyTimeoutMS
 	if chromeReadyTimeoutMS == 0 {
 		chromeReadyTimeoutMS = DefaultChromeReadyTimeoutMS
 	}
-	chromeReadyPollIntervalMS := options.LauncherLocalChromeReadyPollIntervalMS
+	chromeReadyPollIntervalMS := config.LauncherLocalChromeReadyPollIntervalMS
 	if chromeReadyPollIntervalMS == 0 {
 		chromeReadyPollIntervalMS = DefaultChromeReadyPollIntervalMS
 	}
-	usePipe := options.LauncherLocalCDPTransport == "pipe"
-	useLoopbackCDP := !usePipe || options.LauncherLocalCDPListenPort != 0 || (options.LauncherLocalLoopbackCDP != nil && *options.LauncherLocalLoopbackCDP)
-	port := options.LauncherLocalCDPListenPort
-	profileDir := options.LauncherLocalUserDataDir
+	usePipe := config.LauncherLocalCDPTransport == "pipe"
+	useLoopbackCDP := !usePipe || config.LauncherLocalCDPListenPort != 0 || (config.LauncherLocalLoopbackCDP != nil && *config.LauncherLocalLoopbackCDP)
+	port := config.LauncherLocalCDPListenPort
+	profileDir := config.LauncherLocalUserDataDir
 	ownsProfileDir := false
 	if profileDir == "" {
 		profileDir, err = os.MkdirTemp("", "modcdp.")
@@ -66,8 +66,8 @@ func (l *LocalBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser,
 		ownsProfileDir = true
 	}
 	cleanupProfileDir := ownsProfileDir
-	if options.LauncherLocalCleanupUserDataDir != nil {
-		cleanupProfileDir = *options.LauncherLocalCleanupUserDataDir
+	if config.LauncherLocalCleanupUserDataDir != nil {
+		cleanupProfileDir = *config.LauncherLocalCleanupUserDataDir
 	}
 	args := []string{
 		"--enable-unsafe-extension-debugging",
@@ -94,21 +94,21 @@ func (l *LocalBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser,
 		args = append(args, "--remote-debugging-pipe")
 	}
 	headless := runtime.GOOS == "linux" && os.Getenv("DISPLAY") == ""
-	if options.LauncherLocalHeadless != nil {
-		headless = *options.LauncherLocalHeadless
+	if config.LauncherLocalHeadless != nil {
+		headless = *config.LauncherLocalHeadless
 	}
 	if headless {
 		args = append(args, "--headless=new")
 	}
 	sandbox := runtime.GOOS != "linux"
-	if options.LauncherLocalSandbox != nil {
-		sandbox = *options.LauncherLocalSandbox
+	if config.LauncherLocalSandbox != nil {
+		sandbox = *config.LauncherLocalSandbox
 	}
 	if !sandbox {
 		args = append(args, "--no-sandbox")
 	}
-	args = append(args, options.LauncherLocalArgs...)
-	args = append(args, options.LauncherLocalExtraArgs...)
+	args = append(args, config.LauncherLocalArgs...)
+	args = append(args, config.LauncherLocalExtraArgs...)
 	args = append(args, "about:blank")
 	cmd := exec.Command(executablePath, args...)
 	if runtime.GOOS != "windows" {

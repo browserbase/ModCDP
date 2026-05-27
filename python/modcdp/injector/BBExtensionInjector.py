@@ -14,14 +14,15 @@ import zipfile
 from pathlib import Path
 
 from ..launcher.BrowserLauncher import LauncherConfig
-from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, defaultModCDPExtensionPath
+from ..injector.ExtensionInjector import ExtensionInjector, ExtensionInjectionResult, InjectorConfig, defaultModCDPExtensionPath
 
 DEFAULT_BROWSERBASE_BASE_URL = "https://api.browserbase.com"
 
 
 class BBExtensionInjector(ExtensionInjector):
-    def __init__(self, options=None) -> None:
-        super().__init__(options)
+    def __init__(self, config: InjectorConfig | dict | None = None) -> None:
+        config = config.model_dump() if isinstance(config, InjectorConfig) else dict(config or {})
+        super().__init__({**config, "injector_mode": "bb"})
         self.extension_id: str | None = None
         self.zip_path: str | None = None
         self.cleanup_dir: tempfile.TemporaryDirectory[str] | None = None

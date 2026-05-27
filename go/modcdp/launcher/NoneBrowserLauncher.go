@@ -8,11 +8,11 @@ type NoneBrowserLauncher struct {
 	BrowserLauncher
 }
 
-func NewNoneBrowserLauncher(options LauncherConfig) *NoneBrowserLauncher {
-	return &NoneBrowserLauncher{BrowserLauncher: NewBrowserLauncher(options)}
+func NewNoneBrowserLauncher(config LauncherConfig) *NoneBrowserLauncher {
+	return &NoneBrowserLauncher{BrowserLauncher: NewBrowserLauncher(config)}
 }
 
-func (l *NoneBrowserLauncher) Launch(options LauncherConfig) (*LaunchedBrowser, error) {
+func (l *NoneBrowserLauncher) Launch(config LauncherConfig) (*LaunchedBrowser, error) {
 	launched := &LaunchedBrowser{Close: func() {}}
 	l.Launched = launched
 	return launched, nil

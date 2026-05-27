@@ -130,8 +130,8 @@ class ExtensionInjectionResult(TypedDict):
 
 
 class ExtensionInjector:
-    def __init__(self, options: InjectorConfig | dict[str, Any] | None = None) -> None:
-        self.config = _injector_config(options)
+    def __init__(self, config: InjectorConfig | dict[str, Any] | None = None) -> None:
+        self.config = _injector_config(config)
         self.unusable_target_ids: set[str] = set()
         self.source: str | None = None
         self.extension_id: str | None = None
@@ -329,7 +329,7 @@ class ExtensionInjector:
         return bool(has_extension_id or includes or suffixes)
 
 
-def _injector_config(options: InjectorConfig | dict[str, Any] | None = None) -> InjectorConfig:
-    if isinstance(options, InjectorConfig):
-        return options
-    return InjectorConfig.model_validate(options or {})
+def _injector_config(config: InjectorConfig | dict[str, Any] | None = None) -> InjectorConfig:
+    if isinstance(config, InjectorConfig):
+        return config
+    return InjectorConfig.model_validate(config or {})

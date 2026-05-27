@@ -30,8 +30,8 @@ class UpstreamTransport:
     upstream_mode: UpstreamMode = "ws"
     url: str | None = None
 
-    def __init__(self, options: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:
-        self.config = _upstream_transport_config(options)
+    def __init__(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:
+        self.config = _upstream_transport_config(config)
         self._next_id = 0
         self._pending: dict[int, tuple[str, Queue[dict[str, Any]]]] = {}
         self._lock = threading.Lock()
@@ -158,7 +158,7 @@ class UpstreamTransport:
         self._emit_recv(parsed)
 
 
-def _upstream_transport_config(options: UpstreamTransportConfig | dict[str, Any] | None = None) -> UpstreamTransportConfig:
-    if isinstance(options, UpstreamTransportConfig):
-        return options
-    return UpstreamTransportConfig.model_validate(options or {})
+def _upstream_transport_config(config: UpstreamTransportConfig | dict[str, Any] | None = None) -> UpstreamTransportConfig:
+    if isinstance(config, UpstreamTransportConfig):
+        return config
+    return UpstreamTransportConfig.model_validate(config or {})

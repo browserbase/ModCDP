@@ -13,7 +13,7 @@ import (
 	. "github.com/browserbase/modcdp/go/modcdp/injector"
 )
 
-func TestExtensionInjectorOwnsSharedInjectorOptions(t *testing.T) {
+func TestExtensionInjectorOwnsSharedInjectorConfig(t *testing.T) {
 	injector := NewExtensionInjector(InjectorConfig{
 		InjectorServiceWorkerExtensionID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		InjectorServiceWorkerURLSuffixes: []string{"/modcdp/service_worker.js"},

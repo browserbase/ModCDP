@@ -54,26 +54,26 @@ type ExtensionInjector struct {
 	LastError         error
 }
 
-func NewExtensionInjector(options InjectorConfig) ExtensionInjector {
-	if options.InjectorCDPSendTimeoutMS == 0 {
-		options.InjectorCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
+func NewExtensionInjector(config InjectorConfig) ExtensionInjector {
+	if config.InjectorCDPSendTimeoutMS == 0 {
+		config.InjectorCDPSendTimeoutMS = DefaultCDPSendTimeoutMS
 	}
-	if options.InjectorExecutionContextTimeoutMS == 0 {
-		options.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
+	if config.InjectorExecutionContextTimeoutMS == 0 {
+		config.InjectorExecutionContextTimeoutMS = DefaultExecutionContextTimeoutMS
 	}
-	if options.InjectorServiceWorkerProbeTimeoutMS == 0 {
-		options.InjectorServiceWorkerProbeTimeoutMS = DefaultServiceWorkerProbeTimeoutMS
+	if config.InjectorServiceWorkerProbeTimeoutMS == 0 {
+		config.InjectorServiceWorkerProbeTimeoutMS = DefaultServiceWorkerProbeTimeoutMS
 	}
-	if options.InjectorServiceWorkerReadyTimeoutMS == 0 {
-		options.InjectorServiceWorkerReadyTimeoutMS = DefaultServiceWorkerReadyTimeoutMS
+	if config.InjectorServiceWorkerReadyTimeoutMS == 0 {
+		config.InjectorServiceWorkerReadyTimeoutMS = DefaultServiceWorkerReadyTimeoutMS
 	}
-	if options.InjectorServiceWorkerPollIntervalMS == 0 {
-		options.InjectorServiceWorkerPollIntervalMS = DefaultServiceWorkerPollIntervalMS
+	if config.InjectorServiceWorkerPollIntervalMS == 0 {
+		config.InjectorServiceWorkerPollIntervalMS = DefaultServiceWorkerPollIntervalMS
 	}
-	if options.InjectorTargetSessionPollIntervalMS == 0 {
-		options.InjectorTargetSessionPollIntervalMS = DefaultTargetSessionPollIntervalMS
+	if config.InjectorTargetSessionPollIntervalMS == 0 {
+		config.InjectorTargetSessionPollIntervalMS = DefaultTargetSessionPollIntervalMS
 	}
-	return ExtensionInjector{Config: options, UnusableTargetIDs: map[string]bool{}}
+	return ExtensionInjector{Config: config, UnusableTargetIDs: map[string]bool{}}
 }
 
 func (i *ExtensionInjector) Update(config InjectorConfig) *ExtensionInjector {

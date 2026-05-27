@@ -67,8 +67,8 @@ CDP_URL_SCHEME_RE = re.compile(r"^[a-z][a-z\d+\-.]*://", re.I)
 class BrowserLauncher:
     launched: LaunchedBrowser | None
 
-    def __init__(self, options: LauncherConfig | dict[str, Any] | None = None) -> None:
-        self.config = _launcher_config(options)
+    def __init__(self, config: LauncherConfig | dict[str, Any] | None = None) -> None:
+        self.config = _launcher_config(config)
         self.launched = None
 
     def update(self, config: LauncherConfig | dict[str, Any] | None = None) -> "BrowserLauncher":
@@ -90,7 +90,7 @@ class BrowserLauncher:
         loopback_cdp_url = (self.launched or {}).get("loopback_cdp_url")
         return {"upstream": {"upstream_ws_cdp_url": loopback_cdp_url}} if loopback_cdp_url else {}
 
-    def launch(self, options: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
+    def launch(self, config: LauncherConfig | dict[str, Any] | None = None) -> LaunchedBrowser:
         raise NotImplementedError(f"{type(self).__name__}.launch is not implemented.")
 
     def close(self) -> None:
@@ -121,10 +121,10 @@ def merge_chrome_args(existing: list[str] | None = None, incoming: list[str] | N
     return merged
 
 
-def _launcher_config(options: LauncherConfig | dict[str, Any] | None = None) -> LauncherConfig:
-    if isinstance(options, LauncherConfig):
-        return options
-    return LauncherConfig.model_validate(options or {})
+def _launcher_config(config: LauncherConfig | dict[str, Any] | None = None) -> LauncherConfig:
+    if isinstance(config, LauncherConfig):
+        return config
+    return LauncherConfig.model_validate(config or {})
 
 
 def resolveCdpWebSocketUrl(endpoint: str, name: str = "launcher_remote_cdp_url") -> str:

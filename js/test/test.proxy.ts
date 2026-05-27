@@ -117,6 +117,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
     launcher: {
       launcher_mode: "local",
       ...LOCAL_TEST_LAUNCH_OPTIONS,
+      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
@@ -142,6 +143,7 @@ test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser ov
     launcher: {
       launcher_mode: "local",
       ...LOCAL_TEST_LAUNCH_OPTIONS,
+      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "pipe" },
     injector: {
@@ -168,20 +170,22 @@ test("proxy CLI maps user-facing flags into a real pipe upstream browser session
     [
       proxy_script,
       "--bind",
-      `127.0.0.1:`,
+      `127.0.0.1:${proxy_port}`,
       "--launcher-mode=local",
+      "--launcher-local-executable-path",
+      REVERSEWS_TEST_BROWSER_PATH,
       "--launcher-local-headless",
       "true",
       "--upstream-mode=pipe",
       "--injector-mode=cli",
-      "--injector-extension-path",
+      "--injector-cli-extension-path",
       EXTENSION_PATH,
       "--injector-service-worker-url-suffixes",
       JSON.stringify(["/modcdp/service_worker.js"]),
       "--injector-trust-service-worker-target",
       "true",
-      "--server-options-router-routes",
-      JSON.stringify({ "*.*": "chromedebugger" }),
+      "--server-config",
+      JSON.stringify({ router: { router_routes: { "*.*": "chromedebugger" } } }),
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -198,23 +202,22 @@ test("proxy CLI maps local ws launch without requiring upstream ws url", async (
   const proxy_port = await LocalBrowserLauncher.freePort();
   const proxy_script = path.resolve(HERE, "..", "..", "dist", "js", "src", "proxy", "proxy.js");
   const user_data_dir = await mkdtemp(path.join(tmpdir(), "modcdp-proxy-profile-"));
-  const executable_path = LocalBrowserLauncher.findChromeBinary();
   const proc = spawn(
     process.execPath,
     [
       proxy_script,
       "--bind",
-      `127.0.0.1:`,
+      `127.0.0.1:${proxy_port}`,
       "--launcher-mode=local",
       "--launcher-local-executable-path",
-      executable_path,
+      REVERSEWS_TEST_BROWSER_PATH,
       "--launcher-local-user-data-dir",
       user_data_dir,
       "--launcher-local-headless",
       "true",
       "--upstream-mode=ws",
       "--injector-mode=cli",
-      "--injector-extension-path",
+      "--injector-cli-extension-path",
       EXTENSION_PATH,
       "--router-routes",
       JSON.stringify({
@@ -222,8 +225,8 @@ test("proxy CLI maps local ws launch without requiring upstream ws url", async (
         "Custom.*": "service_worker",
         "*.*": "direct_cdp",
       }),
-      "--server-options-router-routes",
-      JSON.stringify({ "*.*": "loopback_cdp" }),
+      "--server-config",
+      JSON.stringify({ router: { router_routes: { "*.*": "loopback_cdp" } } }),
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -242,6 +245,7 @@ test("proxy CLI maps ws upstream URL and route shorthands into an existing real 
     launcher: {
       launcher_mode: "local",
       ...LOCAL_TEST_LAUNCH_OPTIONS,
+      launcher_local_executable_path: REVERSEWS_TEST_BROWSER_PATH,
     },
     upstream: { upstream_mode: "ws" },
     injector: {
@@ -259,8 +263,10 @@ test("proxy CLI maps ws upstream URL and route shorthands into an existing real 
     [
       proxy_script,
       "--bind",
-      `127.0.0.1:`,
+      `127.0.0.1:${proxy_port}`,
       "--launcher-mode=remote",
+      "--launcher-remote-cdp-url",
+      owner.upstream.config.upstream_ws_cdp_url!,
       "--upstream-mode=ws",
       "--upstream-ws-cdp-url",
       owner.upstream.config.upstream_ws_cdp_url!,
@@ -271,8 +277,8 @@ test("proxy CLI maps ws upstream URL and route shorthands into an existing real 
         "Custom.*": "service_worker",
         "*.*": "direct_cdp",
       }),
-      "--server-options-router-routes",
-      JSON.stringify({ "*.*": "loopback_cdp" }),
+      "--server-config",
+      JSON.stringify({ router: { router_routes: { "*.*": "loopback_cdp" } } }),
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -294,7 +300,7 @@ test("proxy CLI maps user-facing flags into a real reversews browser session", a
     [
       proxy_script,
       "--bind",
-      `127.0.0.1:`,
+      `127.0.0.1:${proxy_port}`,
       "--launcher-mode=local",
       "--launcher-local-headless",
       String(LOCAL_TEST_LAUNCH_OPTIONS.launcher_local_headless),
@@ -304,7 +310,7 @@ test("proxy CLI maps user-facing flags into a real reversews browser session", a
       "--upstream-reversews-wait-timeout-ms",
       "10000",
       "--injector-mode=cli",
-      "--injector-extension-path",
+      "--injector-cli-extension-path",
       EXTENSION_PATH,
       "--injector-service-worker-url-suffixes",
       JSON.stringify(["/modcdp/service_worker.js"]),

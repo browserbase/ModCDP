@@ -33,8 +33,9 @@ type borrowedExtensionCandidate struct {
 	hasDebugger bool
 }
 
-func NewBorrowExtensionInjector(options InjectorConfig) BorrowExtensionInjector {
-	return BorrowExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
+func NewBorrowExtensionInjector(config InjectorConfig) BorrowExtensionInjector {
+	config.InjectorMode = "borrow"
+	return BorrowExtensionInjector{ExtensionInjector: NewExtensionInjector(config)}
 }
 
 func (i *BorrowExtensionInjector) Prepare() error {

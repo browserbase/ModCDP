@@ -10,8 +10,8 @@ from ..launcher.BrowserLauncher import LauncherConfig, BrowserLauncher, Launched
 
 
 class RemoteBrowserLauncher(BrowserLauncher):
-    def launch(self, options: LauncherConfig | dict | None = None) -> LaunchedBrowser:
-        merged = self.config if options is None else _launcher_config({**self.config.model_dump(), **_launcher_config(options).model_dump(exclude_unset=True)})
+    def launch(self, config: LauncherConfig | dict | None = None) -> LaunchedBrowser:
+        merged = self.config if config is None else _launcher_config({**self.config.model_dump(), **_launcher_config(config).model_dump(exclude_unset=True)})
         cdp_url = merged.launcher_remote_cdp_url
         if not cdp_url:
             raise RuntimeError("launcher.launcher_mode=remote requires launcher_remote_cdp_url.")

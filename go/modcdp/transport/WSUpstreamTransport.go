@@ -22,8 +22,8 @@ type WSUpstreamTransport struct {
 	writeMu sync.Mutex
 }
 
-func NewWSUpstreamTransport(options UpstreamTransportConfig) *WSUpstreamTransport {
-	transport := &WSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(options), URL: options.UpstreamWSCDPURL}
+func NewWSUpstreamTransport(config UpstreamTransportConfig) *WSUpstreamTransport {
+	transport := &WSUpstreamTransport{UpstreamTransport: NewUpstreamTransport(config), URL: config.UpstreamWSCDPURL}
 	transport.writeCommand = func(command map[string]any) error {
 		body, err := json.Marshal(command)
 		if err != nil {

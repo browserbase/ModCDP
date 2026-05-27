@@ -75,9 +75,9 @@ type closeListener struct {
 	fn func(error)
 }
 
-func NewUpstreamTransport(options UpstreamTransportConfig) UpstreamTransport {
+func NewUpstreamTransport(config UpstreamTransportConfig) UpstreamTransport {
 	return UpstreamTransport{
-		Config:  options,
+		Config:  config,
 		pending: map[int64]chan map[string]any{},
 		writeCommand: func(map[string]any) error {
 			return fmt.Errorf("UpstreamTransport.send is not implemented")

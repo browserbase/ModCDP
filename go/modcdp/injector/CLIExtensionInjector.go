@@ -15,8 +15,9 @@ type CLIExtensionInjector struct {
 	CleanupPath           string
 }
 
-func NewCLIExtensionInjector(options InjectorConfig) CLIExtensionInjector {
-	return CLIExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
+func NewCLIExtensionInjector(config InjectorConfig) CLIExtensionInjector {
+	config.InjectorMode = "cli"
+	return CLIExtensionInjector{ExtensionInjector: NewExtensionInjector(config)}
 }
 
 func (i *CLIExtensionInjector) Prepare() error {

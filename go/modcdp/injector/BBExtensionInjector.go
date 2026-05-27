@@ -26,8 +26,9 @@ type BBExtensionInjector struct {
 	CleanupPath string
 }
 
-func NewBBExtensionInjector(options InjectorConfig) BBExtensionInjector {
-	return BBExtensionInjector{ExtensionInjector: NewExtensionInjector(options)}
+func NewBBExtensionInjector(config InjectorConfig) BBExtensionInjector {
+	config.InjectorMode = "bb"
+	return BBExtensionInjector{ExtensionInjector: NewExtensionInjector(config)}
 }
 
 func (i *BBExtensionInjector) Prepare() error {

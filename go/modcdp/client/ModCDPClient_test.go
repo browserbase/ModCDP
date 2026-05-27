@@ -282,7 +282,7 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 		"Client", "HydrateAliases", "CustomCommands",
 	} {
 		if strings.Contains(raw, wrong) {
-			t.Fatalf("encoded options leaked Go field name %q in %s", wrong, raw)
+			t.Fatalf("encoded config leaked Go field name %q in %s", wrong, raw)
 		}
 	}
 	for _, expected := range []string{
@@ -310,7 +310,7 @@ func TestModCDPClientConfigMarshalToSnakeCaseConfigShape(t *testing.T) {
 		`"custom_commands"`,
 	} {
 		if !strings.Contains(raw, expected) {
-			t.Fatalf("encoded options missing %s in %s", expected, raw)
+			t.Fatalf("encoded config missing %s in %s", expected, raw)
 		}
 	}
 }
@@ -338,7 +338,7 @@ func TestModCDPClientPreservesExplicitEmptyServiceWorkerSuffixConfig(t *testing.
 	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 0 {
 		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Config.Injector.InjectorServiceWorkerURLSuffixes)
 	}
-	injectorConfig := cdp.baseInjectorOptions(nil)
+	injectorConfig := cdp.baseInjectorConfig(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 0 {
 		t.Fatalf("injector InjectorServiceWorkerURLSuffixes = %#v", injectorConfig.InjectorServiceWorkerURLSuffixes)
 	}
@@ -358,7 +358,7 @@ func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.
 	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Config.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Config.Injector.InjectorServiceWorkerURLSuffixes)
 	}
-	injectorConfig := cdp.baseInjectorOptions(nil)
+	injectorConfig := cdp.baseInjectorConfig(nil)
 	if len(injectorConfig.InjectorServiceWorkerURLSuffixes) != 1 || injectorConfig.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("injector InjectorServiceWorkerURLSuffixes = %#v", injectorConfig.InjectorServiceWorkerURLSuffixes)
 	}
