@@ -362,7 +362,7 @@ func TestModCDPClientPreservesExplicitNoneServerConfigConfig(t *testing.T) {
 }
 
 func TestModCDPClientDefaultsServiceWorkerSuffixConfigToModCDPWorker(t *testing.T) {
-	cdp := New(Config{})
+	cdp := New(Config{Injector: InjectorConfig{InjectorMode: "discover"}})
 
 	if len(cdp.Config.Injector.InjectorServiceWorkerURLSuffixes) != 1 || cdp.Config.Injector.InjectorServiceWorkerURLSuffixes[0] != "/modcdp/service_worker.js" {
 		t.Fatalf("InjectorServiceWorkerURLSuffixes = %#v", cdp.Config.Injector.InjectorServiceWorkerURLSuffixes)

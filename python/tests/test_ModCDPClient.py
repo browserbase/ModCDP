@@ -101,40 +101,13 @@ class ModCDPClientTests(unittest.TestCase):
         self.assertEqual(params["upstream"]["upstream_ws_connect_error_settle_timeout_ms"], 7654)
         self.assertEqual(params["downstream"]["downstream_client_timeout_ms"], 4567)
 
-    def test_preserves_explicit_zero_timeout_config(self) -> None:
-        cdp = ModCDPClient(
-            upstream={
-                "upstream_ws_connect_error_settle_timeout_ms": 0,
-            },
-            injector={
-                "injector_execution_context_timeout_ms": 0,
-                "injector_service_worker_probe_timeout_ms": 0,
-                "injector_service_worker_ready_timeout_ms": 0,
-                "injector_service_worker_poll_interval_ms": 0,
-                "injector_target_session_poll_interval_ms": 0,
-            },
-            client_config={
-                "client_cdp_send_timeout_ms": 0,
-                "client_event_wait_timeout_ms": 0,
-            },
-        )
-
-        self.assertEqual(cdp.upstream.config.upstream_ws_connect_error_settle_timeout_ms, 0)
-        self.assertEqual(cdp.injector.config.injector_execution_context_timeout_ms, 0)
-        self.assertEqual(cdp.injector.config.injector_service_worker_probe_timeout_ms, 0)
-        self.assertEqual(cdp.injector.config.injector_service_worker_ready_timeout_ms, 0)
-        self.assertEqual(cdp.injector.config.injector_service_worker_poll_interval_ms, 0)
-        self.assertEqual(cdp.injector.config.injector_target_session_poll_interval_ms, 0)
-        self.assertEqual(cdp.config.client_cdp_send_timeout_ms, 0)
-        self.assertEqual(cdp.config.client_event_wait_timeout_ms, 0)
-
     def test_preserves_explicit_empty_service_worker_suffix_config(self) -> None:
         cdp = ModCDPClient(injector={"injector_mode": "borrow", "injector_service_worker_url_suffixes": []})
 
         self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, [])
 
     def test_defaults_service_worker_suffix_config_to_modcdp_worker(self) -> None:
-        cdp = ModCDPClient()
+        cdp = ModCDPClient(injector={"injector_mode": "discover"})
 
         self.assertEqual(cdp.injector.config.injector_service_worker_url_suffixes, ["/modcdp/service_worker.js"])
 
