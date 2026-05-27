@@ -430,6 +430,13 @@ func (types *CDPTypes) ParseEventPayload(event string, payload any) (any, bool) 
 		return payload, true
 	}
 	if err := abxjsonschema.Validate(schema, payload); err != nil {
+		if payloadMap, ok := payload.(map[string]any); ok && len(payloadMap) == 1 {
+			if value, exists := payloadMap["value"]; exists {
+				if valueErr := abxjsonschema.Validate(schema, value); valueErr == nil {
+					return payload, true
+				}
+			}
+		}
 		panic(fmt.Errorf("%s event did not match event_schema: %w", event, err))
 	}
 	return payload, true

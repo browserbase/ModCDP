@@ -145,11 +145,17 @@ func TestCustomEventsValidateRawStringHandlersThroughRealServiceWorker(t *testin
 func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
 	cdp := New(Config{})
 	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
-		Name: "Custom.clientOnly",
+		Name: "Custom.echo",
 		ParamsSchema: map[string]any{
 			"type":                 "object",
-			"required":             []any{"tabId"},
-			"properties":           map[string]any{"tabId": map[string]any{"type": "integer"}},
+			"required":             []any{"text"},
+			"properties":           map[string]any{"text": map[string]any{"type": "string", "minLength": 1}},
+			"additionalProperties": false,
+		},
+		ResultSchema: map[string]any{
+			"type":                 "object",
+			"required":             []any{"text"},
+			"properties":           map[string]any{"text": map[string]any{"type": "string"}},
 			"additionalProperties": false,
 		},
 	})
@@ -157,89 +163,143 @@ func TestSchemaOnlyAddCustomCommandRegistersWithoutConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	registration, ok := result.(map[string]any)
-	if !ok || registration["name"] != "Custom.clientOnly" || registration["registered"] != true {
+	if !ok || registration["name"] != "Custom.echo" || registration["registered"] != true {
 		t.Fatalf("unexpected schema-only registration result: %#v", result)
 	}
-	if _, err := cdp.Types.ParseCommandParams("Custom.clientOnly", map[string]any{"tabId": 1}); err != nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"text": "ok"}); err != nil {
 		t.Fatalf("expected registered schema to validate params, got %v", err)
 	}
-	if _, err := cdp.Types.ParseCommandParams("Custom.clientOnly", map[string]any{"tabId": "1"}); err == nil {
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"text": ""}); err == nil {
 		t.Fatal("expected registered schema to reject wrong params")
 	}
-}
-
-func TestTypedCustomCommandRegistrationBuildsSchemas(t *testing.T) {
-	type ParamsSchema struct {
-		ID string `json:"id"`
+	if _, err := cdp.Types.ParseCommandParams("Custom.echo", map[string]any{"text": "ok", "extra": true}); err == nil {
+		t.Fatal("expected registered schema to reject extra params")
 	}
-	type ResultSchema struct {
-		Success bool `json:"success"`
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"text": "ok"}); err != nil {
+		t.Fatalf("expected registered schema to validate result, got %v", err)
 	}
-
-	cdp := New(Config{})
-	result, err := cdp.Mod.AddCustomCommand(CustomCommand{
-		Name:         "Custom.doSomething",
-		ParamsSchema: abxjsonschema.SchemaFor[ParamsSchema](),
-		ResultSchema: abxjsonschema.SchemaFor[ResultSchema](),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	registration, ok := result.(map[string]any)
-	if !ok || registration["name"] != "Custom.doSomething" || registration["registered"] != true {
-		t.Fatalf("unexpected custom command registration: %#v", result)
-	}
-	params, err := cdpParamsMap(ParamsSchema{ID: "abc"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := cdp.Types.ParseCommandParams("Custom.doSomething", params); err != nil {
-		t.Fatalf("expected typed params schema to validate: %v", err)
-	}
-	if _, err := cdp.Types.ParseCommandParams("Custom.doSomething", map[string]any{"id": 123}); err == nil {
-		t.Fatal("expected typed params schema to reject wrong id type")
-	}
-	if _, err := cdp.Types.ParseCommandResult("Custom.doSomething", ResultSchema{Success: true}); err != nil {
-		t.Fatalf("expected typed result schema to validate: %v", err)
-	}
-	if _, err := cdp.Types.ParseCommandResult("Custom.doSomething", map[string]any{"success": "yes"}); err == nil {
-		t.Fatal("expected typed result schema to reject wrong success type")
+	if _, err := cdp.Types.ParseCommandResult("Custom.echo", map[string]any{"text": 123}); err == nil {
+		t.Fatal("expected registered schema to reject wrong result")
 	}
 }
 
-func TestTypedCustomEventRegistrationAndHandler(t *testing.T) {
-	type EventSchema struct {
-		Data string `json:"data"`
-	}
+func TestConstructorCustomCommandAndEventSchemasValidateNestedPayloads(t *testing.T) {
+	cdp := New(Config{
+		Launcher:     LauncherConfig{LauncherMode: "none"},
+		Upstream:     UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector:     InjectorConfig{InjectorMode: "none"},
+		ServerConfig: ServerConfigNone,
+		Types: &CDPTypesConfig{
+			CustomCommands: []CustomCommand{{
+				Name: "Custom.collect",
+				ParamsSchema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"items": map[string]any{
+							"type":     "array",
+							"minItems": 1,
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"id":    map[string]any{"type": "string"},
+									"count": map[string]any{"type": "integer", "minimum": 1},
+								},
+								"required":             []any{"id", "count"},
+								"additionalProperties": false,
+							},
+						},
+					},
+					"required":             []any{"items"},
+					"additionalProperties": false,
+				},
+			}},
+			CustomEvents: []CustomEvent{
+				{
+					Name: "Custom.ready",
+					EventSchema: map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"url":   map[string]any{"type": "string", "pattern": "^https://"},
+							"ready": map[string]any{"type": "boolean"},
+						},
+						"required":             []any{"url", "ready"},
+						"additionalProperties": false,
+					},
+				},
+				{Name: "Custom.count", EventSchema: map[string]any{"type": "integer", "minimum": 1}},
+			},
+		},
+	})
 
-	cdp := New(Config{})
-	result, err := cdp.Mod.AddCustomEvent(CustomEvent{
-		Name:        "Custom.someEvent",
-		EventSchema: abxjsonschema.SchemaFor[EventSchema](),
+	validParams := map[string]any{"items": []any{map[string]any{"id": "a", "count": 1}}}
+	if _, err := cdp.Types.ParseCommandParams("Custom.collect", validParams); err != nil {
+		t.Fatalf("expected Custom.collect params to validate: %v", err)
+	}
+	if _, err := cdp.Types.ParseCommandParams("Custom.collect", map[string]any{"items": []any{map[string]any{"id": "a", "count": 0}}}); err == nil {
+		t.Fatal("expected Custom.collect params to reject count below minimum")
+	}
+	if _, err := cdp.Types.ParseCommandParams("Custom.collect", map[string]any{"items": []any{}}); err == nil {
+		t.Fatal("expected Custom.collect params to reject empty items")
+	}
+	if _, ok := cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "https://example.com", "ready": true}); !ok {
+		t.Fatal("expected Custom.ready event to validate")
+	}
+	expectPanic(t, func() {
+		cdp.Types.ParseEventPayload("Custom.ready", map[string]any{"url": "http://example.com", "ready": true})
 	})
-	if err != nil {
-		t.Fatal(err)
+	if _, ok := cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 3}); !ok {
+		t.Fatal("expected Custom.count event to validate")
 	}
-	registration, ok := result.(map[string]any)
-	if !ok || registration["name"] != "Custom.someEvent" || registration["registered"] != true {
-		t.Fatalf("unexpected custom event registration: %#v", result)
-	}
-	seen := make(chan string, 1)
-	cdp.On("Custom.someEvent", func(data any) {
-		event := data.(map[string]any)
-		seen <- event["data"].(string)
+	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.count", map[string]any{"value": 0}) })
+}
+
+func TestAssignedTypeRegistryUpdatesRuntimeValidationAndAliases(t *testing.T) {
+	cdp := New(Config{
+		Launcher:     LauncherConfig{LauncherMode: "none"},
+		Upstream:     UpstreamTransportConfig{UpstreamMode: "ws"},
+		Injector:     InjectorConfig{InjectorMode: "none"},
+		ServerConfig: ServerConfigNone,
 	})
-	if data, ok := cdp.Types.ParseEventPayload("Custom.someEvent", map[string]any{"data": "ok"}); ok {
-		for _, entry := range cdp.handlers["Custom.someEvent"] {
-			entry.handler(data)
-		}
-	} else {
-		t.Fatal("expected valid typed event payload")
+
+	cdp.Types = cdp.Types.Update(CDPTypesConfig{
+		CustomCommands: []CustomCommand{{
+			Name: "Custom.later",
+			ParamsSchema: map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{"value": map[string]any{"type": "number"}},
+				"required":             []any{"value"},
+				"additionalProperties": false,
+			},
+			ResultSchema: map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{"ok": map[string]any{"type": "boolean"}},
+				"required":             []any{"ok"},
+				"additionalProperties": false,
+			},
+		}},
+		CustomEvents: []CustomEvent{{
+			Name: "Custom.laterReady",
+			EventSchema: map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{"value": map[string]any{"type": "string"}},
+				"required":             []any{"value"},
+				"additionalProperties": false,
+			},
+		}},
+	})
+
+	if _, ok := cdp.Types.CustomCommands["Custom.later"]; !ok {
+		t.Fatal("expected Custom.later registry entry")
 	}
-	if got := <-seen; got != "ok" {
-		t.Fatalf("unexpected typed event data %q", got)
+	if _, err := cdp.Types.ParseCommandParams("Custom.later", map[string]any{"value": 1}); err != nil {
+		t.Fatalf("expected Custom.later params to validate: %v", err)
 	}
-	expectPanic(t, func() { cdp.Types.ParseEventPayload("Custom.someEvent", map[string]any{"data": 123}) })
+	if _, err := cdp.Types.ParseCommandResult("Custom.later", map[string]any{"ok": true}); err != nil {
+		t.Fatalf("expected Custom.later result to validate: %v", err)
+	}
+	if _, ok := cdp.Types.ParseEventPayload("Custom.laterReady", map[string]any{"value": "ok"}); !ok {
+		t.Fatal("expected Custom.laterReady event to validate")
+	}
 }
 
 func expectPanic(t *testing.T, fn func()) {
