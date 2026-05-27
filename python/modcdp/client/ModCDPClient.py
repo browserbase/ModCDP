@@ -205,6 +205,7 @@ class ModCDPClient(CDPSurfaceMixin):
         router: Mapping[str, Any] | None = None,
         client_config: Mapping[str, Any] | None = None,
         server_config: Mapping[str, JsonValue] | None | object = DEFAULT_SERVER,
+        types: CDPTypes | Mapping[str, Any] | None = None,
         custom_commands: Sequence[ModCDPAddCustomCommandParams] | None = None,
         custom_events: Sequence[ModCDPAddCustomEventParams] | None = None,
         custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
@@ -268,7 +269,16 @@ class ModCDPClient(CDPSurfaceMixin):
         else:
             raise RuntimeError(f"unknown injector.injector_mode={injector_config.injector_mode}")
         self.cdp_url: str | None = self.upstream.config.upstream_ws_cdp_url
-        self.types = CDPTypes(custom_commands, custom_events, custom_middlewares)
+        if isinstance(types, CDPTypes):
+            self.types = types
+        elif isinstance(types, Mapping):
+            self.types = CDPTypes(
+                cast(Any, types.get("custom_commands")),
+                cast(Any, types.get("custom_events")),
+                cast(Any, types.get("custom_middlewares")),
+            )
+        else:
+            self.types = CDPTypes(custom_commands, custom_events, custom_middlewares)
 
         self.extension_id: str | None = None
         self.ext_target_id: str | None = None
@@ -376,7 +386,8 @@ class ModCDPClient(CDPSurfaceMixin):
         preparation = self.types.prepareCommand(
             method,
             dict(params or {}),
-            can_register_locally=method == "Mod.addCustomCommand" or (method == "Mod.addCustomEvent" and self.ext_session_id is None),
+            can_register_locally=method == "Mod.addCustomCommand"
+            or (method in ("Mod.addCustomEvent", "Mod.addMiddleware") and self.ext_session_id is None),
         )
         if preparation.local_result is not None:
             completed_at = int(time.time() * 1000)

@@ -264,21 +264,49 @@ func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, cus
 	}
 	types.hydrateNativeProtocolSchemas()
 	for _, command := range defaultBuiltinCommands {
-		_, _, _ = types.AddCustomCommand(command)
+		if _, _, err := types.AddCustomCommand(command); err != nil {
+			panic(err)
+		}
 	}
 	for _, event := range defaultBuiltinEvents {
-		_, _ = types.AddCustomEvent(event)
+		if _, err := types.AddCustomEvent(event); err != nil {
+			panic(err)
+		}
 	}
 	for _, command := range customCommands {
-		_, _, _ = types.AddCustomCommand(command)
+		if _, _, err := types.AddCustomCommand(command); err != nil {
+			panic(err)
+		}
 	}
 	for _, event := range customEvents {
-		_, _ = types.AddCustomEvent(event)
+		if _, err := types.AddCustomEvent(event); err != nil {
+			panic(err)
+		}
 	}
 	for _, middleware := range customMiddlewares {
-		_, _ = types.AddCustomMiddleware(middleware)
+		if _, err := types.AddCustomMiddleware(middleware); err != nil {
+			panic(err)
+		}
 	}
 	return types
+}
+
+func (types *CDPTypes) Update(config CDPTypesConfig) *CDPTypes {
+	types.mu.RLock()
+	customCommands := make([]CustomCommand, 0, len(types.CustomCommands)+len(config.CustomCommands))
+	for _, command := range types.CustomCommands {
+		customCommands = append(customCommands, command)
+	}
+	customEvents := make([]CustomEvent, 0, len(types.CustomEvents)+len(config.CustomEvents))
+	for _, event := range types.CustomEvents {
+		customEvents = append(customEvents, event)
+	}
+	customMiddlewares := append([]CustomMiddleware{}, types.CustomMiddlewares...)
+	types.mu.RUnlock()
+	customCommands = append(customCommands, config.CustomCommands...)
+	customEvents = append(customEvents, config.CustomEvents...)
+	customMiddlewares = append(customMiddlewares, config.CustomMiddlewares...)
+	return NewCDPTypes(customCommands, customEvents, customMiddlewares)
 }
 
 func (types *CDPTypes) ToJSON() map[string]any {
@@ -530,6 +558,9 @@ func (types *CDPTypes) AddCustomMiddleware(middleware CustomMiddleware) (string,
 	}
 	if name != "*" && !strings.Contains(name, ".") {
 		return "", fmt.Errorf("name must be '*' or Domain.name form")
+	}
+	if middleware.Phase != "request" && middleware.Phase != "response" && middleware.Phase != "event" {
+		return "", fmt.Errorf("phase must be request, response, or event")
 	}
 	middleware.Name = name
 	types.CustomMiddlewares = append(types.CustomMiddlewares, middleware)

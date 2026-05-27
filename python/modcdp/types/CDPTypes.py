@@ -8,7 +8,7 @@ import re
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from pydantic_core import to_jsonable_python
@@ -319,8 +319,8 @@ def _model_or_json_object(value: object) -> ProtocolResult:
 class CDPTypes:
     def __init__(
         self,
-        custom_commands: Sequence[ModCDPAddCustomCommandParams] | None = None,
-        custom_events: Sequence[ModCDPAddCustomEventParams] | None = None,
+        custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None = None,
+        custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None = None,
         custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
     ) -> None:
         self.custom_commands: dict[str, ModCDPAddCustomCommandParams] = {}
@@ -336,12 +336,23 @@ class CDPTypes:
             self.addCustomCommand(command)
         for event in DEFAULT_BUILTIN_EVENTS:
             self.addCustomEvent(event)
-        for command in custom_commands or []:
+        for command in _custom_command_entries(custom_commands):
             self.addCustomCommand(command)
-        for event in custom_events or []:
+        for event in _custom_event_entries(custom_events):
             self.addCustomEvent({"name": event} if isinstance(event, str) else event)
         for middleware in custom_middlewares or []:
             self.addCustomMiddleware(middleware)
+
+    def update(
+        self,
+        custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None = None,
+        custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None = None,
+        custom_middlewares: Sequence[ModCDPAddMiddlewareParams] | None = None,
+    ) -> "CDPTypes":
+        commands = [*self.custom_commands.values(), *_custom_command_entries(custom_commands)]
+        events = [*self.custom_events.values(), *_custom_event_entries(custom_events)]
+        middlewares = [*self.custom_middlewares, *(custom_middlewares or [])]
+        return CDPTypes(commands, events, middlewares)
 
     def toJSON(self) -> dict[str, object]:
         custom_commands = []
@@ -590,3 +601,29 @@ class CDPTypes:
             raise TypeError(f"{field_name} must be a JSON Schema object")
         json_schema = _json_object(schema)
         return _AdapterRegistration(adapter=type_adapter_from_json_schema(json_schema), json_schema=json_schema)
+
+
+def _custom_command_entries(
+    custom_commands: Sequence[ModCDPAddCustomCommandParams] | Mapping[str, ModCDPAddCustomCommandParams] | None,
+) -> list[ModCDPAddCustomCommandParams]:
+    if custom_commands is None:
+        return []
+    if isinstance(custom_commands, Mapping):
+        return [
+            cast(ModCDPAddCustomCommandParams, {**dict(command), "name": name})
+            for name, command in custom_commands.items()
+        ]
+    return list(custom_commands)
+
+
+def _custom_event_entries(
+    custom_events: Sequence[ModCDPAddCustomEventParams] | Mapping[str, ModCDPAddCustomEventObjectParams] | None,
+) -> list[ModCDPAddCustomEventParams]:
+    if custom_events is None:
+        return []
+    if isinstance(custom_events, Mapping):
+        return [
+            cast(ModCDPAddCustomEventObjectParams, {**dict(event), "name": name})
+            for name, event in custom_events.items()
+        ]
+    return list(custom_events)

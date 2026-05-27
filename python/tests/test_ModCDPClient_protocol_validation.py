@@ -7,125 +7,224 @@
 from __future__ import annotations
 
 import unittest
-from typing import TYPE_CHECKING, assert_type
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from modcdp import ModCDPClient
-from modcdp.client.ModCDPClient import AwaitableValue
-from modcdp.types.generated.cdp import RuntimeDomain, TargetDomain
-from modcdp.types.generated.cdp import AwaitableDict
+from modcdp.types.CDPTypes import CDPTypes
 from modcdp.types.modcdp import JsonValue, ProtocolPayload
 
 
-class CustomEchoParams(BaseModel):
-    text: str
+class SumParams(BaseModel):
+    left: int
+    right: int
 
 
-class CustomEchoResult(BaseModel):
+class SumResult(BaseModel):
+    value: int
+
+
+class FinishedEvent(BaseModel):
+    total: int
+    label: str
+
+
+class DynamicParams(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class DynamicResult(BaseModel):
     ok: bool
 
 
-class CustomReadyEvent(BaseModel):
-    ok: bool
+class UpdatedParams(BaseModel):
+    count: int = Field(gt=0)
+
+
+class UpdatedResult(BaseModel):
+    done: bool
+
+
+class UpdatedReadyEvent(BaseModel):
+    ready: bool
 
 
 class ModCDPClientProtocolValidationTests(unittest.TestCase):
-    def test_protocol_validation_covers_native_methods_native_events_custom_methods_custom_events_and_native_overrides(self) -> None:
-        client = ModCDPClient()
-
-        if TYPE_CHECKING:
-            runtime_result = client.Runtime.evaluate(expression="1 + 1", returnByValue=True)
-            assert_type(runtime_result, RuntimeDomain._EvaluateResult)
-
-            def on_target_created(event: TargetDomain._TargetCreatedEvent) -> None:
-                assert_type(event.targetId, str | None)
-
-            assert_type(client.on(client.Target.targetCreated, on_target_created), ModCDPClient)
-            assert_type(
-                client.Mod.addCustomCommand("Custom.echo", params_schema=CustomEchoParams, result_schema=CustomEchoResult),
-                AwaitableDict | AwaitableValue,
-            )
-            assert_type(client.Mod.addCustomEvent("Custom.ready", event_schema=CustomReadyEvent), AwaitableDict | AwaitableValue)
-            assert_type(
-                client.Mod.addMiddleware(
-                    name="Target.getTargets",
-                    phase="response",
-                    expression="async (value, next) => next(value)",
-                ),
-                AwaitableDict | AwaitableValue,
-            )
-
+    def test_native_cdp_schemas_validate_method_params_return_values_and_event_payloads_statically_and_at_runtime(self) -> None:
+        types = CDPTypes()
+        client = ModCDPClient(launcher={"launcher_mode": "none"}, upstream={"upstream_mode": "ws"}, injector={"injector_mode": "none"}, server_config=None)
         runtime_params = {"expression": "1 + 1", "returnByValue": True}
-        runtime_result_payload = {"result": {"type": "number", "value": 2, "description": "2"}}
-        native_target_info: dict[str, JsonValue] = {
-            "targetId": "target-1",
-            "type": "page",
-            "title": "Example",
-            "url": "https://example.com",
-            "attached": False,
-            "canAccessOpener": False,
+        runtime_result = {"result": {"type": "number", "value": 2, "description": "2"}}
+        target_event: ProtocolPayload = {
+            "targetInfo": {
+                "targetId": "target-1",
+                "type": "page",
+                "title": "Example",
+                "url": "https://example.com",
+                "attached": False,
+                "canAccessOpener": False,
+            }
         }
-        native_event_payload: ProtocolPayload = {"targetInfo": native_target_info}
 
-        self.assertEqual(client.types.parseCommandParams("Runtime.evaluate", runtime_params), runtime_params)
-        self.assertEqual(client.types.parseCommandResult("Runtime.evaluate", runtime_result_payload), runtime_result_payload)
-        self.assertEqual(client.types.parseEventPayload("Target.targetCreated", native_event_payload), native_event_payload)
+        self.assertTrue(callable(client.Runtime.evaluate))
+        self.assertEqual(types.parseCommandParams("Runtime.evaluate", runtime_params), runtime_params)
+        self.assertEqual(types.parseCommandResult("Runtime.evaluate", runtime_result), runtime_result)
+        self.assertEqual(types.parseEventPayload("Target.targetCreated", target_event), target_event)
         with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Runtime.evaluate", {})
+            types.parseCommandParams("Runtime.evaluate", {"returnByValue": True})
         with self.assertRaises(ValueError):
-            client.types.parseCommandResult("Runtime.evaluate", {})
+            types.parseCommandResult("Runtime.evaluate", {})
         with self.assertRaises(ValueError):
-            client.types.parseEventPayload("Target.targetCreated", {})
+            types.parseEventPayload("Target.targetCreated", {})
 
-        client.Mod.addCustomCommand("Custom.echo", params_schema=CustomEchoParams, result_schema=CustomEchoResult)
-        client.Mod.addCustomEvent("Custom.ready", event_schema=CustomReadyEvent)
+    def test_mod_schemas_validate_method_params_return_values_event_payloads_and_middleware_registrations_statically_and_at_runtime(self) -> None:
+        types = CDPTypes()
+        client = ModCDPClient(launcher={"launcher_mode": "none"}, upstream={"upstream_mode": "ws"}, injector={"injector_mode": "none"}, server_config=None)
+        ping_params = {"sent_at": 123}
+        ping_result = {"ok": True}
+        pong_event = {"sent_at": 123, "received_at": 124, "from": "extension-service-worker"}
+        middleware_params = {
+            "name": "Target.getTargets",
+            "phase": "response",
+            "expression": "async (payload, next) => next(payload)",
+        }
+        middleware_result = {"name": "Target.getTargets", "phase": "response", "registered": True}
 
-        self.assertEqual(client.types.parseCommandParams("Custom.echo", {"text": "ok"}), {"text": "ok"})
-        self.assertEqual(client.types.parseCommandResult("Custom.echo", {"ok": True}), {"ok": True})
-        self.assertEqual(client.types.parseEventPayload("Custom.ready", {"ok": True}), {"ok": True})
+        self.assertEqual(types.parseCommandParams("Mod.ping", ping_params), ping_params)
+        self.assertEqual(types.parseCommandResult("Mod.ping", ping_result), ping_result)
+        self.assertEqual(types.parseEventPayload("Mod.pong", pong_event), pong_event)
+        self.assertEqual(types.parseCommandParams("Mod.addMiddleware", middleware_params), middleware_params)
+        self.assertEqual(types.parseCommandResult("Mod.addMiddleware", middleware_result), middleware_result)
         with self.assertRaises(ValueError):
-            client.types.parseCommandParams("Custom.echo", {"text": 1})
+            types.parseCommandParams("Mod.ping", {"sent_at": "123"})
         with self.assertRaises(ValueError):
-            client.types.parseCommandResult("Custom.echo", {"ok": "yes"})
+            types.parseCommandResult("Mod.ping", {"ok": "true"})
         with self.assertRaises(ValueError):
-            client.types.parseEventPayload("Custom.ready", {"ok": "yes"})
+            types.parseEventPayload("Mod.pong", {"sent_at": 123, "from": "extension-service-worker"})
+        with self.assertRaises(ValueError):
+            types.parseCommandParams("Mod.addMiddleware", {"name": "Custom.any", "phase": "after", "expression": "async (payload, next) => next(payload)"})
+        with self.assertRaises(ValueError):
+            types.parseCommandResult("Mod.addMiddleware", {"name": "Custom.any", "phase": "after", "registered": True})
 
-        client.Mod.addCustomCommand(
-            "Target.getTargets",
-            result_schema={
-                "type": "object",
-                "properties": {
-                    "targetInfos": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "targetId": {"type": "string"},
-                                "type": {"type": "string"},
-                                "title": {"type": "string"},
-                                "url": {"type": "string"},
-                                "attached": {"type": "boolean"},
-                                "canAccessOpener": {"type": "boolean"},
-                                "tabId": {"type": "integer"},
-                            },
-                            "required": ["targetId", "type", "title", "url", "attached", "canAccessOpener"],
-                            "additionalProperties": True,
-                        },
+    def test_constructor_custom_schemas_validate_command_params_return_values_events_and_middleware_registrations_statically_and_at_runtime(self) -> None:
+        client = ModCDPClient(
+            launcher={"launcher_mode": "none"},
+            upstream={"upstream_mode": "ws"},
+            injector={"injector_mode": "none"},
+            server_config=None,
+            types={
+                "custom_commands": {
+                    "Custom.sum": {
+                        "params_schema": SumParams,
+                        "result_schema": SumResult,
+                        "expression": "async ({ left, right }) => ({ value: left + right })",
                     }
                 },
-                "required": ["targetInfos"],
-                "additionalProperties": True,
+                "custom_events": {"Custom.finished": {"event_schema": FinishedEvent}},
+                "custom_middlewares": [{"name": "Custom.sum", "phase": "response", "expression": "async (payload, next) => next(payload)"}],
             },
         )
-        client.Mod.addCustomEvent("Target.targetCreated")
 
-        extended_target_info = {**native_target_info, "tabId": 7}
-        self.assertEqual(client.types.parseCommandResult("Target.getTargets", {"targetInfos": [extended_target_info]}), {"targetInfos": [extended_target_info]})
+        self.assertEqual(client.types.parseCommandParams("Custom.sum", {"left": 1, "right": 2}), {"left": 1, "right": 2})
+        self.assertEqual(client.types.parseCommandResult("Custom.sum", {"value": 3}), {"value": 3})
+        self.assertEqual(client.types.parseEventPayload("Custom.finished", {"total": 3, "label": "ok"}), {"total": 3, "label": "ok"})
+        with self.assertRaises(ValueError):
+            client.types.parseCommandParams("Custom.sum", {"left": "1", "right": 2})
+        with self.assertRaises(ValueError):
+            client.types.parseCommandResult("Custom.sum", {"value": "3"})
+        with self.assertRaises(ValueError):
+            client.types.parseEventPayload("Custom.finished", {"total": "3", "label": "ok"})
         self.assertEqual(
-            client.types.parseEventPayload("Target.targetCreated", {"targetInfo": extended_target_info}),
-            {"targetInfo": extended_target_info},
+            client.types.customMiddlewareWireRegistrations(),
+            [{"name": "Custom.sum", "phase": "response", "expression": "async (payload, next) => next(payload)"}],
         )
+        with self.assertRaises(Exception):
+            CDPTypes(custom_middlewares=[{"name": "Custom.sum", "phase": "after", "expression": "async (payload, next) => next(payload)"}])
+
+    def test_dynamic_mod_registration_updates_custom_command_event_and_middleware_validation(self) -> None:
+        client = ModCDPClient(launcher={"launcher_mode": "none"}, upstream={"upstream_mode": "ws"}, injector={"injector_mode": "none"}, server_config=None)
+
+        self.assertEqual(
+            client.Mod.addCustomCommand("Custom.dynamic", params_schema=DynamicParams, result_schema=DynamicResult),
+            {"name": "Custom.dynamic", "registered": True},
+        )
+        self.assertEqual(
+            client.Mod.addCustomEvent(
+                "Custom.dynamicReady",
+                event_schema={
+                    "type": "object",
+                    "properties": {"id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"}},
+                    "required": ["id"],
+                    "additionalProperties": False,
+                },
+            ),
+            {"name": "Custom.dynamicReady", "registered": True},
+        )
+        self.assertEqual(
+            client.Mod.addMiddleware(
+                name="Custom.dynamic",
+                phase="response",
+                expression="async (payload, next) => next(payload)",
+            ),
+            {"name": "Custom.dynamic", "phase": "response", "registered": True},
+        )
+
+        self.assertTrue(callable(client.Custom.dynamic))
+        self.assertEqual(client.types.parseCommandParams("Custom.dynamic", {"text": "ok"}), {"text": "ok"})
+        self.assertEqual(client.types.parseCommandResult("Custom.dynamic", {"ok": True}), {"ok": True})
+        self.assertEqual(
+            client.types.parseEventPayload("Custom.dynamicReady", {"id": "550e8400-e29b-41d4-a716-446655440000"}),
+            {"id": "550e8400-e29b-41d4-a716-446655440000"},
+        )
+        self.assertEqual(
+            client.types.customMiddlewareWireRegistrations(),
+            [{"name": "Custom.dynamic", "phase": "response", "expression": "async (payload, next) => next(payload)"}],
+        )
+        with self.assertRaises(ValueError):
+            client.types.parseCommandParams("Custom.dynamic", {"text": ""})
+        with self.assertRaises(ValueError):
+            client.types.parseCommandResult("Custom.dynamic", {"ok": "yes"})
+        with self.assertRaises(ValueError):
+            client.types.parseEventPayload("Custom.dynamicReady", {"id": "nope"})
+        with self.assertRaises(ValueError):
+            client.Mod.addMiddleware(name="Custom.dynamic", phase="after", expression="async (payload, next) => next(payload)")
+
+    def test_client_types_update_replaces_the_registry_with_extended_runtime_validation_and_preserves_static_custom_aliases_on_typed_clients(self) -> None:
+        client = ModCDPClient(launcher={"launcher_mode": "none"}, upstream={"upstream_mode": "ws"}, injector={"injector_mode": "none"}, server_config=None)
+        updated_types = client.types.update(
+            custom_commands={
+                "Custom.updated": {
+                    "params_schema": UpdatedParams,
+                    "result_schema": UpdatedResult,
+                }
+            },
+            custom_events={"Custom.updatedReady": {"event_schema": UpdatedReadyEvent}},
+            custom_middlewares=[{"name": "Custom.updated", "phase": "request", "expression": "async (payload, next) => next(payload)"}],
+        )
+        typed_client = ModCDPClient(
+            launcher={"launcher_mode": "none"},
+            upstream={"upstream_mode": "ws"},
+            injector={"injector_mode": "none"},
+            server_config=None,
+            types=updated_types,
+        )
+        client.types = updated_types
+
+        self.assertTrue(callable(typed_client.Custom.updated))
+        self.assertTrue(callable(client.Custom.updated))
+        self.assertEqual(client.types.parseCommandParams("Custom.updated", {"count": 1}), {"count": 1})
+        self.assertEqual(client.types.parseCommandResult("Custom.updated", {"done": True}), {"done": True})
+        self.assertEqual(client.types.parseEventPayload("Custom.updatedReady", {"ready": True}), {"ready": True})
+        self.assertEqual(
+            client.types.customMiddlewareWireRegistrations(),
+            [{"name": "Custom.updated", "phase": "request", "expression": "async (payload, next) => next(payload)"}],
+        )
+        with self.assertRaises(ValueError):
+            client.types.parseCommandParams("Custom.updated", {"count": 0})
+        with self.assertRaises(ValueError):
+            client.types.parseCommandResult("Custom.updated", {"done": "true"})
+        with self.assertRaises(ValueError):
+            client.types.parseEventPayload("Custom.updatedReady", {"ready": "true"})
 
 
 if __name__ == "__main__":

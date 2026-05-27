@@ -190,6 +190,12 @@ type CustomMiddleware struct {
 	Expression string `json:"expression"`
 }
 
+type CDPTypesConfig struct {
+	CustomCommands    []CustomCommand    `json:"custom_commands,omitempty"`
+	CustomEvents      []CustomEvent      `json:"custom_events,omitempty"`
+	CustomMiddlewares []CustomMiddleware `json:"custom_middlewares,omitempty"`
+}
+
 type ServerConfig struct {
 	Upstream           UpstreamTransportConfig `json:"upstream,omitempty"`
 	Router             RouterConfig            `json:"router,omitempty"`
@@ -219,6 +225,7 @@ type Config struct {
 	Router                 RouterConfig            `json:"router,omitempty"`
 	ClientConfig           ClientConfig            `json:"client_config,omitempty"`
 	ServerConfig           *ServerConfig           `json:"server_config,omitempty"`
+	Types                  *CDPTypesConfig         `json:"types,omitempty"`
 	CustomCommands         []CustomCommand         `json:"custom_commands,omitempty"`
 	CustomEvents           []CustomEvent           `json:"custom_events,omitempty"`
 	CustomMiddlewares      []CustomMiddleware      `json:"custom_middlewares,omitempty"`
@@ -439,9 +446,17 @@ func New(config Config) *ModCDPClient {
 	if config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS == 0 {
 		config.Upstream.UpstreamWSConnectErrorSettleTimeoutMS = DefaultWSConnectErrorSettleTimeoutMS
 	}
+	typesConfig := CDPTypesConfig{
+		CustomCommands:    config.CustomCommands,
+		CustomEvents:      config.CustomEvents,
+		CustomMiddlewares: config.CustomMiddlewares,
+	}
+	if config.Types != nil {
+		typesConfig = *config.Types
+	}
 	client := &ModCDPClient{
 		Config:      config,
-		Types:       NewCDPTypes(config.CustomCommands, config.CustomEvents, config.CustomMiddlewares),
+		Types:       NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
 		handlers:    map[string][]handlerEntry{},
 		cdpHandlers: map[string][]func(CDPEvent){},
 	}
@@ -995,7 +1010,7 @@ func (c *ModCDPClient) sendCommand(method string, params map[string]any, cdpSess
 	preparation, err := c.Types.PrepareCommand(
 		method,
 		params,
-		method == "Mod.addCustomCommand" || (method == "Mod.addCustomEvent" && c.ExtSessionID == ""),
+		method == "Mod.addCustomCommand" || ((method == "Mod.addCustomEvent" || method == "Mod.addMiddleware") && c.ExtSessionID == ""),
 	)
 	if err != nil {
 		return nil, err
