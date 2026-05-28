@@ -17,12 +17,13 @@ from ..types.toJSON import modCDPToJSON
 
 
 UpstreamMode: TypeAlias = Literal["ws"]
+UpstreamPeerKind: TypeAlias = Literal["browser_cdp", "modcdp_server"]
 UpstreamTransportConfig: TypeAlias = ModCDPUpstreamConfig
 
 
 class UpstreamTransport:
     upstream_mode: UpstreamMode = "ws"
-    upstream_is_modcdp_server: bool = False
+    peer_kind: UpstreamPeerKind = "browser_cdp"
     url: str | None = None
 
     def __init__(self, config: UpstreamTransportConfig | dict[str, Any] | None = None) -> None:

@@ -37,7 +37,7 @@ type NatsSocket = WebSocket | NatsTcpSocket;
 
 class NATSUpstreamTransport extends UpstreamTransport {
   declare config: NATSUpstreamTransportConfig;
-  override upstream_is_modcdp_server = true;
+  override peer_kind = "modcdp_server" as const;
   private socket: NatsSocket | null = null;
   private tcp_buffer = Buffer.alloc(0);
   private ws_buffer = "";

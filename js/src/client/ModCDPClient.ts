@@ -323,7 +323,7 @@ export class ModCDPClient<
       return this;
     }
 
-    if (this.upstream.upstream_is_modcdp_server) {
+    if (this.upstream.peer_kind === "modcdp_server") {
       const configure_started_at = Date.now();
       if (this.server_config !== null) await this.upstream.send("Mod.configure", this._serverConfigureParams());
       const configure_completed_at = Date.now();
@@ -395,7 +395,7 @@ export class ModCDPClient<
   async send(method: string, params: unknown = {}, session_id: string | null = null): Promise<Record<string, unknown>> {
     const started_at = Date.now();
     const can_register_locally =
-      !this.upstream.upstream_is_modcdp_server &&
+      this.upstream.peer_kind !== "modcdp_server" &&
       (method === "Mod.addCustomCommand" ||
         (method === "Mod.addCustomEvent" && !this.injector?.session_id) ||
         (method === "Mod.addMiddleware" && !this.injector?.session_id));
@@ -416,7 +416,7 @@ export class ModCDPClient<
       };
       return this.types.parseCommandResult(method, prepared.local_result);
     }
-    if (this.upstream.upstream_is_modcdp_server) {
+    if (this.upstream.peer_kind === "modcdp_server") {
       const result = await this.upstream.send(method, command_params as ProtocolPayload, session_id, {
         timeout_ms: this.config.client_cdp_send_timeout_ms,
       });

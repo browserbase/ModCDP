@@ -28,7 +28,7 @@ type ReverseHello = {
 
 class ReverseWSUpstreamTransport extends UpstreamTransport {
   declare config: ReverseWSUpstreamTransportConfig;
-  override upstream_is_modcdp_server = true;
+  override peer_kind = "modcdp_server" as const;
   endpoint_url: string;
   private reversews_listener: WsServer | null = null;
   private socket: WsSocket | null = null;

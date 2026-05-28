@@ -14,7 +14,7 @@ const DEFAULT_REVERSE_BRIDGE_URL = "ws://127.0.0.1:29292";
 
 const ReverseWSDownstreamTransportConfigSchema = z
   .object({
-    upstream_reversews_url: z.string().default(DEFAULT_REVERSE_BRIDGE_URL),
+    downstream_reversews_url: z.string().default(DEFAULT_REVERSE_BRIDGE_URL),
     reconnect_interval_ms: z.number().positive().default(DEFAULT_REVERSE_BRIDGE_RECONNECT_INTERVAL_MS),
   })
   .strict();
@@ -69,19 +69,19 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
   start(endpoint?: string, config: z.input<typeof ReverseWSDownstreamTransportConfigSchema> = {}) {
     this.config = ReverseWSDownstreamTransportConfigSchema.parse({
       ...config,
-      upstream_reversews_url: endpoint,
+      downstream_reversews_url: endpoint,
     });
-    if (!/^wss?:\/\//i.test(this.config.upstream_reversews_url)) {
+    if (!/^wss?:\/\//i.test(this.config.downstream_reversews_url)) {
       throw new Error(
-        `reverse proxy endpoint must be a ws:// or wss:// URL, got ${this.config.upstream_reversews_url}.`,
+        `reverse proxy endpoint must be a ws:// or wss:// URL, got ${this.config.downstream_reversews_url}.`,
       );
     }
     this.started = true;
-    void this.connect(this.config.upstream_reversews_url).catch(() => {
+    void this.connect(this.config.downstream_reversews_url).catch(() => {
       this.scheduleReconnect();
     });
     return {
-      upstream_reversews_url: this.config.upstream_reversews_url,
+      downstream_reversews_url: this.config.downstream_reversews_url,
       reconnect_interval_ms: this.config.reconnect_interval_ms,
       connecting: true,
     };
@@ -94,7 +94,7 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
 
   /** Stop reconnecting and close the active reversews socket. */
   stop(reason = "stopped") {
-    const upstream_reversews_url = this.started ? this.config.upstream_reversews_url : null;
+    const downstream_reversews_url = this.started ? this.config.downstream_reversews_url : null;
     this.started = false;
     if (this.reconnect_timer) {
       clearTimeout(this.reconnect_timer);
@@ -105,7 +105,7 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
       socket.close(1000, reason);
     }
-    return { upstream_reversews_url, stopped: true, reason };
+    return { downstream_reversews_url, stopped: true, reason };
   }
 
   /** Send one CDP response to the reversews client that sent the request. */
@@ -138,14 +138,14 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
     this.reconnect_timer = setTimeout(() => {
       this.reconnect_timer = null;
       if (!this.started) return;
-      void this.connect(this.config.upstream_reversews_url).catch(() => {});
+      void this.connect(this.config.downstream_reversews_url).catch(() => {});
     }, this.config.reconnect_interval_ms);
   }
 
   private async connect(endpoint: string) {
     if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
       return {
-        upstream_reversews_url: endpoint,
+        downstream_reversews_url: endpoint,
         connected: this.socket.readyState === WebSocket.OPEN,
       };
     }
@@ -173,7 +173,7 @@ class ReverseWSDownstreamTransport extends DownstreamTransport {
       if (this.socket === ws) this.socket = null;
       this.scheduleReconnect();
     });
-    return { upstream_reversews_url: endpoint, connected: false };
+    return { downstream_reversews_url: endpoint, connected: false };
   }
 
   private async handleMessage(ws: WebSocket, data: unknown) {

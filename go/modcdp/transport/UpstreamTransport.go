@@ -43,9 +43,13 @@ func freePort() (int, error) {
 }
 
 type UpstreamMode string
+type UpstreamPeerKind string
 
 const (
 	UpstreamModeWS UpstreamMode = "ws"
+
+	UpstreamPeerKindBrowserCDP   UpstreamPeerKind = "browser_cdp"
+	UpstreamPeerKindModCDPServer UpstreamPeerKind = "modcdp_server"
 )
 
 type HostPort struct {
@@ -54,17 +58,17 @@ type HostPort struct {
 }
 
 type UpstreamTransport struct {
-	Config                 UpstreamTransportConfig
-	UpstreamIsModCDPServer bool
-	recvListeners          []recvListener
-	closeListeners         []closeListener
-	eventListeners         map[string][]upstreamEventListener
-	listenerMu             sync.Mutex
-	nextListenerID         int64
-	nextID                 int64
-	pending                map[int64]chan map[string]any
-	pendingMu              sync.Mutex
-	writeCommand           func(map[string]any) error
+	Config         UpstreamTransportConfig
+	PeerKind       UpstreamPeerKind
+	recvListeners  []recvListener
+	closeListeners []closeListener
+	eventListeners map[string][]upstreamEventListener
+	listenerMu     sync.Mutex
+	nextListenerID int64
+	nextID         int64
+	pending        map[int64]chan map[string]any
+	pendingMu      sync.Mutex
+	writeCommand   func(map[string]any) error
 }
 
 type recvListener struct {
@@ -94,6 +98,7 @@ func NewUpstreamTransport(config UpstreamTransportConfig) UpstreamTransport {
 	}
 	return UpstreamTransport{
 		Config:         config,
+		PeerKind:       UpstreamPeerKindBrowserCDP,
 		eventListeners: map[string][]upstreamEventListener{},
 		pending:        map[int64]chan map[string]any{},
 		writeCommand: func(map[string]any) error {

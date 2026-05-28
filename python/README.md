@@ -121,7 +121,6 @@ Each demo launches Chrome with the fixed ModCDP extension artifact loaded, headf
 ```sh
 pnpm run demo:js                    # defaults to --loopback --upstream=ws
 pnpm run demo:js -- --debugger --upstream=pipe
-pnpm run demo:js -- --loopback --upstream=reversews
 pnpm run demo:python
 pnpm run demo:go
 ```
@@ -142,24 +141,9 @@ pnpm run proxy -- --launcher-mode=local --upstream-mode=nats --upstream-nats-url
 # ✨ All ModCDP commands now work through playwright! you can modify/extend playwright behavior to your heart's content
 ```
 
-The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-config='{"client_cdp_send_timeout_ms": 10000}'`, `--router='{"router_routes": {...}}'`, and `--server-config='{"router": {"router_routes": {...}}}'` config groups as `ModCDPClient`. CLI flags use kebab case and map to the owner-prefixed config fields, for example `--launcher-local-executable-path` maps to `launcher.launcher_local_executable_path`. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, `nats`, and launched `reversews` proxy downstream CDP-shaped messages through the selected `ModCDPClient` upstream transport.
+The proxy uses the same `--launcher-*`, `--injector-*`, `--upstream-*`, `--client-config='{"client_cdp_send_timeout_ms": 10000}'`, `--router='{"router_routes": {...}}'`, and `--server-config='{"router": {"router_routes": {...}}}'` config groups as `ModCDPClient`. CLI flags use kebab case and map to the owner-prefixed config fields, for example `--launcher-local-executable-path` maps to `launcher.launcher_local_executable_path`. `ws` keeps a transparent websocket-to-websocket fast path; `pipe`, `nativemessaging`, and `nats` proxy downstream CDP-shaped messages through the selected client-side `ModCDPClient` transport.
 
 Native messaging mode uses the configured browser native host name directly. The baked extension expects the default `com.modcdp.bridge` host, so changing `--upstream-nativemessaging-host-name` requires using an extension build that was baked for that host. Because Chrome owns native host process launch and stdio, native messaging is not a standalone `pnpm run proxy` mode.
-
-### Reverse proxy mode
-
-Use reverse mode when the browser does not expose a public CDP websocket to the final client, but the ModCDP extension can open a websocket back to a local proxy. The proxy still serves a normal-looking CDP endpoint to Playwright, Puppeteer, Stagehand, or any other CDP client:
-
-```sh
-pnpm run proxy -- --upstream-mode=reversews --port 9223
-pnpm run proxy -- --launcher-mode=local --upstream-mode=reversews --port 9223
-pnpm run proxy -- --launcher-mode=local --upstream-mode=reversews --upstream-reversews-bind=127.0.0.1:29293 --port 9223
-# const browser = await playwright.chromium.connectOverCDP("http://127.0.0.1:9223")
-```
-
-Reverse mode is opt-in. The shipped extension auto-connects to the fixed local reverse connector at `ws://127.0.0.1:29292`; the proxy/client listens there and waits for that extension connection. Keep `--upstream-reversews-bind` when using a custom extension build whose compiled autoconnect URL points at a different host or port. `--upstream-reversews-wait-timeout-ms` controls how long the proxy/client waits. Once connected, the extension identifies itself as a ModCDP service worker and the proxy uses that reverse websocket as its upstream. `Mod.*`, expression-backed `Custom.*` commands, custom event fanout, middleware, and normal CDP commands all stay routed through `globalThis.ModCDP.handleCommand(...)` in the service worker.
-
-Reverse mode is intentionally scoped to one local browser and one reverse extension connection per proxy process. The browser may still have other extensions installed; ModCDP does not require `--disable-extensions-except`.
 
 ## Routing modes
 
@@ -232,8 +216,6 @@ dist/                     Built JS output used by the extension and Node CLI scr
 3. Attach a session to that SW target and `Runtime.enable` on it.
 4. Call `globalThis.ModCDP.configure(...)` to push the resolved loopback websocket and any explicit server route overrides into the SW. The clients do this automatically by default.
 
-Reverse proxy mode flips the bootstrap direction: `js/src/proxy/proxy.ts --upstream-mode=reversews --port 9223` listens for the extension on the configured reverse connector while still serving downstream clients from the proxy port. The service worker sends a `modcdp.reverse.hello` message and then accepts CDP-shaped command messages from the proxy. The proxy maps downstream request IDs to reverse request IDs and forwards reverse events back to the downstream CDP client.
-
 ### Send
 
 - `Mod.evaluate({ expression, params, cdpSessionId })` → `Runtime.evaluate` on the ext session, wrapping the expression with an IIFE that exposes `params` and `cdp = ModCDP.attachToSession(...)`.
@@ -242,13 +224,9 @@ Reverse proxy mode flips the bootstrap direction: `js/src/proxy/proxy.ts --upstr
 - `Mod.addMiddleware({ name, phase, expression })` → `Runtime.evaluate` registering a service-worker middleware for `phase: "request" | "response" | "event"`. Use `name: "*"` to match every method/event in that phase, or pass generated names like `cdp.Target.targetInfoChanged`.
 - `Custom.X(params)` → `Runtime.evaluate` calling `globalThis.ModCDP.handleCommand("Custom.X", params, cdpSessionId)`.
 
-In reverse mode, expression-backed commands cannot use `new Function` directly because MV3 extension CSP blocks unsafe eval. The service worker evaluates user expressions by attaching `chrome.debugger` to its own service-worker target and issuing `Runtime.evaluate`, preserving the normal ModCDP expression surface without weakening extension CSP.
-
 ### Receive
 
 When SW handlers `cdp.emit('Custom.X', payload)`, the SW invokes `globalThis.__ModCDP_custom_event__(JSON.stringify({ event, data, cdpSessionId }))`. CDP delivers `Runtime.bindingCalled` on the ext session; the client (or proxy) decodes the payload and re-dispatches it as a normal `cdp.on('Custom.X', ...)` event.
-
-In reverse mode, the same `publishEvent(...)` path also sends CDP-shaped event messages over the reverse websocket, so custom events and mirrored upstream events fan out through the standalone proxy to the downstream client.
 
 ### Why this works
 
@@ -256,7 +234,7 @@ In reverse mode, the same `publishEvent(...)` path also sends CDP-shaped event m
 
 - A guaranteed JS execution context that's not a page, with the right permissions
 - A way to push named events back through the same CDP socket your client already speaks
-- The same command/event surface whether the bytes arrive by websocket, pipe, native messaging, reverse websocket, or NATS.
+- The same command/event surface whether the bytes arrive by websocket, pipe, native messaging, or NATS.
 
 </details>
 

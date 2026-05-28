@@ -330,7 +330,7 @@ test("proxy CLI maps user-facing flags into a real reversews browser session", a
   }
 }, 90_000);
 
-test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser over reversews upstream", async () => {
+test("proxy upgrades a vanilla CDP websocket to ModCDP against a real browser over reversews client transport", async () => {
   const proxy_port = await LocalBrowserLauncher.freePort();
   const proxy = await startProxy({
     proxy_listen_port: proxy_port,

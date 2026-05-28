@@ -33,6 +33,7 @@ type TargetRoute = {
   sessionId?: cdp.types.ts.Target.SessionID | null;
 };
 type UpstreamPeerWaitConfig = { connected_after_ms?: number | null };
+type UpstreamPeerKind = "browser_cdp" | "modcdp_server";
 
 type UpstreamEventListener = (
   payload: ProtocolPayload,
@@ -42,10 +43,11 @@ type UpstreamEventListener = (
 
 class UpstreamTransport {
   config: UpstreamTransportBaseConfig;
-  // True when this transport terminates at a ModCDPServer peer instead of a
-  // raw browser CDP endpoint. ModCDPClient reads this to skip local
-  // target/session bootstrap and send CDP-shaped commands directly upstream.
-  upstream_is_modcdp_server = false;
+  // The kind of remote peer this client-side transport talks to. Most
+  // transports talk to raw browser CDP. Reverse client transports talk to a
+  // ModCDPServer downstream connection and therefore do not use the local
+  // AutoSessionRouter bootstrap path.
+  peer_kind: UpstreamPeerKind = "browser_cdp";
   private next_id = 1;
   private pending = new Map<
     number,
@@ -278,5 +280,6 @@ export type {
   UpstreamTransportConfig,
   TargetRoute,
   UpstreamPeerWaitConfig,
+  UpstreamPeerKind,
   UpstreamEventListener,
 };

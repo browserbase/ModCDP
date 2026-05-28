@@ -11,7 +11,7 @@ import { test } from "vitest";
 import { LocalBrowserLauncher } from "../src/launcher/LocalBrowserLauncher.js";
 import { ReverseWSUpstreamTransport } from "../src/transport/ReverseWSUpstreamTransport.js";
 
-test("reversews upstream config owns bind updates and wait timeout", async () => {
+test("reversews client transport config owns bind updates and wait timeout", async () => {
   const transport = new ReverseWSUpstreamTransport({
     upstream_reversews_bind: "127.0.0.1:29292",
     upstream_reversews_wait_timeout_ms: 10,
@@ -32,7 +32,7 @@ test("reversews upstream config owns bind updates and wait timeout", async () =>
   await assert.rejects(() => transport.waitForPeer(), /Timed out waiting 5ms/);
 });
 
-test("reversews upstream close rejects pending peer waits", async () => {
+test("reversews client transport close rejects pending peer waits", async () => {
   const reverse_port = await LocalBrowserLauncher.freePort();
   const transport = new ReverseWSUpstreamTransport({
     upstream_reversews_bind: `127.0.0.1:${reverse_port}`,
@@ -48,7 +48,7 @@ test("reversews upstream close rejects pending peer waits", async () => {
   );
 });
 
-test("reversews upstream close resets peer wait state", async () => {
+test("reversews client transport close resets peer wait state", async () => {
   const reverse_port = await LocalBrowserLauncher.freePort();
   const transport = new ReverseWSUpstreamTransport({
     upstream_reversews_bind: `127.0.0.1:${reverse_port}`,
@@ -72,7 +72,7 @@ test("reversews upstream close resets peer wait state", async () => {
   }
 });
 
-test("reversews upstream waits again after a peer disconnects", async () => {
+test("reversews client transport waits again after a peer disconnects", async () => {
   const reverse_port = await LocalBrowserLauncher.freePort();
   const transport = new ReverseWSUpstreamTransport({
     upstream_reversews_bind: `127.0.0.1:${reverse_port}`,
@@ -95,7 +95,7 @@ test("reversews upstream waits again after a peer disconnects", async () => {
   }
 });
 
-test("reversews upstream accepts a replacement peer after disconnect", async () => {
+test("reversews client transport accepts a replacement peer after disconnect", async () => {
   const reverse_port = await LocalBrowserLauncher.freePort();
   const transport = new ReverseWSUpstreamTransport({
     upstream_reversews_bind: `127.0.0.1:${reverse_port}`,

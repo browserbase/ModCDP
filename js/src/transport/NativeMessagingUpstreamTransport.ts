@@ -17,7 +17,7 @@ type NativeMessagingUpstreamTransportConfig = z.infer<typeof NativeMessagingUpst
 
 class NativeMessagingUpstreamTransport extends UpstreamTransport {
   declare config: NativeMessagingUpstreamTransportConfig;
-  override upstream_is_modcdp_server = true;
+  override peer_kind = "modcdp_server" as const;
   private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private read_native_message: ((chunk: Buffer) => void) | null = null;
 
