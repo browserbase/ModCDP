@@ -17,9 +17,10 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strictNullChecks": false,
+    "rewriteRelativeImportExtensions": true,
     "useUnknownInCatchVariables": false,
     "verbatimModuleSyntax": true
   },
-  "include": ["js/src/**/*.ts", "js/examples/**/*.ts", "js/test/**/*.ts", "extension/src/**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  "include": ["src/**/*.ts", "js/src/**/*.ts", "js/examples/**/*.ts", "js/test/**/*.ts", "extension/src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "src/codegen/codegen_*.ts"]
 }

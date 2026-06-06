@@ -88,6 +88,9 @@ type AutoSessionRouter = router.AutoSessionRouter
 type CustomCommand = types.ModCDPAddCustomCommandParams
 type CustomEvent = types.ModCDPAddCustomEventObjectParams
 type CustomMiddleware = types.ModCDPAddMiddlewareParams
+type CustomAliasObject = types.ModCDPAliasObject
+type AliasMethod = types.ModCDPAliasMethod
+type AliasReturn = types.ModCDPAliasReturn
 
 var NewLocalBrowserLauncher = launcher.NewLocalBrowserLauncher
 var NewRemoteBrowserLauncher = launcher.NewRemoteBrowserLauncher
@@ -163,9 +166,10 @@ func freePort() (int, error) {
 }
 
 type CDPTypesConfig struct {
-	CustomCommands    []CustomCommand    `json:"custom_commands,omitempty"`
-	CustomEvents      []CustomEvent      `json:"custom_events,omitempty"`
-	CustomMiddlewares []CustomMiddleware `json:"custom_middlewares,omitempty"`
+	CustomCommands     []CustomCommand     `json:"custom_commands,omitempty"`
+	CustomEvents       []CustomEvent       `json:"custom_events,omitempty"`
+	CustomMiddlewares  []CustomMiddleware  `json:"custom_middlewares,omitempty"`
+	CustomAliasObjects []CustomAliasObject `json:"custom_alias_objects,omitempty"`
 }
 
 type ServerConfig struct {
@@ -177,6 +181,7 @@ type ServerConfig struct {
 	CustomCommands     []CustomCommand              `json:"custom_commands,omitempty"`
 	CustomEvents       []CustomEvent                `json:"custom_events,omitempty"`
 	CustomMiddlewares  []CustomMiddleware           `json:"custom_middlewares,omitempty"`
+	CustomAliasObjects []CustomAliasObject          `json:"custom_alias_objects,omitempty"`
 	disabled           bool
 }
 
@@ -406,7 +411,7 @@ func New(config Config) *ModCDPClient {
 	upstream := NewWSUpstreamTransport(config.Upstream)
 	client := &ModCDPClient{
 		Config:   config,
-		Types:    NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares),
+		Types:    NewCDPTypes(typesConfig.CustomCommands, typesConfig.CustomEvents, typesConfig.CustomMiddlewares, typesConfig.CustomAliasObjects),
 		Upstream: upstream,
 		handlers: map[string][]handlerEntry{},
 	}

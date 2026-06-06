@@ -88,6 +88,33 @@ class ModCDPAddMiddlewareParams(ModCDPModel):
     name: str | None = None
 
 
+class ModCDPAliasReturn(ModCDPModel):
+    object: str | None = None
+    unwrap: str | None = None
+    array: bool | None = None
+    nullable: bool | None = None
+
+
+class ModCDPAliasMethod(ModCDPModel):
+    name: str
+    command: str | None = None
+    sdk_method_name: str | None = None
+    params_schema: ModCDPPayloadSchemaSpec | None = None
+    result_schema: ModCDPPayloadSchemaSpec | None = None
+    sticky_param: str | None = None
+    sticky_params: list[str] | None = None
+    sticky_fields: list[str] | None = None
+    return_: ModCDPAliasReturn | None = Field(default=None, alias="return")
+
+
+class ModCDPAliasObject(ModCDPModel):
+    name: str
+    type_name: str | None = None
+    sticky_schema: ModCDPPayloadSchemaSpec | None = None
+    sticky_fields: list[str] | None = None
+    methods: list[ModCDPAliasMethod] | None = None
+
+
 class ModCDPEvaluateParams(ModCDPModel):
     expression: str
     params: dict[str, object] | None = None
@@ -260,6 +287,7 @@ class ModCDPServerConfig(ModCDPModel):
     custom_commands: list[ModCDPAddCustomCommandParams] | None = None
     custom_events: list[ModCDPAddCustomEventObjectParams] | None = None
     custom_middlewares: list[ModCDPAddMiddlewareParams] | None = None
+    custom_alias_objects: list[ModCDPAliasObject] | None = None
 
 
 ModCDPConfigureParams: TypeAlias = ModCDPServerConfig
