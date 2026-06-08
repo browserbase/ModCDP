@@ -3,3 +3,7 @@ dist/
 client/go/modcdp
 client/go/modcdp-go
 __pycache__/
+testdata/codegen/stagehand_alias_manifest.json
+js/test/stagehand_client_generated/stagehand_client_gen.ts
+python/tests/stagehand_client_generated/stagehand_client_gen.py
+testdata/codegen/stagehand_client_generated_go/stagehand_client_gen.go

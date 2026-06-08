@@ -24,6 +24,8 @@ import {
   type ModCDPAddCustomCommandParams,
   type ModCDPAddCustomEventObjectParams,
   type ModCDPAddMiddlewareParams,
+  type ModCDPAliasObject,
+  type ModCDPAliasMethod,
   type ModCDPNamedValue,
   type ModCDPPayloadSchemaSpec,
   type ProtocolEventParams,
@@ -57,6 +59,7 @@ type CDPTypesConfig<TCommands extends CDPCommandMap = {}, TEvents extends CDPEve
   custom_commands?: CDPTypesCustomCommands<TCommands>;
   custom_events?: CDPTypesCustomEvents<TEvents>;
   custom_middlewares?: ModCDPAddMiddlewareParams[];
+  custom_alias_objects?: ModCDPAliasObject[];
 };
 type CDPTypesCommandRegistration = ModCDPAddCustomCommandParams & {
   params_schema?: z.ZodType | null;
@@ -225,6 +228,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
   readonly custom_commands: Map<string, ModCDPAddCustomCommandParams>;
   readonly custom_events: Map<string, ModCDPAddCustomEventObjectParams>;
   readonly custom_middlewares: ModCDPAddMiddlewareParams[];
+  readonly custom_alias_objects: Map<string, ModCDPAliasObject>;
   readonly event_schemas = new Map<string, ProtocolEventSchema>();
   readonly command_params_schemas = new Map<string, z.ZodType>();
   readonly command_result_schemas = new Map<string, z.ZodType>();
@@ -236,12 +240,14 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
     this.custom_commands = new Map();
     this.custom_events = new Map();
     this.custom_middlewares = [];
+    this.custom_alias_objects = new Map();
     this.hydrateBuiltinSchemas();
     for (const command of DEFAULT_BUILTIN_COMMANDS) this.addCustomCommand(command);
     for (const event of DEFAULT_BUILTIN_EVENTS) this.addCustomEvent(event);
     this.registerCustomCommands(config.custom_commands ?? []);
     this.registerCustomEvents(config.custom_events ?? []);
     for (const middleware of config.custom_middlewares ?? []) this.addCustomMiddleware(middleware);
+    for (const object of config.custom_alias_objects ?? []) this.addCustomAliasObject(object);
     this.service_worker_expression_builders.set("Mod.evaluate", (params) => {
       const parsed = Mod.EvaluateParams.parse(params);
       return `
@@ -260,6 +266,7 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
       custom_commands: [...this.custom_commands.values(), ...this.customCommandEntries(config.custom_commands ?? [])],
       custom_events: [...this.custom_events.values(), ...this.customEventEntries(config.custom_events ?? [])],
       custom_middlewares: [...this.custom_middlewares, ...(config.custom_middlewares ?? [])],
+      custom_alias_objects: [...this.custom_alias_objects.values(), ...(config.custom_alias_objects ?? [])],
     });
     for (const binding of this.alias_bindings) updated.installAliases(binding.target, binding.send);
     return updated;
@@ -406,11 +413,13 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
         custom_middlewares: this.customMiddlewareWireRegistrations().map(
           ({ expression: _expression, ...middleware }) => middleware,
         ),
+        custom_alias_objects: this.customAliasObjectWireRegistrations(),
       },
       state: {
         custom_commands: this.custom_commands.size,
         custom_events: this.custom_events.size,
         custom_middlewares: this.custom_middlewares.length,
+        custom_alias_objects: this.custom_alias_objects.size,
         command_params_schemas: this.command_params_schemas.size,
         command_result_schemas: this.command_result_schemas.size,
         event_schemas: this.event_schemas.size,
@@ -484,6 +493,72 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
       const middleware_name = middleware.name == null ? "*" : normalizeModCDPName(middleware.name);
       return middleware.phase === phase && (middleware_name === "*" || middleware_name === name);
     });
+  }
+
+  addCustomAliasObject(registration: ModCDPAliasObject) {
+    const parsed = Mod.AliasObject.parse(registration);
+    const name = parsed.name.trim();
+    if (!name) throw new Error("custom alias object name is required.");
+    const methods: ModCDPAliasMethod[] = [];
+    for (const method of parsed.methods ?? []) {
+      const method_name = method.name.trim();
+      if (!method_name) throw new Error(`${name} alias method name is required.`);
+      const command_name = method.command == null || method.command === "" ? "" : normalizeModCDPName(method.command);
+      if (command_name && !/^[^.]+\.[^.]+$/.test(command_name))
+        throw new Error(`${name}.${method_name} command must be in Domain.method form.`);
+      const params_schema = validateZodSchema(method.params_schema);
+      const result_schema = validateZodSchema(method.result_schema);
+      if (command_name && params_schema) this.command_params_schemas.set(command_name, params_schema);
+      if (command_name && result_schema && !this.command_result_schemas.has(command_name))
+        this.command_result_schemas.set(command_name, result_schema);
+      methods.push({
+        ...method,
+        name: method_name,
+        command: command_name,
+        sdk_method_name: method.sdk_method_name?.trim(),
+        sticky_param: method.sticky_param?.trim(),
+        sticky_params: [...(method.sticky_params ?? [])],
+        sticky_fields: [...(method.sticky_fields ?? [])],
+        return: method.return
+          ? {
+              object: method.return.object?.trim(),
+              unwrap: method.return.unwrap?.trim(),
+              array: method.return.array,
+              nullable: method.return.nullable,
+            }
+          : undefined,
+      });
+    }
+    this.custom_alias_objects.set(name, {
+      ...parsed,
+      name,
+      type_name: parsed.type_name?.trim(),
+      sticky_fields: [...(parsed.sticky_fields ?? [])],
+      methods,
+    });
+    return name;
+  }
+
+  customAliasObjectWireRegistrations() {
+    return [...this.custom_alias_objects.values()].map((object) => ({
+      name: object.name,
+      ...(object.type_name == null || object.type_name === "" ? {} : { type_name: object.type_name }),
+      ...(object.sticky_schema == null ? {} : { sticky_schema: serializablePayloadSchema(object.sticky_schema) }),
+      sticky_fields: [...(object.sticky_fields ?? [])],
+      methods: (object.methods ?? []).map((method) => ({
+        name: method.name,
+        ...(method.command == null || method.command === "" ? {} : { command: method.command }),
+        ...(method.sdk_method_name == null || method.sdk_method_name === ""
+          ? {}
+          : { sdk_method_name: method.sdk_method_name }),
+        ...(method.params_schema == null ? {} : { params_schema: serializablePayloadSchema(method.params_schema) }),
+        ...(method.result_schema == null ? {} : { result_schema: serializablePayloadSchema(method.result_schema) }),
+        ...(method.sticky_param == null || method.sticky_param === "" ? {} : { sticky_param: method.sticky_param }),
+        sticky_params: [...(method.sticky_params ?? [])],
+        sticky_fields: [...(method.sticky_fields ?? [])],
+        ...(method.return == null ? {} : { return: method.return }),
+      })),
+    }));
   }
 
   addCustomEvent(registration: ModCDPAddCustomEventObjectParams) {

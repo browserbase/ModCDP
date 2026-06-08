@@ -24,6 +24,8 @@ from ..types.modcdp import (
     ModCDPAddCustomEventObjectParams,
     ModCDPAddCustomEventParams,
     ModCDPAddMiddlewareParams,
+    ModCDPAliasObject,
+    ModCDPAliasMethod,
     ModCDPPayloadSchemaSpec,
     ProtocolParams,
     ProtocolPayload,
@@ -39,9 +41,11 @@ CustomMiddlewareConfig: TypeAlias = Mapping[str, object]
 CustomCommandRegistration: TypeAlias = dict[str, object]
 CustomEventRegistration: TypeAlias = dict[str, object]
 CustomMiddlewareRegistration: TypeAlias = dict[str, object]
+CustomAliasObjectRegistration: TypeAlias = dict[str, object]
 CustomCommandRegistrations: TypeAlias = Sequence[Mapping[str, object]] | dict[str, object]
 CustomEventRegistrations: TypeAlias = Sequence[str | Mapping[str, object]] | dict[str, object]
 CustomMiddlewareRegistrations: TypeAlias = Sequence[Mapping[str, object]]
+CustomAliasObjectRegistrations: TypeAlias = Sequence[Mapping[str, object]]
 
 
 class _ModCDPAddCustomCommand(BaseModel):
@@ -115,6 +119,7 @@ class CDPTypesConfig(BaseModel):
     custom_commands: CustomCommandRegistrations | None = None
     custom_events: CustomEventRegistrations | None = None
     custom_middlewares: CustomMiddlewareRegistrations | None = None
+    custom_alias_objects: CustomAliasObjectRegistrations | None = None
 
 
 JSON_SCHEMA_OBJECT: JsonSchema = {"type": "object"}
@@ -448,12 +453,36 @@ def _json_value(value: object) -> JsonValue:
     if value is None or isinstance(value, bool | int | float | str):
         return value
     if isinstance(value, type) and issubclass(value, BaseModel):
-        return _json_object(value.model_json_schema())
+        return _normalize_json_schema(_json_object(value.model_json_schema()))
     if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
         return [_json_value(item) for item in value]
     if isinstance(value, Mapping):
         return {str(key): _json_value(raw_value) for key, raw_value in value.items()}
     raise TypeError(f"expected a JSON value, got {type(value).__name__}")
+
+
+def _normalize_json_schema(value: JsonValue) -> JsonValue:
+    if isinstance(value, list):
+        return [_normalize_json_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    normalized: dict[str, JsonValue] = {}
+    for key, raw_value in value.items():
+        if key == "type" and raw_value == "None":
+            normalized[key] = "null"
+        elif key == "type" and isinstance(raw_value, list):
+            normalized[key] = ["null" if item == "None" else _normalize_json_schema(item) for item in raw_value]
+        else:
+            normalized[key] = _normalize_json_schema(raw_value)
+    return normalized
+
+
+def _json_schema_object(value: object) -> dict[str, JsonValue]:
+    json_schema = _json_object(value)
+    normalized = _normalize_json_schema(json_schema)
+    if not isinstance(normalized, dict):
+        raise TypeError("expected a JSON Schema object")
+    return normalized
 
 
 def _model_or_json_object(value: object) -> ProtocolResult:
@@ -470,6 +499,7 @@ class CDPTypes:
         self.custom_commands: dict[str, CustomCommandRegistration] = {}
         self.custom_events: dict[str, CustomEventRegistration] = {}
         self.custom_middlewares: list[CustomMiddlewareRegistration] = []
+        self.custom_alias_objects: dict[str, CustomAliasObjectRegistration] = {}
         self.command_schemas: dict[str, CommandSchema] = {}
         self.event_schemas: dict[str, TypeAdapter[object]] = {}
         self.native_command_names: set[str] = set()
@@ -487,6 +517,8 @@ class CDPTypes:
             self.addCustomEvent({"name": event} if isinstance(event, str) else event)
         for middleware in parsed_config.custom_middlewares or []:
             self.addCustomMiddleware(middleware)
+        for alias_object in parsed_config.custom_alias_objects or []:
+            self.addCustomAliasObject(alias_object)
         self.service_worker_expression_builders["Mod.evaluate"] = lambda params, _cdp_session_id: (
             "\n        async ({ params = {}, cdpSessionId = null }) => {\n"
             f"          const value = ({params['expression']});\n"
@@ -505,11 +537,13 @@ class CDPTypes:
         commands = [*self.custom_commands.values(), *_custom_command_entries(parsed_config.custom_commands)]
         events = [*self.custom_events.values(), *_custom_event_entries(parsed_config.custom_events)]
         middlewares = [*self.custom_middlewares, *(parsed_config.custom_middlewares or [])]
+        alias_objects = [*self.custom_alias_objects.values(), *(parsed_config.custom_alias_objects or [])]
         return CDPTypes(
             {
                 "custom_commands": commands,
                 "custom_events": events,
                 "custom_middlewares": middlewares,
+                "custom_alias_objects": alias_objects,
             }
         )
 
@@ -531,11 +565,13 @@ class CDPTypes:
                     "custom_commands": custom_commands,
                     "custom_events": self.customEventWireRegistrations(),
                     "custom_middlewares": custom_middlewares,
+                    "custom_alias_objects": self.customAliasObjectWireRegistrations(),
                 },
                 "state": {
                     "custom_commands": len(self.custom_commands),
                     "custom_events": len(self.custom_events),
                     "custom_middlewares": len(self.custom_middlewares),
+                    "custom_alias_objects": len(self.custom_alias_objects),
                     "command_params_schemas": len(self.command_schemas),
                     "command_result_schemas": len(self.command_schemas),
                     "event_schemas": len(self.event_schemas),
@@ -803,6 +839,62 @@ class CDPTypes:
             if middleware["phase"] == phase and (middleware.get("name") in (None, "*", name))
         ]
 
+    def addCustomAliasObject(self, registration: Mapping[str, object]) -> str:
+        parsed = ModCDPAliasObject.model_validate(registration)
+        name = parsed.name.strip()
+        if not name:
+            raise ValueError("custom alias object name is required")
+        methods: list[dict[str, object]] = []
+        for method in parsed.methods or []:
+            method_name = method.name.strip()
+            if not method_name:
+                raise ValueError(f"{name} alias method name is required")
+            command_name = "" if not method.command else normalizeModCDPName(method.command)
+            if command_name and not re.match(r"^[^.]+\.[^.]+$", command_name):
+                raise ValueError(f"{name}.{method_name} command must be in Domain.method form")
+            params_schema = self._adapterFromOptionalSchema(method.params_schema, "params_schema")
+            result_schema = self._adapterFromOptionalSchema(method.result_schema, "result_schema")
+            if command_name:
+                with self._lock:
+                    existing = self.command_schemas.get(command_name, CommandSchema())
+                    if params_schema.adapter is not None:
+                        existing = CommandSchema(params=params_schema.adapter, result=existing.result)
+                    if result_schema.adapter is not None and existing.result is None:
+                        existing = CommandSchema(params=existing.params, result=result_schema.adapter)
+                    self.command_schemas[command_name] = existing
+            method_registration: dict[str, object] = {"name": method_name}
+            if command_name:
+                method_registration["command"] = command_name
+            if method.sdk_method_name:
+                method_registration["sdk_method_name"] = method.sdk_method_name.strip()
+            if params_schema.json_schema:
+                method_registration["params_schema"] = params_schema.json_schema
+            if result_schema.json_schema:
+                method_registration["result_schema"] = result_schema.json_schema
+            if method.sticky_param:
+                method_registration["sticky_param"] = method.sticky_param.strip()
+            method_registration["sticky_params"] = list(method.sticky_params or [])
+            method_registration["sticky_fields"] = list(method.sticky_fields or [])
+            if method.return_ is not None:
+                method_registration["return"] = method.return_.model_dump(mode="json", exclude_none=True, by_alias=True)
+            methods.append(method_registration)
+        alias_object: CustomAliasObjectRegistration = {
+            "name": name,
+            "sticky_fields": list(parsed.sticky_fields or []),
+            "methods": methods,
+        }
+        if parsed.type_name:
+            alias_object["type_name"] = parsed.type_name.strip()
+        if parsed.sticky_schema is not None:
+            alias_object["sticky_schema"] = _json_value(parsed.sticky_schema)
+        with self._lock:
+            self.custom_alias_objects[name] = alias_object
+        return name
+
+    def customAliasObjectWireRegistrations(self) -> list[CustomAliasObjectRegistration]:
+        with self._lock:
+            return [dict(alias_object) for alias_object in self.custom_alias_objects.values()]
+
     def serviceWorkerCommandStep(
         self,
         method: str,
@@ -925,10 +1017,10 @@ class CDPTypes:
         if schema is None:
             return _AdapterRegistration()
         if isinstance(schema, type) and issubclass(schema, BaseModel):
-            return _AdapterRegistration(adapter=TypeAdapter(schema), json_schema=schema.model_json_schema())
+            return _AdapterRegistration(adapter=TypeAdapter(schema), json_schema=_json_schema_object(schema.model_json_schema()))
         if not isinstance(schema, Mapping):
             raise TypeError(f"{field_name} must be a JSON Schema object")
-        json_schema = _json_object(schema)
+        json_schema = _json_schema_object(schema)
         return _AdapterRegistration(adapter=type_adapter_from_json_schema(json_schema), json_schema=json_schema)
 
 

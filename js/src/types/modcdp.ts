@@ -162,6 +162,42 @@ const ModCDPAddMiddlewareParamsSchema = z.object({
 });
 type ModCDPAddMiddlewareParams = z.infer<typeof ModCDPAddMiddlewareParamsSchema>;
 
+const ModCDPAliasReturnSchema = z
+  .object({
+    object: z.string().optional(),
+    unwrap: z.string().optional(),
+    array: z.boolean().optional(),
+    nullable: z.boolean().optional(),
+  })
+  .strict();
+type ModCDPAliasReturn = z.infer<typeof ModCDPAliasReturnSchema>;
+
+const ModCDPAliasMethodSchema = z
+  .object({
+    name: z.string(),
+    command: z.string().optional(),
+    sdk_method_name: z.string().optional(),
+    params_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
+    result_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
+    sticky_param: z.string().optional(),
+    sticky_params: z.array(z.string()).optional(),
+    sticky_fields: z.array(z.string()).optional(),
+    return: ModCDPAliasReturnSchema.optional().nullable(),
+  })
+  .strict();
+type ModCDPAliasMethod = z.infer<typeof ModCDPAliasMethodSchema>;
+
+const ModCDPAliasObjectSchema = z
+  .object({
+    name: z.string(),
+    type_name: z.string().optional(),
+    sticky_schema: ModCDPPayloadSchemaSpecSchema.optional().nullable(),
+    sticky_fields: z.array(z.string()).optional(),
+    methods: z.array(ModCDPAliasMethodSchema).optional(),
+  })
+  .strict();
+type ModCDPAliasObject = z.infer<typeof ModCDPAliasObjectSchema>;
+
 const BrowserbaseBrowserSettingsSchema = z
   .object({
     extensionId: z.string().optional(),
@@ -257,6 +293,7 @@ const ModCDPServerConfigSchema = z
     custom_commands: z.array(ModCDPAddCustomCommandParamsSchema).optional(),
     custom_events: z.array(ModCDPAddCustomEventObjectParamsSchema).optional(),
     custom_middlewares: z.array(ModCDPAddMiddlewareParamsSchema).optional(),
+    custom_alias_objects: z.array(ModCDPAliasObjectSchema).optional(),
   })
   .strict();
 type ModCDPServerConfig = z.infer<typeof ModCDPServerConfigSchema>;
@@ -441,6 +478,9 @@ type ModCDPCustomEventRegistration = z.infer<typeof ModCDPCustomEventRegistratio
 const ModCDPMiddlewareRegistrationSchema = ModCDPAddMiddlewareParamsSchema;
 type ModCDPMiddlewareRegistration = z.infer<typeof ModCDPMiddlewareRegistrationSchema>;
 
+const ModCDPAliasObjectRegistrationSchema = ModCDPAliasObjectSchema;
+type ModCDPAliasObjectRegistration = z.infer<typeof ModCDPAliasObjectRegistrationSchema>;
+
 const CdpErrorSchema = z.object({
   code: z.number().optional().nullable(),
   message: z.string(),
@@ -509,6 +549,9 @@ const Mod = {
   AddCustomEventObjectParams: ModCDPAddCustomEventObjectParamsSchema,
   AddCustomEventParams: ModCDPAddCustomEventParamsSchema,
   AddMiddlewareParams: ModCDPAddMiddlewareParamsSchema,
+  AliasReturn: ModCDPAliasReturnSchema,
+  AliasMethod: ModCDPAliasMethodSchema,
+  AliasObject: ModCDPAliasObjectSchema,
   LauncherConfig: ModCDPLauncherConfigSchema,
   UpstreamConfig: ModCDPUpstreamConfigSchema,
   ClientConfig: ModCDPClientConfigSchema,
@@ -536,6 +579,7 @@ const Mod = {
   CustomCommandRegistration: ModCDPCustomCommandRegistrationSchema,
   CustomEventRegistration: ModCDPCustomEventRegistrationSchema,
   MiddlewareRegistration: ModCDPMiddlewareRegistrationSchema,
+  AliasObjectRegistration: ModCDPAliasObjectRegistrationSchema,
 } as const;
 
 export {
@@ -569,6 +613,9 @@ export {
   ModCDPAddCustomEventObjectParamsSchema,
   ModCDPAddCustomEventParamsSchema,
   ModCDPAddMiddlewareParamsSchema,
+  ModCDPAliasReturnSchema,
+  ModCDPAliasMethodSchema,
+  ModCDPAliasObjectSchema,
   ModCDPLauncherConfigSchema,
   ModCDPUpstreamConfigSchema,
   ModCDPClientConfigSchema,
@@ -602,6 +649,7 @@ export {
   ModCDPCustomCommandRegistrationSchema,
   ModCDPCustomEventRegistrationSchema,
   ModCDPMiddlewareRegistrationSchema,
+  ModCDPAliasObjectRegistrationSchema,
   CdpErrorSchema,
   CdpCommandMessageSchema,
   CdpResponseMessageSchema,
@@ -631,6 +679,9 @@ export type {
   ModCDPAddCustomEventObjectParams,
   ModCDPAddCustomEventParams,
   ModCDPAddMiddlewareParams,
+  ModCDPAliasReturn,
+  ModCDPAliasMethod,
+  ModCDPAliasObject,
   ModCDPLauncherConfig,
   ModCDPUpstreamConfig,
   ModCDPClientConfig,
@@ -664,6 +715,7 @@ export type {
   ModCDPCustomCommandRegistration,
   ModCDPCustomEventRegistration,
   ModCDPMiddlewareRegistration,
+  ModCDPAliasObjectRegistration,
   CdpError,
   CdpCommandMessage,
   CdpResponseMessage,

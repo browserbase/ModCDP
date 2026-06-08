@@ -117,6 +117,33 @@ type ModCDPAddMiddlewareParams struct {
 	Expression string `json:"expression"`
 }
 
+type ModCDPAliasReturn struct {
+	Object   string `json:"object,omitempty"`
+	Unwrap   string `json:"unwrap,omitempty"`
+	Array    bool   `json:"array,omitempty"`
+	Nullable bool   `json:"nullable,omitempty"`
+}
+
+type ModCDPAliasMethod struct {
+	Name          string             `json:"name"`
+	Command       string             `json:"command,omitempty"`
+	SDKMethodName string             `json:"sdk_method_name,omitempty"`
+	ParamsSchema  map[string]any     `json:"params_schema,omitempty"`
+	ResultSchema  map[string]any     `json:"result_schema,omitempty"`
+	StickyParam   string             `json:"sticky_param,omitempty"`
+	StickyParams  []string           `json:"sticky_params,omitempty"`
+	StickyFields  []string           `json:"sticky_fields,omitempty"`
+	Return        *ModCDPAliasReturn `json:"return,omitempty"`
+}
+
+type ModCDPAliasObject struct {
+	Name         string              `json:"name"`
+	TypeName     string              `json:"type_name,omitempty"`
+	StickySchema map[string]any      `json:"sticky_schema,omitempty"`
+	StickyFields []string            `json:"sticky_fields,omitempty"`
+	Methods      []ModCDPAliasMethod `json:"methods,omitempty"`
+}
+
 type ModCDPPingParams struct {
 	SentAt int `json:"sent_at,omitempty"`
 }
@@ -163,6 +190,7 @@ type ModCDPServerConfig struct {
 	CustomCommands     []ModCDPAddCustomCommandParams     `json:"custom_commands,omitempty"`
 	CustomEvents       []ModCDPAddCustomEventObjectParams `json:"custom_events,omitempty"`
 	CustomMiddlewares  []ModCDPAddMiddlewareParams        `json:"custom_middlewares,omitempty"`
+	CustomAliasObjects []ModCDPAliasObject                `json:"custom_alias_objects,omitempty"`
 }
 
 type ModCDPGetTopologyParams struct {

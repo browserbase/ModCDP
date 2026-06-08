@@ -67,6 +67,7 @@ import type {
   ProtocolParams,
   ProtocolResult,
 } from "../types/modcdp.js";
+import { installAliasMethods } from "./alias.js";
 
 type ModCDPClientConfig<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap = {}> = {
   launcher?: LauncherConfig;
@@ -224,6 +225,7 @@ export class ModCDPClient<
     });
     if (this.config.client_hydrate_aliases)
       this.types.installAliases(this, (method, params) => this.send(method, params));
+    installAliasMethods(this);
   }
 
   toJSON() {

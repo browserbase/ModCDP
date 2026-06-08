@@ -29,6 +29,7 @@ type CDPTypes struct {
 	CustomCommands       map[string]CustomCommand
 	CustomEvents         map[string]CustomEvent
 	CustomMiddlewares    []CustomMiddleware
+	CustomAliasObjects   map[string]CustomAliasObject
 	commandSchemas       map[string]CDPCommandSchema
 	commandParamsSchemas map[string]map[string]any
 	commandResultSchemas map[string]map[string]any
@@ -105,6 +106,47 @@ var modMiddlewareRegistrationSchema = map[string]any{
 	"additionalProperties": false,
 }
 
+var modAliasReturnSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"object":   map[string]any{"type": "string"},
+		"unwrap":   map[string]any{"type": "string"},
+		"array":    map[string]any{"type": "boolean"},
+		"nullable": map[string]any{"type": "boolean"},
+	},
+	"additionalProperties": false,
+}
+
+var modAliasMethodRegistrationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":          map[string]any{"type": "string"},
+		"command":       map[string]any{"type": "string"},
+		"params_schema": map[string]any{"type": []any{"object", "null"}},
+		"result_schema": map[string]any{"type": []any{"object", "null"}},
+		"sticky_param":  map[string]any{"type": "string"},
+		"sticky_params": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"sticky_fields": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"return":        modAliasReturnSchema,
+	},
+	"required":             []any{"name", "command"},
+	"additionalProperties": false,
+}
+
+var modAliasObjectRegistrationSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"name":          map[string]any{"type": "string"},
+		"type_name":     map[string]any{"type": "string"},
+		"root":          map[string]any{"type": "boolean"},
+		"sticky_schema": map[string]any{"type": []any{"object", "null"}},
+		"sticky_fields": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"methods":       map[string]any{"type": "array", "items": modAliasMethodRegistrationSchema},
+	},
+	"required":             []any{"name"},
+	"additionalProperties": false,
+}
+
 var modConfigureParamsSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
@@ -149,6 +191,7 @@ var modConfigureParamsSchema = map[string]any{
 		"custom_commands":      map[string]any{"type": "array", "items": modCommandRegistrationSchema},
 		"custom_events":        map[string]any{"type": "array", "items": modEventRegistrationSchema},
 		"custom_middlewares":   map[string]any{"type": "array", "items": modMiddlewareRegistrationSchema},
+		"custom_alias_objects": map[string]any{"type": "array", "items": modAliasObjectRegistrationSchema},
 	},
 	"additionalProperties": false,
 }
@@ -327,11 +370,12 @@ var defaultBuiltinEvents = []CustomEvent{
 	},
 }
 
-func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, customMiddlewares []CustomMiddleware) *CDPTypes {
+func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, customMiddlewares []CustomMiddleware, customAliasObjectGroups ...[]CustomAliasObject) *CDPTypes {
 	types := &CDPTypes{
 		CustomCommands:       map[string]CustomCommand{},
 		CustomEvents:         map[string]CustomEvent{},
 		CustomMiddlewares:    []CustomMiddleware{},
+		CustomAliasObjects:   map[string]CustomAliasObject{},
 		commandSchemas:       map[string]CDPCommandSchema{},
 		commandParamsSchemas: map[string]map[string]any{},
 		commandResultSchemas: map[string]map[string]any{},
@@ -375,6 +419,13 @@ func NewCDPTypes(customCommands []CustomCommand, customEvents []CustomEvent, cus
 			panic(err)
 		}
 	}
+	for _, customAliasObjects := range customAliasObjectGroups {
+		for _, object := range customAliasObjects {
+			if _, err := types.AddCustomAliasObject(object); err != nil {
+				panic(err)
+			}
+		}
+	}
 	return types
 }
 
@@ -389,11 +440,16 @@ func (types *CDPTypes) Update(config CDPTypesConfig) *CDPTypes {
 		customEvents = append(customEvents, event)
 	}
 	customMiddlewares := append([]CustomMiddleware{}, types.CustomMiddlewares...)
+	customAliasObjects := make([]CustomAliasObject, 0, len(types.CustomAliasObjects)+len(config.CustomAliasObjects))
+	for _, object := range types.CustomAliasObjects {
+		customAliasObjects = append(customAliasObjects, object)
+	}
 	types.mu.RUnlock()
 	customCommands = append(customCommands, config.CustomCommands...)
 	customEvents = append(customEvents, config.CustomEvents...)
 	customMiddlewares = append(customMiddlewares, config.CustomMiddlewares...)
-	return NewCDPTypes(customCommands, customEvents, customMiddlewares)
+	customAliasObjects = append(customAliasObjects, config.CustomAliasObjects...)
+	return NewCDPTypes(customCommands, customEvents, customMiddlewares, customAliasObjects)
 }
 
 func (types *CDPTypes) ToJSON() map[string]any {
@@ -410,11 +466,13 @@ func (types *CDPTypes) ToJSON() map[string]any {
 		}
 		customMiddlewares = append(customMiddlewares, registration)
 	}
+	customAliasObjects := types.CustomAliasObjectWireRegistrations()
 	types.mu.RLock()
 	state := map[string]any{
 		"custom_commands":        len(types.CustomCommands),
 		"custom_events":          len(types.CustomEvents),
 		"custom_middlewares":     len(types.CustomMiddlewares),
+		"custom_alias_objects":   len(types.CustomAliasObjects),
 		"command_params_schemas": len(types.commandParamsSchemas),
 		"command_result_schemas": len(types.commandResultSchemas),
 		"event_schemas":          len(types.eventSchemas),
@@ -422,9 +480,10 @@ func (types *CDPTypes) ToJSON() map[string]any {
 	types.mu.RUnlock()
 	return modtypes.ModCDPToJSON(types, modtypes.ModCDPJSONConfig{
 		Config: map[string]any{
-			"custom_commands":    customCommands,
-			"custom_events":      types.CustomEventWireRegistrations(),
-			"custom_middlewares": customMiddlewares,
+			"custom_commands":      customCommands,
+			"custom_events":        types.CustomEventWireRegistrations(),
+			"custom_middlewares":   customMiddlewares,
+			"custom_alias_objects": customAliasObjects,
 		},
 		State: state,
 	})
@@ -695,15 +754,21 @@ func (types *CDPTypes) AddCustomMiddleware(middleware CustomMiddleware) (string,
 		return "", fmt.Errorf("phase must be request, response, or event")
 	}
 	middleware.Name = name
+	types.mu.Lock()
+	defer types.mu.Unlock()
 	types.CustomMiddlewares = append(types.CustomMiddlewares, middleware)
 	return name, nil
 }
 
 func (types *CDPTypes) CustomMiddlewareWireRegistrations() []CustomMiddleware {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
 	return append([]CustomMiddleware{}, types.CustomMiddlewares...)
 }
 
 func (types *CDPTypes) CustomMiddlewareRegistrations(phase string, name string) []CustomMiddleware {
+	types.mu.RLock()
+	defer types.mu.RUnlock()
 	middlewares := []CustomMiddleware{}
 	for _, middleware := range types.CustomMiddlewares {
 		middlewareName := middleware.Name
@@ -715,6 +780,129 @@ func (types *CDPTypes) CustomMiddlewareRegistrations(phase string, name string) 
 		}
 	}
 	return middlewares
+}
+
+func (types *CDPTypes) AddCustomAliasObject(object CustomAliasObject) (string, error) {
+	name := strings.TrimSpace(object.Name)
+	if name == "" {
+		return "", fmt.Errorf("custom alias object name is required")
+	}
+	normalized := CustomAliasObject{
+		Name:         name,
+		TypeName:     strings.TrimSpace(object.TypeName),
+		StickyFields: append([]string{}, object.StickyFields...),
+		Methods:      make([]AliasMethod, 0, len(object.Methods)),
+	}
+	if object.StickySchema != nil {
+		normalized.StickySchema = cloneSchema(object.StickySchema)
+	}
+	for _, method := range object.Methods {
+		methodName := strings.TrimSpace(method.Name)
+		if methodName == "" {
+			return "", fmt.Errorf("%s alias method name is required", name)
+		}
+		commandName := ""
+		if strings.TrimSpace(method.Command) != "" {
+			normalizedCommandName, err := normalizeModCDPName(method.Command)
+			if err != nil {
+				return "", fmt.Errorf("%s.%s command: %w", name, methodName, err)
+			}
+			commandName = normalizedCommandName
+		}
+		normalizedMethod := AliasMethod{
+			Name:          methodName,
+			Command:       commandName,
+			SDKMethodName: strings.TrimSpace(method.SDKMethodName),
+			StickyParam:   strings.TrimSpace(method.StickyParam),
+			StickyParams:  append([]string{}, method.StickyParams...),
+			StickyFields:  append([]string{}, method.StickyFields...),
+		}
+		if method.ParamsSchema != nil {
+			normalizedMethod.ParamsSchema = cloneSchema(method.ParamsSchema)
+		}
+		if method.ResultSchema != nil {
+			normalizedMethod.ResultSchema = cloneSchema(method.ResultSchema)
+		}
+		if method.Return != nil {
+			normalizedMethod.Return = &AliasReturn{
+				Object:   strings.TrimSpace(method.Return.Object),
+				Unwrap:   strings.TrimSpace(method.Return.Unwrap),
+				Array:    method.Return.Array,
+				Nullable: method.Return.Nullable,
+			}
+		}
+		normalized.Methods = append(normalized.Methods, normalizedMethod)
+	}
+	types.mu.Lock()
+	defer types.mu.Unlock()
+	for _, method := range normalized.Methods {
+		if method.Command == "" {
+			continue
+		}
+		if method.ParamsSchema != nil {
+			if schema := cloneSchema(method.ParamsSchema); schema != nil {
+				types.commandParamsSchemas[method.Command] = schema
+			}
+		}
+		if method.ResultSchema != nil {
+			if _, exists := types.commandResultSchemas[method.Command]; exists {
+				continue
+			}
+			if schema := cloneSchema(method.ResultSchema); schema != nil {
+				types.commandResultSchemas[method.Command] = schema
+			}
+		}
+	}
+	types.CustomAliasObjects[name] = normalized
+	return name, nil
+}
+
+func (types *CDPTypes) CustomAliasObjectWireRegistrations() []CustomAliasObject {
+	types.mu.RLock()
+	objects := make([]CustomAliasObject, 0, len(types.CustomAliasObjects))
+	for _, object := range types.CustomAliasObjects {
+		objects = append(objects, object)
+	}
+	types.mu.RUnlock()
+	registrations := make([]CustomAliasObject, 0, len(objects))
+	for _, object := range objects {
+		registration := CustomAliasObject{
+			Name:         object.Name,
+			TypeName:     object.TypeName,
+			StickyFields: append([]string{}, object.StickyFields...),
+			Methods:      make([]AliasMethod, 0, len(object.Methods)),
+		}
+		if object.StickySchema != nil {
+			registration.StickySchema = cloneSchema(object.StickySchema)
+		}
+		for _, method := range object.Methods {
+			methodRegistration := AliasMethod{
+				Name:          method.Name,
+				Command:       method.Command,
+				SDKMethodName: method.SDKMethodName,
+				StickyParam:   method.StickyParam,
+				StickyParams:  append([]string{}, method.StickyParams...),
+				StickyFields:  append([]string{}, method.StickyFields...),
+			}
+			if method.ParamsSchema != nil {
+				methodRegistration.ParamsSchema = cloneSchema(method.ParamsSchema)
+			}
+			if method.ResultSchema != nil {
+				methodRegistration.ResultSchema = cloneSchema(method.ResultSchema)
+			}
+			if method.Return != nil {
+				methodRegistration.Return = &AliasReturn{
+					Object:   method.Return.Object,
+					Unwrap:   method.Return.Unwrap,
+					Array:    method.Return.Array,
+					Nullable: method.Return.Nullable,
+				}
+			}
+			registration.Methods = append(registration.Methods, methodRegistration)
+		}
+		registrations = append(registrations, registration)
+	}
+	return registrations
 }
 
 func (types *CDPTypes) ServiceWorkerCommandStep(method string, params map[string]any, cdpSessionID string, executionContextID int) (modtypes.TranslatedStep, error) {
