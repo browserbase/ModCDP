@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -71,7 +71,7 @@ def alias_sticky_from_result(result: object, unwrap: str, sticky_fields: Sequenc
 def alias_array_from_result(result: object, unwrap: str) -> list[object]:
     unwrapped = unwrap_alias_result(result, unwrap)
     if isinstance(unwrapped, list):
-        return unwrapped
+        return cast(list[object], unwrapped)
     raise TypeError(f"alias unwrap {unwrap!r} expected array")
 
 
@@ -136,9 +136,9 @@ def _params_to_alias_object(params: object) -> AliasJSONObject:
     if isinstance(params, BaseModel):
         return dict(params.model_dump(mode="json", exclude_none=True, by_alias=True))
     if isinstance(params, Mapping):
-        return dict(params)
+        return {str(key): value for key, value in params.items()}
     return {}
 
 
 def _clone_alias_object(source: Mapping[str, object]) -> AliasSticky:
-    return json.loads(json.dumps(dict(source)))
+    return cast(AliasSticky, json.loads(json.dumps(dict(source))))

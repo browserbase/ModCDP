@@ -39,7 +39,15 @@ function generateClientWithAliasesForGo(options: GenerateClientWithAliasesOption
   out += `  modcdpclient "github.com/browserbase/modcdp/go/modcdp/client"\n`;
   out += `)\n\n`;
   out += emitGoSchemaDefinitions(objects);
-  out += emitGoClientType(clientName, clientRef, aliasObjectsName, customCommandsName, sortedObjectsArray(objects), statelessObjects, options.default_config);
+  out += emitGoClientType(
+    clientName,
+    clientRef,
+    aliasObjectsName,
+    customCommandsName,
+    sortedObjectsArray(objects),
+    statelessObjects,
+    options.default_config,
+  );
   for (const object of sortedObjectsArray(objects)) {
     const typeName = object.type_name || pascal(object.name);
     out += `type ${typeName} struct {\n`;
@@ -48,7 +56,16 @@ function generateClientWithAliasesForGo(options: GenerateClientWithAliasesOption
     out += `}\n\n`;
     out += emitGoAliasObjectConstructor(clientRef, object);
     for (const method of object.methods ?? []) {
-      if (sdkPath(object, method).length === 2) out += emitGoMethod(clientRef, typeName, "receiver.alias.Client", "receiver.alias.Sticky", object, method, objectsByName);
+      if (sdkPath(object, method).length === 2)
+        out += emitGoMethod(
+          clientRef,
+          typeName,
+          "receiver.alias.Client",
+          "receiver.alias.Sticky",
+          object,
+          method,
+          objectsByName,
+        );
     }
   }
   out += emitGoAliasObjectsFunction(clientRef, aliasObjectsName, sortedObjectsArray(objects));
@@ -56,14 +73,23 @@ function generateClientWithAliasesForGo(options: GenerateClientWithAliasesOption
   return out;
 }
 
-function emitGoClientType(clientName, clientRef, aliasObjectsName, customCommandsName, objects, statelessObjects, defaultConfig) {
+function emitGoClientType(
+  clientName,
+  clientRef,
+  aliasObjectsName,
+  customCommandsName,
+  objects,
+  statelessObjects,
+  defaultConfig,
+) {
   const concreteName = lowerFirst(clientName);
   const optionsName = `${clientName}Options`;
   const hasDefaultConfig = defaultConfig != null;
   let out = `type ${optionsName} ${clientRef}Config\n\n`;
   out += `type ${concreteName} struct {\n  *${clientRef}ModCDPClient\n`;
   for (const object of objects) {
-    if (statelessObjects.has(object.name)) out += `  ${object.type_name || pascal(object.name)} ${object.type_name || pascal(object.name)} \`json:"-"\`\n`;
+    if (statelessObjects.has(object.name))
+      out += `  ${object.type_name || pascal(object.name)} ${object.type_name || pascal(object.name)} \`json:"-"\`\n`;
   }
   out += `}\n\n`;
   if (hasDefaultConfig) out += emitGoDefaultConfig(clientName, clientRef, defaultConfig);
@@ -84,7 +110,8 @@ function emitGoClientType(clientName, clientRef, aliasObjectsName, customCommand
   out += `  }\n`;
   out += `  receiver := &${concreteName}{ModCDPClient: ${clientRef}New(config)}\n`;
   for (const object of objects) {
-    if (statelessObjects.has(object.name)) out += `  receiver.${object.type_name || pascal(object.name)} = new${object.type_name || pascal(object.name)}Alias(receiver.ModCDPClient, nil)\n`;
+    if (statelessObjects.has(object.name))
+      out += `  receiver.${object.type_name || pascal(object.name)} = new${object.type_name || pascal(object.name)}Alias(receiver.ModCDPClient, nil)\n`;
   }
   out += `  return receiver\n`;
   out += `}\n\n`;
@@ -92,21 +119,26 @@ function emitGoClientType(clientName, clientRef, aliasObjectsName, customCommand
 }
 
 function emitGoDefaultConfig(clientName, clientRef, config) {
-  return `const ${lowerFirst(clientName)}DefaultOptionsJSON = ${JSON.stringify(JSON.stringify(config))}\n\n` +
+  return (
+    `const ${lowerFirst(clientName)}DefaultOptionsJSON = ${JSON.stringify(JSON.stringify(config))}\n\n` +
     `func ${clientName}DefaultOptions() ${clientName}Options {\n` +
     `  var config ${clientRef}Config\n` +
     `  if err := json.Unmarshal([]byte(os.ExpandEnv(${lowerFirst(clientName)}DefaultOptionsJSON)), &config); err != nil {\n` +
     `    panic(err)\n` +
     `  }\n` +
     `  return ${clientName}Options(config)\n` +
-    `}\n\n`;
+    `}\n\n`
+  );
 }
 
 function emitGoSchemaDefinitions(objects) {
   const emitted = new Set(objects.map((object) => object.type_name || pascal(object.name)));
   let out = "";
   for (const object of sortedObjectsArray(objects)) {
-    const defs = collectDefinitionsFromSchemas([object.sticky_schema, ...(object.methods ?? []).flatMap((method) => [method.params_schema, method.result_schema])]);
+    const defs = collectDefinitionsFromSchemas([
+      object.sticky_schema,
+      ...(object.methods ?? []).flatMap((method) => [method.params_schema, method.result_schema]),
+    ]);
     for (const [name, schema] of sortedEntries(defs)) {
       const typeName = goExportName(name);
       if (emitted.has(typeName)) continue;
@@ -120,7 +152,8 @@ function emitGoSchemaDefinitions(objects) {
 function emitGoSchemaDefinition(name, schema) {
   if (Object.keys(schemaPropertiesObject(schema)).length > 0) return emitGoSchemaType(name, schema, new Set());
   let fieldType = goTypeForSchemaWithName(schema, name);
-  if (fieldType === name || fieldType.startsWith(`*${name}`) || fieldType.startsWith(`[]${name}`)) fieldType = "json.RawMessage";
+  if (fieldType === name || fieldType.startsWith(`*${name}`) || fieldType.startsWith(`[]${name}`))
+    fieldType = "json.RawMessage";
   return `type ${name} ${fieldType}\n\n`;
 }
 
@@ -128,7 +161,8 @@ function emitGoAliasObjectConstructor(clientRef, object) {
   const typeName = object.type_name || pascal(object.name);
   let out = `func new${typeName}Alias(base *${clientRef}ModCDPClient, sticky ${clientRef}AliasSticky) ${typeName} {\n`;
   out += `  value := ${typeName}{alias: ${clientRef}NewModCDPAliasObject(base, sticky)}\n`;
-  if (Object.keys(schemaPropertiesObject(object.sticky_schema)).length > 0) out += `  _ = value.applyAliasSticky(sticky)\n`;
+  if (Object.keys(schemaPropertiesObject(object.sticky_schema)).length > 0)
+    out += `  _ = value.applyAliasSticky(sticky)\n`;
   out += `  return value\n`;
   out += `}\n\n`;
   if (Object.keys(schemaPropertiesObject(object.sticky_schema)).length === 0) return out;
@@ -221,7 +255,6 @@ function emitGoMethod(clientRef, receiverType, clientExpression, stickyExpressio
   return out;
 }
 
-
 function emitGoSchemaType(name, schema, optionalFields) {
   let out = emitGoInlineSchemaTypes(name, schema, new Set([name]));
   out += `type ${name} struct {\n`;
@@ -264,7 +297,8 @@ function emitGoSchemaFields(schema, parentName, optionalFields) {
     const receiverStickyOptional = optionalFields.has(property);
     if (receiverStickyOptional) required.delete(property);
     let fieldType = goTypeForSchemaWithName(propertySchema, `${parentName}${goExportName(property)}`);
-    if (!required.has(property) && !receiverStickyOptional && goIsObjectLikeSchema(propertySchema)) fieldType = goPointerType(fieldType);
+    if (!required.has(property) && !receiverStickyOptional && goIsObjectLikeSchema(propertySchema))
+      fieldType = goPointerType(fieldType);
     let tag = property;
     if (!required.has(property)) tag += ",omitempty";
     out += `  ${goExportName(property)} ${fieldType} \`json:"${tag}"\`\n`;
@@ -290,7 +324,10 @@ function goTypeForSchemaWithName(schema, suggestedName) {
     if (nonNullTypes.length > 0) {
       let nonNullType = nonNullTypes[0];
       if (nonNullTypes.length > 1) {
-        nonNullType = nonNullTypes.includes("int") && nonNullTypes.includes("float64") && nonNullTypes.length === 2 ? "float64" : "json.RawMessage";
+        nonNullType =
+          nonNullTypes.includes("int") && nonNullTypes.includes("float64") && nonNullTypes.length === 2
+            ? "float64"
+            : "json.RawMessage";
       }
       if (nullable) return nonNullType === "string" ? nonNullType : goPointerType(nonNullType);
       return nonNullType;
@@ -321,7 +358,8 @@ function goScalarType(value, schema, suggestedName) {
     return "json.RawMessage";
   }
   if (value === "array") {
-    if (schema.items && typeof schema.items === "object") return `[]${goTypeForSchemaWithName(schema.items, `${suggestedName}Item`).replace(/^\*/, "")}`;
+    if (schema.items && typeof schema.items === "object")
+      return `[]${goTypeForSchemaWithName(schema.items, `${suggestedName}Item`).replace(/^\*/, "")}`;
     return "[]json.RawMessage";
   }
   return "json.RawMessage";
@@ -365,7 +403,6 @@ function emitGoCustomCommandsFunction(clientRef, name, commands) {
   return `func ${name}() []${clientRef}CustomCommand {\n  var values []${clientRef}CustomCommand\n  if err := json.Unmarshal([]byte(${JSON.stringify(JSON.stringify(sanitizeCommandRegistry(commands)))}), &values); err != nil {\n    panic(err)\n  }\n  return values\n}\n\n`;
 }
 
-
 function collectDefinitionsFromSchemas(schemas) {
   const defs = new Map();
   for (const schema of schemas) collectSchemaDefinitions(schema, defs);
@@ -386,21 +423,28 @@ function goExportName(value) {
 }
 
 function goPackageName(value) {
-  return String(value).replace(/[^A-Za-z0-9]/g, "").toLowerCase() || "generatedclient";
+  return (
+    String(value)
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toLowerCase() || "generatedclient"
+  );
 }
-
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const manifest = JSON.parse(readFileSync("testdata/codegen/stagehand_alias_manifest.json", "utf8"));
   const output = "testdata/codegen/stagehand_client_generated_go/stagehand_client_gen.go";
-  const generated = generateClientWithAliasesForGo({
-    language: "go",
-    name: "StagehandClient",
-    custom_commands: manifest.custom_commands,
-    custom_alias_objects: manifest.custom_alias_objects,
-    default_config: manifest.modcdp_config,
-    output,
-  }, manifest.custom_alias_objects ?? [], manifest.custom_commands ?? []);
+  const generated = generateClientWithAliasesForGo(
+    {
+      language: "go",
+      name: "StagehandClient",
+      custom_commands: manifest.custom_commands,
+      custom_alias_objects: manifest.custom_alias_objects,
+      default_config: manifest.modcdp_config,
+      output,
+    },
+    manifest.custom_alias_objects ?? [],
+    manifest.custom_commands ?? [],
+  );
   mkdirSync(dirname(output), { recursive: true });
   writeFileSync(output, generated);
 }

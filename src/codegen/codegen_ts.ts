@@ -43,12 +43,18 @@ function generateClientWithAliasesForTs(options: GenerateClientWithAliasesOption
   for (const [name, schema] of sortedEntries(defs)) out += emitTSInterface(name, schema, objectNames);
   for (const object of objects) {
     const typeName = object.type_name || pascal(object.name);
-    if (schemaProperties(object.sticky_schema).size > 0) out += emitTSInterface(`${typeName}Data`, object.sticky_schema, objectNames);
+    if (schemaProperties(object.sticky_schema).size > 0)
+      out += emitTSInterface(`${typeName}Data`, object.sticky_schema, objectNames);
   }
   for (const object of objects) {
     const typeName = object.type_name || pascal(object.name);
     for (const method of object.methods ?? []) {
-      out += emitTSInterface(`${typeName}${pascal(method.name)}Params`, method.params_schema, objectNames, receiverStickyParamFields(object, method));
+      out += emitTSInterface(
+        `${typeName}${pascal(method.name)}Params`,
+        method.params_schema,
+        objectNames,
+        receiverStickyParamFields(object, method),
+      );
       out += emitTSInterface(`${typeName}${pascal(method.name)}Result`, method.result_schema, objectNames);
     }
   }
@@ -77,7 +83,8 @@ function generateClientWithAliasesForTs(options: GenerateClientWithAliasesOption
 }
 
 function emitTSDefaultConfig(clientName, functionPrefix, config) {
-  return `const ${clientName.toUpperCase()}_DEFAULT_OPTIONS_JSON = ${JSON.stringify(JSON.stringify(config))};\n\n` +
+  return (
+    `const ${clientName.toUpperCase()}_DEFAULT_OPTIONS_JSON = ${JSON.stringify(JSON.stringify(config))};\n\n` +
     `export function ${functionPrefix}DefaultOptions(): ${clientName}Options {\n` +
     `  return ${functionPrefix}ReplaceEnv(JSON.parse(${clientName.toUpperCase()}_DEFAULT_OPTIONS_JSON)) as ${clientName}Options;\n` +
     `}\n\n` +
@@ -86,7 +93,8 @@ function emitTSDefaultConfig(clientName, functionPrefix, config) {
     `  if (Array.isArray(value)) return value.map((item) => ${functionPrefix}ReplaceEnv(item));\n` +
     `  if (value != null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, ${functionPrefix}ReplaceEnv(item)]));\n` +
     `  return value;\n` +
-    `}\n\n`;
+    `}\n\n`
+  );
 }
 
 function emitTSClass(object, objects) {
@@ -162,7 +170,11 @@ function tsType(schema, suggestedName, objectNames) {
     if (schema.properties) return tsInlineObjectType(schema, objectNames);
     return "{ [key: string]: JsonValue }";
   }
-  if (Array.isArray(schema.type)) return schema.type.filter((item) => item !== "null").map((item) => tsType({ type: item }, suggestedName, objectNames)).join(" | ");
+  if (Array.isArray(schema.type))
+    return schema.type
+      .filter((item) => item !== "null")
+      .map((item) => tsType({ type: item }, suggestedName, objectNames))
+      .join(" | ");
   if (schema.enum) return schema.enum.map((value) => JSON.stringify(value)).join(" | ");
   if (schema.type === "string") return "string";
   if (schema.type === "boolean") return "boolean";
@@ -180,23 +192,25 @@ function tsInlineObjectType(schema, objectNames) {
   return `{ ${fields.join("; ")} }`;
 }
 
-
 function tsFieldName(name) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
 }
 
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const manifest = JSON.parse(readFileSync("testdata/codegen/stagehand_alias_manifest.json", "utf8"));
   const output = "js/test/stagehand_client_generated/stagehand_client_gen.ts";
-  const generated = generateClientWithAliasesForTs({
-    language: "ts",
-    name: "StagehandClient",
-    custom_commands: manifest.custom_commands,
-    custom_alias_objects: manifest.custom_alias_objects,
-    default_config: manifest.modcdp_config,
-    output,
-  }, manifest.custom_alias_objects ?? [], manifest.custom_commands ?? []);
+  const generated = generateClientWithAliasesForTs(
+    {
+      language: "ts",
+      name: "StagehandClient",
+      custom_commands: manifest.custom_commands,
+      custom_alias_objects: manifest.custom_alias_objects,
+      default_config: manifest.modcdp_config,
+      output,
+    },
+    manifest.custom_alias_objects ?? [],
+    manifest.custom_commands ?? [],
+  );
   mkdirSync(dirname(output), { recursive: true });
   writeFileSync(output, generated);
 }

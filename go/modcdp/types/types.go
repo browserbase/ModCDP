@@ -125,15 +125,15 @@ type ModCDPAliasReturn struct {
 }
 
 type ModCDPAliasMethod struct {
-	Name         string             `json:"name"`
-	Command      string             `json:"command,omitempty"`
-	SDKMethodName string           `json:"sdk_method_name,omitempty"`
-	ParamsSchema map[string]any     `json:"params_schema,omitempty"`
-	ResultSchema map[string]any     `json:"result_schema,omitempty"`
-	StickyParam  string             `json:"sticky_param,omitempty"`
-	StickyParams []string           `json:"sticky_params,omitempty"`
-	StickyFields []string           `json:"sticky_fields,omitempty"`
-	Return       *ModCDPAliasReturn `json:"return,omitempty"`
+	Name          string             `json:"name"`
+	Command       string             `json:"command,omitempty"`
+	SDKMethodName string             `json:"sdk_method_name,omitempty"`
+	ParamsSchema  map[string]any     `json:"params_schema,omitempty"`
+	ResultSchema  map[string]any     `json:"result_schema,omitempty"`
+	StickyParam   string             `json:"sticky_param,omitempty"`
+	StickyParams  []string           `json:"sticky_params,omitempty"`
+	StickyFields  []string           `json:"sticky_fields,omitempty"`
+	Return        *ModCDPAliasReturn `json:"return,omitempty"`
 }
 
 type ModCDPAliasObject struct {

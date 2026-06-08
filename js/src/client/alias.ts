@@ -203,10 +203,18 @@ async function invokeCommandAliasMethod(
     );
     if (method.return?.array === true) {
       return aliasArrayFromResult(raw, method.return.unwrap ?? "").map((item) =>
-        createRuntimeAliasObject(client, return_object, aliasStickyFromResult(item, "", aliasObjectRegistration(client, return_object).sticky_fields ?? [])),
+        createRuntimeAliasObject(
+          client,
+          return_object,
+          aliasStickyFromResult(item, "", aliasObjectRegistration(client, return_object).sticky_fields ?? []),
+        ),
       );
     }
-    const unwrapped = aliasStickyFromResult(raw, method.return?.unwrap ?? "", aliasObjectRegistration(client, return_object).sticky_fields ?? []);
+    const unwrapped = aliasStickyFromResult(
+      raw,
+      method.return?.unwrap ?? "",
+      aliasObjectRegistration(client, return_object).sticky_fields ?? [],
+    );
     if (method.return?.nullable === true && Object.keys(unwrapped).length === 0) return null;
     return createRuntimeAliasObject(client, return_object, unwrapped);
   }

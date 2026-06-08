@@ -20,7 +20,8 @@ function collectSchemaDefinitions(schema, defs) {
   for (const property of Object.values(schema.properties ?? {})) collectSchemaDefinitions(property, defs);
   for (const item of [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])]) collectSchemaDefinitions(item, defs);
   if (schema.items) collectSchemaDefinitions(schema.items, defs);
-  if (schema.additionalProperties && typeof schema.additionalProperties === "object") collectSchemaDefinitions(schema.additionalProperties, defs);
+  if (schema.additionalProperties && typeof schema.additionalProperties === "object")
+    collectSchemaDefinitions(schema.additionalProperties, defs);
 }
 
 function receiverStickyParamFields(object, method) {
@@ -103,7 +104,8 @@ function sdkMethodName(object, method) {
 function statelessAliasObjects(objects) {
   const stateless = new Set();
   for (const object of objects) {
-    if ((object.sticky_fields ?? []).length === 0 && schemaProperties(object.sticky_schema).size === 0) stateless.add(object.name);
+    if ((object.sticky_fields ?? []).length === 0 && schemaProperties(object.sticky_schema).size === 0)
+      stateless.add(object.name);
   }
   return stateless;
 }
@@ -124,12 +126,18 @@ function sanitizeCommandRegistry(value) {
   if (value == null || typeof value !== "object") return value;
   const output = {};
   for (const [key, child] of Object.entries(value)) {
-    if (key === "description" || key === "$schema" || key === "event_type" || key === "sdk_method_name" || key === "root") continue;
+    if (
+      key === "description" ||
+      key === "$schema" ||
+      key === "event_type" ||
+      key === "sdk_method_name" ||
+      key === "root"
+    )
+      continue;
     output[key] = sanitizeCommandRegistry(child);
   }
   return output;
 }
-
 
 export {
   aliasObjectCanPopulateStickyParam,

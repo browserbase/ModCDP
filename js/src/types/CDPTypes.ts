@@ -548,7 +548,9 @@ class CDPTypes<TCommands extends CDPCommandMap = {}, TEvents extends CDPEventMap
       methods: (object.methods ?? []).map((method) => ({
         name: method.name,
         ...(method.command == null || method.command === "" ? {} : { command: method.command }),
-        ...(method.sdk_method_name == null || method.sdk_method_name === "" ? {} : { sdk_method_name: method.sdk_method_name }),
+        ...(method.sdk_method_name == null || method.sdk_method_name === ""
+          ? {}
+          : { sdk_method_name: method.sdk_method_name }),
         ...(method.params_schema == null ? {} : { params_schema: serializablePayloadSchema(method.params_schema) }),
         ...(method.result_schema == null ? {} : { result_schema: serializablePayloadSchema(method.result_schema) }),
         ...(method.sticky_param == null || method.sticky_param === "" ? {} : { sticky_param: method.sticky_param }),
