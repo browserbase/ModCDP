@@ -1,5 +1,7 @@
 # ModCDP
 
+<img width="1491" height="1055" alt="image" src="https://github.com/user-attachments/assets/043490b6-8c2e-4330-83f3-69a9faa43b4b" />
+
 CDP is powerful but it's been stretched to many use-cases beyond its initial audience. It is difficult for agents and humans to use without a harness library, because:
 
 - lacks the ability to use it statelessly without maintaining mappings of sessionIds, targetIds, frameIds, execution context IDs, backendNodeId ownership, and event listeners
